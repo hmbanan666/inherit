@@ -234,6 +234,7 @@ h1 {
   max-width: 920px;
 }
 .order-ticket {
+  flex-shrink: 0;
   position: relative;
   overflow: hidden;
   align-items: center;
@@ -834,6 +835,9 @@ button.run {
   border-color: #58513a;
 }
 .shipped {
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin-inline: auto;
   position: absolute;
   left: 12px;
   right: 12px;
@@ -855,7 +859,7 @@ button.run {
   display: block;
 }
 .shipped small {
-  font-size: 10px;
+  font-size: 11px;
   margin-top: 3px;
 }
 .shipped button {

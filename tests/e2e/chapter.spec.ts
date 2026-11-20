@@ -67,6 +67,7 @@ test('write, build and ship the shed chapter', async ({ page }) => {
   await page.getByRole('button', { name: 'Coal mine', exact: true }).click()
   await page.getByRole('button', { name: 'Place at 2, 4' }).click()
   await wire(page, 'coal-mine', 'press')
+  await expect(page.locator('.floor-guide')).toContainText('coal-mine → press')
   await setController(page, [
     'ctx.dig("mine")',
     'ctx.work("furnace-a")',

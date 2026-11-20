@@ -30,6 +30,7 @@ let previous: World | undefined,
   animationTime = 0,
   shippedAt = 0
 let painted = ''
+let pressedOutput = false
 const layoutKey = computed(() =>
   JSON.stringify([
     props.world.machines.map((m) => [m.id, m.kind, m.x, m.y]),
@@ -86,12 +87,14 @@ function dropAt(x: number, y: number) {
   emit('place', Math.round(p.x / 80), Math.round(p.y / camera.value.row))
 }
 function floorClick(e: MouseEvent) {
+  if (pressedOutput) return
   if (props.placing) return dropAt(e.clientX, e.clientY)
   const belt = scene?.beltAt(local(e.clientX, e.clientY))
   emit('select', belt ? belt.from + ' → ' + belt.to : '')
 }
 function startWire(id: string, e: PointerEvent) {
   e.preventDefault()
+  pressedOutput = true
   drag.value = id
   moveWire(e)
 }
@@ -220,6 +223,7 @@ const inventory = computed(() => {
     class="floor"
     :class="{ placing, frozen: !running }"
     :style="{ '--label-scale': Math.max(1, 0.83 / camera.scale) }"
+    @pointerdown="pressedOutput = false"
     @click="floorClick"
     @dragover.prevent
     @drop.prevent="dropAt($event.clientX, $event.clientY)"

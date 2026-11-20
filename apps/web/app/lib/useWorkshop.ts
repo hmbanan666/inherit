@@ -173,6 +173,7 @@ export function useWorkshop() {
       notice.value = 'That connection cannot carry material.'
       return
     }
+    selected.value = from + ' → ' + to
     rebuild({ ...layout.value, links: [...layout.value.links, { from, to }] })
   }
   const removable = computed(() => {
