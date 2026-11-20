@@ -1,174 +1,272 @@
-import { Container, Graphics } from 'pixi.js'
-import { BELT_LENGTH, type Belt, type Machine, type Station, type World } from '@inherit/sim'
+import { Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
+import { BELT_LENGTH, type Belt, type Item, type Station, type World } from '@inherit/sim'
 import { machineArt } from './machineArt'
 
-export const WIDTH = 760,
-  HEIGHT = 324
-export const point = (s: Station) => ({ x: 60 + s.x * 80, y: 66 + s.y * 60 })
 export interface Point {
   x: number
   y: number
 }
-export function path(belt: Belt, machines: Station[]): Point[] {
-  const a = point(machines.find((m) => m.id === belt.from)!)
-  const b = point(machines.find((m) => m.id === belt.to)!)
-  const start = { x: a.x + 37, y: a.y }
-  const end = { x: b.x - 37, y: b.y }
-  const mid = (start.x + end.x) / 2
-  return [start, { x: mid, y: start.y }, { x: mid, y: end.y }, end]
-}
-function along(points: Point[], fraction: number) {
-  const segments = points.slice(1).map((p, i) => Math.hypot(p.x - points[i]!.x, p.y - points[i]!.y))
-  let distance = Math.max(0, Math.min(1, fraction)) * segments.reduce((a, b) => a + b, 0)
-  for (const [i, length] of segments.entries()) {
-    if (length && distance <= length) {
-      const t = distance / length,
-        a = points[i]!,
-        b = points[i + 1]!
-      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
-    }
-    distance -= length
+export const point = (s: Pick<Station, 'x' | 'y'>, row: number) => ({ x: s.x * 80, y: s.y * row })
+
+// The canvas and DOM hit targets share this camera, including available placement tiles.
+export function fit(stations: Station[], tiles: [number, number][], width: number, height: number) {
+  const xs = [...stations.map((m) => m.x), ...tiles.map((t) => t[0])]
+  const ys = [...stations.map((m) => m.y), ...tiles.map((t) => t[1])]
+  const cols = Math.max(...xs) - Math.min(...xs),
+    rows = Math.max(...ys) - Math.min(...ys)
+  const innerW = Math.max(1, width - 36),
+    innerH = Math.max(1, height - 36)
+  const span = cols * 80 + 116
+  const row = Math.max(56, Math.min(146, ((innerH * span) / innerW - 132) / (rows || 1)))
+  const depth = rows * row + 132
+  const scale = Math.min(innerW / span, innerH / depth)
+  return {
+    row,
+    scale,
+    x: (width - span * scale) / 2 + (58 - Math.min(...xs) * 80) * scale,
+    y: (height - depth * scale) / 2 + (59 - Math.min(...ys) * row) * scale,
   }
-  return points[points.length - 1]!
 }
-function line(g: Graphics, points: Point[], color: number, width: number) {
-  g.moveTo(points[0]!.x, points[0]!.y)
-  for (const p of points.slice(1)) g.lineTo(p.x, p.y)
-  g.stroke({ color, width, cap: 'round', join: 'round' })
-}
-export function nearBelt(world: World, p: Point) {
-  return world.belts.find((b) => {
-    const pts = path(b, world.machines)
-    return pts.slice(1).some((end, i) => {
-      const start = pts[i]!,
+
+function route(b: Belt, stations: Station[], row: number) {
+  const a = point(stations.find((s) => s.id === b.from)!, row)
+  const z = point(stations.find((s) => s.id === b.to)!, row)
+  a.x += 37
+  z.x -= 37
+  const mid = (a.x + z.x) / 2
+  const points = [a, { x: mid, y: a.y }, { x: mid, y: z.y }, z]
+  const segments = points
+    .slice(1)
+    .map((end, i) => {
+      const start = points[i]!,
         dx = end.x - start.x,
         dy = end.y - start.y
-      const t = Math.min(
-        1,
-        Math.max(0, ((p.x - start.x) * dx + (p.y - start.y) * dy) / (dx * dx + dy * dy || 1)),
-      )
-      return Math.hypot(p.x - start.x - t * dx, p.y - start.y - t * dy) < 10
+      return { start, dx: Math.sign(dx), dy: Math.sign(dy), length: Math.abs(dx) + Math.abs(dy) }
     })
+    .filter((s) => s.length > 0)
+  return { points, segments, length: segments.reduce((n, s) => n + s.length, 0) }
+}
+type Route = ReturnType<typeof route>
+function position(display: Container, path: Route, fraction: number) {
+  let d = path.length * Math.min(1, Math.max(0, fraction))
+  for (const s of path.segments) {
+    if (d <= s.length) {
+      display.position.set(s.start.x + d * s.dx, s.start.y + d * s.dy)
+      return
+    }
+    d -= s.length
+  }
+}
+function texture(width: number, height: number, paint: (ctx: CanvasRenderingContext2D) => void) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  paint(canvas.getContext('2d')!)
+  return Texture.from(canvas)
+}
+function parcel(kind: Item) {
+  const g = new Graphics()
+  g.ellipse(1, 3, 7, 4).fill({ color: 0x0c1417, alpha: 0.6 })
+  if (kind === 'part') {
+    const teeth: number[] = []
+    for (let i = 0; i < 24; i++) {
+      const r = i % 3 ? 6 : 4.3
+      teeth.push(r * Math.cos((i * Math.PI) / 12), r * Math.sin((i * Math.PI) / 12))
+    }
+    g.poly(teeth).fill(0x85d2bb).stroke({ color: 0x253e39, width: 1 })
+    g.circle(0, 0, 2).fill(0x34514a)
+  } else if (kind === 'ingot') {
+    g.poly([-7, -2, -3, -5, 7, -5, 8, 1, 4, 4, -7, 4]).fill(0xd79350).stroke({ color: 0x483322, width: 1.2 })
+    g.poly([-7, -2, -3, -5, 7, -5, 4, -2]).fill(0xffcf8c)
+  } else {
+    g.poly([-7, 0, -3, -5, 3, -6, 7, -1, 4, 4, -2, 6])
+      .fill(kind === 'ore' ? 0x99b3bf : 0x525f69)
+      .stroke({ color: 0x1b292e, width: 1.3 })
+    g.poly([-6, 0, -3, -4, 3, -5, 1, 0]).fill(kind === 'ore' ? 0xd2e2df : 0x8c9ca2)
+  }
+  return g
+}
+function makeMachine(parent: Container, station: Station, row: number, glow: Texture) {
+  const { x, y } = point(station, row)
+  const base = parent.addChild(new Container())
+  base.position.set(x, y)
+  const pad = base.addChild(new Graphics())
+  pad.roundRect(-46, -30, 92, 63, 5).fill(0x171e20)
+  pad.roundRect(-46, -33, 92, 63, 5).fill(0x394344).stroke({ color: 0x657170, width: 1 })
+  pad.roundRect(-42, -29, 84, 51, 3).fill(0x293233).stroke({ color: 0x454f50, width: 1 })
+  for (let i = 0; i < 5; i++)
+    pad.poly([-39 + i * 6, 26, -36 + i * 6, 26, -33 + i * 6, 22, -36 + i * 6, 22]).fill(0xb19758)
+  for (const xx of [-41, 41]) for (const yy of [-28, 25]) pad.circle(xx, yy, 1.25).fill(0x96a09a)
+  const heat = base.addChild(new Sprite(glow))
+  heat.anchor.set(0.5)
+  heat.position.set(2, -12)
+  heat.visible = false
+  const art = base.addChild(machineArt(station.kind))
+  const fire = base.addChild(new Graphics())
+  fire.ellipse(3, -22, 14, 4.4).fill(0xffb544)
+  fire.ellipse(3, -22, 8, 2.6).fill(0xffe1a0)
+  for (const xx of [-1, 3, 7]) fire.roundRect(xx - 0.8, -3, 1.8, 8, 0.6).fill(0xffa73e)
+  fire.visible = false
+  const sparks = Array.from({ length: station.kind === 'furnace' ? 5 : 0 }, () =>
+    base.addChild(new Graphics()).circle(0, 0, 1.2).fill(0xffc16a),
+  )
+  const dust = Array.from({ length: station.kind === 'mine' || station.kind === 'coal' ? 3 : 0 }, () =>
+    base.addChild(new Graphics()).circle(0, 0, 1.6).fill(0xcabf9f),
+  )
+  return { art, heat, fire, sparks, dust }
+}
+
+// Retain artwork across frames. Only world snapshots change cargo bindings.
+export class FloorScene {
+  readonly root = new Container()
+  private tread = texture(12, 10, (ctx) => {
+    ctx.fillStyle = '#354244'
+    ctx.fillRect(0, 0, 12, 10)
+    ctx.strokeStyle = '#657476'
+    ctx.lineWidth = 1.65
+    ctx.beginPath()
+    ctx.moveTo(2, 0)
+    ctx.lineTo(5, 5)
+    ctx.lineTo(2, 10)
+    ctx.stroke()
   })
-}
-const material = { ore: 0xa6b8c0, ingot: 0xe0a467, coal: 0x69757f, part: 0x87bbad }
-export function drawPlant(scene: Container, world: World, selected: string) {
-  scene.removeChildren().forEach((child) => child.destroy({ children: true }))
-  const g = scene.addChild(new Graphics())
-  for (const b of world.belts) {
-    const pts = path(b, world.machines)
-    const active = selected === b.from + ' → ' + b.to
-    line(g, pts, active ? 0xe3bc60 : 0x535d5c, 18)
-    line(g, pts, 0x15191a, 14)
-    line(g, pts, 0x353d3e, 10)
-    const length = pts.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - pts[i]!.x, p.y - pts[i]!.y), 0)
-    for (let d = 6; d < length - 3; d += 9) {
-      const p = along(pts, d / length),
-        q = along(pts, (d + 1) / length)
-      const nx = (q.y - p.y) * 4,
-        ny = (p.x - q.x) * 4
-      line(
-        g,
-        [
-          { x: p.x - nx, y: p.y - ny },
-          { x: p.x + nx, y: p.y + ny },
-        ],
-        0x566060,
-        1.6,
-      )
-    }
-  }
-  for (const m of world.machines) {
-    const p = point(m)
-    g.roundRect(p.x - 45, p.y - 28, 90, 58, 6)
-      .fill({ color: 0x343b3a, alpha: 0.55 })
-      .stroke({ color: selected === m.id ? 0xe3ba53 : 0x4a5351, width: 1 })
-    for (let i = 0; i < 4; i++)
-      g.poly([
-        p.x - 37 + i * 6,
-        p.y + 26,
-        p.x - 34 + i * 6,
-        p.y + 26,
-        p.x - 31 + i * 6,
-        p.y + 22,
-        p.x - 34 + i * 6,
-        p.y + 22,
-      ]).fill(0x9b834b)
-    const art = scene.addChild(machineArt(m.kind))
-    art.position.set(p.x, p.y)
-    art.scale.set(1.08)
-  }
-}
-export function animateFloor(
-  g: Graphics,
-  world: World,
-  previous: World | undefined,
-  mix: number,
-  time: number,
-  drag?: { from: Machine; to: Point },
-) {
-  g.clear()
-  for (const [i, b] of world.belts.entries()) {
-    const pts = path(b, world.machines)
-    for (const item of b.items) {
-      const old = previous?.belts[i]?.items.find((it) => it.id === item.id)
-      const progress = old ? old.position + (item.position - old.position) * mix : item.position
-      const { x, y } = along(pts, (progress + 0.4) / BELT_LENGTH)
-      const c = material[item.kind]
-      if (item.kind === 'part') {
-        const teeth = Array.from({ length: 24 }, (_, i) => {
-          const radius = i % 3 === 0 ? 3.8 : 5.5,
-            angle = (i * Math.PI) / 12
-          return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius]
-        }).flat()
-        g.poly(teeth).fill(c).stroke({ color: 0x345048, width: 1 })
-        g.circle(x, y, 1.8).fill(0x394446)
-      } else if (item.kind === 'ingot') {
-        g.roundRect(x - 6, y - 3.5, 12, 7, 2)
-          .fill(c)
-          .stroke({ color: 0x342e26, width: 1.2 })
-        g.rect(x - 4, y - 2, 7, 1).fill(0xefc69d)
-      } else {
-        g.poly([x - 6, y, x - 2, y - 5, x + 4, y - 4, x + 6, y + 1, x + 1, y + 5, x - 4, y + 4])
-          .fill(c)
-          .stroke({ color: 0x303a3e, width: 1.5 })
-        g.poly([x - 4, y, x - 1, y - 3, x + 3, y - 2, x, y + 1]).fill(
-          item.kind === 'ore' ? 0xc1cdcd : 0x879399,
+  private glow = texture(130, 130, (ctx) => {
+    const gradient = ctx.createRadialGradient(65, 65, 0, 65, 65, 65)
+    gradient.addColorStop(0, 'rgba(255,187,75,.8)')
+    gradient.addColorStop(0.4, 'rgba(248,125,41,.35)')
+    gradient.addColorStop(1, 'rgba(236,105,27,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 130, 130)
+  })
+  private tracks: { path: Route; treads: TilingSprite[]; moving: boolean; phase: number }[]
+  private machines: ReturnType<typeof makeMachine>[]
+  private bins = new Map<Item, Graphics[]>()
+  private moves: { art: Graphics; path: Route; from: number; to: number; leaving: boolean }[] = []
+  private cargo = new Container()
+  private world: World
+  constructor(world: World, row: number) {
+    this.world = world
+    this.tracks = world.belts.map((b) => {
+      const path = route(b, world.machines, row)
+      const rail = this.root.addChild(new Graphics())
+      for (const [width, color] of [
+        [20, 0x171e20],
+        [17, 0x657172],
+        [14, 0x273030],
+      ] as const) {
+        for (const [i, p] of path.points.entries()) {
+          if (!i) rail.moveTo(p.x, p.y)
+          else rail.lineTo(p.x, p.y)
+        }
+        rail.stroke({ width, color, join: 'round', cap: 'round' })
+      }
+      const treads = path.segments.map((s) => {
+        const tile = this.root.addChild(
+          new TilingSprite({ texture: this.tread, width: s.length, height: 10 }),
         )
+        tile.anchor.set(0, 0.5)
+        tile.position.set(s.start.x, s.start.y)
+        tile.rotation = Math.atan2(s.dy, s.dx)
+        return tile
+      })
+      return { path, treads, moving: false, phase: 0 }
+    })
+    this.root.addChild(this.cargo)
+    this.machines = world.machines.map((s) => makeMachine(this.root, s, row, this.glow))
+  }
+  beltAt(p: Point) {
+    const i = this.tracks.findIndex(({ path }) =>
+      path.segments.some((s) => {
+        const dx = p.x - s.start.x,
+          dy = p.y - s.start.y
+        const distance = Math.max(0, Math.min(s.length, dx * s.dx + dy * s.dy))
+        return Math.hypot(dx - distance * s.dx, dy - distance * s.dy) < 11
+      }),
+    )
+    return this.world.belts[i]
+  }
+  update(world: World, previous?: World, selected = '') {
+    this.world = world
+    for (const m of this.moves) m.art.visible = false
+    this.moves.length = 0
+    const counts = new Map<Item, number>()
+    for (const [i, b] of world.belts.entries()) {
+      const track = this.tracks[i]!
+      const old = previous?.belts[i]?.items
+      const bind = (kind: Item, from: number, to: number, leaving: boolean) => {
+        const n = counts.get(kind) ?? 0
+        const pool = this.bins.get(kind) ?? []
+        const art = pool[n] ?? (pool[n] = this.cargo.addChild(parcel(kind)))
+        this.bins.set(kind, pool)
+        counts.set(kind, n + 1)
+        art.visible = true
+        this.moves.push({ art, path: track.path, from, to, leaving })
+      }
+      track.moving = false
+      for (const item of b.items) {
+        const before = old?.find((o) => o.id === item.id)
+        const from = before ? before.position + 0.5 : old ? 0 : item.position + 0.5
+        const to = item.position + 0.5
+        if (from !== to) track.moving = true
+        bind(item.kind, from, to, false)
+      }
+      for (const item of old ?? [])
+        if (!b.items.some((o) => o.id === item.id)) {
+          bind(item.kind, item.position + 0.5, BELT_LENGTH, true)
+          track.moving = true
+        }
+      const jam = b.items.length === BELT_LENGTH && !track.moving
+      for (const tile of track.treads)
+        tile.tint = selected === b.from + ' → ' + b.to ? 0xffda85 : jam ? 0xf6937b : 0xffffff
+    }
+  }
+  frame(mix: number, time: number, delta: number, departure: number) {
+    for (const track of this.tracks) {
+      if (track.moving && delta) {
+        track.phase = (track.phase + delta * 0.036) % 12
+        for (const tile of track.treads) tile.tilePosition.x = track.phase
+      }
+    }
+    for (const m of this.moves) {
+      position(m.art, m.path, (m.from + (m.to - m.from) * mix) / BELT_LENGTH)
+      m.art.visible = !m.leaving || mix < 1
+    }
+    for (let i = 0; i < this.machines.length; i++) {
+      const m = this.world.machines[i]!,
+        visual = this.machines[i]!
+      if (m.kind === 'dispatch') {
+        visual.art.x = departure * departure * 210
+        visual.art.alpha = 1 - departure
+      }
+      for (let j = 0; j < visual.dust.length; j++) {
+        const mote = visual.dust[j]!
+        mote.visible = m.status === 'working'
+        if (!mote.visible) continue
+        const t = (time / 680 + j / 3) % 1
+        mote.position.set(-26 - t * 9, -4 - t * 13)
+        mote.alpha = (1 - t) * 0.75
+      }
+      if (m.kind !== 'furnace') continue
+      const hot = m.status === 'working'
+      visual.art.tint = hot ? 0xffffff : 0x93a3ac
+      visual.fire.visible = visual.heat.visible = hot
+      const flicker = 0.9 + 0.1 * Math.sin(time / 113 + i)
+      visual.heat.alpha = flicker
+      visual.fire.scale.y = flicker
+      for (let j = 0; j < visual.sparks.length; j++) {
+        const spark = visual.sparks[j]!
+        spark.visible = hot
+        if (!hot) continue
+        const t = (time / 910 + j / 5) % 1
+        spark.position.set(3 + Math.sin(j * 3.7 + t * 4) * 11, -24 - t * 27)
+        spark.alpha = 1 - t
+        spark.scale.set(1.3 - t)
       }
     }
   }
-  for (const m of world.machines) {
-    const { x, y } = point(m)
-    if (m.status === 'blocked') {
-      g.roundRect(x - 45, y - 28, 90, 58, 6).stroke({
-        color: 0xd59960,
-        alpha: 0.25 + 0.12 * Math.sin(time / 270),
-        width: 1.3,
-      })
-    }
-    if ((m.kind === 'mine' || m.kind === 'coal') && m.status === 'working') {
-      for (let i = 0; i < 3; i++) {
-        const t = (time / 650 + i * 0.32) % 1
-        g.circle(x - 25 - t * 7, y - 3 - t * 10, 1.6 - t).fill({ color: 0xc8bfa1, alpha: (1 - t) * 0.65 })
-      }
-    }
-    if (m.kind !== 'furnace' || m.status !== 'working') continue
-    const heat = (Math.sin(time / 124) + 1) / 2
-    for (let r = 4; r > 0; r--)
-      g.ellipse(x + 3, y - 21, 13 + r * 4, 4 + r * 3).fill({ color: 0xff8d38, alpha: 0.038 })
-    g.ellipse(x + 3, y - 21, 13, 4).fill({ color: 0xffad49, alpha: 0.7 + heat * 0.3 })
-    g.ellipse(x + 2, y - 22, 8, 2).fill(0xffda83)
-    for (let i = 0; i < 4; i++) {
-      const t = (time / 850 + i * 0.23) % 1
-      g.circle(x + 4 + Math.sin(i * 5 + t * 3) * 9, y - 23 - t * 19, 1.4 - t * 0.8).fill({
-        color: 0xf7ba6a,
-        alpha: 1 - t,
-      })
-    }
-  }
-  if (drag) {
-    const p = point(drag.from)
-    line(g, [{ x: p.x + 37, y: p.y }, { x: drag.to.x, y: p.y }, drag.to], 0xe3ba53, 2)
+  destroy() {
+    this.root.destroy({ children: true })
+    this.tread.destroy(true)
+    this.glow.destroy(true)
   }
 }
