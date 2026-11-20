@@ -1,4 +1,13 @@
 {
-  "name": "@inherit/sandbox", "private": true, "type": "module", "exports": "./src/index.ts",
-  "dependencies": {"@inherit/sim":"workspace:*","@jitl/quickjs-singlefile-browser-release-sync":"0.32.0","quickjs-emscripten":"0.32.0","typescript":"5.9.3","@jridgewell/trace-mapping":"^0.3.31"}
+  "name": "@inherit/sandbox",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@inherit/sim": "workspace:*",
+    "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",
+    "quickjs-emscripten": "0.32.0",
+    "typescript": "5.9.3",
+    "@jridgewell/trace-mapping": "^0.3.31"
+  }
 }
