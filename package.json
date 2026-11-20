@@ -1,0 +1,19 @@
+{
+  "name": "inherit-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "test": "vitest run --maxWorkers=2 --exclude '**/e2e/**'",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter web typecheck",
+    "lint": "pnpm typecheck",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.9"
+  }
+}
