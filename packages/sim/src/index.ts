@@ -94,7 +94,12 @@ function advanceBelts(world: World) {
 }
 function processMachine(world: World, m: Machine) {
   if (m.kind === 'dispatch') {
-    if (world.tick % world.level.dockInterval === 0 && m.queue[0] === world.level.product) {
+    const { deadline, dockInterval, product } = world.level
+    if (
+      (deadline === undefined || world.tick <= deadline) &&
+      world.tick % dockInterval === 0 &&
+      m.queue[0] === product
+    ) {
       m.queue.shift()
       world.shipped++
       world.deliveries.push(world.tick)
@@ -164,20 +169,49 @@ export function evaluate(world: World): Check[] {
   const ore = world.machines.find((m) => m.kind === 'mine')?.processed ?? 0
   const checks = [
     check('Dig the first ore', ore > 0, ore + '/1 ore'),
-    check('Fire the furnace', ingots > 0, ingots + '/1 ingot', ore > 0 && !furnaces.some((m) => m.status === 'ready')),
+    check(
+      'Fire the furnace',
+      ingots > 0,
+      ingots + '/1 ingot',
+      ore > 0 && !furnaces.some((m) => m.status === 'ready'),
+    ),
   ]
   if (level.minRate)
     checks.push(check('Load the rail wagons', rate >= level.minRate, rate + '/' + level.minRate + ' per min'))
   if (level.maxIdle)
-    checks.push(check('Keep both furnaces busy', idle <= level.maxIdle, idle + '% idle / ' + level.maxIdle + '% max'))
+    checks.push(
+      check('Keep both furnaces busy', idle <= level.maxIdle, idle + '% idle / ' + level.maxIdle + '% max'),
+    )
   if (level.product === 'part') {
-    const press = world.machines.find((m) => m.kind === 'assembler')!
-    const coal = press.queue.filter((i) => i === 'coal').length + press.processed + Number(press.remaining > 0)
+    const coal = world.machines
+      .filter((m) => m.kind === 'assembler')
+      .reduce((received, press) => {
+        const inBin = press.queue.filter((item) => item === 'coal').length
+        return received + inBin + press.processed + Number(press.remaining > 0)
+      }, 0)
     checks.push(check('Get coal to the press', coal > 0, coal + '/1 coal'))
   }
   if (level.lossless)
     checks.push(check('Keep material on the belts', world.lost === 0, world.lost + ' lost / 0 allowed'))
-  checks.push(check('Load the customer’s truck', world.shipped >= level.order,
-    world.shipped + '/' + level.order + ' ' + level.product + 's', true))
+  if (level.coalBudget !== undefined) {
+    const sacks = world.machines.find((m) => m.kind === 'coal')?.processed ?? 0
+    checks.push(
+      check(
+        'Stay within the coal allowance',
+        sacks <= level.coalBudget,
+        sacks + '/' + level.coalBudget + ' sacks',
+      ),
+    )
+  }
+  const closed = level.deadline !== undefined && world.tick >= level.deadline
+  const load = world.shipped + '/' + level.order + ' ' + level.product + 's'
+  checks.push(
+    check(
+      closed && world.shipped < level.order ? 'Last truck left. Run to retry' : 'Load the customer’s truck',
+      world.shipped >= level.order,
+      level.deadline === undefined ? load : load + ' · tick ' + world.tick + '/' + level.deadline,
+      !closed,
+    ),
+  )
   return checks
 }

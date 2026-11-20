@@ -21,4 +21,13 @@ ${routeToShorterQueue}
   ctx.work("press")`),
   controller(`  if (ctx.space("mine")) ctx.dig("mine")
   ctx.work("furnace-a")`),
+  controller(
+    `  if (ctx.space("mine")) ctx.dig("mine")
+${routeToShorterQueue}
+  ctx.work("furnace-a")
+  ctx.work("furnace-b")
+  if (sacks < 12 && ctx.space("coal-mine") && ctx.dig("coal-mine")) sacks++
+  ctx.work("press")`,
+    'let sacks = 0',
+  ),
 ]

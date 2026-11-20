@@ -26,7 +26,7 @@ export const levels: Level[] = [
     dockInterval: 1,
     brief:
       'Ten iron ingots are due at Hale Hardware. Click the furnace to see what’s waiting inside, then give it a job and press Run.',
-    concept: 'A handler runs when an event arrives. Your furnace answered each tick like a service answering a request.',
+    concept: 'An event handler answers each tick, like a web server handling each request.',
     layout: single,
     additions: [],
     starter: code(
@@ -49,7 +49,8 @@ export const levels: Level[] = [
     dockInterval: 1,
     brief:
       'Wire the splitter to furnace-b. It smelts in one tick to furnace-a’s four. Keep both busy and load at least 185 ingots per minute.',
-    concept: 'Load balancing sends work to the shorter queue, like a dispatcher choosing a worker for the next job.',
+    concept:
+      'Load balancing sends work to the shorter queue, like a dispatcher choosing a worker for the next job.',
     layout: {
       stations: [
         station('mine', 'mine', 1, 2),
@@ -124,7 +125,8 @@ export const levels: Level[] = [
     lossless: true,
     brief:
       'The truck takes one ingot every twelve ticks. Ore spills when the line fills. Load seven ingots without a spill.',
-    concept: 'Backpressure slows the producer when the consumer fills up, like a Node stream returning false from write().',
+    concept:
+      'Backpressure slows the producer when the consumer fills up, like a Node stream returning false from write().',
     layout: single,
     additions: [],
     starter: code('  // TODO: the truck cannot keep up.\n  ctx.dig("mine")\n' + smelt),
@@ -132,6 +134,58 @@ export const levels: Level[] = [
       'Watch the dock between pickups. Once the ore belt backs up to the mine, the next dig spills.',
       'ctx.space("mine") tells you whether the belt can take one more ore this tick. Skip the dig when it’s full.',
       'if (ctx.space("mine")) ctx.dig("mine")',
+    ],
+  },
+  {
+    title: 'First real order',
+    note: '“Put a chalk mark by the coal hatch for every sack you take. An empty bin can’t tell you how many went through yesterday.”',
+    customer: 'Canal Lock Works',
+    order: 12,
+    product: 'part',
+    dockInterval: 8,
+    deadline: 128,
+    coalBudget: 12,
+    lossless: true,
+    brief:
+      'The lock crew needs 12 gate parts by tick 128. Each furnace takes ten ticks. The truck collects one part every eight ticks. You may draw twelve sacks of coal. Every load must reach a belt.',
+    concept:
+      'State carries a value between events, like a service tracking how much of a quota it has spent.',
+    layout: {
+      stations: [
+        station('mine', 'mine', 0, 1),
+        station('splitter', 'splitter', 2, 1),
+        { ...station('furnace-a', 'furnace', 4, 0), smeltTicks: 10 },
+        { ...station('furnace-b', 'furnace', 4, 2), smeltTicks: 10 },
+        station('coal-mine', 'coal', 5, 3),
+        station('press', 'assembler', 6, 1),
+        station('dock', 'dispatch', 8, 1),
+      ],
+      links: [
+        link('mine', 'splitter'),
+        link('splitter', 'furnace-a'),
+        link('splitter', 'furnace-b'),
+        link('furnace-a', 'press'),
+        link('furnace-b', 'press'),
+        link('coal-mine', 'press'),
+        link('press', 'dock'),
+      ],
+    },
+    additions: [],
+    starter: code(`  if (ctx.space("mine")) ctx.dig("mine")
+  const a = ctx.stock("furnace-a")
+  const b = ctx.stock("furnace-b")
+  ctx.route("splitter", a <= b ? "furnace-a" : "furnace-b")
+  ctx.work("furnace-a")
+  ctx.work("furnace-b")
+
+  // TODO: remember how many coal sacks you have drawn.
+  // TODO: close the hatch after sack twelve.
+  if (ctx.space("coal-mine")) ctx.dig("coal-mine")
+  ctx.work("press")`),
+    hints: [
+      'Watch the coal tally when the press empties its bin. The crew pays for every sack you draw, including the ones still on the belt.',
+      'Put let sacks = 0 above onTick so the next tick remembers the last tally. Count a sack only when ctx.dig returns true.',
+      'Keep let sacks = 0 above onTick. Replace the coal line with if (sacks < 12 && ctx.space("coal-mine") && ctx.dig("coal-mine")) sacks++',
     ],
   },
 ]

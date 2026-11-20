@@ -32,6 +32,8 @@ export interface Level {
   hints: [string, string, string]
   minRate?: number
   maxIdle?: number
+  deadline?: number
+  coalBudget?: number
   dockInterval: number
   lossless?: boolean
 }
