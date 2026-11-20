@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/.nuxt
+**/.output
+.local
+test-results
+playwright-report
+*.log
+**/dist
