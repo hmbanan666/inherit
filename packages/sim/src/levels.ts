@@ -33,7 +33,7 @@ export const levels: Level[] = [
       '  // The extractor is already wired up.\n  ctx.dig("mine")\n\n  // TODO: fire up the furnace.\n  // Machine ID: "furnace-a"',
     ),
     hints: [
-      'Click furnace-a. “Ready” means ore has arrived and the furnace is waiting for instructions.',
+      'Click furnace-a. “Awaiting work” means ore has arrived and the furnace is waiting for instructions.',
       'Inside onTick, call ctx.work with the furnace ID. Press Run to try your change.',
       smelt.trim(),
     ],

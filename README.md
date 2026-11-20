@@ -9,9 +9,10 @@ The starter controller runs as soon as you open the game. Click a machine to ins
 | Level | Customer order | Factory problem |
 | --- | --- | --- |
 | The shed | 10 iron ingots | Ore piles up until the furnace gets a work instruction. |
-| Second furnace | 24 ingots, at least 75/min, each furnace at most 18% idle | Drag a belt from the splitter’s output to the second furnace’s input and share the load. |
+| Second furnace | 48 ingots, at least 185/min, each furnace at most 50% idle | Belt in the one-tick furnace. Compare the input bins to keep it and its four-tick partner busy. |
 | Parts department | 10 pressed parts | Place the coal mine on the floor, connect it to the press, and feed both ingredients. |
-| Loading bay | 12 ingots with zero ore lost | A slow truck fills the line. Check belt capacity before digging. |
+| Loading bay | 7 ingots with zero ore lost | A slow truck fills the line. Check belt capacity before digging. |
+| First real order | 12 gate parts by tick 128, at most 12 sacks of coal, zero spills | Feed the press from two furnaces. Remember each successful coal draw across ticks while the truck takes one part every eight ticks. |
 
 A tick represents 250 ms of simulation time. Speed changes how quickly you watch the shift. Throughput counts deliveries over the last simulated minute, using elapsed time for younger shifts. The idle readout shows the least utilized furnace. Each recipe has separate ingredient bins. A completed machine holds its product until the outgoing belt has room.
 
@@ -52,7 +53,7 @@ Open `http://localhost:8080`. The image builds the workspace with Node 24 and se
 
 ## Screenshots
 
-Running-state images of the first three orders are captured by the chapter browser test. Set `INHERIT_SHOTS` to an output directory to regenerate them. A gallery is planned for the first release.
+The chapter browser test captures all five running orders and the first and last shipment receipts. Set `INHERIT_SHOTS` to an output directory to regenerate them. A gallery is planned for the first release.
 
 ## Roadmap
 

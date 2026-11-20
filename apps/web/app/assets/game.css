@@ -837,12 +837,8 @@ button.run {
 .shipped {
   width: max-content;
   max-width: calc(100% - 24px);
-  margin-inline: auto;
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  z-index: 3;
+  flex: none;
+  margin: 5px auto;
   padding: 11px 12px;
   gap: 10px;
   background: #23382ff5;
@@ -861,6 +857,11 @@ button.run {
 .shipped small {
   font-size: 11px;
   margin-top: 3px;
+}
+.shipped p {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.35;
 }
 .shipped button {
   gap: 6px;
