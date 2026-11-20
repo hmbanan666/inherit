@@ -33,10 +33,12 @@ export function machineArt(kind: Kind) {
     poly([x + w, y, x + w + d, y - d * 0.65, x + w + d, y + h - d * 0.65, x + w, y + h], side)
   }
   // Cast feet, bevel and the four anchor bolts unify the different machines.
-  g.ellipse(2, 20, 41, 11).fill({ color: 0x101315, alpha: 0.45 })
-  box(-37, 13, 63, 12, 8, 0x657072, 0x414a4c, 0x323c40)
-  line([-34, 16, 22, 16], 0x7d8581, 1)
-  for (const x of [-31, 21]) g.circle(x, 18, 1.5).fill(0xaab1a6)
+  if (kind !== 'dispatch') {
+    g.ellipse(2, 20, 41, 11).fill({ color: 0x101315, alpha: 0.45 })
+    box(-37, 13, 63, 12, 8, 0x657072, 0x414a4c, 0x323c40)
+    line([-34, 16, 22, 16], 0x7d8581, 1)
+    for (const x of [-31, 21]) g.circle(x, 18, 1.5).fill(0xaab1a6)
+  }
   if (kind === 'mine' || kind === 'coal') {
     const rock = kind === 'coal' ? 0x50585d : 0x89999f
     poly([-38, 11, -35, -1, -27, -8, -18, -4, -14, 9, -19, 14], rock)
@@ -91,10 +93,21 @@ export function machineArt(kind: Kind) {
       }
       rect(x + w * 0.45, y + 3, 6, 4, 0xdad4b7, 0xb3ad93)
     }
-    crate(-29, -4, 28, 17)
-    crate(3, -1, 24, 15)
-    crate(-13, -21, 26, 17)
-    line([-32, 14, 27, 14], 0xc3ad7d, 3)
+    g.ellipse(2, 17, 40, 8).fill({ color: ink, alpha: 0.45 })
+    box(-35, 3, 63, 9, 8, 0x758484, 0x475253, 0x394547)
+    crate(-30, -9, 22, 12)
+    crate(-8, -8, 16, 11)
+    crate(-23, -19, 19, 10)
+    poly([11, 4, 11, -17, 23, -17, 33, -4, 34, 8, 11, 8], 0x6fa59b)
+    poly([11, -17, 18, -22, 29, -22, 23, -17], 0xb1ccc1)
+    poly([23, -17, 29, -22, 39, -9, 33, -4], 0x789a9d)
+    poly([33, -4, 39, -9, 39, 5, 34, 8], 0x476e68)
+    poly([15, -14, 22, -14, 28, -5, 15, -5], 0x344c52)
+    line([17, -13, 21, -13, 24, -9], 0xb2cfcc, 1.4)
+    rect(14, -1, 4, 1, ink)
+    line([34, 2, 38, 0], 0xf5ce82, 2.6)
+    wheel(-22, 11, 6, steel)
+    wheel(22, 11, 6, steel)
   } else if (kind === 'splitter') {
     box(-27, -11, 45, 12, 23, 0x919e98, 0x61706c, 0x434f4f)
     line([-16, -1, -4, -1, 6, -6, 13, -6], gold, 3)
