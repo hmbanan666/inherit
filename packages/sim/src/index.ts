@@ -56,7 +56,7 @@ function factory(world: World): Factory {
       const recipe = recipes[m.kind]
       if (!recipe.every((item) => m.queue.includes(item))) return false
       for (const item of recipe) m.queue.splice(m.queue.indexOf(item), 1)
-      m.remaining = m.kind === 'assembler' ? 5 : 4
+      m.remaining = m.kind === 'assembler' ? 5 : (m.smeltTicks ?? 4)
       return true
     },
     route(id, target) {
@@ -159,27 +159,25 @@ export function evaluate(world: World): Check[] {
     status: ok ? 'pass' : pending ? 'warn' : 'fail',
     value,
   })
-  const ingots = world.machines.filter((m) => m.kind === 'furnace').reduce((n, m) => n + m.processed, 0)
+  const furnaces = world.machines.filter((m) => m.kind === 'furnace')
+  const ingots = furnaces.reduce((n, m) => n + m.processed, 0)
+  const ore = world.machines.find((m) => m.kind === 'mine')?.processed ?? 0
   const checks = [
-    check(
-      'Extract iron ore',
-      world.machines.some((m) => m.kind === 'mine' && m.processed > 0),
-      'extractor',
-    ),
-    check('Smelt the first ingot', ingots > 0, ingots + ' made'),
+    check('Dig the first ore', ore > 0, ore + '/1 ore'),
+    check('Fire the furnace', ingots > 0, ingots + '/1 ingot', ore > 0 && !furnaces.some((m) => m.status === 'ready')),
   ]
   if (level.minRate)
-    checks.push(check('Sustain ' + level.minRate + '/min', rate >= level.minRate, rate + '/min'))
+    checks.push(check('Load the rail wagons', rate >= level.minRate, rate + '/' + level.minRate + ' per min'))
   if (level.maxIdle)
-    checks.push(check('Each furnace idle ≤ ' + level.maxIdle + '%', idle <= level.maxIdle, idle + '%'))
-  if (level.lossless) checks.push(check('Keep all extracted ore', world.lost === 0, world.lost + ' lost'))
-  checks.push(
-    check(
-      'Ship ' + level.order + ' ' + level.product + 's',
-      world.shipped >= level.order,
-      world.shipped + '/' + level.order,
-      true,
-    ),
-  )
+    checks.push(check('Keep both furnaces busy', idle <= level.maxIdle, idle + '% idle / ' + level.maxIdle + '% max'))
+  if (level.product === 'part') {
+    const press = world.machines.find((m) => m.kind === 'assembler')!
+    const coal = press.queue.filter((i) => i === 'coal').length + press.processed + Number(press.remaining > 0)
+    checks.push(check('Get coal to the press', coal > 0, coal + '/1 coal'))
+  }
+  if (level.lossless)
+    checks.push(check('Keep material on the belts', world.lost === 0, world.lost + ' lost / 0 allowed'))
+  checks.push(check('Load the customer’s truck', world.shipped >= level.order,
+    world.shipped + '/' + level.order + ' ' + level.product + 's', true))
   return checks
 }

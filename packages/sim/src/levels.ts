@@ -25,37 +25,37 @@ export const levels: Level[] = [
     product: 'ingot',
     dockInterval: 1,
     brief:
-      'Hale needs ten iron ingots. The extractor still runs, but the furnace is waiting for your signal.',
-    concept: 'A handler runs your instructions once per tick.',
+      'Ten iron ingots are due at Hale Hardware. Click the furnace to see what’s waiting inside, then give it a job and press Run.',
+    concept: 'A handler runs when an event arrives. Your furnace answered each tick like a service answering a request.',
     layout: single,
     additions: [],
     starter: code(
       '  // The extractor is already wired up.\n  ctx.dig("mine")\n\n  // TODO: fire up the furnace.\n  // Machine ID: "furnace-a"',
     ),
     hints: [
-      'Follow the ore from the extractor. Where does it stop?',
-      'Call ctx.work with the furnace ID inside onTick.',
+      'Click furnace-a. “Ready” means ore has arrived and the furnace is waiting for instructions.',
+      'Inside onTick, call ctx.work with the furnace ID. Press Run to try your change.',
       smelt.trim(),
     ],
   },
   {
     title: 'Second furnace',
-    note: '“Two hot furnaces beat one busy furnace and one cold one.”',
+    note: '“Watch the ore bins. The new burner can finish a whole ingot while the old one is still warming up.”',
     customer: 'West End Rail',
-    order: 24,
+    order: 48,
     product: 'ingot',
-    minRate: 75,
-    maxIdle: 18,
+    minRate: 185,
+    maxIdle: 50,
     dockInterval: 1,
     brief:
-      'One furnace can’t fill the rail order. Drag a belt from the splitter to furnace-b and give both furnaces a share.',
-    concept: 'Round-robin routing shares work between consumers.',
+      'Wire the splitter to furnace-b. It smelts in one tick to furnace-a’s four. Keep both busy and load at least 185 ingots per minute.',
+    concept: 'Load balancing sends work to the shorter queue, like a dispatcher choosing a worker for the next job.',
     layout: {
       stations: [
         station('mine', 'mine', 1, 2),
         station('splitter', 'splitter', 3, 2),
         station('furnace-a', 'furnace', 5, 0),
-        station('furnace-b', 'furnace', 5, 3),
+        { ...station('furnace-b', 'furnace', 5, 3), smeltTicks: 1 },
         station('dock', 'dispatch', 7, 2),
       ],
       links: [
@@ -73,8 +73,8 @@ export const levels: Level[] = [
     ),
     hints: [
       'Connect the right port of splitter to the left port of furnace-b.',
-      'Use odd and even ticks to choose a different destination.',
-      'ctx.route("splitter", ctx.tick % 2 ? "furnace-a" : "furnace-b")',
+      'Try taking turns. If ore backs up at furnace-a, compare the two input bins with ctx.stock. Give a tie to furnace-a to keep it lit.',
+      'ctx.route("splitter", ctx.stock("furnace-a") <= ctx.stock("furnace-b") ? "furnace-a" : "furnace-b")',
     ],
   },
   {
@@ -94,7 +94,7 @@ export const levels: Level[] = [
     dockInterval: 1,
     brief:
       'Miller needs pressed parts. Place a coal mine on a marked tile, belt it to the press, and feed both ingredients.',
-    concept: 'A recipe synchronizes two input queues.',
+    concept: 'A join pairs inputs from two queues, like matching a payment with its order before dispatch.',
     layout: {
       stations: [
         station('mine', 'mine', 1, 0),
@@ -109,28 +109,28 @@ export const levels: Level[] = [
       '  ctx.dig("mine")\n' + smelt + '\n\n  // TODO: supply the press with coal.\n  ctx.work("press")',
     ),
     hints: [
-      'The press consumes one ingot and one coal per part.',
+      'Click the press. Even with ingots in its bin, it waits for one coal before it can stamp a part.',
       'Place the coal mine, then drag its output port to the press input.',
-      'Add ctx.dig("coal-mine") inside onTick.',
+      'Add ctx.dig("coal-mine") inside onTick and keep ctx.work("press") running.',
     ],
   },
   {
     title: 'Loading bay',
     note: '“When the loading bay fills up, leave the next chunk in the ground.”',
     customer: 'County Freight',
-    order: 12,
+    order: 7,
     product: 'ingot',
     dockInterval: 12,
     lossless: true,
     brief:
-      'The truck takes one ingot every twelve ticks. Ore spills when the line fills. Ship the order without losing any material.',
-    concept: 'Backpressure lets a slow consumer set the pace upstream.',
+      'The truck takes one ingot every twelve ticks. Ore spills when the line fills. Load seven ingots without a spill.',
+    concept: 'Backpressure slows the producer when the consumer fills up, like a Node stream returning false from write().',
     layout: single,
     additions: [],
     starter: code('  // TODO: the truck cannot keep up.\n  ctx.dig("mine")\n' + smelt),
     hints: [
-      'Watch the furnace buffer fill while the truck is away.',
-      'Ask whether the mine has space on its outbound belt before digging.',
+      'Watch the dock between pickups. Once the ore belt backs up to the mine, the next dig spills.',
+      'ctx.space("mine") tells you whether the belt can take one more ore this tick. Skip the dig when it’s full.',
       'if (ctx.space("mine")) ctx.dig("mine")',
     ],
   },

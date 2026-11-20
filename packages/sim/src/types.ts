@@ -4,6 +4,8 @@ export type Kind = 'mine' | 'coal' | 'furnace' | 'splitter' | 'assembler' | 'dis
 export interface Station {
   id: string
   kind: Kind
+  /** Ticks per furnace batch when fitted with a different burner. */
+  smeltTicks?: number
   x: number
   y: number
 }
