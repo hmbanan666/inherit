@@ -835,24 +835,19 @@ button.run {
   border-color: #58513a;
 }
 .shipped {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   width: max-content;
   max-width: calc(100% - 24px);
-  margin-inline: auto;
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  z-index: 3;
+  flex: none;
+  margin: 5px auto;
   padding: 11px 12px;
-  gap: 10px;
+  gap: 4px 10px;
   background: #23382ff5;
   border: 1px solid #557b63;
   box-shadow: 0 5px 20px #0004;
   border-radius: 5px;
   color: #b6dfc7;
-}
-.shipped div {
-  flex: 1;
 }
 .shipped strong,
 .shipped small {
@@ -861,6 +856,11 @@ button.run {
 .shipped small {
   font-size: 11px;
   margin-top: 3px;
+}
+.shipped p {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  line-height: 1.35;
 }
 .shipped button {
   gap: 6px;
@@ -1062,9 +1062,6 @@ footer button {
   .panel {
     height: 415px;
   }
-  .factory {
-    height: 420px;
-  }
   .brief {
     align-items: stretch;
     flex-direction: column;
@@ -1145,9 +1142,6 @@ footer button {
 @media (max-width: 435px) {
   .panel {
     height: 400px;
-  }
-  .factory {
-    height: 335px;
   }
   .shipped small {
     max-width: 150px;
@@ -1374,6 +1368,10 @@ button.run.fault {
 @media (max-width: 740px) {
   .factory {
     grid-row: 1;
+    height: auto;
+  }
+  .floor-wrap {
+    min-height: clamp(220px, 60vw, 300px);
   }
   .floor-guide {
     max-width: 95%;
@@ -1476,6 +1474,6 @@ button.run.active {
     transform-origin: center top;
   }
   .machine-state {
-    top: 91px;
+    top: calc(69px + 17px * var(--label-scale));
   }
 }
