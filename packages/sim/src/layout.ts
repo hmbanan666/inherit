@@ -1,7 +1,5 @@
 import type { Kind, Layout, Level, Link, Station } from './types'
 
-export const COLUMNS = 9
-export const ROWS = 4
 const targets: Record<Kind, Kind[]> = {
   mine: ['furnace', 'splitter'],
   coal: ['assembler'],
@@ -22,12 +20,6 @@ export function canConnect(layout: Layout, from: string, to: string) {
 }
 export function canPlace(level: Level, stations: Station[], x: number, y: number) {
   return (
-    Number.isInteger(x) &&
-    Number.isInteger(y) &&
-    x >= 0 &&
-    x < COLUMNS &&
-    y >= 0 &&
-    y < ROWS &&
     !!level.buildTiles?.some(([col, row]) => x === col && y === row) &&
     !stations.some((m) => m.x === x && m.y === y)
   )

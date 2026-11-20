@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Application, Container, Graphics } from 'pixi.js'
-import { BELT_LENGTH, COLUMNS, ROWS, TICK_MS, idlePercent, type World } from '@inherit/sim'
+import { BELT_LENGTH, TICK_MS, idlePercent, type World } from '@inherit/sim'
 import { animateFloor, drawPlant, HEIGHT, nearBelt, point, WIDTH, type Point } from '../lib/floor'
 
 const props = defineProps<{
@@ -170,21 +170,18 @@ const station = computed(() => props.world.machines.find((m) => m.id === props.s
       @click="floorClick"
     >
       <div ref="mount" class="pixi-mount" />
-      <template v-if="placing"
-        ><template v-for="row in ROWS" :key="row"
-          ><button
-            v-for="col in COLUMNS"
-            :key="col"
-            class="place-cell"
-            :disabled="world.machines.some((m) => m.x === col - 1 && m.y === row - 1)"
-            :aria-label="'Place at ' + col + ', ' + row"
-            :style="{ left: 60 + (col - 1) * 80 + 'px', top: 66 + (row - 1) * 60 + 'px' }"
-            @click.stop="emit('place', col - 1, row - 1)"
-          >
-            +
-          </button></template
-        ></template
-      >
+      <template v-if="placing">
+        <button
+          v-for="[x, y] in world.level.buildTiles"
+          :key="x + ',' + y"
+          class="place-cell"
+          :aria-label="'Place at ' + (x + 1) + ', ' + (y + 1)"
+          :style="{ left: 60 + x * 80 + 'px', top: 66 + y * 60 + 'px' }"
+          @click.stop="emit('place', x, y)"
+        >
+          +
+        </button>
+      </template>
       <button
         v-for="m in world.machines"
         :key="m.id"
@@ -220,7 +217,7 @@ const station = computed(() => props.world.machines.find((m) => m.id === props.s
     </div>
     <span v-if="renderError" class="floor-error">{{ renderError }}</span>
     <span v-if="placing || drag" class="floor-guide">{{
-      placing ? 'Click a free grid tile to place the coal mine' : 'Release on an input port to connect'
+      placing ? 'Click a marked tile to place the coal mine' : 'Release on an input port to connect'
     }}</span>
     <span v-else-if="station || belt" class="floor-guide">{{
       station

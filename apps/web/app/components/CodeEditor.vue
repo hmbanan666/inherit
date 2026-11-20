@@ -41,7 +41,7 @@ onMounted(() => {
     module: ts.ModuleKind.ESNext,
     strict: true,
     noLib: false,
-    lib: ['es2020'],
+    lib: ['lib.es2020.d.ts'],
   })
   extra = ts.typescriptDefaults.addExtraLib(
     'declare module "inherit" {\n' + apiText + '\n}',
@@ -74,7 +74,8 @@ onMounted(() => {
   source = monaco.editor.createModel(props.code, 'typescript', monaco.Uri.parse('file:///controller.ts'))
   library = monaco.editor.createModel(apiText, 'typescript', monaco.Uri.parse('file:///api.ts'))
   editor = monaco.editor.create(host.value!, {
-    model: source,
+    model: props.tab === 'controller' ? source : library,
+    readOnly: props.tab === 'api',
     theme: 'foundry',
     automaticLayout: true,
     minimap: { enabled: false },

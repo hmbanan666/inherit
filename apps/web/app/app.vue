@@ -65,7 +65,6 @@ const log = ref(false),
   confirmReset = ref(false),
   hintOpen = ref(false)
 const pad = (n: number) => String(n).padStart(2, '0')
-const title = (i: number) => levels[i]!.title
 const material = computed(() => (level.value.product === 'ingot' ? 'iron ingots' : 'pressed parts'))
 const stockItems = computed(() =>
   level.value.product === 'part' ? ['ore', 'ingot', 'coal', 'part'] : ['ore', 'ingot'],
@@ -75,15 +74,6 @@ const canAdd = computed(() =>
 )
 const phase = computed(() =>
   loading.value ? 'Starting' : error.value ? 'Stopped' : running.value ? 'Running' : 'Paused',
-)
-const note = computed(() =>
-  index.value === 0
-    ? '“The mine still knows its job. That old furnace needs telling, every single tick.”'
-    : index.value === 1
-      ? '“Two hot furnaces beat one busy furnace and one cold one.”'
-      : index.value === 2
-        ? '“The press wants one of each. You can’t stamp a part out of iron alone.”'
-        : '“When the loading bay fills up, leave the next chunk in the ground.”',
 )
 function enter(i: number) {
   log.value = false
@@ -113,14 +103,17 @@ function keys(e: KeyboardEvent) {
   if (!(e.ctrlKey || e.metaKey)) return
   if (e.key === 'Enter') {
     e.preventDefault()
+    e.stopPropagation()
     run()
   }
   if (e.key === '.') {
     e.preventDefault()
+    e.stopPropagation()
     pause()
   }
   if (e.key === 'ArrowRight') {
     e.preventDefault()
+    e.stopPropagation()
     oneStep()
   }
 }
@@ -256,7 +249,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
             <FileCode2 :size="13" />api.d.ts
           </button>
         </div>
-        <CodeEditor
+        <LazyCodeEditor
           :code="code"
           :ids="layout.stations.map((s) => s.id)"
           :selected="selected"
@@ -306,7 +299,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
           </dl>
         </div>
         <div class="floor-wrap">
-          <FactoryFloor
+          <LazyFactoryFloor
             :world="world"
             :selected="selected"
             :placing="placing"
@@ -359,7 +352,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
       <div class="note-icon"><BookOpen :size="21" /></div>
       <div class="note-copy">
         <div class="tiny">{{ hintOpen ? 'WORKSHOP HINT ' + hints + ' / 3' : 'UNCLE’S NOTEBOOK' }}</div>
-        <p>{{ hintOpen ? level.hints[hints - 1] : note }}</p>
+        <p>{{ hintOpen ? level.hints[hints - 1] : level.note }}</p>
       </div>
       <button v-if="hintOpen" class="dismiss" aria-label="Close hint" @click="hintOpen = false">
         <X :size="14" />
@@ -381,7 +374,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
     <div v-if="confirmReset" class="veil">
       <section role="dialog" aria-modal="true" aria-label="Reset level" class="dialog">
         <RotateCcw :size="22" />
-        <h2>Reset {{ title(index) }}?</h2>
+        <h2>Reset {{ level.title }}?</h2>
         <p>This restores the starter controller and floor plan for this level.</p>
         <div>
           <button @click="confirmReset = false">Cancel</button
