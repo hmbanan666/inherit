@@ -7,19 +7,58 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import apiText from '@inherit/sim/api?raw'
 
-const props = defineProps<{ code: string; selected: string; ids: string[]; tab: 'controller' | 'api' }>()
-const emit = defineEmits<{ edit: [string]; select: [string] }>()
+const props = defineProps<{
+  code: string
+  selected: string
+  error: string
+  ids: string[]
+  tab: 'controller' | 'api'
+}>()
+const emit = defineEmits<{ edit: [string]; focusIds: [string[]]; ready: [] }>()
 const host = ref<HTMLElement>()
 let editor: monaco.editor.IStandaloneCodeEditor
 let source: monaco.editor.ITextModel, library: monaco.editor.ITextModel
 let highlights: monaco.editor.IEditorDecorationsCollection
 let extra: monaco.IDisposable
+const idPatterns = computed(
+  () =>
+    new Map(
+      props.ids.map((id) => [
+        id,
+        new RegExp('(?<![\\w-])' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])'),
+      ]),
+    ),
+)
+function mentions(line: string, id: string) {
+  return idPatterns.value.get(id)?.test(line)
+}
+function diagnostics() {
+  if (!source) return
+  const line = Number(/^controller\.ts:(\d+)/.exec(props.error)?.[1])
+  monaco.editor.setModelMarkers(
+    source,
+    'factory-runtime',
+    line && line <= source.getLineCount()
+      ? [
+          {
+            severity: monaco.MarkerSeverity.Error,
+            source: 'Factory runtime',
+            message: props.error,
+            startLineNumber: line,
+            startColumn: source.getLineFirstNonWhitespaceColumn(line) || 1,
+            endLineNumber: line,
+            endColumn: source.getLineMaxColumn(line),
+          },
+        ]
+      : [],
+  )
+}
 function highlight() {
   if (!highlights || props.tab !== 'controller') return
   const ids = props.selected.split(' → ').filter(Boolean)
   highlights.set(
     source.getLinesContent().flatMap((line, i) =>
-      ids.some((id) => line.includes('"' + id + '"') || line.includes("'" + id + "'"))
+      ids.some((id) => mentions(line, id))
         ? [
             {
               range: new monaco.Range(i + 1, 1, i + 1, 1),
@@ -100,12 +139,27 @@ onMounted(() => {
     highlight()
     if (source.getValue() !== props.code) emit('edit', source.getValue())
   })
-  editor.onMouseDown(({ target }) => {
-    if (props.tab !== 'controller' || !target.position) return
-    const line = source.getLineContent(target.position.lineNumber)
-    const id = props.ids.find((id) => line.includes('"' + id + '"') || line.includes("'" + id + "'"))
-    if (id) emit('select', id)
+  let hovered: number | undefined
+  function focusLine(line = editor.getPosition()?.lineNumber) {
+    emit(
+      'focusIds',
+      props.tab === 'controller' && line
+        ? props.ids.filter((id) => mentions(source.getLineContent(line), id))
+        : [],
+    )
+  }
+  editor.onMouseMove(({ target }) => {
+    if (target.position?.lineNumber === hovered) return
+    hovered = target.position?.lineNumber
+    focusLine(hovered)
   })
+  editor.onMouseLeave(() => {
+    hovered = undefined
+    focusLine()
+  })
+  editor.onDidChangeCursorPosition(({ position }) => focusLine(position.lineNumber))
+  diagnostics()
+  emit('ready')
   highlight()
 })
 watch(
@@ -114,11 +168,20 @@ watch(
     if (source && source.getValue() !== v) source.setValue(v)
   },
 )
-watch(() => props.selected, highlight)
+watch(
+  () => props.selected,
+  () => {
+    highlight()
+    const first = highlights?.getRange(0)
+    if (first && props.tab === 'controller') editor.revealLineInCenterIfOutsideViewport(first.startLineNumber)
+  },
+)
+watch(() => props.error, diagnostics)
 watch(
   () => props.tab,
   (v) => {
     if (!editor) return
+    emit('focusIds', [])
     editor.setModel(v === 'controller' ? source : library)
     editor.updateOptions({ readOnly: v === 'api' })
     highlight()

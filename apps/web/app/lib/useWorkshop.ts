@@ -4,6 +4,7 @@ import {
   createWorld,
   evaluate,
   levels,
+  metrics,
   restoreLayout,
   TICK_MS,
   type Layout,
@@ -39,7 +40,8 @@ export function useWorkshop() {
   const selected = ref('')
   const placing = ref(false)
   const notice = ref('')
-  const stamped = ref(false)
+  const shipment = shallowRef<{ ticks: number; rate: number; lines: number }>()
+  const commands = shallowRef<Record<string, string>>({})
   const saved = ref(true)
   let entries: Save['entries'] = {}
   let worker: Worker | undefined
@@ -86,7 +88,8 @@ export function useWorkshop() {
     stop()
     error.value = ''
     notice.value = ''
-    stamped.value = false
+    shipment.value = undefined
+    commands.value = {}
     activeCode = code.value
     dirty.value = false
     world.value = createWorld(level.value, layout.value)
@@ -108,8 +111,13 @@ export function useWorkshop() {
         return
       }
       world.value = data.world
-      if (!stamped.value && checks.value.every((c) => c.status === 'pass')) {
-        stamped.value = true
+      commands.value = data.commands
+      if (!shipment.value && checks.value.every((c) => c.status === 'pass')) {
+        shipment.value = {
+          ticks: data.world.tick,
+          rate: metrics(data.world).rate,
+          lines: activeCode.split('\n').filter((line) => line.trim()).length,
+        }
         if (!completed.value.includes(index.value)) completed.value.push(index.value)
         persist()
       }
@@ -230,7 +238,8 @@ export function useWorkshop() {
     selected,
     placing,
     notice,
-    stamped,
+    shipment,
+    commands,
     saved,
     removable,
     run,

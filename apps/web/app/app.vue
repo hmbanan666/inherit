@@ -44,7 +44,8 @@ const {
   selected,
   placing,
   notice,
-  stamped,
+  shipment,
+  commands,
   saved,
   removable,
   run,
@@ -58,6 +59,57 @@ const {
   hint,
   reset,
 } = useWorkshop()
+useHead({ title: () => level.value.title + ' · inherit — a factory you program' })
+const editorReady = ref(false)
+const floorMounted = ref(false)
+const focusedIds = ref<string[]>([])
+const orderNote = ref(false)
+let noteTimer: ReturnType<typeof setTimeout>
+function welcome() {
+  clearTimeout(noteTimer)
+  orderNote.value = true
+  noteTimer = setTimeout(() => {
+    orderNote.value = false
+  }, 5000)
+}
+onMounted(welcome)
+onBeforeUnmount(() => clearTimeout(noteTimer))
+function inspect(id: string) {
+  if (id) tab.value = 'controller'
+  orderNote.value = false
+  selected.value = id
+}
+function startRun() {
+  orderNote.value = false
+  run()
+}
+const modifier = ref('Ctrl')
+onMounted(() => {
+  if (/Mac|iPhone|iPad/.test(navigator.platform)) modifier.value = '⌘'
+})
+const stationIds = computed(() => layout.value.stations.map((m) => m.id))
+const showReceipt = ref(false)
+let receiptTimer: ReturnType<typeof setTimeout>
+watch(shipment, (receipt) => {
+  clearTimeout(receiptTimer)
+  showReceipt.value = !!receipt
+  if (receipt)
+    receiptTimer = setTimeout(() => {
+      showReceipt.value = false
+    }, 7000)
+})
+onBeforeUnmount(() => clearTimeout(receiptTimer))
+function nextOrder() {
+  if (index.value + 1 < levels.length) enter(index.value + 1)
+  else log.value = true
+}
+const nextLabel = computed(() => (index.value < levels.length - 1 ? 'Next order' : 'Chapter log'))
+const primaryStarts = computed(() => dirty.value || !!error.value)
+const deliveryTrace = computed(() => {
+  const { tick, deliveries } = world.value
+  const ticks = new Set(deliveries.slice(-32))
+  return Array.from({ length: 32 }, (_, i) => ticks.has(tick - 31 + i))
+})
 const stats = computed(() => metrics(world.value))
 const passed = computed(() => checks.value.filter((c) => c.status === 'pass').length)
 const tab = ref<'controller' | 'api'>('controller')
@@ -69,17 +121,19 @@ const material = computed(() => (level.value.product === 'ingot' ? 'iron ingots'
 const stockItems = computed(() =>
   level.value.product === 'part' ? ['ore', 'ingot', 'coal', 'part'] : ['ore', 'ingot'],
 )
-const canAdd = computed(() =>
-  level.value.additions.some((s) => !layout.value.stations.some((m) => m.id === s.id)),
+const addition = computed(() =>
+  level.value.additions.find((s) => !layout.value.stations.some((m) => m.id === s.id)),
 )
 const phase = computed(() =>
-  loading.value ? 'Starting' : error.value ? 'Stopped' : running.value ? 'Running' : 'Paused',
+  loading.value ? 'Starting' : error.value ? 'Error' : running.value ? 'Running' : 'Paused',
 )
 function enter(i: number) {
   log.value = false
   hintOpen.value = false
   tab.value = 'controller'
+  focusedIds.value = []
   open(i)
+  welcome()
 }
 function showHint() {
   if (!hintOpen.value && hints.value) hintOpen.value = true
@@ -99,13 +153,22 @@ function keys(e: KeyboardEvent) {
     confirmReset.value = false
     placing.value = false
     hintOpen.value = false
+    selected.value = ''
+    orderNote.value = false
   }
   if (!(e.ctrlKey || e.metaKey)) return
   if (e.key === 'Enter') {
     e.preventDefault()
     e.stopPropagation()
-    run()
+    startRun()
   }
+  if (e.key === '[' || e.key === ']') {
+    e.preventDefault()
+    e.stopPropagation()
+    const speeds = [0.5, 1, 2, 4]
+    speed.value = speeds[Math.max(0, Math.min(3, speeds.indexOf(speed.value) + (e.key === ']' ? 1 : -1)))]!
+  }
+  if (loading.value) return
   if (e.key === '.') {
     e.preventDefault()
     e.stopPropagation()
@@ -171,7 +234,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
         <h1>{{ level.title }}</h1>
         <p>{{ level.brief }}</p>
       </div>
-      <div class="order-ticket">
+      <div class="order-ticket" :class="{ fulfilled: shipment }">
         <div class="order-glyph">
           <Cog v-if="level.product === 'part'" :size="44" :stroke-width="1.3" color="#d8b477" /><svg
             v-else
@@ -199,7 +262,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
           <strong>{{ level.order }} {{ material }}</strong
           ><small>{{ level.customer }}</small>
         </div>
-        <div class="order-total">
+        <div v-if="shipment" class="ticket-stub">
+          <div class="order-stamp">SHIPPED</div>
+          <button v-if="!showReceipt" @click="nextOrder">{{ nextLabel }} <ArrowRight :size="12" /></button>
+        </div>
+        <div v-else class="order-total">
           <strong
             >{{ Math.min(world.shipped, level.order) }}<small>/{{ level.order }}</small></strong
           ><span>shipped</span>
@@ -211,7 +278,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
       <div class="section-label">
         <span class="signal"><i /><i /><i /></span>Simulation<span
           class="phase"
-          :class="{ live: running && !loading }"
+          :class="{ live: running && !loading, fault: error }"
           ><i />{{ phase }}</span
         >
       </div>
@@ -228,9 +295,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
           </button>
         </div>
         <span class="divider" />
-        <button class="run" @click="run()"><Play :size="12" fill="currentColor" />Run</button>
-        <button :disabled="!!error || loading" @click="pause">
+        <button
+          class="run"
+          :class="{ fault: error, active: running && !primaryStarts }"
+          :disabled="loading"
+          @click="primaryStarts ? startRun() : pause()"
+        >
+          <component :is="running && !primaryStarts ? Pause : Play" :size="13" />
+          {{ loading ? 'Starting…' : error ? 'Retry' : dirty ? 'Run' : running ? 'Pause' : 'Resume' }}
+        </button>
+        <button v-if="dirty && !error" :disabled="loading" @click="pause">
           <component :is="running ? Pause : Play" :size="13" />{{ running ? 'Pause' : 'Resume' }}
+        </button>
+        <button
+          v-else-if="!error"
+          :disabled="loading"
+          title="Run the controller from tick zero"
+          @click="startRun"
+        >
+          <RotateCcw :size="13" />Restart
         </button>
         <button :disabled="loading" @click="oneStep"><SkipForward :size="14" />Step</button>
       </div>
@@ -249,14 +332,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
             <FileCode2 :size="13" />api.d.ts
           </button>
         </div>
-        <LazyCodeEditor
-          :code="code"
-          :ids="layout.stations.map((s) => s.id)"
-          :selected="selected"
-          :tab="tab"
-          @edit="edit"
-          @select="selected = $event"
-        />
+        <div class="editor-slot">
+          <LazyCodeEditor
+            :code="code"
+            :ids="stationIds"
+            :error="dirty ? '' : error"
+            :selected="selected"
+            :tab="tab"
+            @edit="edit"
+            @focus-ids="focusedIds = $event"
+            @ready="editorReady = true"
+          />
+          <div v-if="!editorReady" class="editor-loading" role="status">Opening controller.ts…</div>
+        </div>
         <div class="tests">
           <div class="tests-heading">
             <span><Terminal :size="15" />Test bench</span
@@ -283,6 +371,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
             <strong>{{ stats.rate }}</strong
             ><span>/ min</span>
           </div>
+          <div class="delivery-trace" aria-label="Shipments in the last 32 ticks">
+            <div class="trace-bars" aria-hidden="true">
+              <i v-for="(delivered, i) in deliveryTrace" :key="i" :class="{ delivered }" />
+            </div>
+            <span>Shipments · last 32 ticks</span>
+          </div>
           <dl>
             <div>
               <dt>Furnace idle</dt>
@@ -299,24 +393,36 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
           </dl>
         </div>
         <div class="floor-wrap">
+          <span v-if="!floorMounted" class="floor-error" role="status">Opening the shop plan…</span>
           <LazyFactoryFloor
             :world="world"
             :selected="selected"
             :placing="placing"
             :running="running"
             :speed="speed"
+            :commands="commands"
+            :focused-ids="focusedIds"
+            :shipped="!!shipment"
+            @vue:mounted="floorMounted = true"
             @place="place"
             @connect="connect"
-            @select="selected = $event"
+            @select="inspect"
           />
-          <div v-if="stamped" class="shipped" role="status">
+          <aside v-if="orderNote && !shipment && !selected && !placing" class="arrival">
+            <span>Incoming order · {{ level.customer }}</span>
+            <strong>{{ level.order }} {{ material }}</strong>
+            <button aria-label="Dismiss incoming order" @click="orderNote = false"><X :size="13" /></button>
+          </aside>
+          <div v-if="shipment && showReceipt" class="shipped" role="status">
             <PackageCheck :size="23" />
             <div>
-              <strong>Order shipped</strong><small>{{ level.concept }}</small>
+              <strong>Order shipped</strong
+              ><small
+                >{{ shipment.ticks }} ticks · {{ shipment.rate }}/min · {{ shipment.lines }} lines of
+                code</small
+              >
             </div>
-            <button v-if="index < levels.length - 1" @click="enter(index + 1)">
-              Next level <ArrowRight :size="14" /></button
-            ><button v-else @click="log = true">Chapter log</button>
+            <button @click="nextOrder">{{ nextLabel }} <ArrowRight :size="14" /></button>
           </div>
         </div>
         <div class="floor-tools">
@@ -333,13 +439,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
               <MousePointer2 :size="15" />
             </button>
             <button
-              v-if="canAdd"
+              v-if="addition"
               draggable="true"
               :class="{ active: placing }"
               @dragstart="placing = true"
               @click="placing = !placing"
             >
-              <Hammer :size="14" /> Coal mine
+              <Hammer :size="14" />
+              {{ addition.id.replaceAll('-', ' ').replace(/^./, (c) => c.toUpperCase()) }}
             </button>
             <button v-if="removable" title="Remove selected equipment" @click="remove">
               <Trash2 :size="14" /> Remove
@@ -366,8 +473,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
     </div>
     <footer>
       <div class="shortcuts">
-        <span><kbd>Ctrl</kbd> <kbd>↵</kbd> Run</span><span><kbd>Ctrl</kbd> <kbd>.</kbd> Pause</span
-        ><span><kbd>Ctrl</kbd> <kbd>→</kbd> Step</span>
+        <span
+          ><kbd>{{ modifier }}</kbd> <kbd>↵</kbd> Run</span
+        ><span
+          ><kbd>{{ modifier }}</kbd> <kbd>.</kbd> Pause</span
+        ><span
+          ><kbd>{{ modifier }}</kbd> <kbd>→</kbd> Step</span
+        ><span
+          ><kbd>{{ modifier }}</kbd> <kbd>[</kbd><kbd>]</kbd> Speed</span
+        >
       </div>
       <button @click="confirmReset = true"><RotateCcw :size="12" /> Reset level</button>
     </footer>
