@@ -156,7 +156,7 @@ export const levels: Level[] = [
         station('splitter', 'splitter', 2, 1),
         { ...station('furnace-a', 'furnace', 4, 0), smeltTicks: 10 },
         { ...station('furnace-b', 'furnace', 4, 2), smeltTicks: 10 },
-        station('coal-mine', 'coal', 5, 3),
+        station('coal-mine', 'coal', 5, 4),
         station('press', 'assembler', 6, 1),
         station('dock', 'dispatch', 8, 1),
       ],

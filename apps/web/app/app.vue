@@ -365,7 +365,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
             ><i class="dot" :class="{ green: running }" />{{ running ? 'LIVE VIEW' : 'PLAN VIEW' }}</span
           >
         </div>
-        <div class="metrics">
+        <div v-if="shipment && showReceipt" class="shipped" role="status">
+          <PackageCheck :size="23" />
+          <div>
+            <strong>Order shipped</strong>
+            <small>{{ shipment.ticks }} ticks · {{ shipment.rate }}/min · {{ shipment.lines }} lines of code</small>
+          </div>
+          <button @click="nextOrder">{{ nextLabel }} <ArrowRight :size="14" /></button>
+          <p>What you learned · {{ level.concept }}</p>
+        </div>
+        <div v-else class="metrics">
           <div class="rate">
             <div class="tiny"><Activity :size="13" />THROUGHPUT</div>
             <strong>{{ stats.rate }}</strong
@@ -413,15 +422,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
             <strong>{{ level.order }} {{ material }}</strong>
             <button aria-label="Dismiss incoming order" @click="orderNote = false"><X :size="13" /></button>
           </aside>
-        </div>
-        <div v-if="shipment && showReceipt" class="shipped" role="status">
-          <PackageCheck :size="23" />
-          <div>
-            <strong>Order shipped</strong>
-            <small>{{ shipment.ticks }} ticks · {{ shipment.rate }}/min · {{ shipment.lines }} lines of code</small>
-            <p>What you learned · {{ level.concept }}</p>
-          </div>
-          <button @click="nextOrder">{{ nextLabel }} <ArrowRight :size="14" /></button>
         </div>
         <div class="floor-tools">
           <div class="legend">

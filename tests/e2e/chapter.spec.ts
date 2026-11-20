@@ -28,6 +28,41 @@ async function photo(page: Page, n: number) {
     await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'level-' + n + '.png') })
   }
 }
+async function expectFifthFloorToFit(page: Page) {
+  const floor = page.locator('.floor')
+  await expect(floor.locator('.station')).toHaveCount(7)
+  await expect
+    .poll(() =>
+      floor.evaluate((plan) => {
+        const frame = plan.getBoundingClientRect()
+        const boxes = [...plan.querySelectorAll('.station')].map((station) => {
+          const parts = [...station.querySelectorAll('button, .machine-label, .machine-state')].map((part) =>
+            part.getBoundingClientRect(),
+          )
+          return {
+            name: station.querySelector('.machine-label')!.textContent,
+            left: Math.min(...parts.map((p) => p.left)),
+            right: Math.max(...parts.map((p) => p.right)),
+            top: Math.min(...parts.map((p) => p.top)),
+            bottom: Math.max(...parts.map((p) => p.bottom)),
+          }
+        })
+        return boxes
+          .filter(
+            (b, i) =>
+              b.left < frame.left ||
+              b.right > frame.right ||
+              b.top < frame.top ||
+              b.bottom > frame.bottom ||
+              boxes
+                .slice(i + 1)
+                .some((c) => b.left < c.right && b.right > c.left && b.top < c.bottom && b.bottom > c.top),
+          )
+          .map((b) => b.name)
+      }),
+    )
+    .toEqual([])
+}
 test('write, build and ship the shed chapter', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -45,7 +80,10 @@ test('write, build and ship the shed chapter', async ({ page }) => {
   await expect(page.locator('.order-stamp')).toHaveText('SHIPPED')
   await expect(page.locator('.shipped small')).toHaveText(/\d+ ticks · \d+\/min · 5 lines of code/)
   if (process.env.INHERIT_SHOTS) {
-    await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'completion.png') })
+    await page.screenshot({
+      path: join(process.env.INHERIT_SHOTS, 'completion.png'),
+      animations: 'disabled',
+    })
   }
   await page.getByRole('button', { name: 'Next order' }).click()
   await expect(page.getByRole('heading', { name: 'Second furnace' })).toBeVisible()
@@ -75,11 +113,18 @@ test('write, build and ship the shed chapter', async ({ page }) => {
   await page.getByRole('button', { name: 'Close hint' }).click()
   await setController(page, solutions[4])
   await photo(page, 5)
+  await expectFifthFloorToFit(page)
   await expect(page.locator('.shipped p')).toContainText('State', { timeout: 20_000 })
   await expect(page.locator('.chapter-count')).toHaveText('5 / 5 complete')
   if (process.env.INHERIT_SHOTS) {
-    await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'level-5-completion.png') })
+    await page.screenshot({
+      path: join(process.env.INHERIT_SHOTS, 'level-5-completion.png'),
+      animations: 'disabled',
+    })
   }
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.locator('.shipped p')).toBeInViewport({ ratio: 1 })
+  await expectFifthFloorToFit(page)
   expect(errors).toEqual([])
 })
 
