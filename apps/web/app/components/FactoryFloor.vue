@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Application } from 'pixi.js'
-import { Minus, Plus, Maximize, X, MapPin } from '@lucide/vue'
+import { Minus, Plus, Maximize, X } from '@lucide/vue'
 import { MACHINES, TICK_MS } from '@inherit/sim'
 import { useGame } from '../lib/useGame'
+import TownPortrait from './town/TownPortrait.vue'
 import { center, FloorScene, tile } from '../lib/floor'
 
 const props = defineProps<{ highlighted: string[] }>()
@@ -21,13 +22,37 @@ let app: Application | undefined,
   disposed = false
 let paintKey = ''
 const pointers = new Map<number, { x: number; y: number }>()
-const scale = computed(
-  () => Math.max(0.38, Math.min(1.6, size.value.w / (tile * 9.5), size.value.h / (tile * 5.9))) * zoom.value,
-)
+const bounds = computed(() => {
+  const occupied = world.value.sites.flatMap(site => site.plots.filter(plot =>
+    world.value.machines.some(m => m.siteId === site.id && m.x >= plot.x && m.x < plot.x + plot.width &&
+      m.y >= plot.y && m.y < plot.y + plot.height),
+  ).map(plot => {
+    const corner = center(site.id, plot)
+    const x = corner.x - tile / 2, y = corner.y - tile / 2
+    return { left: x, right: x + plot.width * tile, top: y, bottom: y + plot.height * tile }
+  }))
+  const left = Math.min(...occupied.map(p => p.left)), right = Math.max(...occupied.map(p => p.right))
+  const top = Math.min(...occupied.map(p => p.top)), bottom = Math.max(...occupied.map(p => p.bottom))
+  return { x: (left + right) / 2, y: (top + bottom) / 2, w: right - left + .35 * tile, h: bottom - top + tile }
+})
+const scale = computed(() => Math.min(1.6, size.value.w / bounds.value.w, size.value.h / bounds.value.h) * zoom.value)
 const camera = computed(() => ({
-  x: size.value.w / 2 - 4 * tile * scale.value + pan.value.x,
-  y: size.value.h / 2 - 2.45 * tile * scale.value + pan.value.y,
+  x: size.value.w / 2 - bounds.value.x * scale.value + pan.value.x,
+  y: size.value.h * 0.56 - bounds.value.y * scale.value + pan.value.y,
 }))
+const story = computed(() => g.step.value?.step)
+const speaker = computed(() => g.town.value.people.find(p => p.id === story.value?.who))
+const travelRail = computed(() => {
+  const stops = world.value.machines.map(m => center(m.siteId, m))
+  if (!stops.every(stop => stop.y === stops[0]?.y)) return
+  const xs = stops.map(stop => stop.x)
+  return { left: (Math.min(...xs) - 24) + 'px', width: (Math.max(...xs) - Math.min(...xs) + 48) + 'px', top: (stops[0]!.y + tile * .94) + 'px' }
+})
+const armPoint = computed(() => {
+  const target = world.value.machines.find(m => m.id === g.playback.last.value?.args[0])
+  const point = target ? center(target.siteId, target) : bounds.value
+  return { x: point.x + (target ? 0 : -tile), y: point.y + tile * .94 }
+})
 function recenter() {
   pan.value = { x: 0, y: 0 }
   zoom.value = 1
@@ -173,7 +198,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     ref="host"
-    class="floor"
+    class="floor" data-testid="floor"
     tabindex="0"
     aria-label="Factory map"
     @wheel.prevent="wheel"
@@ -189,17 +214,23 @@ onBeforeUnmount(() => {
         v-for="m in world.machines"
         :key="m.id"
         class="station"
-        :class="{ chosen: selected === m.id }"
+        :class="{ chosen: selected === m.id || highlighted.includes(m.id), acting: g.playback.call.value?.args[0] === m.id }"
         :style="pos(center(m.siteId, m).x, center(m.siteId, m).y)"
       >
         <button class="machine-hit" :aria-label="'Inspect ' + m.id" @click="inspect(m.id)">
-          <span class="machine-label"
-            >{{ m.id }}<b v-if="m.fault"> · {{ m.fault }}</b></span
+          <span class="machine-label" :data-testid="'place-' + m.id"
+            >"{{ m.id }}"<b v-if="m.fault"> · {{ m.fault }}</b></span
           >
         </button>
       </div>
+      <div v-if="travelRail" class="travel-rail" :style="travelRail" aria-hidden="true"></div>
+      <FloorArm :x="armPoint.x" :y="armPoint.y" :call="g.playback.call.value" :hand="g.hand.value" />
     </div>
-    <div class="map-location"><MapPin :size="13" /> Shed floor</div>
+    <div v-if="story" class="floor-story" data-testid="speech">
+      <TownPortrait v-if="speaker" :person="speaker" />
+      <div><strong>{{ speaker?.name ?? story.who }}</strong><p>{{ story.story }}</p></div>
+    </div>
+    <div v-if="g.button.value === 'deploy'" class="shed-clock" :class="{ running: g.active.value }" aria-label="Factory clock">◷</div>
     <div class="map-controls">
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
       ><button aria-label="Center map" @click="recenter()"><Maximize /></button
@@ -245,3 +276,22 @@ onBeforeUnmount(() => {
     </aside>
   </div>
 </template>
+
+<style scoped>
+.travel-rail {
+  position: absolute; height: 7px; border: solid #242426; border-width: 2px 0;
+  background: repeating-linear-gradient(90deg, #756e63 0 4px, #4a4844 4px 12px);
+  box-shadow: 0 2px #303033, 0 4px 2px #262629;
+}
+.floor-story { position: absolute; top: 5%; left: 4%; right: 4%; display: flex; align-items: end; gap: 12px; pointer-events: none; }
+.floor-story canvas { width: clamp(48px, 6vw, 86px); image-rendering: pixelated; }
+.floor-story > div { max-width: 345px; padding: 12px 16px; border: 1px solid var(--line-strong); border-radius: 12px 12px 12px 1px; background: var(--panel); box-shadow: 0 4px 12px var(--shadow); }
+.floor-story strong { color: var(--accent-soft); font-size: 14px; }
+.floor-story p { margin: 4px 0 0; line-height: 1.45; font-size: 15px; }
+.shed-clock { position: absolute; right: 14px; top: 14px; color: var(--soft); font-size: 28px; }
+.shed-clock.running { color: var(--gold); animation: clock-turn 8s linear infinite; }
+@keyframes clock-turn { to { transform: rotate(360deg); } }
+.acting .machine-label { color: var(--gold); border-color: var(--gold); }
+.chosen .machine-hit, .acting .machine-hit { box-shadow: 0 0 14px var(--gold); border-radius: 20%; }
+.machine-label { font-size: 13px; }
+</style>

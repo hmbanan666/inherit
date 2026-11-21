@@ -103,10 +103,10 @@ export function commandSites(files: ProjectFiles) {
     }
     return site
   }
-  function wrap(ctx: GameFactory, drain: () => string[], machines: Set<string>): GameFactory {
-    const traced = { ...ctx }
+  function wrap(factory: GameFactory, drain: () => string[], machines: Set<string>, record?: (op: Command, args: string[], result: unknown, site?: CallSite) => void): GameFactory {
+    const traced = { ...factory }
     for (const op of commands) {
-      const method = ctx[op]
+      const method = factory[op]
       if (!method) continue
       Object.assign(traced, {
         [op]: (id: string, ...args: unknown[]) => {
@@ -115,7 +115,8 @@ export function commandSites(files: ProjectFiles) {
             tag?.op === op
               ? [tag]
               : candidates.filter((c) => c.op === op && (c.target === undefined || c.target === id))
-          const result: unknown = Reflect.apply(method, ctx, [id, ...args])
+          const result: unknown = Reflect.apply(method, factory, [id, ...args])
+          record?.(op, [id, ...args].map(String), result, matches.length === 1 ? matches[0] : undefined)
           if (matches.length !== 1) return result
           const { file, line, fn } = matches[0]!
           const targets = [op === 'buy' ? args[0] ?? id : id]

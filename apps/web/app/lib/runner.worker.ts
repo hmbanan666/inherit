@@ -1,170 +1,101 @@
-import { createProgram, runVerb, type Program } from '@inherit/sandbox'
 import {
-  advanceGame,
-  currentLesson,
-  runBench,
-  benchChecks,
-  isStarterProject,
-  deployGameProject,
-  rollbackGameProject,
-  getSurface,
-  loadSave,
-  townSnapshot,
-  payInstallment,
-  markMessageRead,
-  snapshotProject,
-  type Campaign,
-  type GameTick,
-  type ProjectFiles,
-  type GameProgram,
+  deployProject, rollbackProject, townSnapshot, payInstallment, markMessageRead, snapshotProject,
+  type Campaign, type ProjectFiles,
 } from '@inherit/sim'
-import { commandSites } from './commandSites'
+import { compileController, continueStep, idleTick, primaryButton, type CallRecord } from './lesson-flow'
 import type { Action, Frame } from './gameProtocol'
 
 let campaign: Campaign
-let program: Program | undefined
-let sites = commandSites({})
+type Controller = Awaited<ReturnType<typeof compileController>>
+let live: Controller | undefined
 let error = ''
+let calls: CallRecord[] = []
 let logs: string[] = []
-let cpu = { calls: 0, interrupts: 0, used: 0, budget: 96 }
-
-async function compile(files: ProjectFiles, allowStarter = false) {
-  const { budget } = getSurface(campaign)
-  const sites = commandSites(files)
-  if (allowStarter && isStarterProject(files)) return { program: undefined, sites }
-  const program = await createProgram({
-    files: sites.compiledFiles,
-    memory: campaign.memory,
-    budget,
-    chapterExports: getSurface(campaign).exports,
-  })
-  return { program, sites }
-}
-function install(next: Awaited<ReturnType<typeof compile>>) {
-  program?.dispose()
-  program = next.program
+let feedback: Frame['feedback']
+let traces: Frame['traces'] = {}
+async function install(files: ProjectFiles, resume: boolean) {
+  const starter = campaign.project.history[0]?.files
+  const idle = resume && JSON.stringify(files) === JSON.stringify(starter)
+  const next = idle ? undefined : await compileController(campaign, files, resume ? 'resume' : 'deploy')
+  live?.dispose()
+  live = next
+  calls = next?.initialCalls ?? []
+  logs = next?.drainLogs() ?? []
+  traces = next?.traces ?? {}
   error = ''
-  // Module-level logs belong to deployment. Only a running tick advances Bram's lesson.
-  if (program) logs.push(...program.drainLogs())
-  sites = next.sites
-  cpu = { calls: 0, interrupts: 0, used: 0, budget: getSurface(campaign).budget }
 }
-const message = (e: unknown) => (e instanceof Error ? e.message : 'Controller stopped.')
-function step(): GameTick | undefined {
-  const live = program
-  if (!live) {
-    cpu = { ...cpu, used: 0, calls: 0, interrupts: 0 }
-    return advanceGame(campaign, () => {})
-  }
-  const machines = new Set(campaign.world.machines.map((m) => m.id))
-  const traced: GameProgram = {
-    onTick: (ctx) => live.onTick(sites.wrap(ctx, live.drainLogs, machines)),
+function execute(controller: Controller | undefined, mode: 'watched' | 'once' | 'tick' = 'tick') {
+  if (!controller) {
+    feedback = idleTick(campaign)
+    return
   }
   try {
-    return advanceGame(campaign, traced)
-  } catch (e) {
-    error = message(e)
+    const result = controller.step(campaign, mode)
+    calls = result.calls
+    feedback = result.feedback
+    if (result.error) throw new Error(result.error)
   } finally {
-    cpu = live.stats
-    const printed = sites.drainLogs(live.drainLogs())
-    if (printed.length && campaign.town.beat === 1) campaign.progress.signals.printedTick = true
-    logs.push(...printed)
+    logs.push(...controller.drainLogs())
+    traces = controller.traces
   }
-  live.dispose()
-  program = undefined
 }
-let checked: { id: string; files: ProjectFiles } | undefined
-let bench: Frame['bench']
-async function apply(a: Action) {
-  switch (a.kind) {
+async function apply(action: Action) {
+  switch (action.kind) {
     case 'init':
-      campaign = loadSave(a.campaign)
-      install(await compile(campaign.project.deployed, true))
-      return true
-    case 'deploy':
-    case 'rollback': {
-      const files = a.kind === 'deploy' ? a.files : campaign.project.history.find((r) => r.id === a.id)?.files
-      if (!files) return false
-      const next = await compile(files, a.kind === 'rollback')
-      try {
-        if (a.kind === 'deploy') {
-          campaign.project.working = files
-          deployGameProject(campaign)
-        } else if (!rollbackGameProject(campaign, a.id)) throw new Error('Unknown revision.')
-      } catch (e) {
-        next.program?.dispose()
+      campaign = action.campaign
+      await install(campaign.project.deployed, true)
+      break
+    case 'run': {
+      error = ''
+      const watched = primaryButton(campaign) === 'run'
+      const once = await compileController(campaign, action.files, watched ? 'watched' : 'once')
+      try { execute(once, watched ? 'watched' : 'once') } finally { once.dispose() }
+      break
+    }
+    case 'step':
+      try { execute(live) } catch (e) {
+        live?.dispose()
+        live = undefined
         throw e
       }
-      install(next)
-      return true
-    }
-    case 'bench': {
-      const task = currentLesson(campaign)
-      checked = undefined
-      if (!task?.cases.length || task.id !== a.id) return true
-      try {
-        const checks = await runBench(task, a.files, (api, args, files) =>
-          runVerb(
-            {
-              files,
-              entry: task.file,
-              chapterExports: getSurface(campaign).exports,
-            },
-            task.name,
-            api,
-            args,
-          ),
-        )
-        bench = { checks }
-        if (checks.every((row) => row.state === 'done')) checked = a
-      } catch (e) {
-        bench = { checks: benchChecks(task), error: message(e) }
+      break
+    case 'continue':
+      campaign = continueStep(campaign)
+      break
+    case 'deploy':
+      await install(action.files, false)
+      campaign.project.working = action.files
+      deployProject(campaign)
+      break
+    case 'rollback': {
+      const revision = campaign.project.history.find(r => r.id === action.id)
+      if (revision) {
+        await install(revision.files, true)
+        rollbackProject(campaign, action.id)
       }
-      return true
+      break
     }
-    case 'solve':
-      if (
-        currentLesson(campaign)?.id === a.id &&
-        checked?.id === a.id &&
-        JSON.stringify(checked.files) === JSON.stringify(a.files)
-      )
-        campaign.town.solved.push(a.id)
-      checked = undefined
-      return true
     case 'pay':
-      return payInstallment(campaign, a.inFull)
+      payInstallment(campaign, action.inFull)
+      break
     case 'snapshot':
-      campaign.project.working = a.files
-      return snapshotProject(campaign, a.name)
+      campaign.project.working = action.files
+      snapshotProject(campaign, action.name)
+      break
     case 'read':
-      return markMessageRead(campaign, a.id)
+      markMessageRead(campaign, action.id)
   }
 }
-// The host waits for each reply before sending another mutation or tick.
 self.onmessage ??= async ({ data }: MessageEvent<Action>) => {
-  bench = undefined
-  let feedback: GameTick | undefined, notice: string | undefined
-  try {
-    if (data.kind === 'step') feedback = step()
-    else if (!(await apply(data))) notice = 'Could not complete that action.'
-  } catch (e) {
-    error = data.kind === 'deploy' ? 'Deploy failed · ' + message(e) : message(e)
-  }
-  // Deploy histories may contain many full projects. Tick frames only carry the live state.
-  const { project, seenSections: _seenSections, ...live } = campaign
-  const changed = ['init', 'deploy', 'rollback', 'snapshot'].includes(data.kind)
-  self.postMessage({
-    campaign: live,
-    bench,
-    town: townSnapshot(campaign),
-    project: changed ? project : undefined,
-    active: !!program,
-    feedback,
-    notice,
-    error,
-    logs,
-    cpu,
-    traces: sites.traces,
-  } satisfies Frame)
+  calls = []
+  feedback = undefined
   logs = []
+  try { await apply(data) } catch (e) { error = e instanceof Error ? e.message : 'Controller stopped.' }
+  const { project, seenSections: _seenSections, ...state } = campaign
+  self.postMessage({
+    campaign: state, calls, town: townSnapshot(campaign),
+    project: ['init', 'deploy', 'rollback', 'snapshot', 'continue'].includes(data.kind) ? project : undefined,
+    active: !!live, feedback, error, logs, traces,
+    cpu: live?.stats() ?? { calls: 0, interrupts: 0, used: 0, budget: 1024 },
+  } satisfies Frame)
 }

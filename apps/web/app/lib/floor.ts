@@ -157,8 +157,8 @@ type MachineArt = {
   status?: FloorStatus
   fire?: Graphics
   hiccup: Graphics
-  stuck?: Graphics
-  stuckKind?: string
+  visibleItem?: Graphics
+  visibleKind?: string
   processed: number
   built: number
   pulse: number
@@ -282,11 +282,12 @@ export class FloorScene {
               m.queue[0]
             )?.kind
           : undefined
-      if (stuckKind !== view.stuckKind) {
-        view.stuck?.destroy()
-        view.stuck = stuckKind ? view.art.addChild(materialArt(stuckKind)) : undefined
-        view.stuck?.position.set(-25, -8)
-        view.stuckKind = stuckKind
+      const kind = stuckKind ?? m.output?.kind
+      if (kind !== view.visibleKind) {
+        view.visibleItem?.destroy()
+        view.visibleItem = kind ? view.art.addChild(materialArt(kind)) : undefined
+        view.visibleItem?.position.set(-25, -8)
+        view.visibleKind = kind
       }
       if (m.stats.processed > view.processed) {
         const p = center(m.siteId, m)
@@ -344,9 +345,7 @@ export class FloorScene {
         const m = world.machines.find((m) => m.id === event.machineId)
         if (!m) continue
         const p = center(m.siteId, m),
-          art = this.root.addChild(new Graphics())
-        art.circle(0, 0, 7).fill(0xf6c861).stroke({ color: 0x70522b, width: 2 })
-        art.roundRect(-1, -4, 2, 8, 1).fill(0xa97532)
+          art = this.root.addChild(materialArt(event.item.kind, event.item.defect))
         this.pops.push({ art, x: p.x + 18, y: p.y - 29, birth: now })
       }
   }
