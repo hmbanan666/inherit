@@ -1,4 +1,5 @@
 import type { MachineKind, MaterialId, RecipeId } from './campaign-api'
+import { activeCard } from './objective-highlights'
 import type { Campaign, ObjectiveRun } from './model'
 import { questStatus, QUESTS, restartQuest } from './quests'
 
@@ -831,7 +832,7 @@ export function objectiveTrack(c: Campaign): {
   const stage = stages[index]
   if (!stage) return { progress: { current: 0, target: 0 } }
   return {
-    active: OBJECTIVES[index],
+    active: activeCard(c, OBJECTIVES[index]),
     next: OBJECTIVES[index + 1],
     progress: { current: Math.min(stage.target, Number(stage.measure(c))), target: stage.target },
   }

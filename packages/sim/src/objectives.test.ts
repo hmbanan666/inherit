@@ -107,3 +107,16 @@ test('the routing card remembers each furnace independently across a long pause 
   expect(objectiveProgress(c, 'share-ore')).toEqual({ state: 'complete', current: 2, target: 2 })
   expect(objectiveTrack(c).active?.id).toBe('balance')
 })
+
+test('highlights follow an unlock and examples use the IDs on the player’s floor', () => {
+  const c = createCampaign()
+  c.progress.completedObjectives = ['copper-bar']
+  expect(objectiveTrack(c).active?.highlight).toEqual({ type: 'research', id: 'cutter' })
+  c.economy.research.push('cutter')
+  expect(objectiveTrack(c).active?.highlight).toMatchObject({ type: 'shop', item: 'cutter' })
+  placeMachine(c, 'cutter', 'shed', 3, 1, 'my wire cutter')
+  c.progress.completedObjectives.push('cutter')
+  const card = objectiveTrack(c).active!
+  expect(card.highlight).toMatchObject({ type: 'machine', id: 'my wire cutter' })
+  expect(card.hints.join('\n')).toContain('ctx.work("my wire cutter", "wire")')
+})
