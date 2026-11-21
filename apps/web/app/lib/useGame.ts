@@ -59,7 +59,9 @@ function createGameStore() {
   const reference = computed(() => apiReference(state.value))
   const api = computed(() => apiDeclarations(state.value))
   const playback = usePlayback()
-  const hand = computed(() => playback.call.value ? playback.hand.value : (state.value.world.hand?.item ?? null))
+  const hand = computed(() => (playback.watching.value || playback.call.value)
+    ? playback.hand.value
+    : state.value.world.hand?.item ?? null)
   const busy = ref(false)
   let speed = 1
   let storageKey = saveKey
@@ -161,7 +163,10 @@ function createGameStore() {
     const action = current!
     const instance = worker
     const mode = action.type === 'run' ? 'run' : action.type === 'step' ? 'tick' : 'setup'
-    await playback.play(frame.calls, mode, speed)
+    // A Run that fails before executing leaves the previous hand in place.
+    const returned = mode === 'run' && frame.campaign.world.tick !== state.value.world.tick
+      ? state.value.world.hand : undefined
+    await playback.play(frame.calls, mode, speed, returned)
     if (worker !== instance) return
     current = undefined
     const c = {

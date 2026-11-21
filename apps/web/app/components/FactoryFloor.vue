@@ -42,6 +42,7 @@ const camera = computed(() => ({
   y: size.value.h * 0.56 - bounds.value.y * scale.value + pan.value.y,
 }))
 const story = computed(() => g.step.value?.step)
+const bramOrderComplete = computed(() => story.value?.id === 'bram-loop' && g.step.value?.phase === 'solved')
 const speaker = computed(() => g.town.value.people.find(p => p.id === story.value?.who))
 const travelRail = computed(() => {
   const stops = world.value.machines.map(m => center(m.siteId, m))
@@ -50,8 +51,7 @@ const travelRail = computed(() => {
   return { left: (Math.min(...xs) - 24) + 'px', width: (Math.max(...xs) - Math.min(...xs) + 48) + 'px', top: (stops[0]!.y + tile * .94) + 'px' }
 })
 const armPoint = computed(() => {
-  const call = g.playback.last.value
-  const place = call?.fn === 'buy' ? call.args[1] ?? call.args[0] : call?.args[0]
+  const place = g.playback.place.value ?? world.value.hand?.origin
   const target = world.value.machines.find(m => m.id === place)
   const point = target ? center(target.siteId, target) : bounds.value
   return { x: point.x + (target ? 0 : -tile), y: point.y + tile * .94 }
@@ -226,13 +226,15 @@ onBeforeUnmount(() => {
             >"{{ m.id }}"<b v-if="m.fault"> · {{ m.fault }}</b></span
           >
         </button>
-        <span v-if="g.playback.stationStatuses.value.has(m.id)" class="station-status">
+        <span v-if="g.step.value?.phase !== 'solved' && g.playback.stationStatuses.value.has(m.id)" class="station-status">
           <span v-for="status in g.playback.stationStatuses.value.get(m.id)" :key="status">{{ status }}</span>
         </span>
-        <span v-if="m.id === 'cart' && g.step.value?.checks[0]?.progress" class="cart-load">{{ g.step.value?.checks[0]?.progress }} delivered</span>
+        <span v-if="m.id === 'cart' && g.step.value?.checks[0]?.progress" class="cart-load" :class="{ complete: bramOrderComplete }">
+          {{ g.step.value.checks[0].progress }} delivered{{ bramOrderComplete ? ' · order complete' : '' }}
+        </span>
       </div>
       <div v-if="travelRail" class="travel-rail" :style="travelRail" aria-hidden="true"></div>
-      <FloorArm :x="armPoint.x" :y="armPoint.y" :call="g.playback.call.value" :hand="g.hand.value" />
+      <FloorArm :x="armPoint.x" :y="armPoint.y" :call="g.playback.call.value" :hand="g.hand.value" :returning="g.playback.returning.value" />
     </div>
     <div v-if="story" class="floor-story" data-testid="speech">
       <TownPortrait v-if="speaker" :person="speaker" />
@@ -288,6 +290,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .shed-street { position: absolute; left: 465px; bottom: 0; width: 300px; pointer-events: none; }
 .cart-load { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); color: var(--gold); background: var(--panel); font: 13px var(--mono); padding: 3px 6px; white-space: nowrap; }
+.cart-load.complete { left: auto; right: -24px; transform: none; }
 .station-status {
   display: grid; text-align: center; position: absolute; top: -44px; left: 0; transform: translateX(-50%);
   padding: 2px 6px; border-radius: 6px; background: var(--overlay); color: var(--soft);

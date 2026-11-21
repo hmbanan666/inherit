@@ -7,6 +7,12 @@ import { take, put } from "inherit"
 export const firstIngotAfterRetry =
   'Your first Run found the furnace still working, so take came back empty. Running again collected the finished ingot.'
 
+const smeltBlock = `function smelt() {
+  take("mine")
+  put("furnace")
+}
+smelt()`
+
 const clockBlock = `export function onTick() {
   smelt()
   ship()
@@ -43,7 +49,10 @@ export const lessons: LessonStep[] = [
     story: 'That rock will make a shoe once it gets hot. See the cold hearth?',
     task: `Keep the pickup line. Under it, use put to leave the rock at "furnace".
 Press Run and watch the hearth.`,
-    idea: { name: 'One line after another', explain: 'The arm follows your lines from top to bottom.' },
+    idea: {
+      name: 'One line after another',
+      explain: 'Each Run starts fresh: the arm first puts back what it holds, then runs your lines from the top.',
+    },
     hints: ['Pick up first, set down second.', 'Use put with the furnace label.', 'put("furnace")'],
     checks: [{ id: 'bram-feed', text: 'A rock reaches the furnace' }],
     solved: {
@@ -84,26 +93,17 @@ put("cart")`,
     who: 'bram',
     title: 'Give the hearth work a name',
     story: 'Uncle called feeding the furnace smelting. Can you show me his trick?',
-    task: `1. Click at the start of the first highlighted line and type function smelt() { on a new line above it.
-2. After the second highlighted line add } on its own line.
-3. On the next line type smelt() — this line runs the job. Press Run.`,
+    task: 'Replace the two gold lines with this block. Keep the two cart lines underneath.',
     callsToMove: [{ name: 'take', place: 'mine' }, { name: 'put', place: 'furnace' }],
     idea: {
       name: 'Function',
       explain: 'The first part names the job, and smelt() below asks the arm to do it.',
     },
-    example: `function smelt() {
-  // your two lines go here
-}
-smelt()   // this line runs the job`,
+    example: smeltBlock + '   // this line starts the job',
     hints: [
       'Keep the same two moves inside the braces.',
       'Put the mine pickup and furnace drop inside smelt, then call smelt.',
-      `function smelt() {
-  take("mine")
-  put("furnace")
-}
-smelt()`,
+      smeltBlock,
     ],
     checks: [{ id: 'bram-smelt', text: 'Calling smelt feeds the furnace' }],
     solved: {

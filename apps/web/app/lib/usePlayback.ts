@@ -1,9 +1,10 @@
-import { TICK_MS, type CallRecord } from '@inherit/sim'
+import { TICK_MS, type CallRecord, type CampaignWorld } from '@inherit/sim'
 
 export function usePlayback() {
   const watching = ref(false)
   const call = shallowRef<CallRecord>()
-  const last = shallowRef<CallRecord>()
+  const place = ref<string>()
+  const returning = shallowRef<CampaignWorld['hand']>()
   const hand = ref<string | null>(null)
   const stationStatuses = shallowRef(new Map<string, Set<string>>())
   const messages = ref<string[]>([])
@@ -14,7 +15,9 @@ export function usePlayback() {
     watching.value = false
     finishWait?.()
     stationStatuses.value = new Map()
-    call.value = last.value = undefined
+    call.value = undefined
+    returning.value = undefined
+    place.value = undefined
     messages.value = []
   }
   function wait(ms: number) {
@@ -23,7 +26,7 @@ export function usePlayback() {
       finishWait = () => { clearTimeout(timer); resolve() }
     })
   }
-  async function play(calls: CallRecord[], mode: 'run' | 'tick' | 'setup', speed: number) {
+  async function play(calls: CallRecord[], mode: 'run' | 'tick' | 'setup', speed: number, held?: CampaignWorld['hand']) {
     const watched = mode === 'run'
     if (!calls.length && !watched && !stationStatuses.value.size) return
     const statuses = new Map<string, Set<string>>()
@@ -40,10 +43,23 @@ export function usePlayback() {
     const interval = (watched ? 500 : TICK_MS / (2 * Math.max(1, visible.length))) / speed
     const ticket = generation
     watching.value = watched
-    if (watched) hand.value = null
     messages.value = []
+    if (watched) {
+      hand.value = held?.item ?? null
+      if (held) {
+        returning.value = held
+        place.value = held.origin
+        await wait(interval)
+        if (ticket !== generation) return
+        hand.value = null
+        await wait(interval / 2)
+        if (ticket !== generation) return
+        returning.value = undefined
+      }
+    }
     for (const record of visible) {
-      call.value = last.value = record
+      call.value = record
+      place.value = record.fn === 'buy' ? record.args[1] ?? record.args[0] : record.args[0]
       // A watched call has two visible moments: reach the place, then lift or release.
       if (watched) {
         await wait(interval / 2)
@@ -58,5 +74,5 @@ export function usePlayback() {
     watching.value = false
     call.value = undefined
   }
-  return { watching, call, last, hand, messages, stationStatuses, play, clear }
+  return { watching, call, place, returning, hand, messages, stationStatuses, play, clear }
 }

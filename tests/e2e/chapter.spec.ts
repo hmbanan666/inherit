@@ -38,9 +38,7 @@ test('play every request from the visible hints, build the bridge and pay the ta
       await expect(page.getByTestId('speech')).toContainText(step.story)
       if (step.id === 'bram-smelt') {
         await expectMarkedLines(['take("mine")', 'put("furnace")'])
-        await expect(card.locator('pre')).toContainText('function smelt() {')
-        await expect(card.locator('pre')).toContainText('smelt()   // this line runs the job')
-        await expect(card.locator('pre')).not.toContainText('take("mine")')
+        expect(await card.locator('pre').innerText()).toBe('function smelt() {\n  take("mine")\n  put("furnace")\n}\nsmelt()   // this line starts the job')
       }
       if (step.id === 'bram-loop') {
         await expectMarkedLines(['smelt()', 'ship()'])

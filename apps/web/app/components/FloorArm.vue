@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { CallRecord } from '@inherit/sim'
-defineProps<{ x: number; y: number; hand: string | null; call?: CallRecord }>()
+import type { CallRecord, CampaignWorld } from '@inherit/sim'
+defineProps<{ x: number; y: number; hand: string | null; call?: CallRecord; returning?: CampaignWorld['hand'] }>()
 </script>
 <template>
   <div class="arm" data-testid="arm" :class="{ carrying: hand }" :style="{ left: x + 'px', top: y + 'px' }">
@@ -8,7 +8,8 @@ defineProps<{ x: number; y: number; hand: string | null; call?: CallRecord }>()
     <span class="forearm"></span><span class="claw"></span>
     <i v-if="hand" class="item" :class="{ ingot: hand.includes('ingot') }"></i>
     <div class="caption" data-testid="hand">{{ hand ? hand.replaceAll('-', ' ') : 'empty hand' }}</div>
-    <code v-if="call?.within" class="function">{{ call.within }}()</code>
+    <span v-if="returning" class="function">Putting {{ returning.item.replaceAll('-', ' ') }} back at "{{ returning.origin }}"</span>
+    <code v-else-if="call?.within" class="function">{{ call.within }}()</code>
     <span v-if="call?.message" class="call-message">{{ call.message }}</span>
   </div>
 </template>
