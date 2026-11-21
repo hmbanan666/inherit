@@ -35,3 +35,5 @@ When triaging an issue, use the labels in `docs/agents/triage-labels.md`.
 ### Domain docs
 
 All packages share one glossary and one set of architecture decisions. See `docs/agents/domain.md`.
+
+Record lasting product and design decisions as ADRs in `docs/adr/` using the next free number. When a decision replaces an earlier one, name it in the new ADR and keep the original file.
