@@ -57,13 +57,32 @@ test('first shift opens a single player file', async ({ page }) => {
   ).toHaveCount(1)
   await expect(page.getByRole('region', { name: 'Project files' })).toHaveCount(0)
   await expect(button(page, 'Quick open')).toHaveCount(0)
-  const program = 'import type { Factory } from "inherit"\nexport function onTick(ctx: Factory) {\n  memory.room = ctx.stock("mine")\n  console.log(memory.room)\n}'
-  const markers = page.locator('.project-editor .squiggly-error')
-  await replaceCode(page, program)
-  await expect(markers.first()).toBeVisible()
-  await replaceCode(page, program.replace('ctx.stock', 'ctx.space'))
-  await expect(markers).toHaveCount(0)
 })
+
+for (const file of ['main.ts', 'lib/drive.ts']) {
+  test(`sandbox globals have zero error markers in ${file}`, async ({ page }) => {
+    // Editing works even while optional preview assets are unavailable.
+    await page.route('**/preview.worker-*.js', (route) => route.abort())
+    await workshop(page, file !== 'main.ts')
+    if (file !== 'main.ts') {
+      await page.getByRole('region', { name: 'Project files' }).getByRole('button', { name: file }).click()
+    }
+    const program = [
+      'import type { Factory } from "inherit"',
+      'export function onTick(ctx: Factory) {',
+      '  memory.room = ctx.space("mine")',
+      '  console.log(memory.room)',
+      '}',
+      'test("room", ctx => { assert(ctx.tick >= 0); equal(memory.room, true) })',
+    ].join('\n')
+    const markers = page.locator('.project-editor .squiggly-error')
+    // Wait for a semantic error first so a worker still starting up cannot give a false pass.
+    await replaceCode(page, program.replace('ctx.space', 'ctx.missing'))
+    await expect(markers.first()).toBeVisible()
+    await replaceCode(page, program)
+    await expect(markers).toHaveCount(0)
+  })
+}
 
 test('follow definitions and references across files, search the draft and organize a folder', async ({
   page,

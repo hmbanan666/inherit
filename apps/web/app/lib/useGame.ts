@@ -7,6 +7,7 @@ import {
   TICK_MS,
   type ProjectFiles,
 } from '@inherit/sim'
+import { sandboxDeclarations } from '@inherit/sandbox/declarations'
 import type { CpuStats } from '@inherit/sandbox'
 import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
 export type { CallSite, GameLog, MetricSample } from './gameProtocol'
@@ -49,7 +50,7 @@ function createGameStore() {
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
   const surface = computed(() => getSurface(state.value)),
-    api = computed(() => apiDeclarations(state.value))
+    api = computed(() => apiDeclarations(state.value) + '\n' + sandboxDeclarations)
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
   let worker: Worker | undefined, current: Action | undefined, rollbackDraft: ProjectFiles | undefined
