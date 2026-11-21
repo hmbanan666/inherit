@@ -66,6 +66,7 @@ export interface Incident {
   key?: string
 }
 export interface CampaignWorld {
+  hand?: { origin: string; item: MaterialId; jam: boolean }
   tick: number
   seed: number
   nextMachineId: number
@@ -155,7 +156,8 @@ export type WorkshopSection = typeof workshopSections[number]
 
 export interface Campaign {
   seenSections: WorkshopSection[]
-  version: 5
+  version: 6
+  lesson: import('./lesson-flow').LessonProgress
   town: TownState
   world: CampaignWorld
   economy: Economy

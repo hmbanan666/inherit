@@ -39,7 +39,6 @@ export class TownScene {
     private app: Application,
     private host: HTMLElement,
     snapshot: TownSnapshot,
-    private announce: (text: string) => void,
     replay: Change[] = [],
   ) {
     host.appendChild(app.canvas)
@@ -75,7 +74,6 @@ export class TownScene {
       if (latest < previousTick || s.day < this.snapshot.day) {
         this.pending = []
         this.active = undefined
-        this.announce('')
         this.center()
       } else {
         for (const change of s.changes) {
@@ -196,14 +194,12 @@ export class TownScene {
     if (!this.active && this.pending.length) {
       const change = this.pending.shift()!
       this.active = { change, start: now }
-      this.announce(change.text)
     }
     if (this.active) {
       const age = (now - this.active.start) / 1700
       const site = sites[this.active.change.buildingId]
       if (age >= 1) {
         this.active = undefined
-        this.announce('')
         this.center()
       } else if (!reduced) {
         const wave = Math.sin(age * Math.PI)

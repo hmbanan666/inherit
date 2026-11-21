@@ -12,21 +12,19 @@ import {
   Settings2,
   X,
 } from '@lucide/vue'
-import type { TownSnapshot, Townsperson, WorkshopSection, StoryMessage } from '@inherit/sim'
+import type { TownSnapshot, Townsperson, WorkshopSection } from '@inherit/sim'
 import { provideGame } from './lib/useGame'
 import TownView from './components/town/TownView.vue'
-import TownPortrait from './components/town/TownPortrait.vue'
 
 const g = provideGame()
-const { campaign, files, activeFile, dirty, ready, saved, error, surface, town } = g
+const { campaign, files, activeFile, dirty, ready, saved, error, surface, town, step, reveals, sections, letters } = g
 const townPerson = ref<Townsperson['id']>()
 const replay = shallowRef<TownSnapshot['changes']>([])
 const highlighted = shallowRef<string[]>([])
-const requester = computed(() => town.value.people.find((p) => p.ask))
-const section = ref<WorkshopSection>('code')
-const unread = computed(() => campaign.value.progress.messages.filter(m => m.unread).length)
+const section = ref<WorkshopSection>('factory')
+const unread = computed(() => letters.value.filter(m => m.unread).length)
 const sectionNames: Record<WorkshopSection, string> = {
-  code: 'Code', factory: 'Factory', town: 'Town', inbox: 'Inbox', orders: 'Orders',
+  code: 'Shed', factory: 'Shed', town: 'Town', inbox: 'Inbox', orders: 'Orders',
 }
 function sectionDescription(item: WorkshopSection) {
   const details = []
@@ -34,22 +32,25 @@ function sectionDescription(item: WorkshopSection) {
   if (item === 'inbox' && unread.value) details.push(unread.value + ' unread letters')
   return details.join('. ') || undefined
 }
-const hasFloor = computed(() => surface.value.sections.includes('factory'))
+const showMoney = computed(() => reveals.value.some(r => r.kind === 'coins'))
+const bankFunds = computed(() => campaign.value.economy.money - (town.value.debt.reserve ?? 0))
+const showDebt = computed(() => reveals.value.some(r => r.kind === 'debt'))
 const drawer = computed(() => section.value === 'inbox' || section.value === 'orders' ? sectionNames[section.value] : '')
 const floorPane = ref<HTMLElement>()
 const drawerPane = ref<HTMLElement>()
 const editorStatus = computed(() => {
-  if (g.lesson.value?.cases.length) return 'Working copy · checks run as you type'
-  if (dirty.value) return 'Working copy · deploy to run your edits'
-  if (error.value) return 'Check the error above'
-  return g.active.value ? 'Deployed · your code now runs every tick' : 'Waiting for your first deploy'
+  if (error.value) return 'See Checks for the error'
+  if (g.playback.watching.value) return 'Watching the arm'
+  if (g.button.value === 'run') return 'Working copy · Run to watch your code'
+  if (dirty.value) return 'Working copy · Deploy to run your edits'
+  return g.active.value ? 'Deployed · the clock is running' : 'Ready to deploy'
 })
 const tab = ref<'controller' | 'api'>('controller')
 const showFiles = ref(false)
 const menu = ref<'' | 'history' | 'settings' | 'bank'>('')
 const confirmNew = ref(false)
 const swapped = ref(false)
-const dockWidth = ref(40)
+const dockWidth = ref(43)
 const panels = ['Checks', 'Console'] as const
 type Panel = typeof panels[number]
 const panel = ref<Panel>('Checks')
@@ -77,8 +78,6 @@ function movePanel(event: KeyboardEvent) {
 const editor = ref<{ focus(): void; revealLine(file: string, line: number): void }>()
 const celebration = shallowRef<TownSnapshot['changes']>([])
 const story = ref('')
-const letters = ref<StoryMessage[]>([])
-const letter = computed(() => letters.value[0])
 const archives = computed(() =>
   campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ') || r.name.startsWith('Previous')),
 )
@@ -107,18 +106,6 @@ watch(
     if (ready.value && n > last) celebration.value = town.value.changes.slice(last)
   },
 )
-watch(
-  () => campaign.value.progress.messages.length,
-  (n, previous) => {
-    if (ready.value && n > previous && surface.value.sections.includes('inbox'))
-      letters.value.push(...campaign.value.progress.messages.slice(previous).filter(m => m.kind === 'email'))
-  },
-)
-let letterTimer: ReturnType<typeof setTimeout>
-watch(letter, value => {
-  clearTimeout(letterTimer)
-  if (value) letterTimer = setTimeout(() => letters.value.shift(), 12000)
-})
 watch(g.notice, (message) => {
   if (message) {
     notify(message)
@@ -130,8 +117,12 @@ watch(g.navigation, async ({ file, line }) => {
   await nextTick()
   editor.value?.revealLine(file, line)
 })
+watch(() => step.value?.step.id, id => {
+  if (id === 'mayor-tools') showFiles.value = true
+  if (id && section.value === 'inbox' && id !== 'harrow-tab') openSection('factory')
+})
 function payBank(inFull = false) {
-  g.act({ kind: 'pay', inFull })
+  g.act({ type: 'pay', inFull })
   menu.value = ''
 }
 function restoreRevision(id: number) {
@@ -147,7 +138,7 @@ function askNewGame() {
   menu.value = ''
 }
 function openSection(next: WorkshopSection, person?: Townsperson['id']) {
-  if (!surface.value.sections.includes(next)) return
+  if (!sections.value.includes(next)) return
   section.value = next
   g.visitSection(next)
   menu.value = ''
@@ -158,20 +149,15 @@ function openSection(next: WorkshopSection, person?: Townsperson['id']) {
     townPerson.value = person ?? town.value.people.find(p => p.buildingId === residence)?.id
     celebration.value = []
     highlighted.value = []
-  } else if (next === 'inbox') letters.value = []
-  else if (next === 'code') {
-    tab.value = 'controller'
-    nextTick(() => editor.value?.focus())
   }
 }
 function navigateTo(next: WorkshopSection) {
   openSection(next)
-  if (next !== 'code') nextTick(() => (drawerPane.value ?? floorPane.value)?.focus())
+  nextTick(() => (drawerPane.value ?? floorPane.value)?.focus())
 }
 function highlightMachines(ids: string[]) {
-  if (!ids.length || !hasFloor.value) return
   highlighted.value = ids
-  if (section.value !== 'code') openSection('factory')
+  if (ids.length && section.value !== 'factory') openSection('factory')
 }
 function swap() {
   swapped.value = !swapped.value
@@ -181,11 +167,11 @@ function hotkey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key === 'Enter')) {
     e.preventDefault()
     e.stopPropagation()
-    g.deploy()
+    g.submit()
   }
   if (e.key === 'Escape') {
     menu.value = ''
-    if (drawer.value) openSection('code')
+    if (drawer.value) openSection('factory')
     confirmNew.value = false
   }
 }
@@ -205,8 +191,7 @@ function reset() {
   confirmNew.value = false
   showFiles.value = false
   menu.value = ''
-  section.value = 'code'
-  letters.value = []
+  section.value = 'factory'
   celebration.value = []
   replay.value = []
   townPerson.value = undefined
@@ -222,45 +207,45 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', hotkey, true)
   clearTimeout(toastTimer)
-  clearTimeout(letterTimer)
 })
-useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inherit' })
+useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' })
 </script>
 <template>
   <div class="workshop" :style="{ '--dock-width': dockWidth + '%' }">
     <header class="hud">
       <div class="brand"><img src="/mark.svg" alt="" />inherit<span>.</span></div>
       <nav class="section-nav" aria-label="Workshop sections">
-        <button v-for="item in surface.sections" :key="item" :aria-label="sectionNames[item]"
+        <button v-for="item in sections" :data-testid="'nav-' + (item === 'factory' ? 'shed' : item)" :key="item" :aria-label="sectionNames[item]"
           :aria-description="sectionDescription(item)" :aria-pressed="section === item" @click="navigateTo(item)">
           {{ sectionNames[item] }}
           <small v-if="item === 'inbox' && unread" :title="unread + ' unread letters'">{{ unread }}</small>
           <small v-if="!campaign.seenSections.includes(item)" class="section-new">new</small>
         </button>
       </nav>
-      <div v-if="surface.showMoney" class="wallet" title="Workshop money">
+      <div v-if="showMoney" class="wallet" title="Workshop money">
         <Coins /><b>{{ campaign.economy.money.toLocaleString() }} coins</b
         ><small v-if="coinPop" :key="coinPop.tick" class="coin-pop" @animationend="coinPop = undefined"
           >+{{ coinPop.amount }}</small
         >
       </div>
-      <div v-if="surface.showMoney" class="settings bank-chip">
+      <div v-if="showDebt" class="settings bank-chip">
         <button aria-label="Pay debt" @click="toggleMenu('bank')">
           Debt {{ town.debt.owed }} <b v-if="town.debt.next">Pay</b>
         </button>
         <aside v-if="menu === 'bank'" class="hud-menu">
           <h3>Kettlewick Bank</h3>
           <p>{{ town.debt.paid }} paid · {{ town.debt.owed }} owed</p>
+          <p v-if="town.debt.reserve">Keep {{ town.debt.reserve }} coins for the machines the town needs.</p>
           <template v-if="town.debt.next">
             <button
               class="gold"
-              :disabled="campaign.economy.money < town.debt.next.amount"
+              :disabled="bankFunds < town.debt.next.amount"
               @click="payBank()"
             >
               Pay {{ town.debt.next.amount }} coins
             </button>
             <button
-              v-if="town.debt.owed > town.debt.next.amount && campaign.economy.money >= town.debt.owed"
+              v-if="town.debt.owed > town.debt.next.amount && bankFunds >= town.debt.owed"
               @click="payBank(true)"
             >
               Pay balance ({{ town.debt.owed }} coins)
@@ -272,15 +257,15 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         <button aria-label="Settings" @click="toggleMenu('settings')"><Settings2 /></button>
         <aside v-if="menu === 'settings'" class="hud-menu">
           <button :aria-pressed="swapped" @click="swap">Swap sides</button>
-          <button @click="showFiles = !showFiles; menu = ''">Project files</button>
+          <button v-if="surface.multiFile" @click="showFiles = !showFiles; menu = ''">Project files</button>
           <button @click="askNewGame">
             New game
           </button>
         </aside>
       </div>
     </header>
-    <main class="desk" :class="{ swapped: swapped && hasFloor, 'code-only': !hasFloor }">
-      <section v-if="hasFloor" ref="floorPane" tabindex="-1" aria-label="Factory and town" class="world-shell">
+    <main class="desk" :class="{ swapped }">
+      <section ref="floorPane" tabindex="-1" aria-label="Factory and town" class="world-shell">
         <header class="world-title">
           <div class="floor-heading">
             <small class="eyebrow"><Factory />Kettlewick · Chapter 1</small>
@@ -290,37 +275,22 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
             <i />{{ !ready ? 'Starting' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
           </div>
         </header>
-        <div v-if="surface.sections.includes('town')" class="town-ribbon">
-          <button v-if="requester" class="bubble" @click="openSection('town', requester.id)">
-            <TownPortrait :person="requester" />
-            {{ requester.name }} · {{ requester.ask?.title }}
-          </button>
-          <button v-else-if="surface.sections.includes('orders') && campaign.economy.orders.length" class="bubble" @click="openSection('orders')">
-            {{ campaign.economy.orders.length }} open orders
-          </button>
-        </div>
         <div class="map-frame" :data-phase="section !== 'town' ? town.phase : undefined">
           <LazyFactoryFloor v-if="section !== 'town'" :highlighted="highlighted" @focusin="g.visitSection('factory')" />
-          <TownView v-else v-model:selection="townPerson" :snapshot="town" :replay="replay" />
-          <aside v-if="celebration.length" class="town-change" role="status">
-            <div>
-              <small class="eyebrow">Town change</small>
-              <b>{{ celebration.map((change) => change.text).join(' ') }}</b>
-            </div>
-            <button @click="openSection('town')">See it</button>
-            <button aria-label="Dismiss celebration" @click="celebration = []"><X /></button>
-          </aside>
+          <TownView v-else v-model:selection="townPerson" :snapshot="town" :replay="replay" :show-debt="showDebt" />
           <aside v-if="drawer" ref="drawerPane" tabindex="-1" class="drawer" :aria-label="drawer">
             <header>
               <h2>{{ drawer }}</h2>
-              <button aria-label="Close drawer" @click="openSection('code')"><X /></button>
+              <button aria-label="Close drawer" @click="openSection('factory')"><X /></button>
             </header>
             <div v-if="drawer === 'Inbox'" class="drawer-body">
-              <article v-for="m in [...campaign.progress.messages].reverse()" :key="m.id" class="ticket">
+              <p v-if="!letters.length">No letters yet. Press Continue for the next delivery.</p>
+              <article v-for="m in [...letters].reverse()" :key="m.id" class="ticket">
                 <small>{{ m.from }}</small>
                 <h3>{{ m.title }}</h3>
                 <p>{{ m.body }}</p>
-                <button v-if="m.unread" @click="g.act({ kind: 'read', id: m.id })">Mark read</button>
+                <p v-if="m.id === 'tab' && step?.step.id === 'bram-loop'">Press Continue to see the family tab. Then you can reply here.</p>
+                <button v-if="m.unread && (m.id !== 'tab' || step?.step.id === 'harrow-tab')" @click="g.act({ type: 'read', id: m.id })">{{ m.id === 'tab' ? 'Pay later' : 'Mark read' }}</button>
               </article>
             </div>
             <div v-else class="drawer-body">
@@ -338,7 +308,6 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         </div>
       </section>
       <div
-        v-if="hasFloor"
         class="resizer"
         role="separator"
         tabindex="0"
@@ -352,19 +321,17 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         <header class="dock-header">
           <span class="eyebrow"><Code2 />Code workshop</span>
         </header>
-        <RequestCard :person="requester" />
-        <FileTree v-if="showFiles" />
-        <details v-if="g.library.value.length" class="my-library">
-          <summary>My library</summary>
-          <button v-for="verb in g.library.value" :key="verb.file" @click="g.openFile(verb.file)">{{ verb.signature }}</button>
-        </details>
+        <SolvedCard v-if="step?.phase === 'solved'" :solved="step.step.solved" :next-reveal="step.nextReveal" :busy="g.busy.value" @advance="g.advance" />
+        <TaskCard v-else-if="step" :key="step.step.id" :step="step.step" />
+        <section v-else class="lesson-card" aria-label="Chapter complete"><h2>The shed is yours.</h2><p>The bridge to Riverside stands. Your family tab is paid.</p></section>
+        <FileTree v-if="showFiles && surface.multiFile" />
+        <MyLibrary />
         <div class="file-tabs">
           <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
             <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
           </button>
           <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
         </div>
-        <div v-if="error" class="runtime" role="alert">{{ error }}</div>
         <div class="editor-pane">
           <div v-show="tab === 'controller'" class="editor-host">
             <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
@@ -385,9 +352,9 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
             :aria-label="panelOpen ? 'Collapse workshop panel' : 'Expand workshop panel'"
             @click="panelOpen = !panelOpen"><ChevronDown /></button>
         </div>
-        <div v-show="panelOpen" class="panel-slot">
+        <div v-show="panelOpen" class="panel-slot" :class="{ compact: panel === 'Checks' }">
           <div v-show="panel === 'Checks'" id="panel-Checks" role="tabpanel" aria-labelledby="tab-Checks" tabindex="0">
-            <ChecksPanel :key="campaign.town.beat" />
+            <ChecksPanel :key="step?.step.id" />
           </div>
           <div v-show="panel === 'Console'" id="panel-Console" role="tabpanel" aria-labelledby="tab-Console" tabindex="0">
             <ConsolePanel />
@@ -397,23 +364,20 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
     </main>
     <footer class="statusbar">
       <span><Radio />{{ saved ? 'Saved locally' : 'Save unavailable' }}</span>
-      <div v-if="letter" class="toast" role="status">
-        <Mail />New letter from {{ letter.from }} · <button @click="navigateTo('inbox')">Open</button>
-        <button aria-label="Dismiss letter notice" @click="letters.shift()"><X /></button>
-      </div>
-      <div v-else-if="story" class="toast" role="status">
+      <div v-if="story" class="toast" role="status">
         <Mail />{{ story }}<button aria-label="Dismiss notification" @click="story = ''"><X /></button>
       </div>
-      <span v-if="hasFloor">{{ campaign.world.machines.length }} machines</span>
+      <span>{{ campaign.world.machines.length }} machines</span>
       <div class="deploy-group">
-        <button class="deploy" :disabled="!ready && !error" @click="g.deploy">
-          <Play />{{ error ? 'Run' : 'Deploy' }}
+        <button class="deploy" data-testid="primary-button" :disabled="g.busy.value || (!ready && !error)" @click="g.submit()">
+          <Play />{{ g.button.value === 'run' ? 'Run' : 'Deploy' }} <kbd>Ctrl+Enter</kbd>
         </button>
-        <button class="revisions" aria-label="Deploy history" @click="toggleMenu('history')">
+        <button class="revisions" :aria-label="g.button.value === 'deploy' ? 'Deploy history' : 'History'" @click="toggleMenu('history')">
           <ChevronDown />
         </button>
         <aside v-if="menu === 'history'" class="hud-menu">
-          <h3>Deploy history</h3>
+          <button v-if="g.button.value === 'deploy'" :disabled="g.busy.value" @click="menu = ''; g.submit('run')">Run once</button>
+          <h3>{{ g.button.value === 'deploy' ? 'Deploy history' : 'History' }}</h3>
           <button
             v-for="r in [...campaign.project.history].reverse()"
             :key="r.id"
@@ -442,9 +406,6 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
   </div>
 </template>
 <style scoped>
-.my-library { padding: 5px 14px; font: 12px var(--mono); color: var(--soft); max-height: 95px; overflow: auto; }
-.my-library summary { cursor: pointer; }
-.my-library button { margin: 4px 6px 0 0; }
 .wallet {
   position: relative;
 }
@@ -481,6 +442,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
 }
 
 @media (min-width: 801px) {
+  .panel-slot.compact { height: auto; min-height: 38px; max-height: 124px; overflow: auto; }
   .desk.swapped {
     grid-template-columns: var(--dock-width) 7px minmax(0, 1fr);
   }
@@ -497,7 +459,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
     grid-row: 1;
   }
 }
-.section-nav, .town-ribbon, .town-change {
+.section-nav {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -511,53 +473,17 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
   border-color: var(--gold);
 }
 .section-new { color: var(--accent-soft); }
-.town-ribbon { margin-bottom: 8px; }
-.desk.code-only { display: flex; }
-.code-only .editor-dock { flex: 1; }
-.editor-dock .request {
-  margin: 8px 12px;
-  max-height: 38%;
-  overflow: auto;
-}
-.statusbar .deploy, .statusbar .revisions {
-  height: 23px;
-  font-size: 12px;
-}
+.statusbar { height: 34px; border-top: 0; box-shadow: inset 0 1px var(--line); }
+.statusbar .deploy-group, .statusbar .deploy, .statusbar .revisions { height: 100%; }
+.statusbar .deploy { min-width: clamp(124px, 14vw, 200px); justify-content: center; font-size: 16px; gap: 12px; }
+.statusbar .deploy svg, .statusbar .revisions svg { color: inherit; }
+.statusbar kbd { font: 10px var(--mono); border: 1px solid currentColor; border-radius: 3px; padding: 2px 4px; }
 .statusbar .deploy-group .hud-menu {
   top: auto;
   bottom: calc(100% + 4px);
   z-index: 10;
 }
 .statusbar { padding-block: 0; }
-.bubble canvas {
-  width: 20px;
-  border-radius: 3px;
-}
-.bubble {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 16px 16px 16px 3px;
-  font-size: 12px;
-  color: var(--sub);
-}
-.town-change {
-  position: absolute;
-  z-index: 2;
-  left: 12px;
-  top: 12px;
-  max-width: calc(100% - 24px);
-  background: var(--panel);
-  border: 1px solid var(--gold);
-  border-radius: 6px;
-  padding: 10px;
-}
-.town-change b {
-  font-size: 14px;
-}
-.town-change button {
-  flex: none;
-}
 .bank-chip > button {
   gap: 8px;
   font: 12px var(--mono);

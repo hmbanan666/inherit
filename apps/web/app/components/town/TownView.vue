@@ -6,18 +6,25 @@ import { TownScene } from '../../lib/townScene'
 import type { TownSnapshot, Townsperson } from '@inherit/sim'
 import TownPortrait from './TownPortrait.vue'
 
-const props = defineProps<{ snapshot: TownSnapshot; replay?: TownSnapshot['changes'] }>()
+const props = withDefaults(defineProps<{ snapshot: TownSnapshot; replay?: TownSnapshot['changes']; showDebt?: boolean }>(), { showDebt: true })
+const town = computed(() => {
+  if (props.showDebt) return props.snapshot
+  return {
+    ...props.snapshot,
+    buildings: props.snapshot.buildings.map(b => b.id === 'bank' ? { ...b, label: undefined } : b),
+    people: props.snapshot.people.map(p => p.id === 'harrow' ? { ...p, ask: undefined } : p),
+  }
+})
 const host = ref<HTMLElement>()
 const selection = defineModel<Townsperson['id']>('selection')
-const notice = ref('')
 const unavailable = ref(false)
 const person = computed(
   () =>
-    props.snapshot.people.find((p) => p.id === selection.value) ??
-    props.snapshot.people.find((p) => p.ask) ??
-    props.snapshot.people[0],
+    town.value.people.find((p) => p.id === selection.value) ??
+    town.value.people.find((p) => p.ask) ??
+    town.value.people[0],
 )
-const readyBuilding = computed(() => props.snapshot.buildings.find((b) => b.id === person.value?.buildingId))
+const readyBuilding = computed(() => town.value.buildings.find((b) => b.id === person.value?.buildingId))
 const moodIcon = { happy: Smile, waiting: MessageCircle, gone: Footprints }
 const amounts = computed(() =>
   Object.entries(person.value?.ask?.items ?? {}).map(([kind, amount]) => ({
@@ -47,10 +54,7 @@ onMounted(async () => {
     scene = new TownScene(
       app,
       host.value!,
-      props.snapshot,
-      (text) => {
-        notice.value = text
-      },
+      town.value,
       props.replay,
     )
   } catch {
@@ -59,7 +63,7 @@ onMounted(async () => {
   }
 })
 watch(
-  () => props.snapshot,
+  town,
   (snapshot) => scene?.update(snapshot),
 )
 onBeforeUnmount(() => {
@@ -69,7 +73,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="town-view" aria-label="Kettlewick" :data-phase="snapshot.phase">
+  <section class="town-view" aria-label="Kettlewick" :data-phase="town.phase">
     <header class="town-heading">
       <h2>Kettlewick</h2>
     </header>
@@ -79,15 +83,13 @@ onBeforeUnmount(() => {
         class="town-print"
         role="img"
         :aria-label="
-          snapshot.buildings.map((b) => b.name + ' ' + b.state + (b.label ? ', ' + b.label : '')).join('. ')
+          town.buildings.map((b) => b.name + ' ' + b.state + (b.label ? ', ' + b.label : '')).join('. ')
         "
       />
       <p v-if="unavailable" class="town-unavailable">
         Could not open the town illustration. Reload to retry.
       </p>
-      <Transition name="town-pop" mode="out-in"
-        ><p v-if="notice" :key="notice" class="town-notice" role="status">✦ {{ notice }}</p></Transition
-      >
+
     </div>
     <div v-if="person" class="town-directory">
       <article class="town-voice">
@@ -111,11 +113,11 @@ onBeforeUnmount(() => {
           </template>
           <template v-else-if="person.id === 'harrow' && readyBuilding?.label">
             <strong
-              ><Coins /> {{ snapshot.debt.owed ? snapshot.debt.owed + ' coins owed' : 'Debt paid' }}</strong
+              ><Coins /> {{ town.debt.owed ? town.debt.owed + ' coins owed' : 'Debt paid' }}</strong
             >
             <p>
-              {{ snapshot.debt.paid }} coins paid<span v-if="snapshot.debt.next">
-                · Next installment {{ snapshot.debt.next.amount }} coins</span
+              {{ town.debt.paid }} coins paid<span v-if="town.debt.next">
+                · Next installment {{ town.debt.next.amount }} coins</span
               >
             </p>
           </template>
@@ -127,7 +129,7 @@ onBeforeUnmount(() => {
       </article>
       <nav class="town-roster" aria-label="Townspeople">
         <button
-          v-for="p in snapshot.people"
+          v-for="p in town.people"
           :key="p.id"
           type="button"
           :aria-label="p.name + ', ' + p.role + ', ' + p.mood + (p.ask ? ', ' + p.ask.title : '')"
@@ -190,14 +192,12 @@ onBeforeUnmount(() => {
 .town-print :deep(canvas) {
   display: block;
 }
-.town-unavailable,
-.town-notice {
+.town-unavailable {
   position: absolute;
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-.town-notice,
 .town-unavailable {
   margin: 0;
   padding: 7px 13px;
@@ -207,17 +207,6 @@ onBeforeUnmount(() => {
   color: var(--gold);
   font-size: 13px;
   text-align: center;
-}
-.town-pop-enter-active,
-.town-pop-leave-active {
-  transition:
-    opacity 0.18s,
-    translate 0.18s;
-}
-.town-pop-enter-from,
-.town-pop-leave-to {
-  opacity: 0;
-  translate: 0 4px;
 }
 .town-directory {
   display: flex;
@@ -379,12 +368,6 @@ onBeforeUnmount(() => {
   }
   .town-terms {
     gap: 5px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .town-pop-enter-active,
-  .town-pop-leave-active {
-    transition: none;
   }
 }
 </style>

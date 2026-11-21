@@ -7,6 +7,7 @@ import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
+import { standaloneJobCalls } from '../lib/standalone-calls'
 import { useGame } from '../lib/useGame'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
@@ -35,6 +36,39 @@ let opener: monaco.IDisposable
 const libraryUri = monaco.Uri.file('/api.d.ts')
 let library: monaco.IDisposable
 let settingSource = false
+let suggestions: monaco.IDisposable
+let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
+const callsToMove = computed(() => game.step.value?.phase === 'solved' ? undefined : game.step.value?.step.callsToMove)
+let jobLines: monaco.editor.IEditorDecorationsCollection | undefined
+
+function markJobCalls() {
+  const model = editor?.getModel()
+  if (!jobLines || !model || model !== models.get('main.ts') || !callsToMove.value) {
+    jobLines?.clear()
+    return
+  }
+  jobLines.set(standaloneJobCalls(model.getValue(), callsToMove.value).map(({ from, to }) => ({
+    range: monaco.Range.fromPositions(model.getPositionAt(from), model.getPositionAt(to)),
+    options: { inlineClassName: 'call-to-move' },
+  })))
+}
+
+function showJobCalls() {
+  const ranges = jobLines?.getRanges()
+  if (ranges?.length && !editor?.hasTextFocus()) {
+    editor?.revealRangeInCenterIfOutsideViewport(ranges[0].plusRange(ranges[ranges.length - 1]))
+  }
+}
+
+function lightCall() {
+  const call = game.playback.call.value
+  lineLight?.clear()
+  if (!call || !editor || !models.has(call.file)) return
+  if (game.playback.watching.value) open(call.file)
+  else if (activeFile.value !== call.file || files.value[call.file] !== campaign.value.project.deployed[call.file]) return
+  lineLight?.set([{ range: new monaco.Range(call.line, 1, call.line, 1), options: { isWholeLine: true, className: 'machine-line' } }])
+  if (game.playback.watching.value) editor.revealLineInCenterIfOutsideViewport(call.line)
+}
 
 function syncFiles() {
   if (!editor) return
@@ -197,6 +231,7 @@ onMounted(() => {
   editor = monaco.editor.create(host.value!, {
     model: null,
     wordBasedSuggestions: 'off',
+    autoClosingBrackets: 'never',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
@@ -217,6 +252,33 @@ onMounted(() => {
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: 'Factory controller TypeScript',
   })
+  lineLight = editor.createDecorationsCollection()
+  jobLines = editor.createDecorationsCollection()
+  editor.onDidChangeModel(markJobCalls)
+  editor.onDidChangeModelContent(markJobCalls)
+  editor.onDidLayoutChange(showJobCalls)
+  suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
+    triggerCharacters: ['"', "'"],
+    provideCompletionItems(model, pos) {
+      const prefix = model.getLineContent(pos.lineNumber).slice(0, pos.column - 1)
+      const match = /\b(?:take|put|look)\s*\(\s*(["'])([^"']*)$/.exec(prefix)
+      if (!match) return { suggestions: [] }
+      const suffix = model.getLineContent(pos.lineNumber).slice(pos.column - 1)
+      const end = suffix.indexOf(match[1]!)
+      const range = new monaco.Range(pos.lineNumber, pos.column - match[2]!.length, pos.lineNumber, pos.column + Math.max(0, end))
+      return { suggestions: game.places.value.map(name => ({
+        label: name, insertText: name, kind: monaco.languages.CompletionItemKind.Value, range,
+      })) }
+    },
+  })
+  editor.onMouseMove(({ target }) => {
+    const pos = target.position
+    const line = pos && editor?.getModel()?.getLineContent(pos.lineNumber)
+    const place = line && [...line.matchAll(/(["'])([^"']+)\1/g)].find(m =>
+      pos!.column > m.index! && pos!.column <= m.index! + m[0].length && game.places.value.includes(m[2]!))
+    emit('focusIds', place ? [place[2]!] : [])
+  })
+  editor.onMouseLeave(() => emit('focusIds', []))
   editor.onMouseDown(({ target }) => {
     if (!target.position || target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return
     const file = activeFile.value
@@ -228,6 +290,9 @@ onMounted(() => {
   })
   syncFiles()
   runtimeMarker()
+  // Navigation can arrive before the lazy editor mounts.
+  const initial = game.navigation.value
+  revealLine(initial.file, initial.line)
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
@@ -248,12 +313,18 @@ onMounted(() => {
   window.addEventListener('keydown', keys, true)
   emit('ready')
 })
+watch(callsToMove, () => {
+  markJobCalls()
+  showJobCalls()
+})
+watch(game.playback.call, lightCall)
 watch(files, syncFiles)
 watch(activeFile, display)
 watch(api, updateLibrary)
 watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
+  suggestions?.dispose()
   opener?.dispose()
   editor?.dispose()
   for (const model of models.values()) model.dispose()

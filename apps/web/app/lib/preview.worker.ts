@@ -1,5 +1,4 @@
-import { createProgram, runProjectTests, type PlayerTestResult } from '@inherit/sandbox'
-import { commandSites } from './commandSites'
+import { runProjectTests, type PlayerTestResult } from '@inherit/sandbox'
 import { getSurface, type Campaign } from '@inherit/sim'
 import { previewProject, type PreviewResult, type PreviewTicks } from './devtools/preview'
 
@@ -16,9 +15,7 @@ self.onmessage = async ({ data }: MessageEvent<BenchRequest>) => {
   const send = (reply: BenchReply) => self.postMessage(reply)
   try {
     if (data.kind === 'preview') {
-      const result = await previewProject(data.campaign, data.ticks, (options) =>
-        createProgram({ ...options, files: commandSites(options.files).compiledFiles }),
-      )
+      const result = await previewProject(data.campaign, data.ticks)
       send({ kind: 'preview', result })
     } else {
       const { budget, events } = getSurface(data.campaign)

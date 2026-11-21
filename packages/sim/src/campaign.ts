@@ -1,3 +1,4 @@
+import { starter } from './lessons'
 import { PRICES } from './prices'
 import { letter, newTown } from './town'
 import { placeMachine } from './construction'
@@ -57,18 +58,16 @@ export const initialSignals = () => ({
   recovered: false,
   confirmed: false,
 })
-const uncleNote =
-  '// The shed is yours. So is my tab at the bank.\n// Bring your verbs here. The factory calls onTick every tick. — Uncle\n'
-
 export function isStarterProject(files: ProjectFiles): boolean {
-  return files['main.ts'] === uncleNote
+  return files['main.ts'] === starter
 }
 
 export function createCampaign(seed = 1): Campaign {
-  const files = { 'main.ts': uncleNote }
+  const files = { 'main.ts': starter }
   const campaign: Campaign = {
-    version: 5,
-    seenSections: ['code'],
+    version: 6,
+    lesson: { index: 0, phase: 'brief', passed: [], queue: [], released: [] },
+    seenSections: ['factory'],
     town: newTown(),
     world: {
       tick: 0,

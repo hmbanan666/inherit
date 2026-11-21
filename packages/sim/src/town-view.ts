@@ -1,5 +1,5 @@
 import type { Campaign } from './model'
-import { activeRequest, DAY, debtRemaining, nextInstallment, REQUESTS, TAB_LETTER } from './town'
+import { activeRequest, DAY, debtRemaining, machineReserve, nextInstallment, REQUESTS, TAB_LETTER } from './town'
 
 export type BuildingId =
   | 'forge'
@@ -31,7 +31,7 @@ export interface TownSnapshot {
     mood: 'happy' | 'waiting' | 'gone'
     ask?: TownAsk
   }[]
-  debt: { owed: number; paid: number; next?: { amount: number } }
+  debt: { owed: number; paid: number; reserve?: number; next?: { amount: number } }
   changes: { tick: number; buildingId: BuildingId; text: string }[]
 }
 const buildings: Record<BuildingId, string> = {
@@ -62,6 +62,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
   } = c
   const clock = (tick % DAY) / DAY
   const next = nextInstallment(c)
+  const reserve = next ? machineReserve(c) : 0
   const owed = debtRemaining(c)
   const request = activeRequest(c)
   return {
@@ -83,7 +84,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
       .filter(([, , , b]) => b !== 'riverside' || town.beat >= 10)
       .map(([id, name, role, buildingId]) => {
         const ask =
-          request?.who === id
+          request?.who === id && town.filled < request.quantity
             ? {
                 requestId: request.id,
                 title: request.title,
@@ -95,7 +96,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
         const bank = id === 'harrow' && next && (town.beat === 2 || town.beat === 10)
         const hasOrder = c.economy.orders.some((o) => o.customer === id)
         const helped =
-          town.beat > 10 || (id === 'harrow' && !owed) || REQUESTS.some((r) => r.who === id && r.beat < town.beat)
+          town.beat > 10 || (id === 'harrow' && !owed) || REQUESTS.some((r) => r.who === id && town.changes.some(change => change.buildingId === r.building))
         return {
           id,
           name,
@@ -116,7 +117,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
             : ask,
         }
       }),
-    debt: { owed, paid: town.paid, next },
+    debt: { owed, paid: town.paid, ...(reserve ? { reserve } : {}), next },
     changes: town.changes.map((change) => ({ ...change })),
   }
 }
