@@ -56,11 +56,11 @@ export const initialSignals = () => ({
   recovered: false,
   confirmed: false,
 })
+export const uncleNote =
+  '// The shed is yours. So is my tab at the bank.\n// The factory runs this file every tick. Start below. — Uncle\n'
+
 export function createCampaign(seed = 1): Campaign {
-  const files = {
-    'main.ts':
-      'import type { Factory } from "inherit"\n\nexport function onTick(ctx: Factory) {\n  // The shed is yours. So is my tab. — Uncle\n}\n',
-  }
+  const files = { 'main.ts': uncleNote }
   const campaign: Campaign = {
     version: 4,
     town: newTown(),

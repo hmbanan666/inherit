@@ -268,7 +268,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
             <button @click="toggleDrawer('Inbox')"><Mail />Inbox<i v-if="unread" class="dot" /></button>
           </nav>
           <div class="live" :class="{ off: paused || !g.active.value }">
-            <i />{{ !ready ? 'Starting' : paused ? 'Paused' : g.active.value ? 'Live' : 'Offline' }}
+            <i />{{ !ready ? 'Starting' : paused ? 'Paused' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
           </div>
         </header>
         <RequestCard :person="requester" />

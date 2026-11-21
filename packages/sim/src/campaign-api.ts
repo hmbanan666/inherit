@@ -90,7 +90,7 @@ export interface BlueprintAPI {
 }
 export interface Factory {
   readonly tick: number
-  dig(id: string): boolean
+  dig(id: string, mode?: 'wait-for-space'): boolean
   route(id: string, target: string): boolean
   space(id: string, target?: string): boolean
   work(id: string, recipe?: RecipeId): boolean

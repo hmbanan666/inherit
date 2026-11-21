@@ -112,6 +112,15 @@ export const guestSetup = String.raw`
   Object.defineProperties(blueprintApi, descriptors);
   freeze(blueprintApi);
 
+  const connect = name => to => blueprintApi.connect(name, typeof to === "string" ? to : to.name);
+  const machines = freeze({
+    mine: freeze({ name: "mine", connect: connect("mine"), dig: () => api.dig("mine", "wait-for-space") }),
+    furnace: freeze({ name: "furnace", connect: connect("furnace"),
+      smelt: (recipe = "iron-ingot") => api.work("furnace", recipe) }),
+    cart: freeze({ name: "cart" }),
+  });
+  define(globalThis, "__inheritMachines", { value: machines, configurable: true });
+
   const cases = create(null);
   let count = 0, collecting = testing;
   global("test", (name, fn) => {
@@ -142,4 +151,10 @@ export const guestSetup = String.raw`
   return { api, blueprintApi, snapshot, parse, errorText, exported, finishTests() { collecting = false; return count; },
     testName(i) { return stringify(cases[i].name); }, runTest(i) { return cases[i].fn(blueprintApi); } };
 })
+`
+
+// Install the built-in module before any player module runs. Only its exports survive.
+export const inheritModule = `
+  export const { mine, furnace, cart } = globalThis.__inheritMachines;
+  delete globalThis.__inheritMachines;
 `

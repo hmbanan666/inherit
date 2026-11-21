@@ -1,6 +1,7 @@
 import { createProgram, type Program } from '@inherit/sandbox'
 import {
   advanceGame,
+  uncleNote,
   deployGameProject,
   rollbackGameProject,
   getSurface,
@@ -24,9 +25,11 @@ let error = ''
 let logs: string[] = []
 let cpu = { calls: 0, interrupts: 0, used: 0, budget: 96 }
 
-async function compile(files: ProjectFiles) {
+async function compile(files: ProjectFiles, allowStarter = false) {
   const { budget } = getSurface(campaign)
   const sites = commandSites(files)
+  if (allowStarter && files['main.ts'] === uncleNote && Object.keys(files).length === 1)
+    return { program: undefined, sites }
   const program = await createProgram({
     files: sites.compiledFiles,
     memory: campaign.memory,
@@ -71,20 +74,20 @@ async function apply(a: Action) {
   switch (a.kind) {
     case 'init':
       campaign = loadSave(a.campaign)
-      install(await compile(campaign.project.deployed))
+      install(await compile(campaign.project.deployed, true))
       return true
     case 'deploy':
     case 'rollback': {
       const files = a.kind === 'deploy' ? a.files : campaign.project.history.find((r) => r.id === a.id)?.files
       if (!files) return false
-      const next = await compile(files)
+      const next = await compile(files, a.kind === 'rollback')
       try {
         if (a.kind === 'deploy') {
           campaign.project.working = files
           deployGameProject(campaign)
         } else if (!rollbackGameProject(campaign, a.id)) throw new Error('Unknown revision.')
       } catch (e) {
-        next.program.dispose()
+        next.program?.dispose()
         throw e
       }
       install(next)
