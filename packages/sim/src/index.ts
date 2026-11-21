@@ -1,3 +1,23 @@
+import { stepCampaign } from './engine'
+import type { CampaignWorld } from './model'
+import type { Factory as CampaignFactory, FactoryEvent } from './campaign-api'
+export * from './model'
+export * from './catalog'
+export * from './campaign'
+export * from './construction'
+export * from './persistence'
+export * from './quests'
+export type {
+  Factory as CampaignFactory,
+  MaterialId,
+  MaterialItem,
+  MachineKind,
+  RecipeId,
+  MachineView,
+  MachineStats,
+  TruckOutcome,
+  FactoryEvent,
+} from './campaign-api'
 import type { Belt, Factory, Item, Layout, Level, Machine, World } from './types'
 export type * from './types'
 export * from './levels'
@@ -130,7 +150,19 @@ function processMachine(world: World, m: Machine) {
   if (m.status === 'working') m.activeTicks++
 }
 /** Advance a single fixed tick. Only the caller's world is modified. */
-export function step(world: World, onTick: (ctx: Factory) => void) {
+export function step(world: World, onTick: (ctx: Factory) => void): void
+export function step(
+  world: CampaignWorld,
+  onTick: (ctx: CampaignFactory, events: FactoryEvent[]) => void,
+): void
+export function step(
+  world: World | CampaignWorld,
+  onTick: ((ctx: Factory) => void) | ((ctx: CampaignFactory, events: FactoryEvent[]) => void),
+): void {
+  if ('sites' in world) return stepCampaign(world, onTick)
+  stepChapter(world, onTick as (ctx: Factory) => void)
+}
+function stepChapter(world: World, onTick: (ctx: Factory) => void) {
   world.tick++
   advanceBelts(world)
   for (const m of world.machines) m.status = 'idle'
