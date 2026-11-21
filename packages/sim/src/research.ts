@@ -1,8 +1,8 @@
-import type { Factory, MachineKind } from './campaign-api'
+import type { BlueprintAPI, Factory, MachineKind } from './campaign-api'
 import type { Campaign, ProjectFiles } from './model'
 import { deployProject, rollbackProject } from './campaign'
 
-export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'>
+export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'> | keyof BlueprintAPI
 export type GameEventName = 'onItemArrived' | 'onMachineIdle' | 'onTruckReturned'
 export interface UnlockedSurface {
   methods: FactoryMethod[]
@@ -63,6 +63,14 @@ export const RESEARCH: readonly ResearchNode[] = [
     description: 'Keep helpers in their own files.',
     cost: 3,
     requires: ['fork'],
+  },
+  {
+    id: 'blueprints',
+    title: 'Blueprint API',
+    description: 'Buy, belt and dismantle machines from your controller.',
+    cost: 3,
+    requires: ['binder'],
+    methods: ['build', 'connect', 'dismantle', 'lastError'],
   },
   {
     id: 'copper',

@@ -75,20 +75,38 @@ export const guestSetup = String.raw`
   const api = create(null);
   define(api, "tick", { get: tick });
   define(api, "memory", { value: memory });
+  const blueprintApi = create(null);
+  function arg(value) {
+    if (value === undefined) return undefined;
+    if (typeof value !== "string" || value.length > 256)
+      throw new Fault("Expected a short string factory argument.");
+    return stringify(value);
+  }
+  function coordinate(value) {
+    if (typeof value !== "number") throw new Fault("Expected a numeric build coordinate.");
+    return value;
+  }
+  function result(reply) { return reply === undefined ? undefined : parse(reply); }
   for (const name of parse(operations)) {
-    api[name] = (...args) => {
+    if (name === "build") {
+      blueprintApi.build = (kind, x, y, opts) => {
+        if (opts !== undefined && (!opts || typeof opts !== "object" || isArray(opts)))
+          throw new Fault("Expected build options.");
+        return result(call(name, 6, arg(kind), coordinate(x), coordinate(y),
+          arg(opts?.siteId), arg(opts?.recipe), arg(opts?.deposit)));
+      };
+      continue;
+    }
+    const target = name === "connect" || name === "dismantle" || name === "lastError" ? blueprintApi : api;
+    target[name] = (...args) => {
       if (args.length > 4) throw new Fault("Too many factory arguments.");
-      for (let i = 0; i < args.length; i++) {
-        const value = args[i];
-        if (value !== undefined && (typeof value !== "string" || value.length > 256))
-          throw new Fault("Expected a short string factory argument.");
-      }
-      const arg = i => i < args.length && args[i] !== undefined ? stringify(args[i]) : undefined;
-      const reply = call(name, args.length, arg(0), arg(1), arg(2), arg(3));
-      return reply === undefined ? undefined : parse(reply);
+      const at = i => i < args.length ? arg(args[i]) : undefined;
+      return result(call(name, args.length, at(0), at(1), at(2), at(3)));
     };
   }
   freeze(api);
+  Object.defineProperties(blueprintApi, Object.getOwnPropertyDescriptors(api));
+  freeze(blueprintApi);
 
   const cases = create(null);
   let count = 0, collecting = testing;
@@ -117,7 +135,7 @@ export const guestSetup = String.raw`
     const property = own(namespace, name);
     return property && has(property, "value") ? property.value : undefined;
   }
-  return { api, snapshot, parse, errorText, exported, finishTests() { collecting = false; return count; },
-    testName(i) { return stringify(cases[i].name); }, runTest(i) { return cases[i].fn(api); } };
+  return { api, blueprintApi, snapshot, parse, errorText, exported, finishTests() { collecting = false; return count; },
+    testName(i) { return stringify(cases[i].name); }, runTest(i) { return cases[i].fn(blueprintApi); } };
 })
 `

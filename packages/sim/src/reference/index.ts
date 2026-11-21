@@ -49,8 +49,22 @@ export function referenceFiles(objectiveId: string): ProjectFiles {
   else if ((at('press') && !at('plate')) || at('depots'))
     body.push('if (ctx.space("coal-mine")) ctx.dig("coal-mine")')
   if (at('part')) body.push(at('plate') ? 'ctx.work("press", "plate")' : 'ctx.work("press", "part")')
+  if (objectiveId === 'code-furnace')
+    body.push(
+      'if (!memory.oven) {',
+      '  const id = ctx.build("furnace", 10, 2, { recipe: "copper-ingot" })',
+      '  if (id) memory.oven = id',
+      '}',
+    )
+  if (objectiveId === 'code-belt')
+    body.push(
+      'if (typeof memory.oven === "string") {',
+      '  if (!memory.wired) memory.wired = ctx.connect("copper", memory.oven)',
+      '  if (!memory.outlet) memory.outlet = ctx.connect(memory.oven, "dock")',
+      '}',
+    )
   if (at('copper-ore')) body.push('if (ctx.space("copper")) ctx.dig("copper")')
-  if (at('copper-bar')) body.push('ctx.work("smelter", "copper-ingot")')
+  if (at('copper-bar')) body.push('if (typeof memory.oven === "string") ctx.work(memory.oven, "copper-ingot")')
   if (at('wire')) body.push('ctx.work("draw", "wire")')
   if (at('gear')) body.push('ctx.work("teeth", "gear")')
   if (at('jig'))

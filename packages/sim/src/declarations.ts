@@ -36,6 +36,26 @@ const docs: Record<FactoryMethod, [string, string, string]> = {
     'ctx.peek("sorter")?.defect',
     'peek(id: string): MaterialItem | undefined',
   ],
+  build: [
+    'Buy a machine on a free owned tile (shed by default). Miners need a licensed deposit.',
+    'const oven = ctx.build("furnace", 10, 2, { recipe: "copper-ingot" })',
+    'build(kind: MachineKind, x: number, y: number, opts?: { siteId?: string; recipe?: RecipeId; deposit?: "iron" | "coal" | "copper" }): string | undefined',
+  ],
+  connect: [
+    'Buy a shortest belt across owned tiles, paying for both endpoints.',
+    'ctx.connect("copper", oven)',
+    'connect(from: string, to: string): boolean',
+  ],
+  dismantle: [
+    'Sell a machine and its attached belts for their recorded prices.',
+    'ctx.dismantle(oven)',
+    'dismantle(id: string): boolean',
+  ],
+  lastError: [
+    'Read the most recent construction failure. Success or a new tick clears it. Four attempts per tick.',
+    'console.log(ctx.lastError())',
+    'lastError(): string | undefined',
+  ],
   dispatch: [
     'Send one parcel. Reusing its key retries the same load.',
     'ctx.dispatch("truck", "local", "remote", "load-1")',

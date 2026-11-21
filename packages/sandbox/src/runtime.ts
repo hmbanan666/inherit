@@ -35,6 +35,10 @@ const mockFactory = {
   recipes: () => [],
   peek: () => undefined,
   dispatch: () => false,
+  build: () => undefined,
+  connect: () => false,
+  dismantle: () => false,
+  lastError: () => undefined,
 }
 const operations = Object.keys(mockFactory).filter((key) => key !== 'tick')
 
@@ -157,9 +161,14 @@ export async function openRuntime(
         const key = vm.getString(name)
         const method = operations.includes(key) && Reflect.get(current, key)
         if (typeof method !== 'function') throw new Error(`Factory method ${key} is unavailable.`)
-        const params = args
-          .slice(0, vm.getNumber(length))
-          .map((h) => (vm.typeof(h) === 'string' ? JSON.parse(vm.getString(h)) : undefined))
+        const params = args.slice(0, vm.getNumber(length)).map((h) => {
+          if (vm.typeof(h) === 'number') return vm.getNumber(h)
+          if (vm.typeof(h) === 'string') return JSON.parse(vm.getString(h))
+        })
+        if (key === 'build') {
+          const [siteId, recipe, deposit] = params.splice(3)
+          params.push({ siteId, recipe, deposit })
+        }
         const result = Reflect.apply(method, current, params)
         return result === undefined ? vm.undefined : vm.newString(hostJson(result))
       }),
@@ -180,6 +189,7 @@ export async function openRuntime(
     )
     const helper = (key: string) => keep(vm.getProp(helpers, key))
     const api = helper('api'),
+      blueprintApi = helper('blueprintApi'),
       parse = helper('parse'),
       snapshot = helper('snapshot')
     const runTest = helper('runTest'),
@@ -217,13 +227,14 @@ export async function openRuntime(
         }
         begin(frame)
         if (frame.used > budget) throw new Error(`Operation budget (${budget}) exceeded.`)
+        const surface = typeof Reflect.get(ctx, 'build') === 'function' ? blueprintApi : api
         current = ctx
         try {
-          if (event === undefined) usingHandle(invoke(fn, api), assertSynchronous)
+          if (event === undefined) usingHandle(invoke(fn, surface), assertSynchronous)
           else
             usingHandle(vm.newString(hostJson(event)), (text) =>
               usingHandle(invoke(parse, text), (data) =>
-                usingHandle(invoke(fn, data, api), assertSynchronous),
+                usingHandle(invoke(fn, data, surface), assertSynchronous),
               ),
             )
         } finally {

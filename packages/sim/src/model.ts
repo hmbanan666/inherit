@@ -19,6 +19,7 @@ export interface Site {
 }
 export interface CampaignMachine extends MachineView {
   lastInput?: string
+  builtByCode?: true
   paid: number
   builtAt: number
   recentProduction: number[]
@@ -30,6 +31,7 @@ export interface CampaignBelt {
   from: string
   to: string
   path: Tile[]
+  builtByCode?: true
   paid: number
   sequence: number
   items: (MaterialItem & { id: number; position: number })[]
