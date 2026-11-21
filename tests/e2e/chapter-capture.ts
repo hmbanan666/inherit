@@ -8,12 +8,11 @@ export async function chapterCapture(page: Page) {
   const dir = process.env.INHERIT_SHOTS
   if (!dir) return async (_name: string) => {}
   await mkdir(dir, { recursive: true })
-  await page.clock.install()
   const browser = await page.context().newCDPSession(page)
   const sections: string[] = []
   return async (name: string) => {
     await page.mouse.move(0, 0)
-    await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now() + 30)))
+    await browser.send('Page.setWebLifecycleState', { state: 'frozen' })
     try {
       const text = await page.evaluate(() => {
         function read(root: Element) {
@@ -75,7 +74,7 @@ export async function chapterCapture(page: Page) {
       sections.push('## ' + name + '.png\n\n````text\n' + text.join('\n\n') + '\n````\n')
       await writeFile(join(dir, 'visible-text.md'), sections.join('\n'))
     } finally {
-      await page.clock.resume()
+      await browser.send('Page.setWebLifecycleState', { state: 'active' })
     }
   }
 }
