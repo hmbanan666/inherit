@@ -51,3 +51,5 @@ The story adds two non-physical actions when it introduces them: `buy(kind, name
 - Saves from the handle version restart chapter 1 and keep their code as a snapshot (as in ADR 0004).
 - The engine keeps its machines, recipes and belts internally; chapter 1 simply does not teach belts or ship ready-made verbs.
 - Checks, the request card chain and the growing sections stay; their texts move to the new verbs.
+
+> Partly superseded by ADR 0014: `put(place)` puts what the arm holds, the player works in one `main.ts` until the Mayor, and tasks end on a solved card with Continue instead of bench checks that advance on their own.

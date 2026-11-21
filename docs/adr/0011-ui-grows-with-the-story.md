@@ -17,3 +17,5 @@ All main sections live in the existing top navigation bar (Code, Factory, Town, 
 The sim decides which sections are unlocked (part of the unlocked surface, next to the verbs), so the UI and the tests agree. The API reference from ADR 0009 follows the same surface and lists only unlocked verbs. Older saves get the sections their progress has earned.
 
 Every request card connects the story to the code in three short lines: who asks and why, what the factory must do, and what that means in code, for example "Bram needs 3 ingots for horseshoes → the furnace must smelt iron ore → `furnace.smelt()`". This extends ADR 0005 (show tools only when the story needs them) from tools to the whole screen.
+
+> Partly superseded by ADR 0014: the shed floor is on screen from the first second, the navigation starts with Shed, and the code-only first launch is gone.
