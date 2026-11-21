@@ -13,7 +13,9 @@ const kinds = computed(() => [
 ])
 const license = (k: MachineKind) => RESEARCH.find((n) => n.machines?.includes(k))?.title
 const strip = ref<HTMLElement>()
-const guided = computed(() => (props.guide?.[0] === 'machine' ? props.guide[1] : undefined))
+const guided = computed(() =>
+  props.guide?.[0] === 'machine' || props.guide?.[0] === 'shop' ? props.guide[1] : undefined,
+)
 watch(
   guided,
   async (kind) => {
@@ -51,7 +53,7 @@ function move(e: PointerEvent) {
         <Hammer /> Build <kbd>B</kbd>
       </button>
       <button
-        :class="{ 'guide-pulse': guide?.[0] === 'belt' && tool !== 'belt' }"
+        :class="{ 'guide-pulse': (guide?.[0] === 'belt' || guide?.[0] === 'belt-tool') && tool !== 'belt' }"
         :aria-pressed="tool === 'belt'"
         aria-label="Belt tool"
         @click="emit('pick', 'belt')"
@@ -66,7 +68,9 @@ function move(e: PointerEvent) {
       >
         <Eraser /> Remove
       </button>
-      <button class="shop-link" @click="emit('shop')">Shop <ChevronRight /></button>
+      <button class="shop-link" :class="{ 'guide-pulse': guide?.[0] === 'road' }" @click="emit('shop')">
+        Shop <ChevronRight />
+      </button>
     </header>
     <div ref="strip" class="machine-strip">
       <button

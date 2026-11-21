@@ -24,7 +24,7 @@ import {
   TriangleAlert,
   X,
 } from '@lucide/vue'
-import { OBJECTIVES, objectiveTrack, questStatus, RESEARCH, MACHINES } from '@inherit/sim'
+import { OBJECTIVES, objectiveTrack, RESEARCH, MACHINES } from '@inherit/sim'
 import { buildGuide, type BuildTool } from './lib/buildGuide'
 import { provideGame } from './lib/useGame'
 import ConsolePanel from './components/ConsolePanel.vue'
@@ -40,8 +40,10 @@ const track = computed(() => objectiveTrack(campaign.value)),
 const completed = computed(() => campaign.value.progress.completedObjectives)
 const progress = computed(() => track.value.progress)
 const unread = computed(() => campaign.value.progress.messages.filter((m) => m.unread).length)
-const retryable = computed(
-  () => !!questStatus(campaign.value) || ['breakdown', 'ack'].includes(objective.value?.id ?? ''),
+const retryable = computed(() => ['breakdown', 'ack'].includes(objective.value?.id ?? ''))
+const objectiveNumber = computed(() => OBJECTIVES.findIndex((o) => o.id === objective.value?.id) + 1)
+const progressText = computed(
+  () => `${progress.value.current} / ${progress.value.target} ${objective.value?.progressUnit ?? ''}`,
 )
 const ids = computed(() => campaign.value.world.machines.map((m) => m.id))
 const stableIds = computed((previous: string[] | undefined) =>
@@ -70,11 +72,7 @@ const tool = ref<BuildTool>()
 const placing = computed(() =>
   tool.value && tool.value !== 'belt' && tool.value !== 'remove' ? tool.value : undefined,
 )
-const hintIndex = ref(0)
-const hintLines = computed(
-  () => objective.value?.hints.filter((h) => !/^ctx[.(]|^if\s*\(|^memory\./.test(h)) ?? [],
-)
-const example = computed(() => objective.value?.hints.find((h) => /^ctx[.(]|^if\s*\(|^memory\./.test(h)))
+const example = computed(() => objective.value?.hints.slice(1).join('\n'))
 const hints = ref(false),
   toast = ref(''),
   stamp = ref<(typeof OBJECTIVES)[number]>()
@@ -109,7 +107,6 @@ watch(
     clearTimeout(stampTimer)
     stampTimer = setTimeout(() => (stamp.value = undefined), 3500)
     hints.value = false
-    hintIndex.value = 0
   },
 )
 watch(
@@ -145,36 +142,25 @@ function toggleDrawer(name: NonNullable<typeof drawer.value>) {
   menu.value = ''
   tool.value = undefined
 }
-const guide = computed(() => buildGuide(campaign.value, objective.value?.id))
-const editorGoal = computed(() =>
-  ['tally', 'chalk', 'helper', 'contract', 'recipe-table', 'idle'].includes(objective.value?.id ?? ''),
-)
-const focusId = computed(() => {
-  const o = objective.value
-  if (!o || guide.value || editorGoal.value) return
-  const named: Record<string, string> = {
-    dig: 'mine',
-    fire: 'furnace-a',
-    ingot: 'dock',
-    shed: 'dock',
-    loading: 'mine',
-    balance: 'splitter',
-    parts: 'dock',
-    gate: 'coal-mine',
-    bracket: 'dock',
-    arrival: 'scrap',
-    manifest: 'truck',
-    breakdown: 'truck',
-    ack: 'truck',
-    motor: 'motor-jig',
-  }
-  return named[o.id] ?? ids.value.find((id) => o.hints.some((h) => h.includes('"' + id + '"')))
-})
+const guide = computed(() => buildGuide(campaign.value, objective.value))
+const guidedButton = computed(() => (guide.value?.[0] === 'button' ? guide.value[1] : undefined))
+const buttonLabels = {
+  editor: 'Open controller',
+  deploy: 'Find Deploy',
+  files: 'Open project files',
+  memory: 'Show memory',
+  inbox: 'Open inbox',
+}
 const guideKey = computed(() => JSON.stringify(guide.value))
 const floor = ref<{ revealGuide: () => void }>()
 const tutorial = ref(false)
 watch([ready, guideKey, tool], () => {
-  if (ready.value && !g.buildTutorialSeen.value && (guide.value || tool.value)) {
+  if (
+    ready.value &&
+    !g.buildTutorialSeen.value &&
+    (tool.value ||
+      (guide.value && ['shop', 'machine', 'plot', 'research', 'belt', 'unbelt'].includes(guide.value[0])))
+  ) {
     tutorial.value = true
     g.markBuildTutorialSeen()
   }
@@ -183,10 +169,19 @@ const guideLabel = computed(() => {
   const a = guide.value
   if (!a) return ''
   switch (a[0]) {
+    case 'button':
+      return buttonLabels[a[1]]
+    case 'focus':
+      return 'Find ' + a[1]
+    case 'tile':
+      return (a[4] ? 'Place ' + MACHINES[a[4]].name + ' at (' : 'Find tile (') + a[2] + ', ' + a[3] + ')'
+    case 'belt-tool':
+      return 'Choose belt tool'
     case 'research':
       return 'Research ' + RESEARCH.find((n) => n.id === a[1])?.title
     case 'plot':
       return 'Find ' + a[2].replaceAll('-', ' ')
+    case 'shop':
     case 'machine':
       return 'Place ' + MACHINES[a[1]].name
     case 'belt':
@@ -209,11 +204,39 @@ function toggleBuild() {
     return
   }
   const a = guide.value
-  build(a?.[0] === 'machine' ? a[1] : a?.[0] === 'belt' ? 'belt' : a?.[0] === 'unbelt' ? 'remove' : 'furnace')
+  build(
+    a?.[0] === 'machine' || a?.[0] === 'shop'
+      ? a[1]
+      : a?.[0] === 'belt' || a?.[0] === 'belt-tool'
+        ? 'belt'
+        : a?.[0] === 'unbelt'
+          ? 'remove'
+          : 'furnace',
+  )
 }
 async function followGuide() {
   const a = guide.value
   if (!a) return
+  drawer.value = undefined
+  menu.value = ''
+  selected.value = ''
+  tool.value = undefined
+  if (a[0] === 'button') {
+    if (a[1] === 'inbox') drawer.value = 'Inbox'
+    else if (a[1] === 'memory') hints.value = true
+    else if (a[1] === 'deploy') document.querySelector<HTMLButtonElement>('.deploy')?.focus()
+    else {
+      dock.value = true
+      tab.value = 'controller'
+      await nextTick()
+      document
+        .querySelector<HTMLButtonElement>(
+          a[1] === 'files' ? '[aria-label="Project files"] button' : '.file-tabs button',
+        )
+        ?.focus()
+    }
+    return
+  }
   if (a[0] === 'research') {
     drawer.value = 'Research'
     return
@@ -222,8 +245,9 @@ async function followGuide() {
     drawer.value = 'Shop'
     return
   }
-  if (a[0] === 'machine') build(a[1])
-  if (a[0] === 'belt') build('belt')
+  if (a[0] === 'tile' && a[4]) build(a[4])
+  if (a[0] === 'machine' || a[0] === 'shop') build(a[1])
+  if (a[0] === 'belt' || a[0] === 'belt-tool') build('belt')
   if (a[0] === 'unbelt') {
     build('remove')
     selected.value = a[1] + ' → ' + a[2]
@@ -357,7 +381,7 @@ function askNewGame() {
       <div class="deploy-group">
         <button
           class="deploy"
-          :class="{ 'guide-pulse': objective?.id === 'redeploy' || (dirty && objective?.id === 'dig') }"
+          :class="{ 'guide-pulse': guidedButton === 'deploy' }"
           :disabled="!ready && !error"
           @click="g.deploy"
         >
@@ -406,8 +430,7 @@ function askNewGame() {
               :class="{
                 'guide-pulse':
                   ((name === 'Research' && guide?.[0] === 'research') ||
-                    (name === 'Inbox' && objective?.id === 'network') ||
-                    (name === 'Orders' && objective?.id === 'tram')) &&
+                    (name === 'Inbox' && guidedButton === 'inbox')) &&
                   drawer !== name,
               }"
               :aria-pressed="drawer === name"
@@ -428,14 +451,20 @@ function askNewGame() {
                     : 'Live'
             }}
           </div>
-          <button v-if="!dock" aria-label="Open editor" @click="dock = true"><PanelRightOpen /></button>
+          <button
+            v-if="!dock"
+            :class="{ 'guide-pulse': guidedButton === 'editor' || guidedButton === 'files' }"
+            aria-label="Open editor"
+            @click="dock = true"
+          >
+            <PanelRightOpen />
+          </button>
         </header>
         <section ref="objectiveCard" class="objective" aria-label="Objective track">
           <div class="objective-icon"><Target /></div>
           <div class="goal-body">
-            <small class="eyebrow"
-              >Objective {{ Math.min(completed.length + 1, OBJECTIVES.length) }} /
-              {{ OBJECTIVES.length }}</small
+            <small v-if="objective" class="eyebrow"
+              >Objective {{ objectiveNumber }} / {{ OBJECTIVES.length }}</small
             >
             <h2>{{ objective?.title ?? 'Free play' }}</h2>
             <div class="next">
@@ -445,17 +474,20 @@ function askNewGame() {
           <button
             v-if="guideLabel"
             class="guide-link"
+            :class="{ 'guide-pulse': guidedButton === 'memory' }"
             :aria-label="'Guide: ' + guideLabel"
             @click="followGuide"
           >
             {{ guideLabel }} <ArrowRight />
           </button>
-          <div class="goal-aside">
+          <div v-if="objective" class="goal-aside">
             <button class="hint" :aria-expanded="hints" @click="hints = !hints"><CircleHelp /> Hint</button>
-            <b>{{ progress.current }} / {{ progress.target }}</b>
+            <b>{{ progressText }}</b>
           </div>
           <div
+            v-if="objective"
             class="goal-progress"
+            :aria-valuetext="progressText"
             role="progressbar"
             :aria-label="objective?.title ?? 'Free play'"
             :aria-valuemin="0"
@@ -467,17 +499,17 @@ function askNewGame() {
             ></i>
           </div>
           <div v-if="hints && objective" class="hint-note">
-            <p v-if="hintLines.length">{{ hintLines[hintIndex] }}</p>
+            <p>{{ objective.hints[0] }}</p>
             <code v-if="example">{{ example }}</code>
-            <button v-if="hintLines.length > 1" @click="hintIndex = (hintIndex + 1) % hintLines.length">
-              {{ hintIndex === 0 ? 'Next hint' : 'Previous hint' }}
-            </button>
+            <details v-if="guidedButton === 'memory'" open>
+              <summary>Saved memory</summary>
+              <pre>{{ JSON.stringify(campaign.memory, null, 2) }}</pre>
+            </details>
             <button v-if="retryable" @click="g.act({ kind: 'retry' })">Retry objective</button>
           </div>
         </section>
         <div class="map-frame">
           <LazyFactoryFloor
-            :focus-id="focusId"
             ref="floor"
             :tool="tool"
             :guide="guide"
@@ -537,10 +569,10 @@ function askNewGame() {
           <span class="eyebrow"><Code2 /> Code workshop</span
           ><button aria-label="Collapse editor" @click="dock = false"><PanelRightClose /></button>
         </header>
-        <FileTree v-if="surface.multiFile" />
+        <FileTree v-if="surface.multiFile" :class="{ 'guide-pulse': guidedButton === 'files' }" />
         <div class="file-tabs">
           <button
-            :class="{ 'guide-pulse': editorGoal }"
+            :class="{ 'guide-pulse': guidedButton === 'editor' }"
             :aria-pressed="tab === 'controller'"
             @click="tab = 'controller'"
           >

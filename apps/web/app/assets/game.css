@@ -1452,6 +1452,17 @@ button.revisions:hover {
   background: #92ca8538;
   border-color: #d8f4bf;
 }
+.objective-tile {
+  position: absolute;
+  display: grid;
+  place-items: start center;
+  border: 2px dashed var(--gold);
+  border-radius: 6px;
+  background: #ecc97421;
+  color: var(--gold);
+  font-size: 22px;
+  pointer-events: none;
+}
 .target-cell.valid {
   animation: guide 1.5s ease-in-out infinite;
   border: 3px dashed #f1ce74;
@@ -1658,6 +1669,10 @@ button.revisions:hover {
     width: 13px;
     height: 13px;
   }
+}
+.hint-note details pre {
+  max-height: 5em;
+  overflow: auto;
 }
 .hint-note code {
   display: block;
