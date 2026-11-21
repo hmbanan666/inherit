@@ -1,15 +1,25 @@
 import type { Campaign, GameTick, MachineKind, ProjectFiles } from '@inherit/sim'
 import type { CpuStats } from '@inherit/sandbox'
 
-export interface CallSite { file: string; line: number; fn: string }
-export interface GameLog { tick: number; level: 'log' | 'error'; text: string; file?: string; line?: number }
+export interface CallSite {
+  file: string
+  line: number
+  fn: string
+}
+export interface GameLog {
+  tick: number
+  level: 'log' | 'error'
+  text: string
+  file?: string
+  line?: number
+}
 export interface MetricSample {
   tick: number
   money: number
   cpu: number
   budget: number
   errors: number
-  machines: Record<string, {rate: number; idle: number; blocked: number; queue: number}>
+  machines: Record<string, { rate: number; idle: number; blocked: number; queue: number }>
 }
 export type Action =
   | { kind: 'init'; campaign: Campaign }
@@ -22,7 +32,9 @@ export type Action =
   | { kind: 'plot'; site: string; id: string }
   | { kind: 'belt' | 'sellBelt'; from: string; to: string }
 export interface Frame {
-  campaign: Campaign
+  campaign: Omit<Campaign, 'project'>
+  project?: Campaign['project']
+  active: boolean
   error: string
   notice?: string
   cpu: CpuStats
