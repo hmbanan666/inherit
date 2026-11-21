@@ -133,6 +133,8 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await deployBeat(4)
   if (paced) {
     await waitForMinute(25)
+    // Keep the same equipment reserve as the beginner reference before paying the bank early.
+    await expect.poll(async () => (await saved()).economy.money, { timeout: 120_000 }).toBeGreaterThanOrEqual(250)
     await pay()
   }
   await waitForMinute(29)
