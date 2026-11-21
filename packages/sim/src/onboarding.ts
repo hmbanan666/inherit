@@ -17,7 +17,7 @@ export const bramLessons: Record<OnboardingStep, Lesson> = {
   1: {
     check: 'onTick',
     title: 'Write your first function',
-    text: 'The factory looks in main.ts for a function called onTick and runs it every tick. The word export lets the factory see it.',
+    text: 'In the editor below, write a function called onTick in main.ts. The word export lets the factory find it and run it every tick.',
     blank: 'export function ____() { console.log("tick") }',
     idea: 'Name your function onTick. Put a message inside its braces so you can see when it runs.',
     code: 'export function onTick() {\n  console.log("tick")\n}',
@@ -25,7 +25,7 @@ export const bramLessons: Record<OnboardingStep, Lesson> = {
   2: {
     check: 'onTick',
     title: 'Deploy your draft',
-    text: 'Your edits stay a draft until you deploy. Deploy makes the factory run them every tick.',
+    text: 'Your edits stay a draft until you click Deploy at the bottom of the workshop. The factory then runs your code every tick.',
     blank: 'In the console: ____',
     idea: 'Print a message inside onTick, then use the button at the bottom of the workshop.',
     code: 'console.log("tick")',

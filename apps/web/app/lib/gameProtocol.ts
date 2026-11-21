@@ -31,7 +31,7 @@ export type Action =
   | { kind: 'read'; id: string }
 export interface Frame {
   town: TownSnapshot
-  campaign: Omit<Campaign, 'project'>
+  campaign: Omit<Campaign, 'project' | 'seenSections'>
   project?: Campaign['project']
   active: boolean
   error: string

@@ -12,6 +12,7 @@ import {
   TICK_MS,
   townSnapshot,
   type ProjectFiles,
+  type WorkshopSection,
 } from '@inherit/sim'
 import { sandboxDeclarations } from '@inherit/sandbox/declarations'
 import type { CpuStats } from '@inherit/sandbox'
@@ -44,9 +45,7 @@ function createGameStore() {
   const activeFile = ref('main.ts'),
     selected = ref(''),
     navigation = shallowRef({ file: 'main.ts', line: 1 })
-  const speed = ref(1),
-    paused = ref(false),
-    ready = ref(false),
+  const ready = ref(false),
     error = ref(''),
     notice = ref('')
   const active = ref(false)
@@ -140,7 +139,7 @@ function createGameStore() {
     if (!worker || current) return
     current = queue.shift()
     if (!current) {
-      if (!paused.value) timer = setTimeout(() => act({ kind: 'step' }), TICK_MS / speed.value)
+      timer = setTimeout(() => act({ kind: 'step' }), TICK_MS)
       return
     }
     if (current.kind === 'rollback') rollbackDraft = files.value
@@ -162,7 +161,7 @@ function createGameStore() {
     clearTimeout(watchdog)
     const action = current!
     current = undefined
-    const c = { ...frame.campaign, project: frame.project ?? state.value.project }
+    const c = { ...frame.campaign, project: frame.project ?? state.value.project, seenSections: state.value.seenSections }
     active.value = frame.active
     if (action.kind === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
       files.value = c.project.working
@@ -174,7 +173,7 @@ function createGameStore() {
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
     if (frame.error && error.value !== frame.error) {
-      const loc = /^(.+\.ts):(\d+)/.exec(frame.error)
+      const loc = /^(?:Deploy failed · )?([\w./-]+\.ts):(\d+)/.exec(frame.error)
       lines.push({
         tick,
         level: 'error',
@@ -293,6 +292,12 @@ function createGameStore() {
     const site = traces.value[id]?.at(-1)
     if (site) openFile(site.file, site.line)
   }
+  // Visits belong to the browser. Persist them even if the next worker frame is still in flight.
+  function visitSection(section: WorkshopSection) {
+    if (!surface.value.sections.includes(section) || state.value.seenSections.includes(section)) return
+    state.value = { ...state.value, seenSections: [...state.value.seenSections, section] }
+    persist()
+  }
   function newGame() {
     stop()
     state.value = createCampaign()
@@ -306,8 +311,6 @@ function createGameStore() {
     error.value = ''
     selected.value = ''
     notice.value = ''
-    speed.value = 1
-    paused.value = false
     openFile('main.ts')
     persist()
     start()
@@ -326,7 +329,6 @@ function createGameStore() {
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)
   })
-  watch([speed, paused], pump)
   onBeforeUnmount(() => {
     persist()
     stop()
@@ -367,8 +369,7 @@ function createGameStore() {
     metrics,
     ready,
     active,
-    speed,
-    paused,
+    visitSection,
     error,
     notice,
     saved,

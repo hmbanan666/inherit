@@ -97,7 +97,7 @@ function revealLine(file: string, line: number, column = 1) {
   editor?.revealLineInCenterIfOutsideViewport(line)
   editor?.focus()
 }
-defineExpose({ revealLine })
+defineExpose({ revealLine, focus: () => editor?.focus() })
 
 const results = computed(() => {
   const needle = query.value.trim().toLowerCase()

@@ -113,10 +113,10 @@ self.onmessage ??= async ({ data }: MessageEvent<Action>) => {
     if (data.kind === 'step') feedback = step()
     else if (!(await apply(data))) notice = 'Could not complete that action.'
   } catch (e) {
-    error = message(e)
+    error = data.kind === 'deploy' ? 'Deploy failed · ' + message(e) : message(e)
   }
   // Deploy histories may contain many full projects. Tick frames only carry the live state.
-  const { project, ...live } = campaign
+  const { project, seenSections: _seenSections, ...live } = campaign
   const changed = ['init', 'deploy', 'rollback', 'snapshot'].includes(data.kind)
   self.postMessage({
     campaign: live,

@@ -37,7 +37,7 @@ test('resolves relative files and directory indexes with shared cyclic module bi
 test.each([
   [{ 'main.ts': 'import "node:fs"' }, /relative/],
   [{ 'main.ts': 'import "../shared"' }, /escapes/],
-  [{ 'main.ts': 'import "./absent"' }, /resolve/],
+  [{ 'main.ts': '// One\n\nimport "./absent"' }, /main\.ts:3 · Cannot resolve/],
   [{ '../main.ts': '' }, /path/],
 ] as const)('rejects invalid module paths', async (files, message) => {
   await expect(createProgram({ files: { ...files } })).rejects.toThrow(message)
