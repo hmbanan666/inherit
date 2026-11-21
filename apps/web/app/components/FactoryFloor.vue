@@ -1,131 +1,416 @@
 <script setup lang="ts">
 import { Application, Graphics } from 'pixi.js'
-import { X, ScanLine } from '@lucide/vue'
-import { BELT_LENGTH, TICK_MS, type World } from '@inherit/sim'
-import { fit, FloorScene, point } from '../lib/floor'
+import { Minus, Plus, Maximize, LockKeyhole, Coins, X, Move, Trash2, MapPin, Navigation } from '@lucide/vue'
+import {
+  autoPath,
+  purchaseMachine,
+  purchaseBelt,
+  MACHINES,
+  PRICES,
+  TICK_MS,
+  type MachineKind,
+  type Plot,
+  type Tile,
+} from '@inherit/sim'
+import { useGame } from '../lib/useGame'
+import { center, FloorScene, tile, siteX } from '../lib/floor'
+import type { BuildTool, BuildGuide } from '../lib/buildGuide'
+import { machineArt } from '../lib/machineArt'
 
-const props = defineProps<{
-  world: World
-  selected: string
-  focusedIds: string[]
-  commands: Record<string, string>
-  placing: boolean
-  running: boolean
-  speed: number
-  shipped: boolean
-}>()
-const emit = defineEmits<{ select: [string]; place: [number, number]; connect: [string, string] }>()
-const host = ref<HTMLElement>()
-const mount = ref<HTMLElement>()
-const size = shallowRef({ width: 1, height: 1 })
-const drag = ref('')
-const ready = ref(false)
+const props = defineProps<{ placing?: MachineKind; tool?: BuildTool; guide?: BuildGuide; focusId?: string }>()
+const emit = defineEmits<{ placed: [] }>()
+const g = useGame(),
+  { campaign, selected, paused, speed } = g
+const world = computed(() => campaign.value.world)
+const host = ref<HTMLElement>(),
+  mount = ref<HTMLElement>()
+const size = ref({ w: 800, h: 500 }),
+  pan = ref({ x: 0, y: 0 }),
+  zoom = ref(1)
+const site = ref('shed'),
+  source = ref(''),
+  cursor = shallowRef<Tile>(),
+  plotOffer = shallowRef<Plot>()
 const renderError = ref('')
-let app: Application | undefined, scene: FloorScene | undefined, wire: Graphics | undefined
-let observer: ResizeObserver | undefined,
+let app: Application | undefined,
+  scene: FloorScene | undefined,
+  observer: ResizeObserver | undefined,
   disposed = false
-let previous: World | undefined,
-  arrived = 0,
-  interval = TICK_MS,
-  animationTime = 0,
-  shippedAt = 0
-let painted = ''
-let pressedOutput = false
-const layoutKey = computed(() =>
+let ghost: Graphics | undefined,
+  ghostKind = '',
+  paintKey = ''
+const pointers = new Map<number, { x: number; y: number }>()
+let moved = false,
+  draggingWire = false
+const sites = computed(() => world.value.sites.filter((s) => s.id === 'shed' || campaign.value.economy.road))
+const scale = computed(
+  () => Math.max(0.38, Math.min(1.6, size.value.w / (tile * 9.5), size.value.h / (tile * 5.9))) * zoom.value,
+)
+const camera = computed(() => ({
+  x: size.value.w / 2 - (siteX(site.value) + 4) * tile * scale.value + pan.value.x,
+  y: size.value.h / 2 - 2.45 * tile * scale.value + pan.value.y,
+}))
+function goSite(id: string) {
+  site.value = id
+  pan.value = { x: 0, y: 0 }
+  zoom.value = 1
+}
+function local(clientX: number, clientY: number) {
+  const r = host.value!.getBoundingClientRect()
+  return {
+    x: (clientX - r.left - camera.value.x) / scale.value,
+    y: (clientY - r.top - camera.value.y) / scale.value,
+  }
+}
+function here(p: Tile) {
+  return campaign.value.economy.road && p.x >= 18 ? 'yard' : 'shed'
+}
+function zoomBy(ratio: number, px = size.value.w / 2, py = size.value.h / 2) {
+  const before = zoom.value
+  zoom.value = Math.min(2.8, Math.max(0.32, before * ratio))
+  const f = zoom.value / before
+  pan.value = {
+    x: pan.value.x * f + (px - size.value.w / 2) * (1 - f),
+    y: pan.value.y * f + (py - size.value.h / 2) * (1 - f),
+  }
+}
+function wheel(e: WheelEvent) {
+  const r = host.value!.getBoundingClientRect()
+  zoomBy(Math.exp(-Math.max(-130, Math.min(130, e.deltaY)) * 0.0026), e.clientX - r.left, e.clientY - r.top)
+}
+function readCursor(e: PointerEvent) {
+  const r = host.value!.getBoundingClientRect()
+  if (e.clientX < r.left || e.clientX >= r.right || e.clientY < r.top || e.clientY >= r.bottom) {
+    cursor.value = undefined
+    return
+  }
+  const p = local(e.clientX, e.clientY),
+    x = Math.floor(p.x / tile),
+    y = Math.floor(p.y / tile)
+  if (cursor.value?.x !== x || cursor.value.y !== y) cursor.value = { x, y }
+}
+const at = computed(() => {
+  if (!cursor.value) return
+  const id = here(cursor.value)
+  return { site: id, x: cursor.value.x - siteX(id), y: cursor.value.y }
+})
+const target = computed(() =>
+  world.value.machines.find((m) => m.siteId === at.value?.site && m.x === at.value?.x && m.y === at.value?.y),
+)
+const route = computed(() => {
+  const from = world.value.machines.find((m) => m.id === source.value),
+    p = at.value
+  if (!from || !p || from.siteId !== p.site) return
+  return autoPath(world.value.sites.find((s) => s.id === from.siteId)!, from, p)
+})
+// Sim purchase functions write to the ledger and equipment lists. Copy those for a dry run.
+function constructionPreview() {
+  const c = campaign.value
+  return {
+    ...c,
+    economy: { ...c.economy },
+    world: { ...c.world, machines: [...c.world.machines], belts: [...c.world.belts] },
+  }
+}
+const valid = computed(() => {
+  const p = at.value
+  if (!p) return false
+  if (props.placing) return !!purchaseMachine(constructionPreview(), props.placing, p.site, p.x, p.y)
+  return !!(
+    source.value &&
+    target.value &&
+    purchaseBelt(constructionPreview(), source.value, target.value.id)
+  )
+})
+const receivers = computed(
+  () =>
+    new Set(
+      source.value
+        ? world.value.machines
+            .filter((m) => purchaseBelt(constructionPreview(), source.value, m.id))
+            .map((m) => m.id)
+        : [],
+    ),
+)
+interface BuildCell extends Tile {
+  site: string
+  valid: boolean
+}
+const cells = shallowRef<BuildCell[]>([])
+function planGrid() {
+  const result: BuildCell[] = []
+  if (props.placing)
+    for (const s of sites.value)
+      for (const p of s.plots)
+        for (let x = p.x; x < p.x + p.width; x++)
+          for (let y = p.y; y < p.y + p.height; y++) {
+            const valid =
+              p.status === 'owned' && !!purchaseMachine(constructionPreview(), props.placing, s.id, x, y)
+            result.push({ site: s.id, x, y, valid })
+          }
+  cells.value = result
+}
+const suggested = computed(() => {
+  const a = props.guide
+  if (a?.[0] !== 'machine' || props.placing !== a[1]) return
+  const deposits = world.value.sites.find((s) => s.id === a[2])?.deposits
+  const seam = (x: number, y: number) => deposits?.find((d) => d.x === x && d.y === y)?.kind
+  return cells.value
+    .filter((c) => c.valid && c.site === a[2] && (a[1] !== 'miner' || seam(c.x, c.y) === seam(a[3], a[4])))
+    .sort(
+      (l, r) => Math.abs(l.x - a[3]) + Math.abs(l.y - a[4]) - Math.abs(r.x - a[3]) - Math.abs(r.y - a[4]),
+    )[0]
+})
+function keyboardPlace(c: BuildCell) {
+  cursor.value = { x: c.x + siteX(c.site), y: c.y }
+  place()
+}
+function reveal(x: number, y: number) {
+  const px = x * scale.value + camera.value.x,
+    py = y * scale.value + camera.value.y
+  if (px < 48 || px > size.value.w - 48 || py < 48 || py > size.value.h - 48)
+    pan.value = { x: pan.value.x + size.value.w / 2 - px, y: pan.value.y + size.value.h / 2 - py }
+}
+function revealGuide(switchSites = true) {
+  function focus(id: string, x: number, y: number) {
+    if (site.value !== id) {
+      if (!switchSites) return
+      goSite(id)
+    }
+    reveal(x, y)
+  }
+  const a = props.guide
+  if (a?.[0] === 'plot') {
+    const p = plots.value.find((p) => p.id === a[2] && p.site === a[1])
+    if (p) focus(p.site, (siteX(p.site) + p.x + 1.05) * tile, (p.y + 0.68) * tile)
+  } else if (a?.[0] === 'machine' && suggested.value) {
+    const p = center(suggested.value.site, suggested.value)
+    focus(suggested.value.site, p.x, p.y)
+  } else if (a?.[0] === 'belt' || a?.[0] === 'unbelt') {
+    const m = world.value.machines.find((m) => m.id === a[source.value ? 2 : 1])
+    if (m) {
+      const p = center(m.siteId, m)
+      focus(m.siteId, p.x, p.y)
+    }
+  }
+}
+defineExpose({ revealGuide })
+const guidedId = computed(() =>
+  props.guide?.[0] === 'belt' && props.tool === 'belt'
+    ? props.guide[source.value ? 2 : 1]
+    : !props.guide
+      ? props.focusId
+      : undefined,
+)
+function preview() {
+  if (!scene || !cursor.value || !props.placing) {
+    if (ghost) ghost.visible = false
+    return
+  }
+  if (ghostKind !== props.placing || !ghost) {
+    ghost?.destroy()
+    ghost = scene.root.addChild(machineArt(props.placing))
+    ghostKind = props.placing
+  }
+  ghost.visible = true
+  ghost.position.set((cursor.value.x + 0.5) * tile, (cursor.value.y + 0.5) * tile)
+  ghost.tint = valid.value ? 0xa4edab : 0xef806d
+  ghost.alpha = 0.64
+}
+const structure = computed(() =>
   JSON.stringify([
-    props.world.machines.map((m) => [m.id, m.kind, m.x, m.y]),
-    props.world.belts.map((b) => [b.from, b.to]),
+    sites.value.map((s) => s.plots.map((p) => p.status)),
+    world.value.machines.map((m) => [m.id, m.x, m.y, m.kind, m.siteId]),
+    world.value.belts.map((b) => [b.from, b.to, b.path]),
   ]),
 )
-const camera = computed(() =>
-  fit(
-    props.world.machines,
-    props.placing ? (props.world.level.buildTiles ?? []) : [],
-    size.value.width,
-    size.value.height,
+watch(
+  [
+    () => props.placing,
+    structure,
+    () => props.placing && campaign.value.economy.money >= PRICES.machines[props.placing],
+    () => campaign.value.economy.research.join('/'),
+  ],
+  planGrid,
+  { immediate: true },
+)
+watch([() => JSON.stringify(props.guide), () => props.tool], async () => {
+  source.value = ''
+  await nextTick()
+  if (props.guide?.[0] === 'plot' || props.tool) revealGuide(false)
+})
+watch(source, () => {
+  if (props.tool === 'belt') revealGuide(false)
+})
+function sync() {
+  if (!app) return
+  if (!scene || paintKey !== structure.value) {
+    scene?.destroy()
+    scene = new FloorScene(world.value, campaign.value.economy.road)
+    app.stage.addChild(scene.root)
+    ghost = undefined
+    paintKey = structure.value
+  }
+  scene.root.scale.set(scale.value)
+  scene.root.position.set(camera.value.x, camera.value.y)
+  scene.update(world.value)
+  preview()
+}
+watch([world, camera, scale], sync)
+watch([() => props.placing, cursor, valid], preview)
+function down(e: PointerEvent) {
+  if ((e.target as HTMLElement).closest('button,aside') || source.value || props.placing || e.button !== 0)
+    return
+  host.value!.focus({ preventScroll: true })
+  host.value!.setPointerCapture(e.pointerId)
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  moved = false
+}
+function move(e: PointerEvent) {
+  if (props.placing || source.value) readCursor(e)
+  const old = pointers.get(e.pointerId)
+  if (!old) return
+  const other = [...pointers].find(([id]) => id !== e.pointerId)?.[1]
+  if (other) {
+    const r = host.value!.getBoundingClientRect()
+    zoomBy(
+      Math.hypot(e.clientX - other.x, e.clientY - other.y) /
+        Math.max(1, Math.hypot(old.x - other.x, old.y - other.y)),
+      (e.clientX + other.x) / 2 - r.left,
+      (e.clientY + other.y) / 2 - r.top,
+    )
+    moved = true
+  } else {
+    const dx = e.clientX - old.x,
+      dy = e.clientY - old.y
+    if (dx || dy) {
+      pan.value = { x: pan.value.x + dx, y: pan.value.y + dy }
+      moved = true
+    }
+  }
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+}
+function place() {
+  const p = at.value
+  if (p && props.placing && valid.value) {
+    g.act({ kind: 'machine', machine: props.placing, ...p })
+    emit('placed')
+  }
+}
+function up(e: PointerEvent) {
+  const wasPanning = pointers.delete(e.pointerId)
+  if (props.placing || source.value) {
+    const hit = document.elementFromPoint(e.clientX, e.clientY)
+    if (!hit || !host.value?.contains(hit) || hit.closest('.map-controls,.inspect,.deed,.floor-help')) return
+    readCursor(e)
+    if (props.placing) place()
+    else if (draggingWire && target.value && source.value !== target.value.id) {
+      g.act({ kind: 'belt', from: source.value, to: target.value.id })
+      source.value = ''
+      emit('placed')
+    }
+    draggingWire = false
+    return
+  }
+  if (wasPanning && !moved) {
+    const p = local(e.clientX, e.clientY)
+    const b = world.value.belts.find((b) =>
+      b.path.slice(1).some((end, i) => {
+        const a = center(b.siteId, b.path[i]!),
+          z = center(b.siteId, end)
+        const dx = z.x - a.x,
+          dy = z.y - a.y,
+          f = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)))
+        return Math.hypot(p.x - a.x - f * dx, p.y - a.y - f * dy) < 13
+      }),
+    )
+    selected.value = b ? b.from + ' → ' + b.to : ''
+    plotOffer.value = undefined
+  }
+}
+function cancel() {
+  pointers.clear()
+  source.value = ''
+  emit('placed')
+  cursor.value = undefined
+}
+function key(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    cancel()
+    selected.value = ''
+    plotOffer.value = undefined
+    return
+  }
+  if (e.key === 'Delete' && (machine.value || belt.value)) {
+    sell()
+    return
+  }
+  const d: Record<string, number[]> = { w: [0, 42], a: [42, 0], s: [0, -42], d: [-42, 0] }
+  const delta = d[e.key.toLowerCase()]
+  if (delta && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault()
+    pan.value = { x: pan.value.x + delta[0]!, y: pan.value.y + delta[1]! }
+  }
+}
+function beginWire(id: string, e: PointerEvent) {
+  if (props.placing || props.tool === 'remove') return
+  draggingWire = true
+  host.value?.focus({ preventScroll: true })
+  source.value = id
+  selected.value = ''
+  readCursor(e)
+}
+function choose(id: string) {
+  if (source.value && source.value !== id) {
+    g.act({ kind: 'belt', from: source.value, to: id })
+    source.value = ''
+    emit('placed')
+  } else if (props.tool === 'belt') {
+    const m = world.value.machines.find((m) => m.id === id)
+    if (m && m.kind !== 'dock' && m.kind !== 'truck') source.value = id
+  } else if (!props.placing) g.selectMachine(id)
+}
+const belt = computed(() => world.value.belts.find((b) => b.from + ' → ' + b.to === selected.value))
+const machine = computed(() => world.value.machines.find((m) => m.id === selected.value))
+const bins = computed(() =>
+  Object.entries(
+    machine.value?.queue.reduce<Record<string, number>>((r, i) => {
+      r[i.kind] = (r[i.kind] ?? 0) + 1
+      return r
+    }, {}) ?? {},
   ),
 )
-function syncScene() {
-  if (!app) return
-  const c = camera.value
-  const key = layoutKey.value + '/' + c.row
-  if (painted !== key) {
-    scene?.destroy()
-    scene = new FloorScene(props.world, c.row)
-    app.stage.addChildAt(scene.root, 0)
-    painted = key
-  }
-  scene!.root.position.set(c.x, c.y)
-  scene!.root.scale.set(c.scale)
-  wire!.position.copyFrom(scene!.root.position)
-  wire!.scale.set(c.scale)
-  scene!.update(props.world, previous, props.selected)
-}
-watch(
-  () => props.world,
-  (world, last) => {
-    previous = world.tick === last.tick + 1 ? last : undefined
-    arrived = performance.now()
-    interval = TICK_MS / props.speed
-    syncScene()
-  },
+const refund = computed(
+  () =>
+    belt.value?.paid ??
+    (machine.value
+      ? machine.value.paid +
+        world.value.belts
+          .filter((b) => b.from === selected.value || b.to === selected.value)
+          .reduce((n, b) => n + b.paid, 0)
+      : 0),
 )
-watch([() => props.placing, () => props.selected], syncScene)
-watch(
-  () => props.shipped,
-  (value) => {
-    shippedAt = value ? performance.now() : 0
-  },
-)
-function local(x: number, y: number) {
-  const bounds = host.value!.getBoundingClientRect(),
-    c = camera.value
-  return { x: (x - bounds.left - c.x) / c.scale, y: (y - bounds.top - c.y) / c.scale }
+function sell() {
+  if (belt.value) g.act({ kind: 'sellBelt', from: belt.value.from, to: belt.value.to })
+  else if (machine.value) g.act({ kind: 'sellMachine', id: machine.value.id })
+  selected.value = ''
+  emit('placed')
 }
-function dropAt(x: number, y: number) {
-  const p = local(x, y)
-  emit('place', Math.round(p.x / 80), Math.round(p.y / camera.value.row))
+function pos(x: number, y: number) {
+  return { left: x + 'px', top: y + 'px' }
 }
-function floorClick(e: MouseEvent) {
-  if (pressedOutput) return
-  if (props.placing) return dropAt(e.clientX, e.clientY)
-  const belt = scene?.beltAt(local(e.clientX, e.clientY))
-  emit('select', belt ? belt.from + ' → ' + belt.to : '')
-}
-function startWire(id: string, e: PointerEvent) {
-  e.preventDefault()
-  pressedOutput = true
-  drag.value = id
-  moveWire(e)
-}
-function moveWire(e: PointerEvent) {
-  if (!drag.value || !wire) return
-  const pointer = local(e.clientX, e.clientY)
-  const m = props.world.machines.find((m) => m.id === drag.value)
-  if (!m) return cancelWire()
-  const p = point(m, camera.value.row)
-  wire
-    .clear()
-    .moveTo(p.x + 37, p.y)
-    .lineTo(pointer.x, p.y)
-    .lineTo(pointer.x, pointer.y)
-    .stroke({ color: 0xf3c35e, width: 2.5 })
-}
-function cancelWire() {
-  drag.value = ''
-  wire?.clear()
-}
-function endWire(e: PointerEvent) {
-  if (!drag.value) return
-  const target = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('[data-input]')
-  if (target?.dataset.input) emit('connect', drag.value, target.dataset.input)
-  cancelWire()
+const plots = computed(() => sites.value.flatMap((s) => s.plots.map((p) => ({ ...p, site: s.id }))))
+const offerSite = ref('shed')
+function offer(p: Plot, id: string) {
+  plotOffer.value = p
+  offerSite.value = id
+  selected.value = ''
 }
 onMounted(async () => {
-  window.addEventListener('pointermove', moveWire)
-  window.addEventListener('pointerup', endWire)
-  window.addEventListener('pointercancel', cancelWire)
   const renderer = new Application()
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+  window.addEventListener('pointercancel', cancel)
   try {
     await renderer.init({
       width: 1,
@@ -133,7 +418,7 @@ onMounted(async () => {
       preference: 'canvas',
       backgroundAlpha: 0,
       antialias: true,
-      resolution: window.devicePixelRatio,
+      resolution: devicePixelRatio,
       autoDensity: true,
     })
     if (disposed) {
@@ -142,179 +427,239 @@ onMounted(async () => {
     }
     app = renderer
     mount.value!.appendChild(app.canvas)
-    wire = app.stage.addChild(new Graphics())
     function resize() {
-      const width = host.value!.clientWidth,
-        height = host.value!.clientHeight
-      size.value = { width, height }
-      renderer.renderer.resize(width, height, window.devicePixelRatio)
-      syncScene()
+      const w = host.value!.clientWidth,
+        h = host.value!.clientHeight
+      size.value = { w, h }
+      renderer.renderer.resize(w, h, devicePixelRatio)
+      sync()
     }
     resize()
     observer = new ResizeObserver(resize)
     observer.observe(host.value!)
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
-    app.ticker.maxFPS = 60
-    app.ticker.add((ticker) => {
-      const now = performance.now()
-      const delta = props.running ? ticker.deltaMS * props.speed : 0
-      animationTime += delta
-      const mix = Math.min(1, (now - arrived) / interval)
-      const departure = shippedAt ? Math.min(1, (now - shippedAt) / 1250) : 0
-      scene?.frame(
-        reduced.matches ? 1 : mix,
-        reduced.matches ? 0 : animationTime,
-        reduced.matches ? 0 : delta,
-        reduced.matches && shippedAt ? 1 : departure,
-      )
-    })
-    ready.value = true
+    renderer.ticker.maxFPS = 40
+    renderer.ticker.add(() => scene?.animate(performance.now(), TICK_MS / speed.value, paused.value))
   } catch {
-    renderError.value = 'Factory renderer could not start. Reload to retry.'
+    renderError.value = 'Could not open the floor renderer. Reload to retry.'
   }
 })
 onBeforeUnmount(() => {
   disposed = true
-  window.removeEventListener('pointermove', moveWire)
-  window.removeEventListener('pointerup', endWire)
-  window.removeEventListener('pointercancel', cancelWire)
+  window.removeEventListener('pointermove', move)
+  window.removeEventListener('pointerup', up)
+  window.removeEventListener('pointercancel', cancel)
   observer?.disconnect()
-  scene?.destroy()
   app?.destroy(true, { children: true })
 })
-const belt = computed(() => props.world.belts.find((b) => b.from + ' → ' + b.to === props.selected))
-const station = computed(() => props.world.machines.find((m) => m.id === props.selected))
-// Dock the inspector in the corner furthest from the equipment and its ports.
-const inspectorCorner = computed(() => {
-  const { width, height } = size.value
-  const c = camera.value
-  const w = Math.min(280, width - 28),
-    h = 80
-  const corners = [
-    { left: 14, top: 14 },
-    { left: width - w - 14, top: 14 },
-    { left: 14, top: height - h - 14 },
-    { left: width - w - 14, top: height - h - 14 },
-  ]
-  function clearance(corner: (typeof corners)[number]) {
-    return Math.min(
-      ...props.world.machines.map((m) => {
-        const x = c.x + m.x * 80 * c.scale,
-          y = c.y + (m.y * c.row + 13) * c.scale
-        const dx = Math.max(0, corner.left - x, x - corner.left - w)
-        const dy = Math.max(0, corner.top - y, y - corner.top - h)
-        return Math.hypot(dx, dy)
-      }),
-    )
-  }
-  return corners.reduce((best, next) => (clearance(next) > clearance(best) ? next : best))
-})
-const inventory = computed(() => {
-  const m = station.value
-  if (!m) return ''
-  const stock = [...new Set(m.queue)].map((kind) => m.queue.filter((it) => it === kind).length + ' ' + kind)
-  if (m.output) stock.push(m.output + ' ready')
-  return stock.join(' · ') || 'Empty'
-})
+function buyPlot() {
+  if (!plotOffer.value) return
+  g.act({ kind: 'plot', site: offerSite.value, id: plotOffer.value.id })
+  plotOffer.value = undefined
+}
 </script>
 <template>
   <div
     ref="host"
     class="floor"
-    :class="{ placing, frozen: !running }"
-    :style="{ '--label-scale': Math.max(1, 0.83 / camera.scale) }"
-    @pointerdown="pressedOutput = false"
-    @click="floorClick"
-    @dragover.prevent
-    @drop.prevent="dropAt($event.clientX, $event.clientY)"
+    tabindex="0"
+    aria-label="Factory map"
+    @wheel.prevent="wheel"
+    @keydown="key"
+    @pointerdown="down"
   >
-    <div ref="mount" class="pixi-mount" />
-    <div class="floor-label">SHOP PLAN</div>
-    <div class="compass" aria-hidden="true">N ↑</div>
-    <div class="floor-cross tl">+</div>
-    <div class="floor-cross br">+</div>
+    <div ref="mount" class="pixi-mount"></div>
     <div
-      class="floor-stage"
-      :style="{ transform: 'translate(' + camera.x + 'px,' + camera.y + 'px) scale(' + camera.scale + ')' }"
+      class="map-overlay"
+      :style="{ transform: 'translate(' + camera.x + 'px,' + camera.y + 'px) scale(' + scale + ')' }"
     >
-      <template v-if="placing">
+      <button
+        v-for="cell in cells"
+        :key="cell.site + cell.x + ',' + cell.y"
+        class="build-cell"
+        :class="{ valid: cell.valid, 'target-cell': cell === suggested }"
+        :disabled="!cell.valid"
+        :aria-label="'Place ' + MACHINES[placing!].name + ' at ' + cell.site + ' ' + cell.x + ', ' + cell.y"
+        :style="pos((siteX(cell.site) + cell.x) * tile, cell.y * tile)"
+        @click="$event.detail === 0 && keyboardPlace(cell)"
+      >
+        <b v-if="cell === suggested">Build here ↓</b>
+      </button>
+      <template v-for="p in plots" :key="p.site + p.id">
         <button
-          v-for="[x, y] in world.level.buildTiles"
-          :key="x + ',' + y"
-          class="place-cell"
-          :disabled="world.machines.some((m) => m.x === x && m.y === y)"
-          :aria-label="'Place at ' + (x + 1) + ', ' + (y + 1)"
-          :style="{ left: x * 80 + 'px', top: y * camera.row + 'px' }"
-          @click.stop="emit('place', x, y)"
+          v-if="p.status === 'sale'"
+          class="deed"
+          :class="{ 'guide-pulse': guide?.[0] === 'plot' && guide[2] === p.id }"
+          :aria-label="'Buy ' + p.id"
+          :style="pos((siteX(p.site) + p.x + 1.05) * tile, (p.y + 0.68) * tile)"
+          @click="offer(p, p.site)"
         >
-          +
+          <Coins :size="15" />{{ p.price }} <small>{{ p.id.replaceAll('-', ' ') }}</small>
+        </button>
+        <span
+          v-if="p.status === 'locked'"
+          class="fog-label"
+          :style="pos((siteX(p.site) + p.x + 1.3) * tile, (p.y + 0.7) * tile)"
+          ><LockKeyhole :size="14" /> {{ p.id.replaceAll('-', ' ') }}</span
+        >
+      </template>
+      <template v-for="s in sites" :key="s.id"
+        ><small
+          v-for="d in s.deposits.filter(
+            (d) => !world.machines.some((m) => m.siteId === s.id && m.x === d.x && m.y === d.y),
+          )"
+          :key="d.x + ',' + d.y"
+          class="vein"
+          :style="pos(center(s.id, d).x, center(s.id, d).y + 19)"
+          >{{ d.kind }} seam</small
+        ></template
+      >
+      <svg v-if="source && route?.length" class="wire-preview">
+        <defs>
+          <marker
+            id="wire-arrow"
+            viewBox="0 0 10 10"
+            refX="5"
+            refY="5"
+            markerWidth="4"
+            markerHeight="4"
+            orient="auto"
+          >
+            <path d="M0 1 L9 5 L0 9 Z" fill="#ffe194" />
+          </marker>
+        </defs>
+        <polyline
+          class="flow-arrow"
+          marker-mid="url(#wire-arrow)"
+          marker-end="url(#wire-arrow)"
+          :points="
+            route
+              .map((p) => {
+                const q = center(at!.site, p)
+                return q.x + ',' + q.y
+              })
+              .join(' ')
+          "
+          :stroke="valid ? '#b5e1a2' : '#e4ab58'"
+          stroke-width="7"
+          fill="none"
+          stroke-dasharray="10 5"
+        />
+      </svg>
+      <div
+        v-for="m in world.machines"
+        :key="m.id"
+        class="station"
+        :class="{
+          chosen: selected === m.id,
+          'station-guide': guidedId === m.id,
+          'source-station': source === m.id,
+          'can-connect': source && receivers.has(m.id),
+          'cannot-connect': source && source !== m.id && !receivers.has(m.id),
+        }"
+        :style="pos(center(m.siteId, m).x, center(m.siteId, m).y)"
+      >
+        <button class="machine-hit" :aria-label="'Inspect ' + m.id" @click="choose(m.id)">
+          <span class="machine-label">{{ m.id }}</span>
+        </button>
+        <button
+          v-if="MACHINES[m.kind].bin"
+          class="port input"
+          :aria-label="m.id + ' input'"
+          @click="source && choose(m.id)"
+        >
+          ‹
+        </button>
+        <button
+          v-if="!['truck', 'dock'].includes(m.kind)"
+          class="port output"
+          :aria-label="m.id + ' output'"
+          @pointerdown.stop.prevent="beginWire(m.id, $event)"
+          @keydown.enter.prevent="source = m.id"
+        >
+          ›
+        </button>
+      </div>
+      <div
+        v-if="(placing || source) && cursor"
+        class="tile-preview"
+        :class="{ valid }"
+        :style="pos(cursor.x * tile, cursor.y * tile)"
+      >
+        <b>{{ placing ? PRICES.machines[placing] : (route?.length ?? 0) * PRICES.beltPerTile }} coins</b>
+      </div>
+    </div>
+    <div class="map-location">
+      <MapPin :size="13" /> {{ site === 'shed' ? 'Shed floor' : 'Freight yard' }}
+    </div>
+    <div class="map-controls">
+      <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
+      ><button aria-label="Center map" @click="goSite(site)"><Maximize /></button
+      ><button aria-label="Zoom in" @click="zoomBy(1.25)"><Plus /></button
+      ><button v-if="campaign.economy.road" @click="goSite(site === 'shed' ? 'yard' : 'shed')">
+        <Navigation /> {{ site === 'shed' ? 'Yard' : 'Shed' }}
+      </button>
+    </div>
+    <div v-if="renderError" class="floor-help">{{ renderError }}</div>
+    <div v-else-if="tool || source" class="floor-help">
+      <Move :size="15" />{{
+        placing
+          ? 'Place ' + MACHINES[placing].name
+          : source
+            ? 'Click the destination for ' + source
+            : tool === 'remove'
+              ? 'Select equipment or a belt to sell'
+              : 'Click the machine that sends items'
+      }}
+      <button aria-label="Cancel build" @click="cancel"><X :size="14" /></button>
+    </div>
+    <aside v-if="plotOffer" class="inspect" role="dialog" aria-label="Buy land">
+      <header>
+        <strong>{{ plotOffer.id.replaceAll('-', ' ') }}</strong
+        ><button aria-label="Close offer" @click="plotOffer = undefined"><X /></button>
+      </header>
+      <p>{{ plotOffer.width * plotOffer.height }} tiles · {{ plotOffer.price }} coins</p>
+      <button
+        class="gold"
+        :disabled="!campaign.economy.research.includes('survey') || campaign.economy.money < plotOffer.price"
+        @click="buyPlot"
+      >
+        {{ campaign.economy.research.includes('survey') ? 'Buy plot' : 'Research Tape measure' }}
+      </button>
+    </aside>
+    <aside v-else-if="machine || belt" class="inspect" role="region" aria-label="Machine inspector">
+      <header>
+        <strong>{{ selected }}</strong
+        ><button aria-label="Close inspector" @click="selected = ''"><X /></button>
+      </header>
+      <template v-if="machine"
+        ><p>{{ MACHINES[machine.kind].name }} · {{ machine.status }}</p>
+        <dl>
+          <dt>Bins</dt>
+          <dd>{{ bins.map(([k, n]) => n + ' ' + k).join(', ') || 'Empty' }}</dd>
+          <dt v-if="machine.recipe">Recipe</dt>
+          <dd v-if="machine.recipe">{{ machine.recipe }}</dd>
+          <dt>Processed</dt>
+          <dd>{{ machine.stats.processed }} · {{ machine.stats.rate }}/min</dd>
+        </dl>
+        <button
+          v-for="s in g.traces.value[machine.id]"
+          :key="s.file + s.line"
+          @click="g.openFile(s.file, s.line)"
+        >
+          {{ s.fn }} · {{ s.file }}:{{ s.line }}
         </button>
       </template>
-      <template v-for="m in world.machines" :key="m.id">
-        <div class="station" :style="{ left: m.x * 80 + 'px', top: m.y * camera.row + 'px' }">
-          <button
-            class="machine-hit"
-            :class="[m.status, { selected: selected === m.id, linked: focusedIds.includes(m.id) }]"
-            :aria-label="'Inspect ' + m.id"
-            :aria-pressed="selected === m.id"
-            @click.stop="emit('select', m.id)"
-          >
-            <span class="machine-label">{{ m.id }}</span>
-            <span class="machine-state" :class="m.status"
-              ><i />{{
-                m.status === 'ready' && (m.kind === 'furnace' || m.kind === 'assembler')
-                  ? 'awaiting work'
-                  : m.status
-              }}</span
-            >
-          </button>
-          <button
-            v-if="m.kind !== 'mine' && m.kind !== 'coal'"
-            class="port input"
-            :class="{ target: drag }"
-            :data-input="m.id"
-            :aria-label="m.id + ' input'"
-            @click.stop="emit('select', m.id)"
-          />
-          <button
-            v-if="m.kind !== 'dispatch'"
-            class="port output"
-            :data-output="m.id"
-            :aria-label="m.id + ' output'"
-            @pointerdown.stop="startWire(m.id, $event)"
-            @click.stop
-          />
-        </div>
-      </template>
-    </div>
-    <span v-if="!ready" class="floor-error" role="status">{{
-      renderError || 'Lighting the factory floor…'
-    }}</span>
-    <span v-if="placing || drag" class="floor-guide">{{
-      placing ? 'Choose a marked tile' : 'Release on an input port'
-    }}</span>
-    <section
-      v-else-if="station"
-      class="inspector"
-      :style="{ left: inspectorCorner.left + 'px', top: inspectorCorner.top + 'px' }"
-      role="region"
-      aria-label="Machine inspector"
-      @click.stop
-    >
-      <div>
-        <ScanLine :size="14" /><strong>{{ station.id }}</strong
-        ><span :class="station.status">{{ station.status }}</span>
-        <button aria-label="Close inspector" @click="emit('select', '')"><X :size="14" /></button>
+      <p v-else>{{ belt!.path.length }} belt tiles · {{ belt!.items.length }} in transit</p>
+      <div v-if="machine" class="links">
+        <button
+          v-for="b in world.belts.filter((b) => b.from === selected || b.to === selected)"
+          :key="b.from + ' → ' + b.to"
+          @click="selected = b.from + ' → ' + b.to"
+        >
+          {{ b.from }} → {{ b.to }}
+        </button>
       </div>
-      <dl>
-        <dt>Inventory</dt>
-        <dd>{{ inventory }}</dd>
-        <dt>Tick {{ world.tick }}</dt>
-        <dd>{{ commands[station.id] || 'No command' }}</dd>
-      </dl>
-    </section>
-    <span v-else-if="belt" class="floor-guide"
-      >{{ belt.from }} → {{ belt.to }} · {{ belt.items.length }}/{{ BELT_LENGTH }} slots</span
-    >
+      <button class="sell" @click="sell"><Trash2 :size="13" /> Sell · +{{ refund }} coins</button>
+    </aside>
   </div>
 </template>
