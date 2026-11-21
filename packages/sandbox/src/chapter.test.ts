@@ -70,6 +70,10 @@ test('the last pickup accepts a complete twelve-sack order on tick 128', async (
   expect(world.tick).toBe(128)
   expect(world.lost).toBe(0)
   expect(world.machines.find((m) => m.kind === 'coal')?.processed).toBe(12)
+  const truck = { label: 'Load the customer’s truck', status: 'pass', value: '12/12 parts · tick 128/128' }
+  expect(evaluate(world)).toContainEqual(truck)
+  while (world.tick < 400) step(world, () => {})
+  expect(evaluate(world)).toContainEqual(truck)
 })
 test('a counter reset on each tick overspends even with a lossless shipment', async () => {
   const forgetful = solutions[4]
@@ -91,9 +95,12 @@ test('missing the last pickup leaves the undelivered parts at the dock', async (
   )
   const before = await replay(4, late, true, 127)
   expect(evaluate(before).at(-1)).toMatchObject({ status: 'warn', value: '10/12 parts · tick 127/128' })
-  const after = await replay(4, late)
+  const after = await replay(4, late, true, 128)
+  const missed = { label: 'Last truck left. Run to retry', status: 'fail', value: '11/12 parts · tick 128/128' }
+  expect(evaluate(after)).toContainEqual(missed)
+  while (after.tick < 240) step(after, () => {})
   expect(after.shipped).toBe(11)
-  expect(evaluate(after).at(-1)).toMatchObject({ status: 'fail', label: 'Last truck left. Run to retry' })
+  expect(evaluate(after)).toContainEqual(missed)
 })
 test('one furnace cannot supply the lock crew before the last truck', async () => {
   const world = await replay(4, solutions[4].replace('a <= b ? "furnace-a" : "furnace-b"', '"furnace-a"'))

@@ -61,6 +61,7 @@ export interface World {
   machines: Machine[]
   belts: Belt[]
   shipped: number
+  orderFilledTick?: number
   lost: number
   deliveries: number[]
 }
