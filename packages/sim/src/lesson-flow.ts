@@ -33,7 +33,7 @@ export interface LessonStep {
   starter?: string
   hints: [idea: string, places: string, lines: string]
   checks: { id: string; text: string }[]
-  solved: { did: string; idea: string; reward?: string }
+  solved: { reaction: string; did: string; idea: string; reward?: string }
   button: 'run' | 'deploy'
 }
 export interface CheckView {

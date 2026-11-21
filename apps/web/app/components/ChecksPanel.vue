@@ -16,13 +16,13 @@ const labels = { red: 'Still to do', amber: 'Getting closer', green: 'Done' }
       <span aria-hidden="true">{{ expanded ? '▾' : '▸' }}</span>{{ done }} done
     </button>
     <p v-if="error" role="alert">{{ error }}</p>
-    <p v-for="message in playback.messages.value" :key="message">{{ message }}</p>
+    <p v-for="message in step?.phase === 'working' || error ? playback.messages.value : []" :key="message">{{ message }}</p>
     <ul v-if="visible.length">
       <li v-for="check in visible" :key="check.id" :data-state="check.status"
         :aria-current="check.id === checks[0]?.id ? 'step' : undefined">
         <span class="mark" role="img" :aria-label="labels[check.status]">{{ marks[check.status] }}</span>
         {{ check.text }}
-        <span v-if="check.progress" class="count">{{ check.progress }}</span>
+        <span v-if="check.progress && !check.text.endsWith(check.progress)" class="count">{{ check.progress }}</span>
       </li>
     </ul>
     <p v-else-if="!checks.length">No live checks for this part of the story.</p>

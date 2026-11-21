@@ -231,7 +231,7 @@ export function wanted(c: Campaign): MaterialId[] {
 
 export function settleTown(c: Campaign) {
   const t = c.town
-  offerOrders(c)
+  if (c.lesson.released.some(r => r.kind === 'section' && r.id === 'orders')) offerOrders(c)
   function allocate(item: MaterialId, needed: number) {
     const available = t.waiting[item] ?? 0
     const n = Math.min(available, needed)

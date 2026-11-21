@@ -17,7 +17,6 @@ const town = computed(() => {
 })
 const host = ref<HTMLElement>()
 const selection = defineModel<Townsperson['id']>('selection')
-const notice = ref('')
 const unavailable = ref(false)
 const person = computed(
   () =>
@@ -56,9 +55,6 @@ onMounted(async () => {
       app,
       host.value!,
       town.value,
-      (text) => {
-        notice.value = text
-      },
       props.replay,
     )
   } catch {
@@ -93,9 +89,7 @@ onBeforeUnmount(() => {
       <p v-if="unavailable" class="town-unavailable">
         Could not open the town illustration. Reload to retry.
       </p>
-      <Transition name="town-pop" mode="out-in"
-        ><p v-if="notice" :key="notice" class="town-notice" role="status">✦ {{ notice }}</p></Transition
-      >
+
     </div>
     <div v-if="person" class="town-directory">
       <article class="town-voice">
@@ -198,14 +192,12 @@ onBeforeUnmount(() => {
 .town-print :deep(canvas) {
   display: block;
 }
-.town-unavailable,
-.town-notice {
+.town-unavailable {
   position: absolute;
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
 }
-.town-notice,
 .town-unavailable {
   margin: 0;
   padding: 7px 13px;
@@ -215,17 +207,6 @@ onBeforeUnmount(() => {
   color: var(--gold);
   font-size: 13px;
   text-align: center;
-}
-.town-pop-enter-active,
-.town-pop-leave-active {
-  transition:
-    opacity 0.18s,
-    translate 0.18s;
-}
-.town-pop-enter-from,
-.town-pop-leave-to {
-  opacity: 0;
-  translate: 0 4px;
 }
 .town-directory {
   display: flex;
@@ -387,12 +368,6 @@ onBeforeUnmount(() => {
   }
   .town-terms {
     gap: 5px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .town-pop-enter-active,
-  .town-pop-leave-active {
-    transition: none;
   }
 }
 </style>

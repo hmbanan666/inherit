@@ -53,7 +53,7 @@ function createGameStore() {
   const reveals = computed(() => revealed(state.value))
   const sections = computed(() => surface.value.sections)
   const letters = computed(() => state.value.progress.messages.filter(m =>
-    m.id === 'uncle' || reveals.value.some(r => r.kind === 'letter' && r.id === m.id),
+    reveals.value.some(r => r.kind === 'letter' && r.id === m.id),
   ))
   const surface = computed(() => getSurface(state.value))
   const reference = computed(() => apiReference(state.value))
@@ -161,8 +161,12 @@ function createGameStore() {
     const action = current!
     const instance = worker
     const watched = action.type === 'run'
-    if (frame.calls.length || watched) {
-      await playback.play(frame.calls, watched ? 500 / speed : TICK_MS / (2 * frame.calls.length * speed), watched)
+    // Empty pickups are routine while the clock is running. Watched runs show every attempt.
+    const visibleCalls = action.type === 'step' ? frame.calls.filter(record => record.ok || (
+      !record.message?.startsWith('Nothing ready yet') && !record.message?.startsWith('The hand is empty')
+    )) : frame.calls
+    if (visibleCalls.length || watched) {
+      await playback.play(visibleCalls, watched ? 500 / speed : TICK_MS / (2 * visibleCalls.length * speed), watched)
       if (worker !== instance) return
     }
     current = undefined

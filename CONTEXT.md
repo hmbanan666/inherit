@@ -84,7 +84,7 @@ _Avoid_: test, assertion
 A part of the screen in the top navigation (Shed, Town, Inbox, Orders). Shed is there from the start; the others are revealed one per Continue and carry a "new" mark until opened. The editor is not a section.
 
 **Floor view**:
-The animated canvas that shows the factory. It visualizes what the controller does, animating every take and put. You inspect it, you do not build on it.
+The shed floor beside Bram’s forge and Lamp Street, with the same buildings visible in Town. It visualizes what the controller does, animating every take and put. You inspect it, you do not build on it.
 _Avoid_: board, editor
 
 **Run**:

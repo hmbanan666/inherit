@@ -4,6 +4,9 @@ import { advanceGame, createCampaign, DAY } from './index'
 test('idle income ends at the current order budget and stock fills the next matching ask first', () => {
   const c = createCampaign()
   c.town.beat = 2
+  advanceGame(c)
+  expect(c.economy.orders).toHaveLength(0)
+  c.lesson.released.push({ kind: 'section', id: 'orders' })
   const start = c.economy.money
   for (let i = 0; i < 2 * DAY; i++)
     advanceGame(c, (api) => {

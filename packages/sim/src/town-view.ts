@@ -83,7 +83,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
       .filter(([, , , b]) => b !== 'riverside' || town.beat >= 10)
       .map(([id, name, role, buildingId]) => {
         const ask =
-          request?.who === id
+          request?.who === id && town.filled < request.quantity
             ? {
                 requestId: request.id,
                 title: request.title,
@@ -95,7 +95,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
         const bank = id === 'harrow' && next && (town.beat === 2 || town.beat === 10)
         const hasOrder = c.economy.orders.some((o) => o.customer === id)
         const helped =
-          town.beat > 10 || (id === 'harrow' && !owed) || REQUESTS.some((r) => r.who === id && r.beat < town.beat)
+          town.beat > 10 || (id === 'harrow' && !owed) || REQUESTS.some((r) => r.who === id && town.changes.some(change => change.buildingId === r.building))
         return {
           id,
           name,

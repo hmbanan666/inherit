@@ -116,6 +116,10 @@ watch(g.navigation, async ({ file, line }) => {
   await nextTick()
   editor.value?.revealLine(file, line)
 })
+watch(() => step.value?.step.id, id => {
+  if (id === 'mayor-tools') showFiles.value = true
+  if (id && section.value === 'inbox' && id !== 'harrow-tab') openSection('factory')
+})
 function payBank(inFull = false) {
   g.act({ type: 'pay', inFull })
   menu.value = ''
@@ -278,11 +282,13 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
               <button aria-label="Close drawer" @click="openSection('factory')"><X /></button>
             </header>
             <div v-if="drawer === 'Inbox'" class="drawer-body">
+              <p v-if="!letters.length">No letters yet. Press Continue for the next delivery.</p>
               <article v-for="m in [...letters].reverse()" :key="m.id" class="ticket">
                 <small>{{ m.from }}</small>
                 <h3>{{ m.title }}</h3>
                 <p>{{ m.body }}</p>
-                <button v-if="m.unread" @click="g.act({ type: 'read', id: m.id })">Mark read</button>
+                <p v-if="m.id === 'tab' && step?.step.id === 'bram-loop'">Press Continue to see the family tab. Then you can reply here.</p>
+                <button v-if="m.unread && (m.id !== 'tab' || step?.step.id === 'harrow-tab')" @click="g.act({ type: 'read', id: m.id })">{{ m.id === 'tab' ? 'Pay later' : 'Mark read' }}</button>
               </article>
             </div>
             <div v-else class="drawer-body">
@@ -313,8 +319,9 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
         <header class="dock-header">
           <span class="eyebrow"><Code2 />Code workshop</span>
         </header>
-        <SolvedCard v-if="step?.phase === 'solved'" :solved="step.step.solved" :busy="g.busy.value" @advance="g.advance" />
+        <SolvedCard v-if="step?.phase === 'solved'" :solved="step.step.solved" :next-reveal="step.nextReveal" :busy="g.busy.value" @advance="g.advance" />
         <TaskCard v-else-if="step" :key="step.step.id" :step="step.step" />
+        <section v-else class="lesson-card" aria-label="Chapter complete"><h2>The shed is yours.</h2><p>The bridge to Riverside stands. Your family tab is paid.</p></section>
         <FileTree v-if="showFiles && surface.multiFile" />
         <MyLibrary />
         <div class="file-tabs">
@@ -466,7 +473,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
 .section-new { color: var(--accent-soft); }
 .statusbar { height: 34px; border-top: 0; box-shadow: inset 0 1px var(--line); }
 .statusbar .deploy-group, .statusbar .deploy, .statusbar .revisions { height: 100%; }
-.statusbar .deploy { font-size: 14px; gap: 10px; }
+.statusbar .deploy { min-width: clamp(124px, 14vw, 200px); justify-content: center; font-size: 16px; gap: 12px; }
 .statusbar .deploy svg, .statusbar .revisions svg { color: inherit; }
 .statusbar kbd { font: 10px var(--mono); border: 1px solid currentColor; border-radius: 3px; padding: 2px 4px; }
 .statusbar .deploy-group .hud-menu {

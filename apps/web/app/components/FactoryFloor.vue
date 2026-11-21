@@ -3,6 +3,7 @@ import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize, X } from '@lucide/vue'
 import { MACHINES, TICK_MS } from '@inherit/sim'
 import { useGame } from '../lib/useGame'
+import ShedStreet from './town/ShedStreet.vue'
 import TownPortrait from './town/TownPortrait.vue'
 import { center, FloorScene, tile } from '../lib/floor'
 
@@ -210,6 +211,7 @@ onBeforeUnmount(() => {
       class="map-overlay"
       :style="{ transform: 'translate(' + camera.x + 'px,' + camera.y + 'px) scale(' + scale + ')' }"
     >
+      <ShedStreet class="shed-street" :town="g.town.value" />
       <div
         v-for="m in world.machines"
         :key="m.id"
@@ -222,13 +224,14 @@ onBeforeUnmount(() => {
             >"{{ m.id }}"<b v-if="m.fault"> · {{ m.fault }}</b></span
           >
         </button>
+        <span v-if="m.id === 'cart' && story?.id === 'bram-loop'" class="cart-load">{{ campaign.town.filled }} / 3 ingots</span>
       </div>
       <div v-if="travelRail" class="travel-rail" :style="travelRail" aria-hidden="true"></div>
       <FloorArm :x="armPoint.x" :y="armPoint.y" :call="g.playback.call.value" :hand="g.hand.value" />
     </div>
     <div v-if="story" class="floor-story" data-testid="speech">
       <TownPortrait v-if="speaker" :person="speaker" />
-      <div><strong>{{ speaker?.name ?? story.who }}</strong><p>{{ story.story }}</p></div>
+      <div><strong>{{ speaker?.name ?? story.who }}</strong><p>{{ g.step.value?.phase === 'solved' ? story.solved.reaction : story.story }}</p></div>
     </div>
     <div v-if="g.button.value === 'deploy'" class="shed-clock" :class="{ running: g.active.value }" aria-label="Factory clock">◷</div>
     <div class="map-controls">
@@ -278,6 +281,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.shed-street { position: absolute; left: 465px; bottom: 0; width: 300px; pointer-events: none; }
+.cart-load { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); color: var(--gold); background: var(--panel); font: 13px var(--mono); padding: 3px 6px; white-space: nowrap; }
 .travel-rail {
   position: absolute; height: 7px; border: solid #242426; border-width: 2px 0;
   background: repeating-linear-gradient(90deg, #756e63 0 4px, #4a4844 4px 12px);

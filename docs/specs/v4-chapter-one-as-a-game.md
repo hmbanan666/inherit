@@ -46,6 +46,7 @@ The shed is on screen from the first second: the mine, the furnace, the cart and
 - A Run executes `main.ts` once. The sandbox records each primitive call (file, line, function, arguments, result, message, the player function it ran in, the hand afterwards) and the floor and the editor play the record back at about two calls per second.
 - After the loop lesson the button is Deploy: top-level code runs once on Deploy and `onTick` runs every tick. "Run once" (one tick) stays in the menu.
 - The place type is a literal union from the machines on the floor, refreshed when machines change; hovering a place name in the editor lights up the machine.
+- The shed shares its forge and street lamps with the Town view. Bram’s payment, Town, Inbox, Mrs Harrow’s first letter and the debt each have a separate Continue.
 - Chapter 1 pace is retuned so Bram's three ingots take about 30 to 45 seconds after Deploy.
 - Single `main.ts` until the Mayor's request; player-to-player imports only then.
 - Concept order: call with a place name, sequence, nothing ready, function, tick loop, then variable and `if` (mixed vein), object property (`look`), loop over a list (breakdowns), parameters (`move`), and modules (the Mayor). Chapter requests and the ending stay as in ADR 0013.
