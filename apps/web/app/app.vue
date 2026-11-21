@@ -180,6 +180,7 @@ function swap() {
 function hotkey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key === 'Enter')) {
     e.preventDefault()
+    e.stopPropagation()
     g.deploy()
   }
   if (e.key === 'Escape') {

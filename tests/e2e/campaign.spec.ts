@@ -38,7 +38,16 @@ async function typeHint(page: Page) {
   await card.getByRole('button', {name:'Hide hint'}).click()
   await page.getByRole('textbox', {name:'Factory controller TypeScript'}).focus()
   await page.keyboard.press('Control+a')
-  await page.keyboard.insertText(source)
+  for (const [i, line] of source.trimEnd().split('\n').entries()) {
+    if (i) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Shift+Home')
+    }
+    if (line) await page.keyboard.insertText(line)
+    // Discard any closing brace Monaco supplied after the caret. The hint includes its own.
+    await page.keyboard.press('Control+Shift+End')
+    await page.keyboard.press('Delete')
+  }
 }
 test('type the growing library from the hints and rebuild Riverside', async ({page}) => {
   test.setTimeout(240000)
@@ -72,9 +81,11 @@ test('type the growing library from the hints and rebuild Riverside', async ({pa
     }
     await page.keyboard.press('Control+Enter')
     if (task.beat === 1) {
+      await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
       await expect(nav.getByRole('button',{name:'Factory'})).toContainText('new')
       await expect(page.locator('.pixi-mount canvas')).toBeVisible()
       await photo(page,'wire-up-deploy')
+      await expect(checks.locator('.done-count')).toContainText('3 done')
       await expect(card).toContainText('The family tab',{timeout:15000})
       await expect(nav.getByRole('button',{name:'Town'})).toContainText('new')
       await expect(nav.getByRole('button',{name:'Inbox'})).toBeVisible()
