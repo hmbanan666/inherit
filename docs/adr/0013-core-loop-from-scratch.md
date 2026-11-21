@@ -31,14 +31,13 @@ The story adds two non-physical actions when it introduces them: `buy(kind, name
 9. The Mayor: brackets from the assembler; his helpers move into their own file with `export` and `import`.
 10. The debt is paid.
 
-**Each task is a kata.** The controller is not one big file that grows on a canvas. A task is a small focused exercise:
+**Each task is one focused step in a growing project.** The controller is not one big file that grows on a canvas, and tasks are not isolated exercises either. They chain like real product development: each builds on the ones before (`dig` → `smelt` → `ship` → wiring → `stamp` → the `move` refactor → ...), and the player's framework grows step by step with no reset between tasks.
 
 - The story gives the reason ("Bram will need ingots, so learn to smelt").
-- The workshop opens one small file with a stub, for example `verbs/smelt.ts` containing `export function smelt() {}`, and shows only the bricks this task needs (`take`, `put`, `look` or a verb he already wrote).
-- Live checks run that one function in isolation on a small test bench (a mine with a rock, an empty furnace) every time the player edits, without Deploy. When they all pass, the task is done and the next one opens.
-- Solved functions stay as files in the player's library (`verbs/`), visible in the file tree.
-- A "wire it up" task follows: `main.ts` imports his own verbs and calls them from `onTick` (`smelt()`, `ship()`), the player deploys, and the real factory runs them. He understands `onTick` because every call in it is his own function.
-- The screen shows only what the current task needs: its file, its bricks, its checks. Earlier files are one click away, never in the way.
+- The workshop opens the code the current task needs, for example a small file `verbs/smelt.ts` with `export function smelt() {}`, and shows only the bricks it needs (primitives or verbs he already wrote). A composite task opens a little more code; nothing grows into a thousand-line file.
+- Live checks run the function on a small test bench (a mine with a rock, an empty furnace) on every edit, without Deploy. When they pass, the task is done and the next one opens.
+- No black boxes: every function the player calls, he wrote himself. Solved functions go into a collapsed "My library" panel that lists names and signatures and opens a function on click. The editor is never cluttered with dozens of files.
+- "Wire it up" steps have `main.ts` import his verbs and call them from `onTick`; the player deploys and the real factory runs them. He understands `onTick` because every call in it is his own function.
 
 **Coins come from people.** The cart pays only when an item fills an open request or order. Items nobody asked for wait in the cart ("nobody ordered these yet") and fill the next matching ask first. Orders are finite and paced by the story; a filled order does not come back on its own. Coins have two uses: buying machines and paying the debt. The chapter's total pay covers the machines the story needs plus the debt, with a little to spare. Progress comes from the story, never from waiting or grinding.
 
