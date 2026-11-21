@@ -1,5 +1,7 @@
 # Chapter 1 · A factory the town needs
 
+> The teaching flow of this chapter is superseded by `docs/specs/v4-chapter-one-as-a-game.md` (ADR 0014, ADR 0015). The story, requests and ending still hold.
+
 Uncle left a shed and a 600-coin tab at Kettlewick Bank. Bram needs shoes for the mail horse, Elsie’s bread oven has lost its grate, and the bridge to Riverside is down. Each request changes something visible in town. The reference beginner spends about 56–60 game minutes reading, editing and running the chapter. Requests wait indefinitely and pay in full.
 
 ## One growing controller

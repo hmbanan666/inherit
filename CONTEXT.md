@@ -31,11 +31,11 @@ _Avoid_: reward, unlock
 A part of the town that is closed until a town change opens it, bringing new townspeople.
 
 **Onboarding**:
-Bram’s introduction to the growing controller. The player writes dig, smelt and ship, then wires them into onTick and deploys. Later requests extend and revise the same project.
+Bram's request. In one file, `main.ts`, the player calls `take("mine")`, adds `put("furnace")`, takes the ingot to the cart, wraps those lines into `smelt()` and `ship()`, and finally hands them to `onTick` and deploys. Later requests extend and revise the same project.
 
 **Onboarding step**:
-One focused edit in the player’s own project. Its card gives the story reason, the bricks, an idea and then the exact lines.
-_Avoid_: tutorial levels
+One task with one new idea. Its card gives the story reason in two or three lines, the starter code has everything except the new line, and it ends on a solved card with Continue.
+_Avoid_: tutorial levels, kata, exercise
 
 **Debt**:
 What the uncle owed the bank. The player pays when ready, in full or in optional installments. The balance has no due days or interest.
@@ -57,11 +57,11 @@ A machine stopped by an item it cannot process, for example copper ore in an iro
 A machine that stopped from wear. It starts again when repaired, or after cooling down.
 
 **Controller**:
-The player's TypeScript project. It exports `onTick`, which the factory runs every tick. Its main file starts as a comment from Uncle. Its first focused file is the dig stub. One codebase for the whole game.
+The player's TypeScript project, a single `main.ts` until the Mayor's request moves his functions into their own file. It starts with Uncle's note and his import line. Once the loop is taught it exports `onTick`, which the factory runs every tick.
 _Avoid_: script, solution
 
 **Primitive**:
-One of the three physical actions the world exposes from `"inherit"`: `take(place)`, `put(place, item)`, `look(place)`. Everything else the player builds from them.
+One of the three physical actions the world exposes from `"inherit"`: `take(place)` lifts the front finished item into the arm's hand and returns its name, `put(place)` puts whatever the hand holds, `look(place)` reports what is there. Everything else the player builds from them.
 _Avoid_: machine method
 
 **Story action**:
@@ -71,30 +71,36 @@ A non-physical action the story unlocks and exports from `"inherit"`: `buy(kind,
 Anything you can take from, put into or look at, named by a string: the mine, a machine, the cart.
 
 **Verb**:
-A function the player writes himself from primitives, such as `dig`, `smelt`, `ship`, `stamp`, `move`, `fixBroken`. A word for an action in a request, hint or check is always the name of the function the player is asked to write.
+Internal term for a function the player writes from primitives (`smelt`, `ship`, `stamp`, `move`, `fixBroken`). Player-facing text says "function". A word for an action in a request, hint or check is always the name of the function the player is asked to write.
 
 **Framework**:
-The player's own collection of verbs. It grows in verbs/ files from the first task. The collapsed **My library** panel lists solved verbs by signature and opens their source.
-
-**Bench**:
-A small disposable factory that tries the current verb and its real imports when the player edits. It leaves the live factory and its coins alone.
-
-**Wire-up**:
-A task in main.ts that imports the player’s library, calls it from onTick and runs it on the floor with Deploy.
+The player's own collection of functions. It grows inside `main.ts` and moves into its own file at the Mayor's request. The collapsed **My library** panel lists them by name and signature and opens their source.
 
 **Check**:
-A live plain sentence about what the current request needs ("Ore reaches the furnace"), coloured red (not yet), amber (getting closer) or green (done). Bench checks exercise a single verb and open the next task when green. During a wire-up, checks follow the real factory.
+A plain sentence about the world that the current task needs ("A rock reaches the furnace", "Ingots in Bram's cart: 1 / 3"), coloured red (not yet), amber (getting closer) or green (done). Checks describe the world, not the code, and use display names.
 _Avoid_: test, assertion
 
 **Section**:
-A part of the screen in the top navigation (Code, Factory, Town, Inbox, Orders). Each appears when the story reaches it and carries a "new" mark until opened.
+A part of the screen in the top navigation (Shed, Town, Inbox, Orders). Shed is there from the start; the others are revealed one per Continue and carry a "new" mark until opened. The editor is not a section.
 
 **Floor view**:
 The animated canvas that shows the factory. It visualizes what the controller does, animating every take and put. You inspect it, you do not build on it.
 _Avoid_: board, editor
 
+**Run**:
+Running `main.ts` once as a watched run: every primitive call is played back on the floor at about two calls per second, with its line lit in the editor. The primary button says Run until the loop lesson.
+
 **Deploy**:
-Making the working copy the running controller. Can be rolled back.
+Handing `onTick` to the factory clock, which then calls it every tick. The primary button becomes Deploy at the loop lesson and never before. Can be rolled back.
+
+**Arm**:
+Uncle's arm on the shed floor that carries out `take` and `put`. Its **hand** holds one item at a time and is always visible.
+
+**Solved card**:
+What a task card becomes when its checks pass: what the player did, the idea he used, the reward, and **Continue**. Nothing advances before Continue.
+
+**Reveal**:
+Something new on screen (a section, coins, the debt, a letter). Reveals wait in a queue and are released one per Continue.
 
 **Chapter**:
 A story arc of requests. Chapter 1 ends when the debt is paid and the bridge stands.
