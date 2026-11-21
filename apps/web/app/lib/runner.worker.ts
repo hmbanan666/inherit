@@ -1,7 +1,7 @@
 import { createProgram, type Program } from '@inherit/sandbox'
 import {
   advanceGame,
-  uncleNote,
+  isStarterProject,
   deployGameProject,
   rollbackGameProject,
   getSurface,
@@ -28,7 +28,7 @@ let cpu = { calls: 0, interrupts: 0, used: 0, budget: 96 }
 async function compile(files: ProjectFiles, allowStarter = false) {
   const { budget } = getSurface(campaign)
   const sites = commandSites(files)
-  if (allowStarter && files['main.ts'] === uncleNote && Object.keys(files).length === 1)
+  if (allowStarter && isStarterProject(files))
     return { program: undefined, sites }
   const program = await createProgram({
     files: sites.compiledFiles,

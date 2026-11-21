@@ -1,11 +1,11 @@
 import { createProgram, type Program, type ProjectOptions } from '@inherit/sandbox'
-import { advanceGame, cloneCampaign, deployProject, getSurface, type Campaign } from '@inherit/sim'
+import { advanceGame, cloneCampaign, deployProject, getSurface, isStarterProject, type Campaign } from '@inherit/sim'
 
 export type PreviewTicks = 100 | 500 | 2000
 
 type Compile = (options: ProjectOptions) => Promise<Program>
 
-async function simulate(campaign: Campaign, ticks: PreviewTicks, compile: Compile) {
+async function simulate(campaign: Campaign, ticks: PreviewTicks, compile?: Compile) {
   const surface = getSurface(campaign)
   let program: Program | undefined
   let errors = 0
@@ -16,7 +16,7 @@ async function simulate(campaign: Campaign, ticks: PreviewTicks, compile: Compil
   const startMoney = campaign.economy.money
   try {
     try {
-      program = await compile({
+      program = await compile?.({
         files: campaign.project.deployed,
         memory: campaign.memory,
         budget: surface.budget,
@@ -61,7 +61,7 @@ export async function previewProject(live: Campaign, ticks: PreviewTicks, compil
     startTick: live.world.tick,
     ticks,
     draft: await simulate(draft, ticks, compile),
-    baseline: await simulate(baseline, ticks, compile),
+    baseline: await simulate(baseline, ticks, isStarterProject(baseline.project.deployed) ? undefined : compile),
   }
 }
 export type PreviewResult = Awaited<ReturnType<typeof previewProject>>

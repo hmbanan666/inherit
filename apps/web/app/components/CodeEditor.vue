@@ -230,8 +230,10 @@ onMounted(() => {
   const probe = monaco.Uri.file('/.onboarding/check.ts')
   const main = monaco.Uri.file('/main.ts')
   watch([files, () => campaign.value.town.beat === 1 && game.lessonStep.value <= 2], ([, needed], _, onCleanup) => {
-    game.draftExportsOnTick.value = false
-    if (!needed) return
+    if (!needed) {
+      game.draftExportsOnTick.value = false
+      return
+    }
     const check = ts.typescriptDefaults.addExtraLib(
       'import { onTick } from "../main"; const handler: (...args: never[]) => unknown = onTick', probe.toString(),
     )
@@ -248,6 +250,7 @@ onMounted(() => {
         if (!stale) game.draftExportsOnTick.value = diagnostics.every(list => list.length === 0)
       } catch {
         // The language worker may be restarting as the editor closes.
+        if (!stale) game.draftExportsOnTick.value = false
       }
     }, 150)
     onCleanup(() => {
