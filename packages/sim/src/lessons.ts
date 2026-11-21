@@ -7,6 +7,11 @@ import { take, put } from "inherit"
 export const firstIngotAfterRetry =
   'Your first Run found the furnace still working, so take came back empty. Running again collected the finished ingot.'
 
+const clockBlock = `export function onTick() {
+  smelt()
+  ship()
+}`
+
 export const lessons: LessonStep[] = [
   {
     id: 'bram-take',
@@ -79,7 +84,8 @@ put("cart")`,
     who: 'bram',
     title: 'Give the hearth work a name',
     story: 'Uncle called feeding the furnace smelting. Can you show me his trick?',
-    task: `Move your mine pickup and furnace drop inside the braces below. Keep the two cart lines after smelt() and press Run.`,
+    task: 'Wrap the two highlighted lines in a function named smelt, like the shape below. Leave the two cart lines underneath.',
+    callsToMove: [{ name: 'take', place: 'mine' }, { name: 'put', place: 'furnace' }],
     idea: {
       name: 'Function',
       explain: 'The first part names the job, and smelt() below asks the arm to do it.',
@@ -87,7 +93,7 @@ put("cart")`,
     example: `function smelt() {
   // your two lines go here
 }
-smelt()`,
+smelt()   // this line runs the job`,
     hints: [
       'Keep the same two moves inside the braces.',
       'Put the mine pickup and furnace drop inside smelt, then call smelt.',
@@ -139,19 +145,17 @@ ship()`,
     who: 'bram',
     title: 'Three ingots for the mail horse',
     story: 'Will you press Run all day? I’ve taken the samples. My forge needs a load of three.',
-    task: `Move these two lines into a new block at the bottom: export function onTick() { ... }. The clock calls onTick() for you; you never call it yourself.
-Keep both named jobs and press Deploy.`,
+    task: 'The clock looks for the exact name onTick. Move the two highlighted calls into this block at the bottom, then press Deploy once.',
+    callsToMove: [{ name: 'smelt' }, { name: 'ship' }],
+    example: clockBlock,
     idea: {
       name: 'The factory clock',
-      explain: 'The highlighted calls are smelt() and ship(). The word export lets the clock see onTick().',
+      explain: 'The word export lets the clock call onTick every tick, so you never call it yourself.',
     },
     hints: [
       'Let the clock repeat both jobs you already wrote.',
       'Call smelt and ship inside the exported onTick function.',
-      `export function onTick() {
-  smelt()
-  ship()
-}`,
+      clockBlock,
     ],
     checks: [{ id: 'bram-loop', text: "Ingots in Bram's cart: 3 / 3" }],
     solved: {
@@ -559,7 +563,7 @@ Use the same check at each stop.`,
     idea: {
       name: 'Loop over a list',
       explain:
-        'A for…of loop gives each listed place a turn under the same name, and as const keeps its exact label.',
+        'The loop sets oven to each furnace name in turn. The words as const keep those names exact.',
     },
     hints: [
       'Visit both doors with the same inspection.',

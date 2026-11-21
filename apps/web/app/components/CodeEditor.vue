@@ -38,16 +38,16 @@ let library: monaco.IDisposable
 let settingSource = false
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
-const movingJobs = computed(() => game.step.value?.step.id === 'bram-loop' && game.step.value.phase !== 'solved')
+const callsToMove = computed(() => game.step.value?.phase === 'solved' ? undefined : game.step.value?.step.callsToMove)
 let jobLines: monaco.editor.IEditorDecorationsCollection | undefined
 
 function markJobCalls() {
   const model = editor?.getModel()
-  if (!jobLines || !model || model !== models.get('main.ts') || !movingJobs.value) {
+  if (!jobLines || !model || model !== models.get('main.ts') || !callsToMove.value) {
     jobLines?.clear()
     return
   }
-  jobLines.set(standaloneJobCalls(model.getValue()).map(({ from, to }) => ({
+  jobLines.set(standaloneJobCalls(model.getValue(), callsToMove.value).map(({ from, to }) => ({
     range: monaco.Range.fromPositions(model.getPositionAt(from), model.getPositionAt(to)),
     options: { inlineClassName: 'call-to-move' },
   })))
@@ -312,7 +312,7 @@ onMounted(() => {
   window.addEventListener('keydown', keys, true)
   emit('ready')
 })
-watch(movingJobs, () => {
+watch(callsToMove, () => {
   markJobCalls()
   showJobCalls()
 })

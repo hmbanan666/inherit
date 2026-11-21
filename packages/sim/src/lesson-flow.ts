@@ -31,6 +31,7 @@ export interface LessonStep {
   task: string
   idea?: { name: string; explain: string }
   example?: string
+  callsToMove?: { name: string; place?: string }[]
   starter?: string
   hints: [idea: string, places: string, lines: string]
   checks: { id: string; text: string }[]

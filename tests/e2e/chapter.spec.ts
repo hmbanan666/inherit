@@ -20,6 +20,13 @@ test('play every request from the visible hints, build the bridge and pay the ta
   const primary = page.getByTestId('primary-button')
   const next = page.getByTestId('continue')
   const solved = page.getByTestId('solved-card')
+  const markedLines = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
+  async function expectMarkedLines(lines: string[]) {
+    await expect(markedLines).toHaveText(lines)
+    for (const line of await markedLines.all()) {
+      await expect(line.locator('.call-to-move').first()).toBeInViewport({ ratio: 1 })
+    }
+  }
   await openShed(page, '?speed=32')
   const visibleStarter = await page.locator('.view-line').allTextContents()
   let files: Record<string, string> = { 'main.ts': visibleStarter.map(line => line.replaceAll('\u00a0', ' ').trimEnd()).join('\n') }
@@ -30,18 +37,21 @@ test('play every request from the visible hints, build the bridge and pay the ta
       await expect(card.getByRole('heading')).toHaveText(step.title)
       await expect(page.getByTestId('speech')).toContainText(step.story)
       if (step.id === 'bram-smelt') {
+        await expectMarkedLines(['take("mine")', 'put("furnace")'])
         await expect(card.locator('pre')).toContainText('function smelt() {')
+        await expect(card.locator('pre')).toContainText('smelt()   // this line runs the job')
         await expect(card.locator('pre')).not.toContainText('take("mine")')
+      }
+      if (step.id === 'bram-loop') {
+        await expectMarkedLines(['smelt()', 'ship()'])
+        expect(await card.locator('pre').innerText()).toBe('export function onTick() {\n  smelt()\n  ship()\n}')
       }
       if (index < 8) await capture(prefix + '-brief')
       for (const label of ['Hint', 'Show places and functions', 'Show exact lines']) await button(label).click()
       const lines = await card.locator('pre.hint').innerText()
       await expect(card.locator('pre.hint')).toHaveText(step.hints[2])
-      if (step.id === 'bram-loop') {
-        const calls = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
-        await expect(calls).toHaveText(['smelt()', 'ship()'])
-        for (const call of await calls.all()) await expect(call.locator('.call-to-move').first()).toBeInViewport({ ratio: 1 })
-      }
+      if (step.id === 'bram-smelt') await expectMarkedLines(['take("mine")', 'put("furnace")'])
+      if (step.id === 'bram-loop') await expectMarkedLines(['smelt()', 'ship()'])
       if (index < 8) await capture(prefix + '-hint')
       await button('Hide hint').click()
       if (step.id === 'harrow-tab') {
