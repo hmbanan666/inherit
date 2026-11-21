@@ -13,6 +13,7 @@ import {
 import type { Reply, Request } from './runner.worker'
 
 const SAVE = 'inherit.workshop.v1'
+const RELOADED_BUILD = 'inherit.workshop.reloadedBuild'
 interface Entry {
   code: string
   layout: Layout
@@ -24,6 +25,7 @@ interface Save {
   entries: Record<number, Entry>
 }
 export function useWorkshop() {
+  const { buildId } = useRuntimeConfig().app
   const index = ref(0)
   const level = computed(() => levels[index.value]!)
   const completed = ref<number[]>([])
@@ -45,6 +47,7 @@ export function useWorkshop() {
   const saved = ref(true)
   let entries: Save['entries'] = {}
   let worker: Worker | undefined
+  let buildCheck: AbortController | undefined
   let timer: ReturnType<typeof setTimeout>
   let watchdog: ReturnType<typeof setTimeout>
   let awaiting = false
@@ -59,6 +62,8 @@ export function useWorkshop() {
     }
   }
   function stop() {
+    buildCheck?.abort()
+    buildCheck = undefined
     clearTimeout(timer)
     clearTimeout(watchdog)
     worker?.terminate()
@@ -71,6 +76,33 @@ export function useWorkshop() {
     stop()
     error.value = message
   }
+  async function assetFailed(message: string) {
+    fail(message)
+    const check = new AbortController()
+    buildCheck = check
+    try {
+      const response = await fetch('/_nuxt/builds/latest.json', { cache: 'no-store', signal: check.signal })
+      if (!response.ok) return
+      const { id } = await response.json()
+      if (check.signal.aborted || typeof id !== 'string' || !id || id === buildId) return
+      if (sessionStorage.getItem(RELOADED_BUILD) === id) return
+      persist()
+      if (!saved.value) return
+      sessionStorage.setItem(RELOADED_BUILD, id)
+      window.location.reload()
+    } catch {
+      // Keep the reload instruction visible if the manifest or storage is unavailable.
+    }
+  }
+  const chunkErrors = new WeakSet<Error>()
+  useRuntimeHook('app:chunkError', ({ error }) => {
+    if (error instanceof Error) chunkErrors.add(error)
+    // A lazy component can fail before the workshop has restored the player's notebook.
+    onNuxtReady(() => assetFailed('Could not load part of the workshop. Reload the page.'))
+  })
+  onErrorCaptured((error) => {
+    if (error instanceof Error && chunkErrors.has(error)) return false
+  })
   function send(message: Request) {
     if (!worker || awaiting) return
     awaiting = true
@@ -93,12 +125,19 @@ export function useWorkshop() {
     activeCode = code.value
     dirty.value = false
     world.value = createWorld(level.value, layout.value)
-    const instance = new Worker(new URL('./runner.worker.ts', import.meta.url), { type: 'module' })
+    const loadError = 'Could not start the controller worker. Reload the page and run again.'
+    let instance: Worker
+    try {
+      instance = new Worker(new URL('./runner.worker.ts', import.meta.url), { type: 'module' })
+    } catch {
+      void assetFailed(loadError)
+      return
+    }
     worker = instance
     loading.value = true
     running.value = !single
     instance.onerror = () => {
-      if (worker === instance) fail('Could not start the controller worker. Try Run again.')
+      if (worker === instance) void assetFailed(loadError)
     }
     instance.onmessage = ({ data }: MessageEvent<Reply>) => {
       if (worker !== instance) return

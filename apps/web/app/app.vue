@@ -302,7 +302,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keys, true))
           @click="primaryStarts ? startRun() : pause()"
         >
           <component :is="running && !primaryStarts ? Pause : Play" :size="13" />
-          {{ loading ? 'Starting…' : error ? 'Retry' : dirty ? 'Run' : running ? 'Pause' : 'Resume' }}
+          {{ loading ? 'Starting…' : primaryStarts ? 'Run' : running ? 'Pause' : 'Resume' }}
         </button>
         <button v-if="dirty && !error" :disabled="loading" @click="pause">
           <component :is="running ? Pause : Play" :size="13" />{{ running ? 'Pause' : 'Resume' }}
