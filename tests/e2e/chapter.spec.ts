@@ -10,7 +10,7 @@ async function setController(page: Page, source: string) {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((text) => navigator.clipboard.writeText(text), source)
   await page.keyboard.press('Control+v')
-  await page.getByRole('button', { name: /^(Run|Retry|Restart)$/ }).click()
+  await page.getByRole('button', { name: /^(Run|Restart)$/ }).click()
 }
 async function wire(page: Page, from: string, to: string) {
   await page
@@ -126,6 +126,37 @@ test('write, build and ship the shed chapter', async ({ page }) => {
   await expect(page.locator('.shipped p')).toBeInViewport({ ratio: 1 })
   await expectFifthFloorToFit(page)
   expect(errors).toEqual([])
+})
+
+test('Run recovers a missing worker after a redeploy and keeps the edited controller', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('.phase')).toHaveText('Running')
+
+  let reloads = 0
+  await page.route('/', async (route) => {
+    if (route.request().isNavigationRequest()) reloads++
+    await route.continue()
+  })
+  await page.route('**/_nuxt/builds/latest.json*', (route) =>
+    route.fulfill({ json: { id: 'next-build' } }),
+  )
+  await page.route('**/_nuxt/runner.worker-*.js', (route) =>
+    reloads ? route.continue() : route.fulfill({ status: 404, contentType: 'text/html', body: 'Not found' }),
+  )
+
+  await setController(page, solutions[0]!)
+  await expect.poll(() => reloads).toBe(1)
+  await expect(page.locator('.phase')).toHaveText('Running')
+  await expect(page.locator('.view-lines')).toContainText('ctx.work("furnace-a")')
+  await expect.poll(async () => Number(await page.locator('.rate strong').textContent())).toBeGreaterThan(0)
+
+  await setController(page, controller('  throw new Error("Valve closed")'))
+  await expect(page.locator('.runtime[role=alert]')).toContainText('Valve closed')
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeVisible()
+  await setController(page, solutions[0]!)
+  await expect(page.locator('.runtime[role=alert]')).toHaveCount(0)
+  await expect.poll(async () => Number(await page.locator('.rate strong').textContent())).toBeGreaterThan(0)
+  expect(reloads).toBe(1)
 })
 
 test('editor checks factory types, suggests commands and recovers from a stopped handler', async ({
