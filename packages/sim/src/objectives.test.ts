@@ -120,3 +120,24 @@ test('highlights follow an unlock and examples use the IDs on the player’s flo
   expect(card.highlight).toMatchObject({ type: 'machine', id: 'my wire cutter' })
   expect(card.hints.join('\n')).toContain('ctx.work("my wire cutter", "wire")')
 })
+
+test('the blueprint guide points at a spare tile, then the actual furnace built from code', () => {
+  const c = createCampaign()
+  c.economy.research.push('survey', 'blueprints')
+  const east = c.world.sites[0].plots.find((p) => p.id === 'east-lot')!
+  east.status = 'owned'
+  c.progress.completedObjectives = ['blueprints']
+  placeMachine(c, 'furnace', 'shed', 10, 2, 'existing')
+  const card = objectiveTrack(c).active!
+  expect(card.highlight.type).toBe('tile')
+  if (card.highlight.type !== 'tile') throw new Error('Expected a construction tile')
+  const { x, y } = card.highlight
+  expect([x, y]).not.toEqual([10, 2])
+  expect(card.hints.join('\n')).toContain('ctx.build("furnace", ' + x + ', ' + y)
+  let id: string | undefined
+  advanceGame(c, (ctx) => {
+    id = ctx.build!('furnace', x, y)
+  })
+  expect(id).toBeTruthy()
+  expect(objectiveTrack(c).active?.highlight).toMatchObject({ type: 'machine', id })
+})

@@ -71,6 +71,27 @@ function focus(c: Campaign, target: Highlight): Highlight {
   }
   return target
 }
+function blueprintTile(c: Campaign, tile: Extract<Highlight, { type: 'tile' }>) {
+  const machines = c.world.machines.filter((m) => m.siteId === tile.siteId)
+  const occupied = (x: number, y: number) => machines.some((m) => m.x === x && m.y === y)
+  if (!occupied(tile.x, tile.y)) return tile
+  const site = c.world.sites.find((s) => s.id === tile.siteId)
+  let nearest = tile
+  let distance = Infinity
+  for (const plot of site?.plots ?? []) {
+    if (plot.status !== 'owned') continue
+    for (let x = plot.x; x < plot.x + plot.width; x++) {
+      for (let y = plot.y; y < plot.y + plot.height; y++) {
+        const d = Math.abs(x - tile.x) + Math.abs(y - tile.y)
+        if (d < distance && !occupied(x, y)) {
+          nearest = { ...tile, x, y }
+          distance = d
+        }
+      }
+    }
+  }
+  return nearest
+}
 export function activeCard(c: Campaign, card: Objective): Objective {
   const hints = card.hints.map((line) =>
     line.replace(/"([^"]+)"/g, (quoted, name: string) => {
@@ -79,5 +100,16 @@ export function activeCard(c: Campaign, card: Objective): Objective {
       return selected ? JSON.stringify(selected.id) : quoted
     }),
   )
-  return { ...card, hints, highlight: focus(c, card.highlight) }
+  let highlight = focus(c, card.highlight)
+  if (card.id === 'code-furnace' && highlight.type === 'tile') {
+    const tile = blueprintTile(c, highlight)
+    hints[2] = hints[2].replace(`${highlight.x}, ${highlight.y}`, `${tile.x}, ${tile.y}`)
+    highlight = tile
+  }
+  if (card.id === 'code-belt') {
+    const furnaces = c.world.machines.filter((m) => m.kind === 'furnace' && m.builtByCode)
+    const furnace = furnaces.find((m) => m.id === c.memory.oven) ?? furnaces[0]
+    if (furnace) highlight = { type: 'machine', kind: 'furnace', id: furnace.id }
+  }
+  return { ...card, hints, highlight }
 }

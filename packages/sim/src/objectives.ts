@@ -7,6 +7,7 @@ export interface Objective {
   id: string
   title: string
   why: string
+  /** First line is an instruction. Remaining lines form one optional TypeScript example. */
   hints: string[]
   progressUnit: string
   highlight:
@@ -19,7 +20,7 @@ export interface Objective {
       }
     | { type: 'shop'; item: MachineKind | 'road' | 'belt'; siteId?: string }
     | { type: 'plot'; siteId: string; id: string }
-    | { type: 'tile'; siteId: string; x: number; y: number }
+    | { type: 'tile'; siteId: string; x: number; y: number; tool?: MachineKind }
     | { type: 'research'; id: string }
     | { type: 'button'; id: 'editor' | 'deploy' | 'files' | 'memory' | 'inbox' }
   reward: { money: number; researchPoints: number }
@@ -221,7 +222,11 @@ const stages: Stage[] = [
     editor,
     'counters',
     (c) => /\blet\s+\w+/.test(code(c)) && /\+\+|\+=\s*1|\+\s*1/.test(code(c)),
-    ['Above onTick: let rocks = 0', 'Inside onTick: if (ctx.space("mine") && ctx.dig("mine")) rocks++'],
+    [
+      'Put the counter above onTick and the dig inside it.',
+      'let rocks = 0',
+      'if (ctx.space("mine") && ctx.dig("mine")) rocks++',
+    ],
     'One chalk mark for each rock.',
   ),
   goal(
@@ -346,7 +351,7 @@ const stages: Stage[] = [
   goal(
     'coal',
     'Place a miner on coal',
-    { type: 'tile', siteId: 'shed', x: 1, y: 4 },
+    { type: 'tile', siteId: 'shed', x: 1, y: 4, tool: 'miner' },
     'coal miners',
     (c) => c.world.machines.some((m) => m.deposit === 'coal'),
     ['Place a miner on the black patch at (1, 4) in the shed.'],
@@ -443,7 +448,7 @@ const stages: Stage[] = [
   goal(
     'copper',
     'Place a miner on copper',
-    { type: 'tile', siteId: 'shed', x: 9, y: 2 },
+    { type: 'tile', siteId: 'shed', x: 9, y: 2, tool: 'miner' },
     'copper miners',
     (c) => c.world.machines.some((m) => m.deposit === 'copper'),
     ['Place a miner on the green patch at (9, 2) on the east lot.'],
@@ -456,16 +461,28 @@ const stages: Stage[] = [
     { type: 'tile', siteId: 'shed', x: 10, y: 2 },
     'furnaces',
     (c) => machines(c, 'furnace').some((m) => m.builtByCode),
-    ['Try the free tile beside your copper miner. Save the new ID.', 'if (!memory.oven)', '  memory.oven = ctx.build("furnace", 10, 2, { recipe: "copper-ingot" }) ?? null'],
+    [
+      'Use a free tile near the copper miner. Save the new ID.',
+      'if (!memory.oven)',
+      '  memory.oven = ctx.build("furnace", 10, 2, { recipe: "copper-ingot" }) ?? null',
+    ],
     'The copper crew can follow a plan.',
   ),
   goal(
     'code-belt',
     'Connect your new furnace from code',
-    { type: 'machine', kind: 'miner', deposit: 'copper' },
+    { type: 'machine', kind: 'furnace', recipe: 'copper-ingot' },
     'belts',
-    (c) => machines(c, 'furnace').some((m) => m.builtByCode && c.world.belts.some((b) => b.builtByCode && (b.from === m.id || b.to === m.id))),
-    ['Use your copper miner’s ID and the furnace ID you saved.', 'if (!memory.wired && typeof memory.oven === "string")', '  memory.wired = ctx.connect("copper", memory.oven)'],
+    (c) =>
+      machines(c, 'furnace').some(
+        (m) =>
+          m.builtByCode && c.world.belts.some((b) => b.builtByCode && (b.from === m.id || b.to === m.id)),
+      ),
+    [
+      'Use your copper miner’s ID and the furnace ID you saved.',
+      'if (!memory.wired && typeof memory.oven === "string")',
+      '  memory.wired = ctx.connect("copper", memory.oven)',
+    ],
     'One belt joins the copper crew to its furnace.',
   ),
   goal(
@@ -474,10 +491,7 @@ const stages: Stage[] = [
     { type: 'machine', kind: 'miner', deposit: 'copper' },
     'rocks',
     (c) => c.world.extracted['copper-ore'] ?? 0,
-    [
-      'Use your copper miner’s ID to dig once.',
-      'if (ctx.space("copper")) ctx.dig("copper")',
-    ],
+    ['Use your copper miner’s ID to dig once.', 'if (ctx.space("copper")) ctx.dig("copper")'],
     'The first green rock is on its way.',
   ),
   goal(
@@ -486,7 +500,10 @@ const stages: Stage[] = [
     { type: 'machine', kind: 'furnace', recipe: 'copper-ingot' },
     'ingots',
     shipped('copper-ingot'),
-    ['Connect the copper furnace to the dock. Run the ingot recipe.', 'if (typeof memory.oven === "string") ctx.work(memory.oven, "copper-ingot")'],
+    [
+      'Connect the copper furnace to the dock. Run the ingot recipe.',
+      'if (typeof memory.oven === "string") ctx.work(memory.oven, "copper-ingot")',
+    ],
     'The electrician likes her copper in bars.',
   ),
   goal(
