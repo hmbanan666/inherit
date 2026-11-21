@@ -140,7 +140,7 @@ Track IDs in order:
 
 ```text
 dig, fire, ingot, shed, loading, tally, chalk, redeploy, plot, oven, belt, gauges,
-fork, balance, coal, press, part, parts, clock, gate, binder, helper, copper, code-furnace, code-belt,
+fork, balance, coal, press, part, parts, clock, gate, binder, helper, copper, blueprints, code-furnace, code-belt,
 copper-ore, copper-bar, cutter, wire, plate, gear, cards, jig, bracket, shelves,
 buffer, release, merger, quality, sorter, scrap, contract, recipe-table, doorbell,
 arrival, idle-bell, idle, road, depots, truck, manifest, breakdown, ack, motor, tram, network
@@ -169,4 +169,4 @@ referenceActions(objectiveId: string): ReferenceAction[]
 applyReferenceAction(c: Campaign, action: ReferenceAction): boolean
 ```
 
-On stage entry, apply its actions once in order, paste the supplied working files, and deploy if changed. The action tuples carry site coordinates and belt endpoints. A belt endpoint such as `{ memory: "oven" }` reads the ID that the controller saved when it built the machine. They use the same public purchase, sell, research, read and order commands as the player. The headless test runs those TypeScript functions on two seeds, verifies each stamp, checks the retained world and ledger, and follows one parcel through both truck faults. The declarations test checks every stage against its unlocked editor surface.
+On stage entry, apply its actions once in order, paste the supplied working files, and deploy if changed. The action tuples carry site coordinates and belt endpoints. A belt endpoint such as `{ memory: "oven" }` reads the ID that the controller saved when it built the machine. The actions use the same public purchase, sell, research, read and order commands as the player. The headless test runs those TypeScript functions on two seeds, verifies each stamp, checks the retained world and ledger, and follows one parcel through both truck faults. The declarations test checks every stage against its unlocked editor surface.

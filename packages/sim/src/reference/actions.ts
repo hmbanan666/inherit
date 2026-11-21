@@ -48,7 +48,7 @@ const plan: Record<string, ReferenceAction[]> = {
     ['research', 'copper'],
     ['machine', 'miner', 'shed', 9, 2, 'copper'],
   ],
-  'code-furnace': [['research', 'blueprints']],
+  blueprints: [['research', 'blueprints']],
   cutter: [
     ['research', 'cutter'],
     ['machine', 'cutter', 'shed', 11, 2, 'draw'],

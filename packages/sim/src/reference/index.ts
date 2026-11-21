@@ -58,12 +58,13 @@ export function referenceFiles(objectiveId: string): ProjectFiles {
     )
   if (objectiveId === 'code-belt')
     body.push(
-      'if (typeof memory.oven === "string") {',
-      '  if (!memory.wired) memory.wired = ctx.connect("copper", memory.oven)',
-      '  if (!memory.outlet) memory.outlet = ctx.connect(memory.oven, "dock")',
-      '}',
+      'if (typeof memory.oven === "string" && !memory.wired) memory.wired = ctx.connect("copper", memory.oven)',
     )
   if (at('copper-ore')) body.push('if (ctx.space("copper")) ctx.dig("copper")')
+  if (objectiveId === 'copper-bar')
+    body.push(
+      'if (typeof memory.oven === "string" && !memory.outlet) memory.outlet = ctx.connect(memory.oven, "dock")',
+    )
   if (at('copper-bar')) body.push('if (typeof memory.oven === "string") ctx.work(memory.oven, "copper-ingot")')
   if (at('wire')) body.push('ctx.work("draw", "wire")')
   if (at('gear')) body.push('ctx.work("teeth", "gear")')

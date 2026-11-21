@@ -162,8 +162,9 @@ export async function openRuntime(
         const method = operations.includes(key) && Reflect.get(current, key)
         if (typeof method !== 'function') throw new Error(`Factory method ${key} is unavailable.`)
         const params = args.slice(0, vm.getNumber(length)).map((h) => {
-          if (vm.typeof(h) === 'number') return vm.getNumber(h)
-          if (vm.typeof(h) === 'string') return JSON.parse(vm.getString(h))
+          const type = vm.typeof(h)
+          if (type === 'number') return vm.getNumber(h)
+          if (type === 'string') return JSON.parse(vm.getString(h))
         })
         if (key === 'build') {
           const [siteId, recipe, deposit] = params.splice(3)
