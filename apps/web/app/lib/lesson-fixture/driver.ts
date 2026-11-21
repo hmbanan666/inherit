@@ -43,6 +43,7 @@ function execute(c: Campaign, mode: PlaybackMode, controller: FixtureController)
     setHand(c, null)
     c.world.machines.find(m => m.id === 'mine')!.output = { kind: 'iron-ore' }
   }
+  const previousIngots = c.world.delivered['iron-ingot'] ?? 0
   const feedback = advanceGame(c, factory => {
     const { program, sites } = controller
     let message: string | undefined
@@ -79,6 +80,7 @@ function execute(c: Campaign, mode: PlaybackMode, controller: FixtureController)
       error = cause instanceof Error ? cause.message : 'Controller stopped.'
     }
   })
-  if (!error) finishCalls(c, calls, mode === 'tick')
+  const deliveredIngots = (c.world.delivered['iron-ingot'] ?? 0) - previousIngots
+  if (!error) finishCalls(c, calls, deliveredIngots, mode === 'tick')
   return { calls, feedback, error }
 }

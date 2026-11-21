@@ -79,15 +79,15 @@ export function continueStep(c: Campaign): Campaign {
   }
   return c
 }
-export function finishCalls(c: Campaign, calls: CallRecord[], automated: boolean) {
+export function finishCalls(c: Campaign, calls: CallRecord[], deliveredIngots: number, automated: boolean) {
   const f = fixture(c)
   if (f.phase === 'solved' || f.mayor) return
   const success = (fn: string, place: string, within?: string) => calls.some(r => r.ok && r.fn === fn && r.args[0] === place && (!within || r.within === within))
-  const shipped = success('put', 'cart')
-  if (shipped && (f.index === 2 || (f.index === 5 && automated))) f.deliveries = Math.min(3, f.deliveries + 1)
+  const shipped = deliveredIngots > 0
+  if (shipped && (f.index === 2 || (f.index === 5 && automated))) f.deliveries = Math.min(3, f.deliveries + deliveredIngots)
   const solved = [
     f.hand === 'iron-ore' && success('take', 'mine'), success('put', 'furnace'), shipped,
-    success('take', 'mine', 'smelt') && success('put', 'furnace', 'smelt'), success('take', 'furnace', 'ship') && success('put', 'cart', 'ship'), automated && f.deliveries === 3,
+    success('take', 'mine', 'smelt') && success('put', 'furnace', 'smelt'), shipped && success('take', 'furnace', 'ship') && success('put', 'cart', 'ship'), automated && f.deliveries === 3,
   ][f.index]
   f.phase = solved ? 'solved' : 'working'
   if (solved && f.index === 5) {
