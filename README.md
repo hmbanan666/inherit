@@ -4,9 +4,9 @@ Your uncle left you a factory and a 600-coin debt. In Kettlewick, the mail horse
 
 ## Your first shift
 
-Start below Uncle’s note in `main.ts`. Write an exported `onTick()` that prints a message, then click **Deploy**. Bram’s card gives you an idea on the first hint and the exact lines on the second. Follow it to import Uncle’s machines from `"inherit"`, dig ore, connect belts and smelt ingots. When the third ingot ships, click **See it** to watch the mail horse trot past the forge.
+Start in `verbs/dig.ts`. Bram’s card explains how to take a rock from the mine. Open Hint for the idea, then Show exact step for the lines. The bench runs as you edit. Use your dig in smelt, write ship, then import your verbs into `main.ts` and click **Deploy**. When the third ingot ships, click **See it** to visit the forge.
 
-Build machines with `ctx.build` and lay belts with `ctx.connect`. Click a machine to inspect its bins and the line that drives it. Each delivery changes the town, and regular orders help pay the bank. Requests and orders wait and pay in full whenever you deliver. Your floor and controller save in this browser. Returning from v2? Open **Deploy history → Open v2 code** to find your old project.
+Find solved functions under **My library**. Machines work automatically when supplied. Use the floor to inspect inputs and the lines that moved them. Requests and finite orders pay for machines and the debt. The cart keeps extra items until someone needs them. Your progress saves in this browser. Open **Deploy history** to find snapshots from earlier versions.
 
 ## Run locally
 
