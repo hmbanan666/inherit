@@ -69,7 +69,7 @@ for (const file of ['main.ts', 'lib/drive.ts']) {
     }
     const program = [
       'import type { Factory } from "inherit"',
-      'export function onTick(ctx: Factory) {',
+      `export function ${file === 'main.ts' ? 'onTick' : 'feed'}(ctx: Factory) {`,
       '  memory.room = ctx.space("mine")',
       '  console.log(memory.room)',
       '}',
@@ -77,7 +77,7 @@ for (const file of ['main.ts', 'lib/drive.ts']) {
     ].join('\n')
     const markers = page.locator('.project-editor .squiggly-error')
     // Wait for a semantic error first so a worker still starting up cannot give a false pass.
-    await replaceCode(page, program.replace('ctx.space', 'ctx.missing'))
+    await replaceCode(page, program.replace('ctx.space', 'ctx.stock'))
     await expect(markers.first()).toBeVisible()
     await replaceCode(page, program)
     await expect(markers).toHaveCount(0)
