@@ -1,22 +1,16 @@
-# inherit
+# Inherit
 
-Your uncle left you a shed, a working ore extractor, and an order for ten iron ingots. Open the workshop, edit the TypeScript controller, and watch the first ingot reach the loading dock. Inherit is a single-player automation game that runs entirely in the browser.
+Your uncle left you a shed, an idle iron mine, and a furnace waiting for its first rock. Inherit is a browser game about growing one persistent factory with TypeScript. The first of 75 objectives takes one line.
 
-## Playing the shed
+## Your first shift
 
-The starter controller runs as soon as you open the game. Click a machine to inspect its state and highlight its mentions in the controller. The `api.d.ts` tab describes the available commands. Edit `controller.ts` and press **Run** to start a fresh shift with your code. **Pause** preserves the shift and **Step** advances it by one tick.
+Open the workshop and click **Hint** on the objective card. Add `ctx.dig("mine")` inside `onTick` in `main.ts`, then click **Deploy**. Watch the rock travel down the belt. The next card shows how to turn it into an ingot.
 
-| Level | Customer order | Factory problem |
-| --- | --- | --- |
-| The shed | 10 iron ingots | Ore piles up until the furnace gets a work instruction. |
-| Second furnace | 48 ingots, at least 185/min, each furnace at most 50% idle | Belt in the one-tick furnace. Compare the input bins to keep it and its four-tick partner busy. |
-| Parts department | 10 pressed parts | Place the coal mine on the floor, connect it to the press, and feed both ingredients. |
-| Loading bay | 7 ingots with zero ore lost | A slow truck fills the line. Check belt capacity before digging. |
-| First real order | 12 gate parts by tick 128, at most 12 sacks of coal, zero spills | Feed the press from two furnaces. Remember each successful coal draw across ticks while the truck takes one part every eight ticks. |
+Spend coins on land, machines, and belts. Take customer orders for extra pay and reputation. Research unlocks equipment and new controller commands. The floor, code, and `memory` carry over between objectives and save locally in your browser.
 
-A tick represents 250 ms of simulation time. Speed changes how quickly you watch the shift. Throughput counts deliveries over the last simulated minute, using elapsed time for younger shifts. The idle readout shows the least utilized furnace. Each recipe has separate ingredient bins. A completed machine holds its product until the outgoing belt has room.
+Edits stay in your working copy while the deployed controller runs. **Ctrl/Cmd+S** deploys a change. Open the arrow beside **Deploy** to roll back to an earlier revision. Research the **Workshop binder** to split your controller into files and import helpers.
 
-Layout changes start a new shift. Select player-built equipment to remove it. Each order has three progressive hints. Shipping unlocks the next level in the chapter log. This browser saves controllers, layouts, hints and unlocked orders in local storage. Reset level restores the current starter plan.
+Click a machine to inspect its bins. **Drivers** shows which lines in your project command each machine. Use the console and metrics to investigate a slow line, preview changes on a copy of the factory, or save a named draft in **Snapshots**.
 
 ## Run locally
 
@@ -46,21 +40,9 @@ Open `http://localhost:8080`. The image builds the workspace with Node 24 and se
 
 ## Project structure
 
-- `packages/sim` defines levels, layouts, fixed-tick physics, the controller API and order checks. A fresh world and the same synchronous controller produce the same shift. The chapter uses no random inputs.
-- `packages/sandbox` transpiles controllers with the TypeScript compiler and runs them in QuickJS WASM. Each instance has an 8 MiB guest heap, a bounded stack, a 25 ms handler interrupt and a limit of 128 factory calls per tick. Runtime errors use the TypeScript source map.
-- `apps/web` contains the Nuxt 4 workspace, Monaco editor, PixiJS equipment and local notebook. A dedicated worker owns the active simulation. The UI can terminate it and start a fresh run.
-- `tests/e2e` plays through the production build using the editor and floor controls.
-
-## Screenshots
-
-The chapter browser test captures all five running orders and the first and last shipment receipts. Set `INHERIT_SHOTS` to an output directory to regenerate them. A gallery is planned for the first release.
-
-## Roadmap
-
-1. **Functions and onTick** — restore the shed, route ore and ship the first orders.
-2. **Modules** — split a growing controller into reusable machine programs.
-3. **Types and contracts** — specify which materials cross each machine boundary.
-4. **Async, events and queues** — coordinate deliveries and handle slow consumers.
-5. **A reactive control panel** — build a small framework of your own from the signals your factory produces.
+- `packages/sim` runs the factory simulation, objectives, orders, and research.
+- `packages/sandbox` compiles the player’s TypeScript and runs it in QuickJS.
+- `apps/web` contains the workshop, floor renderer, editor, and simulation worker.
+- `tests/e2e` exercises the generated site through the editor and floor controls. Set `INHERIT_SHOTS` to a directory outside the checkout to capture workshop screenshots.
 
 Released under the [MIT license](LICENSE).
