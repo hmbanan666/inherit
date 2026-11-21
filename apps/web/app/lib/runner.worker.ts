@@ -10,7 +10,7 @@ export type Reply =
 let stationIds: Set<string>
 let world: World
 let program: Program
-self.onmessage = async ({ data }: MessageEvent<Request>) => {
+self.onmessage ??= async ({ data }: MessageEvent<Request>) => {
   const send = (reply: Reply) => self.postMessage(reply)
   try {
     if (data.kind === 'init') {
