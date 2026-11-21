@@ -66,7 +66,9 @@ onBeforeUnmount(discardRun)
     <h1>The tally desk</h1>
     <section :aria-label="chapter.title">
       <h2>{{ stage + 1 }} / {{ chapter.title }}</h2>
-      <p>{{ chapter.question }}</p>
+      <p v-if="stage === 0">Make your parcel counter behave like the React reference. Each stamp should add one, and repainting the sign should keep the count.</p>
+      <p v-else>{{ chapter.question }}</p>
+      <p v-if="stage === 0"><strong>Start here:</strong> click <strong>Stamp parcel</strong> once. The same click goes to both desks. Compare their numbers, then edit <a href="#desk-code">desk.ts</a> to fix your counter.</p>
       <div class="bench">
         <article v-for="side in (['reference', 'player'] as const)" :key="side" :class="frame?.paint">
           <h3>{{ side === 'reference' ? 'React reference' : 'Your desk' }}</h3>
@@ -84,7 +86,7 @@ onBeforeUnmount(discardRun)
     <div class="work">
       <section>
         <h2><label for="desk-code">desk.ts</label></h2>
-        <p>Implement a single state slot. Each render calls <code>tallyFor(shift)</code> for the current key. Return the displayed number and a setter. A stamp sets the number to its displayed value plus one and triggers a render.</p>
+        <p>Edit <code>tallyFor</code> below. Each stamp calls the setter, then calls your function again to read the count. Click <strong>Check challenge</strong> to try your code on a sequence of actions.</p>
         <textarea id="desk-code" v-model="code" spellcheck="false" autocapitalize="off" maxlength="64000" />
         <div class="tools">
           <button class="check" :disabled="busy" @click="run(chapter.experiment, true)">Check challenge</button>
