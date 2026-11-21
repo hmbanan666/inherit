@@ -73,6 +73,7 @@ const machine = shape({
   stats: shape({ processed: count, rate: count, activeTicks: count, idleTicks: count, blockedTicks: count }),
   lastInput: opt(str),
   recentProduction: list(count),
+  builtByCode: opt(one(true)),
   paid: count,
   builtAt: count,
   batchTicks: opt((v) => count(v) && Number(v) > 0),
@@ -118,6 +119,7 @@ const world = shape({
       from: str,
       to: str,
       path: list(shape(tile)),
+      builtByCode: opt(one(true)),
       paid: count,
       sequence: count,
       items: list(shape({ ...item, id: count, position: count })),
@@ -239,6 +241,7 @@ function migrateEngine(c: Campaign) {
     RESEARCH.find((n) => n.id === id)?.requires.forEach(allow)
   }
   for (const node of RESEARCH) {
+    if (node.id === 'blueprints') continue // Construction methods did not exist on v2 controllers.
     if (
       node.machines?.some((kind) => c.world.machines.some((m) => m.kind === kind)) ||
       node.methods?.some((method) => code.includes('.' + method + '(')) ||

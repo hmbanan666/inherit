@@ -3,15 +3,15 @@ import { arrive, emit, hasRoom, openIncident, produce } from './transport'
 
 export function dispatch(
   world: CampaignWorld,
-  machines: Map<string, CampaignMachine>,
+  findMachine: (id: string) => CampaignMachine | undefined,
   truckId: string,
   from: string,
   to: string,
   key: string,
 ): boolean {
-  const truck = machines.get(truckId),
-    source = machines.get(from),
-    dest = machines.get(to)
+  const truck = findMachine(truckId),
+    source = findMachine(from),
+    dest = findMachine(to)
   if (
     !key ||
     key.length > 128 ||
@@ -39,19 +39,19 @@ export function dispatch(
   }
   return true
 }
-export function advanceTrips(world: CampaignWorld, machines: Map<string, CampaignMachine>) {
+export function advanceTrips(world: CampaignWorld, findMachine: (id: string) => CampaignMachine | undefined) {
   world.trips = world.trips.filter((trip) => {
     const { truckId, from, to, key, outcome, cargo } = trip
-    const truck = machines.get(truckId)!
+    const truck = findMachine(truckId)!
     truck.status = 'working'
     if (world.tick < trip.due) return true
     if (outcome === 'breakdown') {
       // The origin reserved this slot. Put the same parcel first for a retry.
-      const source = machines.get(from)!
+      const source = findMachine(from)!
       source.queue.unshift(cargo!)
       emit(world, { type: 'itemArrived', machineId: from, item: { ...cargo! }, tick: world.tick })
     } else if (cargo) {
-      const dest = machines.get(to)!
+      const dest = findMachine(to)!
       if (!hasRoom(world, dest, cargo)) {
         truck.status = 'blocked'
         return true

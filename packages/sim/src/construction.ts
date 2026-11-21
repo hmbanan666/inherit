@@ -2,6 +2,8 @@ import { MACHINES } from './catalog'
 import type { MachineKind } from './campaign-api'
 import type { Campaign, CampaignBelt, CampaignMachine, Plot, Site, Tile } from './model'
 
+type ReportFailure = (reason: string) => undefined
+
 function contains(plot: Plot, { x, y }: Tile) {
   return x >= plot.x && x < plot.x + plot.width && y >= plot.y && y < plot.y + plot.height
 }
@@ -46,20 +48,23 @@ export function placeMachine(
   y: number,
   id?: string,
   cost = 0,
+  fail?: ReportFailure,
 ): CampaignMachine | undefined {
   const { world } = campaign
   const site = world.sites.find((s) => s.id === siteId)
-  if (!site || !Object.hasOwn(MACHINES, kind) || !owned(site, { x, y }) || !affordable(campaign, cost)) return
+  if (!site || !owned(site, { x, y })) return fail?.('Choose an owned tile at whole coordinates.')
+  if (!Object.hasOwn(MACHINES, kind)) return fail?.('Unknown machine kind.')
+  if (!affordable(campaign, cost)) return fail?.('Insufficient coins for this machine.')
   if (world.machines.some((machine) => machine.siteId === siteId && machine.x === x && machine.y === y))
-    return
+    return fail?.('Tile occupied.')
   const deposit = site.deposits.find((d) => d.x === x && d.y === y)
-  if (kind === 'miner' && !deposit) return
+  if (kind === 'miner' && !deposit) return fail?.('Miners need a deposit tile.')
   if (id === undefined) {
     do {
       id = kind + '-' + world.nextMachineId++
     } while (world.machines.some((machine) => machine.id === id))
   }
-  if (!id || world.machines.some((machine) => machine.id === id)) return
+  if (!id || world.machines.some((machine) => machine.id === id)) return fail?.('Choose a unique machine ID.')
   const machine: CampaignMachine = {
     id,
     kind,
@@ -115,6 +120,7 @@ export function connectBelt(
   to: string,
   path?: Tile[],
   cost = 0,
+  fail?: ReportFailure,
 ): CampaignBelt | undefined {
   const { world } = campaign
   const a = world.machines.find((machine) => machine.id === from),
@@ -125,11 +131,12 @@ export function connectBelt(
     a === b ||
     a.siteId !== b.siteId ||
     ['dock', 'truck'].includes(a.kind) ||
-    !MACHINES[b.kind].bin ||
-    !affordable(campaign, cost)
+    !MACHINES[b.kind].bin
   )
-    return
-  if (world.belts.some((link) => link.from === from && (link.to === to || !MACHINES[a.kind].routes))) return
+    return fail?.('Choose compatible belt endpoints on the same site.')
+  if (!affordable(campaign, cost)) return fail?.('Insufficient coins for this belt.')
+  if (world.belts.some((link) => link.from === from && (link.to === to || !MACHINES[a.kind].routes)))
+    return fail?.('This belt or machine output is already in use.')
   const site = world.sites.find((s) => s.id === a.siteId)!
   const tiles = path ?? autoPath(site, a, b)
   if (
@@ -139,7 +146,7 @@ export function connectBelt(
     !same(tiles[tiles.length - 1], b) ||
     tiles.some((p, i) => !owned(site, p) || (i > 0 && distance(p, tiles[i - 1]) !== 1))
   )
-    return
+    return fail?.('The belt needs a continuous path across owned tiles.')
   const belt: CampaignBelt = {
     siteId: a.siteId,
     from,

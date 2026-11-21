@@ -1,6 +1,7 @@
+import { blueprintCommands } from './blueprints'
 import { affectedOrders } from './incidents'
 import type { Campaign, Incident, OrderState, StoryMessage, JsonObject } from './model'
-import type { Factory, FactoryEvent } from './campaign-api'
+import type { BlueprintAPI, Factory, FactoryEvent } from './campaign-api'
 import { getSurface, type GameEventName } from './research'
 import { advanceCampaign } from './quests'
 import { beginObjective, finishObjective, objectiveTrack } from './objectives'
@@ -14,7 +15,8 @@ export interface GameTick {
   moneyDelta: number
   incidents: Incident[]
 }
-export type GameFactory = Pick<Factory, 'tick' | 'dig' | 'work' | 'space'> & Partial<Omit<Factory, 'recipe'>>
+export type GameFactory = Pick<Factory, 'tick' | 'dig' | 'work' | 'space'> &
+  Partial<Omit<Factory, 'recipe'> & BlueprintAPI>
 export interface GameProgram {
   onTick(ctx: GameFactory): void
   deliverEvent(name: GameEventName, event: FactoryEvent, ctx: GameFactory): void
@@ -52,7 +54,8 @@ function runController(
     return handler && surface.events.includes(handler)
   })
   const ctx: GameFactory = { tick: factory.tick, dig: factory.dig, space: factory.space, work: factory.work }
-  for (const key of surface.methods) Object.assign(ctx, { [key]: factory[key] })
+  const available = { ...factory, ...(surface.methods.includes('build') ? blueprintCommands(c) : {}) }
+  for (const key of surface.methods) Object.assign(ctx, { [key]: available[key] })
   const signals = c.progress.signals
   let ringing: FactoryEvent | undefined
   if (!signals.choseRecipe || (!signals.arrival && events.some((e) => e.type === 'itemArrived'))) {

@@ -66,6 +66,17 @@ export type FactoryEvent =
   | { type: 'machineIdle'; tick: number; machineId: string }
   | { type: 'truckReturned'; tick: number; machineId: string; key: string; outcome: TruckOutcome }
 
+export interface BuildOptions {
+  siteId?: string
+  recipe?: RecipeId
+  deposit?: NonNullable<MachineView['deposit']>
+}
+export interface BlueprintAPI {
+  build(kind: MachineKind, x: number, y: number, opts?: BuildOptions): string | undefined
+  connect(from: string, to: string): boolean
+  dismantle(id: string): boolean
+  lastError(): string | undefined
+}
 export interface Factory {
   readonly tick: number
   dig(id: string): boolean

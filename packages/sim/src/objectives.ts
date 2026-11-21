@@ -298,6 +298,37 @@ const stages: Stage[] = [
     (c) => c.world.machines.some((m) => m.deposit === 'copper'),
   ),
   goal(
+    'blueprints',
+    'Research Blueprint API',
+    'Uncle left the copper crew a set of plans. Your controller can read them now.',
+    ['Buy Blueprint API for three research points. Open api.d.ts to see the new calls.'],
+    license('blueprints'),
+  ),
+  goal(
+    'code-furnace',
+    'Place a furnace from code',
+    'The copper crew needs a burner. Give the controller the blueprints.',
+    [
+      'Choose a free owned tile near the copper miner. Save the returned ID so you only buy one furnace.',
+      'if (!memory.oven) { const id = ctx.build("furnace", 10, 2, { recipe: "copper-ingot" }); if (id) memory.oven = id }',
+    ],
+    (c) => machines(c, 'furnace').some((m) => m.builtByCode),
+  ),
+  goal(
+    'code-belt',
+    'Connect your new furnace from code',
+    'The belt crew takes coordinates. Your controller just needs the two machine IDs.',
+    [
+      'Connect your copper miner to the ID saved in memory. Replace "copper" with the ID of your miner.',
+      'if (!memory.wired && typeof memory.oven === "string") memory.wired = ctx.connect("copper", memory.oven)',
+    ],
+    (c) =>
+      machines(c, 'furnace').some(
+        (m) =>
+          m.builtByCode && c.world.belts.some((b) => b.builtByCode && (b.from === m.id || b.to === m.id)),
+      ),
+  ),
+  goal(
     'copper-ore',
     'Dig your first copper ore',
     'Fresh ore looks better on a belt than in a brochure.',
@@ -308,7 +339,10 @@ const stages: Stage[] = [
     'copper-bar',
     'Ship a copper ingot',
     'The electrician would like her wire in a less rocky shape.',
-    ['Connect the copper furnace to the dock.', 'ctx.work("smelter", "copper-ingot")'],
+    [
+      'Connect the copper furnace to the dock.',
+      'if (typeof memory.oven === "string") ctx.work(memory.oven, "copper-ingot")',
+    ],
     delivered('copper-ingot'),
   ),
   goal(

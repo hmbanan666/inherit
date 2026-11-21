@@ -5,10 +5,12 @@ import { research } from '../research'
 import { markMessageRead } from '../story'
 import { acceptOrder, MOTOR_CUSTOMER } from '../orders'
 
+type MachineRef = string | { memory: string }
 export type ReferenceAction =
   | ['research' | 'read', string]
   | ['road' | 'acceptTram']
-  | ['plot' | 'belt' | 'unbelt', string, string]
+  | ['plot', string, string]
+  | ['belt' | 'unbelt', MachineRef, MachineRef]
   | ['machine', MachineKind, string, number, number, string]
 
 const plan: Record<string, ReferenceAction[]> = {
@@ -46,18 +48,14 @@ const plan: Record<string, ReferenceAction[]> = {
     ['research', 'copper'],
     ['machine', 'miner', 'shed', 9, 2, 'copper'],
   ],
-  'copper-ore': [
-    ['machine', 'furnace', 'shed', 10, 2, 'smelter'],
-    ['belt', 'copper', 'smelter'],
-    ['belt', 'smelter', 'dock'],
-  ],
+  blueprints: [['research', 'blueprints']],
   cutter: [
     ['research', 'cutter'],
     ['machine', 'cutter', 'shed', 11, 2, 'draw'],
   ],
   wire: [
-    ['unbelt', 'smelter', 'dock'],
-    ['belt', 'smelter', 'draw'],
+    ['unbelt', { memory: 'oven' }, 'dock'],
+    ['belt', { memory: 'oven' }, 'draw'],
     ['belt', 'draw', 'dock'],
   ],
   gear: [
@@ -142,13 +140,17 @@ export function referenceActions(objectiveId: string): ReferenceAction[] {
   return structuredClone(plan[objectiveId] ?? [])
 }
 export function applyReferenceAction(c: Campaign, a: ReferenceAction): boolean {
+  const machineId = (ref: MachineRef) => {
+    const value = typeof ref === 'string' ? ref : c.memory[ref.memory]
+    return typeof value === 'string' ? value : ''
+  }
   switch (a[0]) {
     case 'machine':
       return !!purchaseMachine(c, a[1], a[2], a[3], a[4], a[5])
     case 'belt':
-      return !!purchaseBelt(c, a[1], a[2])
+      return !!purchaseBelt(c, machineId(a[1]), machineId(a[2]))
     case 'unbelt':
-      return sellBelt(c, a[1], a[2])
+      return sellBelt(c, machineId(a[1]), machineId(a[2]))
     case 'research':
       return research(c, a[1])
     case 'plot':

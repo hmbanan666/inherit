@@ -1,6 +1,6 @@
 # Workshop game API
 
-The game host imports from `@inherit/sim`. One Campaign owns the floor, player project, ledger, research, board and mail. Build and research between ticks. Call `advanceGame` once per simulation tick. The first program waits for the player to put `ctx.dig("mine")` inside `onTick`. A dock shipment and every objective stamp pay coins.
+The game host imports from `@inherit/sim`. One Campaign owns the floor, player project, ledger, research, board and mail. Shop and research between ticks. Licensed controllers can also build during a tick. Call `advanceGame` once per simulation tick. The first program waits for the player to put `ctx.dig("mine")` inside `onTick`. A dock shipment and every objective stamp pay coins.
 
 ## Worker loop
 
@@ -69,11 +69,41 @@ sellMachine(c: Campaign, id: string): boolean
 sellBelt(c: Campaign, from: string, to: string): boolean
 ```
 
-A ResearchNode has id, title, description, cost in research points, requires (IDs), and optional machines, methods, events or budget. The starting allowance is 96 operations. Clock upgrades raise it to 192 and 384. The 18 node IDs are survey, bins, fork, press, clock, binder, copper, cutter, recipes, assembly, store, merge, quality, arrivals, idle, clock-2, road and freight. Quality research enables seeded defects. The binder licenses multi-file deploys and rollbacks. Drafts and snapshots can contain unfinished work.
+A ResearchNode has id, title, description, cost in research points, requires (IDs), and optional machines, methods, events or budget. The starting allowance is 96 operations. Clock upgrades raise it to 192 and 384. The 19 node IDs are survey, bins, fork, press, clock, binder, blueprints, copper, cutter, recipes, assembly, store, merge, quality, arrivals, idle, clock-2, road and freight. Quality research enables seeded defects. The binder licenses multi-file deploys and rollbacks. Drafts and snapshots can contain unfinished work.
 
 The editor text declares module "inherit" with Factory, MachineKind, MaterialId, RecipeId, MaterialItem, MachineView, MemoryValue, FactoryEvent and Handlers. Factory operations, event variants and buildable machine kinds reflect current research. Material and recipe names describe the common catalog.
 
 Read money, reputation, researchPoints, research (owned IDs) and road from c.economy. Belt price counts every path tile, including both endpoints, on manual or automatic paths. Sales refund the stored purchase price once. Each plot stores its price in world data. Road purchase opens the yard for construction and puts the shed’s rail spur up for sale. Supply the actual placed machine IDs in player code.
+
+### Blueprint API
+
+After Workshop binder, spend three research points on Blueprint API. The unlocked editor declarations include these methods.
+
+```ts
+build(kind: MachineKind, x: number, y: number, opts?: {
+  siteId?: string
+  recipe?: RecipeId
+  deposit?: 'iron' | 'coal' | 'copper'
+}): string | undefined
+connect(from: string, to: string): boolean
+dismantle(id: string): boolean
+lastError(): string | undefined
+```
+
+Build on an empty owned tile in the shed or pass a site ID. A recipe must suit the machine. Miners need a licensed deposit and can request a specific mineral. Connect buys a shortest belt across owned tiles at the shop’s per-tile price. Dismantle refunds the machine and attached belts at their stored prices and counts discarded cargo as lost.
+
+Changes take effect in call order during event handlers and `onTick`, after belt arrivals and before freight and production settle. The next call can inspect, use or connect a newly built machine. All handlers share four construction attempts per tick. A failed attempt uses one slot. On failure, read `ctx.lastError()` for the reason. The next successful construction call or the next tick clears it. Each method call, including reading the error, uses the regular controller budget.
+
+```ts
+if (!memory.oven) {
+  const id = ctx.build("furnace", 10, 2, { recipe: "copper-ingot" })
+  if (id) memory.oven = id
+}
+if (typeof memory.oven === "string" && !memory.wired) {
+  memory.wired = ctx.connect("copper", memory.oven)
+  if (!memory.wired) console.log(ctx.lastError())
+}
+```
 
 ## Objective track and mail
 
@@ -110,7 +140,7 @@ Track IDs in order:
 
 ```text
 dig, fire, ingot, shed, loading, tally, chalk, redeploy, plot, oven, belt, gauges,
-fork, balance, coal, press, part, parts, clock, gate, binder, helper, copper,
+fork, balance, coal, press, part, parts, clock, gate, binder, helper, copper, blueprints, code-furnace, code-belt,
 copper-ore, copper-bar, cutter, wire, plate, gear, cards, jig, bracket, shelves,
 buffer, release, merger, quality, sorter, scrap, contract, recipe-table, doorbell,
 arrival, idle-bell, idle, road, depots, truck, manifest, breakdown, ack, motor, tram, network
@@ -139,4 +169,4 @@ referenceActions(objectiveId: string): ReferenceAction[]
 applyReferenceAction(c: Campaign, action: ReferenceAction): boolean
 ```
 
-On stage entry, apply its actions once in order, paste the supplied working files, and deploy if changed. The action tuples carry the exact IDs, site coordinates and belts used by the example code. They use the same public purchase, sell, research, read and order commands as the player. The headless test runs those TypeScript functions on two seeds, verifies each stamp, checks the retained world and ledger, and follows one parcel through both truck faults. The declarations test checks every stage against its unlocked editor surface.
+On stage entry, apply its actions once in order, paste the supplied working files, and deploy if changed. The action tuples carry site coordinates and belt endpoints. A belt endpoint such as `{ memory: "oven" }` reads the ID that the controller saved when it built the machine. The actions use the same public purchase, sell, research, read and order commands as the player. The headless test runs those TypeScript functions on two seeds, verifies each stamp, checks the retained world and ledger, and follows one parcel through both truck faults. The declarations test checks every stage against its unlocked editor surface.
