@@ -42,6 +42,8 @@ function install(next: Awaited<ReturnType<typeof compile>>) {
   program?.dispose()
   program = next.program
   error = ''
+  // Module-level logs belong to deployment. Only a running tick advances Bram's lesson.
+  if (program) logs.push(...program.drainLogs())
   sites = next.sites
   cpu = { calls: 0, interrupts: 0, used: 0, budget: getSurface(campaign).budget }
 }
@@ -65,7 +67,9 @@ function step(): GameTick | undefined {
     error = message(e)
   } finally {
     cpu = live.stats
-    logs.push(...sites.drainLogs(live.drainLogs()))
+    const printed = sites.drainLogs(live.drainLogs())
+    if (printed.length && campaign.town.beat === 1) campaign.progress.signals.printedTick = true
+    logs.push(...printed)
   }
   live.dispose()
   program = undefined

@@ -48,6 +48,7 @@ function sites(): Site[] {
   ]
 }
 export const initialSignals = () => ({
+  printedTick: false,
   choseRecipe: false,
   inspectedParcel: false,
   arrival: false,
