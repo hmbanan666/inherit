@@ -16,7 +16,7 @@ test('Bram meets the player beside a labelled working shed', async ({ page }) =>
   const action = await page.getByTestId('primary-button').boundingBox()
   const footer = await page.locator('footer').boundingBox()
   expect(action!.height).toEqual(footer!.height)
-  expect(action!.height).toBeGreaterThanOrEqual(34)
+  expect(action!.height).toBe(34)
 })
 
 test('Run shows the rock and its source line before Continue becomes available', async ({ page }) => {

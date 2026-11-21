@@ -464,7 +464,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
   border-color: var(--gold);
 }
 .section-new { color: var(--accent-soft); }
-.statusbar { height: 36px; border-top: 0; box-shadow: inset 0 1px var(--line); }
+.statusbar { height: 34px; border-top: 0; box-shadow: inset 0 1px var(--line); }
 .statusbar .deploy-group, .statusbar .deploy, .statusbar .revisions { height: 100%; }
 .statusbar .deploy { font-size: 14px; gap: 10px; }
 .statusbar .deploy svg, .statusbar .revisions svg { color: inherit; }
