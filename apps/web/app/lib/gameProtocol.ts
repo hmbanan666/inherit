@@ -23,15 +23,15 @@ export interface MetricSample {
   machines: Record<string, { rate: number; idle: number; blocked: number; queue: number }>
 }
 export type Action =
-  | { kind: 'init'; campaign: Campaign }
-  | { kind: 'step' }
-  | { kind: 'run'; files: ProjectFiles }
-  | { kind: 'continue' }
-  | { kind: 'pay'; inFull?: boolean }
-  | { kind: 'deploy'; files: ProjectFiles }
-  | { kind: 'rollback'; id: number }
-  | { kind: 'snapshot'; name: string; files: ProjectFiles }
-  | { kind: 'read'; id: string }
+  | { type: 'init'; campaign: Campaign }
+  | { type: 'step' }
+  | { type: 'run'; files?: ProjectFiles }
+  | { type: 'continue' }
+  | { type: 'pay'; inFull?: boolean }
+  | { type: 'deploy'; files: ProjectFiles }
+  | { type: 'rollback'; id: number }
+  | { type: 'snapshot'; name: string; files: ProjectFiles }
+  | { type: 'read'; id: string }
 export interface Frame {
   calls: CallRecord[]
   town: TownSnapshot

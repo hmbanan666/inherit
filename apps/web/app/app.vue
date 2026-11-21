@@ -17,13 +17,13 @@ import { provideGame } from './lib/useGame'
 import TownView from './components/town/TownView.vue'
 
 const g = provideGame()
-const { campaign, files, activeFile, dirty, ready, saved, error, surface, town, step, reveals, sections } = g
+const { campaign, files, activeFile, dirty, ready, saved, error, surface, town, step, reveals, sections, letters } = g
 const townPerson = ref<Townsperson['id']>()
 const replay = shallowRef<TownSnapshot['changes']>([])
 const highlighted = shallowRef<string[]>([])
 const requester = computed(() => town.value.people.find((p) => p.ask))
 const section = ref<WorkshopSection>('factory')
-const unread = computed(() => campaign.value.progress.messages.filter(m => m.unread).length)
+const unread = computed(() => letters.value.filter(m => m.unread).length)
 const sectionNames: Record<WorkshopSection, string> = {
   code: 'Shed', factory: 'Shed', town: 'Town', inbox: 'Inbox', orders: 'Orders',
 }
@@ -119,7 +119,7 @@ watch(g.navigation, async ({ file, line }) => {
   editor.value?.revealLine(file, line)
 })
 function payBank(inFull = false) {
-  g.act({ kind: 'pay', inFull })
+  g.act({ type: 'pay', inFull })
   menu.value = ''
 }
 function restoreRevision(id: number) {
@@ -280,11 +280,11 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
               <button aria-label="Close drawer" @click="openSection('factory')"><X /></button>
             </header>
             <div v-if="drawer === 'Inbox'" class="drawer-body">
-              <article v-for="m in [...campaign.progress.messages].reverse()" :key="m.id" class="ticket">
+              <article v-for="m in [...letters].reverse()" :key="m.id" class="ticket">
                 <small>{{ m.from }}</small>
                 <h3>{{ m.title }}</h3>
                 <p>{{ m.body }}</p>
-                <button v-if="m.unread" @click="g.act({ kind: 'read', id: m.id })">Mark read</button>
+                <button v-if="m.unread" @click="g.act({ type: 'read', id: m.id })">Mark read</button>
               </article>
             </div>
             <div v-else class="drawer-body">

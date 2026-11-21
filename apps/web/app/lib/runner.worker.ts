@@ -40,7 +40,7 @@ function execute(controller: Controller | undefined, mode: 'watched' | 'once' | 
   }
 }
 async function apply(action: Action) {
-  switch (action.kind) {
+  switch (action.type) {
     case 'init':
       campaign = action.campaign
       await install(campaign.project.deployed, true)
@@ -48,7 +48,7 @@ async function apply(action: Action) {
     case 'run': {
       error = ''
       const watched = primaryButton(campaign) === 'run'
-      const once = await compileController(campaign, action.files, watched ? 'watched' : 'once')
+      const once = await compileController(campaign, action.files ?? campaign.project.working, watched ? 'watched' : 'once')
       try { execute(once, watched ? 'watched' : 'once') } finally { once.dispose() }
       break
     }
@@ -94,7 +94,7 @@ self.onmessage ??= async ({ data }: MessageEvent<Action>) => {
   const { project, seenSections: _seenSections, ...state } = campaign
   self.postMessage({
     campaign: state, calls, town: townSnapshot(campaign),
-    project: ['init', 'deploy', 'rollback', 'snapshot', 'continue'].includes(data.kind) ? project : undefined,
+    project: ['init', 'deploy', 'rollback', 'snapshot', 'continue'].includes(data.type) ? project : undefined,
     active: !!live, feedback, error, logs, traces,
     cpu: live?.stats() ?? { calls: 0, interrupts: 0, used: 0, budget: 1024 },
   } satisfies Frame)

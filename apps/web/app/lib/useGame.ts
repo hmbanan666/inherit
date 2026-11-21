@@ -51,7 +51,17 @@ function createGameStore() {
   const button = computed(() => primaryButton(state.value))
   const places = computed(() => placeNames(state.value))
   const reveals = computed(() => revealed(state.value))
-  const sections = computed<WorkshopSection[]>(() => ['factory', ...reveals.value.flatMap(r => r.kind === 'section' ? [r.id] : [])])
+  const sections = computed(() => {
+    const visible = new Set<WorkshopSection>(['factory'])
+    for (const reveal of reveals.value) {
+      if (reveal.kind === 'section') visible.add(reveal.id)
+      if (reveal.kind === 'letter') visible.add('inbox')
+    }
+    return [...visible]
+  })
+  const letters = computed(() => state.value.progress.messages.filter(m =>
+    m.id === 'uncle' || reveals.value.some(r => r.kind === 'letter' && r.id === m.id),
+  ))
   const surface = computed(() => chapterSurface(state.value))
   const reference = computed(() => chapterReference(state.value))
   const api = computed(() => chapterDeclarations(state.value))
@@ -133,16 +143,16 @@ function createGameStore() {
     if (!worker || current) return
     current = queue.shift()
     if (!current) {
-      timer = setTimeout(() => act({ kind: 'step' }), TICK_MS / speed)
+      timer = setTimeout(() => act({ type: 'step' }), TICK_MS / speed)
       return
     }
-    if (current.kind === 'rollback') rollbackDraft = files.value
+    if (current.type === 'rollback') rollbackDraft = files.value
     watchdog = setTimeout(
       () => {
         stop()
         error.value = 'Controller worker timed out. Run to retry.'
       },
-      current.kind === 'step' ? 3000 : 30000,
+      current.type === 'step' ? 3000 : 30000,
     )
     worker.postMessage(current)
   }
@@ -155,7 +165,7 @@ function createGameStore() {
     clearTimeout(watchdog)
     const action = current!
     const instance = worker
-    const watched = action.kind === 'run'
+    const watched = action.type === 'run'
     if (frame.calls.length || watched) {
       await playback.play(frame.calls, watched ? 500 : Math.max(8, TICK_MS / (2 * frame.calls.length * speed)), watched)
       if (worker !== instance) return
@@ -167,11 +177,11 @@ function createGameStore() {
       seenSections: state.value.seenSections,
     }
     active.value = frame.active
-    if (action.kind === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
+    if (action.type === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
       files.value = c.project.working
       if (!(activeFile.value in files.value)) openFile('main.ts')
     }
-    if (action.kind === 'continue') {
+    if (action.type === 'continue') {
       const starter = currentStep(c)?.step.starter
       if (starter && currentStep(c)?.step.id !== step.value?.step.id) {
         files.value = { ...files.value, 'main.ts': starter }
@@ -202,7 +212,7 @@ function createGameStore() {
     if (frame.notice) notice.value = frame.notice
     cpu.value = frame.cpu
     traces.value = frame.traces
-    if (action.kind === 'step') {
+    if (action.type === 'step') {
       const machines = Object.fromEntries(
         c.world.machines.map((m) => {
           const elapsed = Math.max(1, tick - m.builtAt)
@@ -223,7 +233,7 @@ function createGameStore() {
       ]
     } else persist()
     ready.value = true
-    if (['run', 'deploy', 'continue'].includes(action.kind)) busy.value = false
+    if (['run', 'deploy', 'continue'].includes(action.type)) busy.value = false
     pump()
   }
   function start() {
@@ -238,24 +248,24 @@ function createGameStore() {
       instance.onmessage = ({ data }: MessageEvent<Frame>) => {
         if (worker === instance) receive(data)
       }
-      act({ kind: 'init', campaign: state.value })
+      act({ type: 'init', campaign: state.value })
     } catch {
       void assetFailed(failed)
     }
   }
-  function submit(kind: 'deploy' | 'run' = button.value) {
+  function submit(type: 'deploy' | 'run' = button.value) {
     if (busy.value || (!ready.value && !error.value)) return
     if (!worker) start()
     busy.value = true
     playback.messages.value = []
-    act({ kind, files: files.value })
+    act({ type, files: files.value })
     persist()
   }
   function advance() {
     if (busy.value || step.value?.phase !== 'solved') return
     busy.value = true
     playback.clear()
-    act({ kind: 'continue' })
+    act({ type: 'continue' })
   }
   function openFile(file: string, line = 1) {
     if (!Object.hasOwn(files.value, file)) return
@@ -380,10 +390,10 @@ function createGameStore() {
     renameFile,
     deleteFile,
     submit, advance, busy, playback, hand,
-    rollback: (id: number) => act({ kind: 'rollback', id }),
-    snapshot: (name: string) => act({ kind: 'snapshot', name, files: files.value }),
+    rollback: (id: number) => act({ type: 'rollback', id }),
+    snapshot: (name: string) => act({ type: 'snapshot', name, files: files.value }),
     restoreSnapshot,
-    step, button, places, reveals, sections,
+    step, button, places, reveals, sections, letters,
     surface,
     reference,
     api,

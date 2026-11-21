@@ -3,7 +3,7 @@ import { createCampaign, loadSave, isStarterProject, snapshotProject, getSurface
 import { beforeStep, bram, starter } from './bram'
 import type { CallRecord, Reveal, StepView, StepPhase } from './types'
 
-const reveals: Reveal[] = [{ kind: 'coins' }, { kind: 'section', id: 'town' }, { kind: 'section', id: 'inbox' }, { kind: 'debt' }]
+const reveals: Reveal[] = [{ kind: 'coins' }, { kind: 'section', id: 'town' }, { kind: 'letter', id: 'tab' }, { kind: 'debt' }]
 const interludes = [
   ['Bram paid for his iron.', 'The coin purse holds your first payment.'],
   ['The forge is lit again.', 'Visit Town to see Bram’s forge.'],

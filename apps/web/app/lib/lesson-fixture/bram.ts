@@ -1,6 +1,6 @@
 // Local stand-in for the chapter data owned by the sim.
 import type { LessonStep } from './types'
-export const starter = '// Uncle’s workshop. His arm can take from a place and put into a place.\nimport { take, put } from "inherit"\n\n'
+export const starter = '// Uncle\'s workshop. His arm can take from a place and put into a place.\nimport { take, put } from "inherit"\n\n'
 const take = 'take("mine")'
 const feed = take + '\nput("furnace")'
 const ship = 'take("furnace")\nput("cart")'
