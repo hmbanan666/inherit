@@ -1,0 +1,158 @@
+<!doctype html>
+<!-- PROTOTYPE, throwaway. Question: does "build the factory from scratch with take/put/look" feel like a game? -->
+<html lang="en"><head><meta charset="utf-8"><title>Inherit · from-scratch prototype</title>
+<style>
+:root{--bg:#111214;--panel:#1a1b1e;--line:#2a2b30;--text:#d8d6d0;--sub:#8a8780;--gold:#e2b714;--red:#ca4754;--amber:#e09a3b;--green:#7fb069}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,sans-serif;display:grid;grid-template-columns:1.1fr 1fr;height:100vh}
+section{padding:14px;overflow:auto}#left{border-right:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+h1{font-size:15px;margin:0;color:var(--gold)}h2{font-size:13px;margin:0 0 6px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
+textarea{width:100%;flex:1;min-height:260px;background:#0c0d0f;color:#e8e6df;border:1px solid var(--line);border-radius:6px;padding:10px;font:13px/1.5 ui-monospace,Menlo,monospace;tab-size:2}
+button{background:var(--gold);color:#111;border:0;border-radius:4px;padding:6px 12px;font-weight:600;cursor:pointer}button.ghost{background:transparent;color:var(--sub);border:1px solid var(--line)}
+code,pre{font:12.5px ui-monospace,Menlo,monospace;color:var(--gold)}pre{margin:6px 0 0;white-space:pre-wrap}
+.check{display:flex;gap:8px;align-items:center;margin:3px 0}.dot{width:9px;height:9px;border-radius:50%}
+.todo .dot{background:var(--red)}.close .dot{background:var(--amber)}.done .dot{background:var(--green)}.done{color:var(--sub)}
+.machines{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.m{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:12px;transition:border-color .2s}.m b{color:var(--gold)}
+.m.flash{border-color:var(--gold)}.st-jammed,.st-broken{color:var(--red)}.st-working{color:var(--amber)}.st-ready{color:var(--green)}
+#log{font:12px ui-monospace,monospace;color:var(--sub);max-height:180px;overflow:auto;white-space:pre-wrap}#log .err{color:var(--red)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.chain{color:var(--sub);font-size:12.5px;margin:4px 0}
+#exports{font-size:12px;color:var(--sub)}
+</style></head><body>
+<section id="left">
+  <div class="row"><h1>Inherit · from scratch (prototype)</h1><span style="flex:1"></span><span id="coins"></span></div>
+  <div class="card" id="task"></div>
+  <div class="card" id="exports"></div>
+  <textarea id="code" spellcheck="false"></textarea>
+  <div class="row"><button id="deploy">Deploy</button><button class="ghost" id="reset">Restart</button><span id="status" style="color:var(--sub)"></span></div>
+</section>
+<section>
+  <h2>Factory floor (state)</h2><div class="machines" id="floor"></div>
+  <h2 style="margin-top:14px">Cart</h2><div class="card" id="cart"></div>
+  <h2 style="margin-top:14px">Console</h2><div class="card" id="log"></div>
+</section>
+<script>
+// ---------- world ----------
+const PRICES={press:28,furnace:24,cutter:26}
+const RECIPES={furnace:{'iron-ore':['iron-ingot',1,4],'copper-ore':['copper-ingot',1,4]},press:{'iron-ingot':['plate',1,3]},cutter:{plate:['gear',2,4]}}
+const START=`// The shed is yours. So is my tab at the bank.
+// The factory runs this file every tick. Start below. — Uncle
+`
+let S
+function fresh(){S={tick:0,coins:0,debt:100,task:0,step:0,machines:{
+  mine:{kind:'mine',ready:null,timer:0,inside:[],status:'idle'},
+  furnace:{kind:'furnace',inside:[],ready:null,timer:0,status:'idle'}},
+  cart:{stock:{},filled:{}},code:START,deployed:null,fn:null,logs:[],printed:false,unlocked:['take','put','look'],
+  vein:false,rng:7,held:[],flash:{},paid:false,stats:{dug:0,inFurnace:0,smelted:0}}}
+fresh()
+const rand=()=>(S.rng=(S.rng*1103515245+12345)%2147483648)/2147483648
+function stepWorld(){
+  const mine=S.machines.mine
+  if(!mine.ready&&++mine.timer>=3){mine.timer=0;mine.ready=S.vein&&rand()<0.34?'copper-ore':'iron-ore'}
+  mine.status=mine.ready?'ready':'working'
+  for(const [id,m] of Object.entries(S.machines)){ if(m.kind==='mine')continue
+    if(m.status==='broken'){continue}
+    const r=RECIPES[m.kind]; const kinds=new Set(m.inside)
+    if(kinds.size>1){m.status='jammed';continue}
+    if(m.ready){m.status='ready';continue}
+    const input=m.inside[0]; const rec=input&&r[input]
+    if(!input){m.status='idle';continue}
+    if(!rec){m.status='jammed';continue}
+    if(m.inside.length<rec[1]){m.status='waiting';continue}
+    m.status='working'
+    if(++m.timer>=rec[2]){m.timer=0;m.inside.splice(0,rec[1]);m.ready=rec[0];m.status='ready'; if(m.kind==='furnace')S.stats.smelted++}
+  }
+}
+// ---------- primitives ----------
+function need(name){if(!S.unlocked.includes(name))throw new Error(name+' is not unlocked yet.')}
+function place(p){if(p==='cart')return 'cart';const m=S.machines[p];if(!m)throw new Error('There is no place called "'+p+'". Look at the floor for names.');return m}
+const api={
+  take(p){need('take');const m=place(p);if(m==='cart')return undefined
+    if(m.status==='jammed'&&m.inside.length){const it=m.inside.pop();S.held.push([it,p,'inside']);flash(p);return it}
+    if(!m.ready)return undefined;const it=m.ready;m.ready=null;S.held.push([it,p,'ready']);if(p==='mine')S.stats.dug++;flash(p);return it},
+  put(p,item){need('put');if(item===undefined)return false
+    const h=S.held.findIndex(x=>x[0]===item);if(h<0)throw new Error('You can only put an item you just took.')
+    const m=place(p);
+    if(m==='cart'){S.held.splice(h,1);deliver(item);flash('cart');return true}
+    if(m.inside.length>=4||m.status==='broken')return false
+    S.held.splice(h,1);m.inside.push(item);if(p==='furnace'||m.kind==='furnace')S.stats.inFurnace++;flash(p);return true},
+  look(p){need('look');const m=place(p);if(m==='cart')return{wanted:wanted(),inside:{...S.cart.stock}}
+    return{status:m.status,inside:[...m.inside],ready:m.ready??undefined}},
+  buy(kind,name=kind){need('buy');if(S.machines[name])return true;const c=PRICES[kind];if(c===undefined)throw new Error('Nobody sells a "'+kind+'".')
+    if(S.coins<c)return false;S.coins-=c;S.machines[name]={kind,inside:[],ready:null,timer:0,status:'idle'};log('Bought '+kind+(name!==kind?' "'+name+'"':'')+' for '+c+' coins.');return true},
+}
+function flash(p){S.flash[p]=2}
+// ---------- tasks ----------
+const T=[
+ {who:'Bram, blacksmith',why:'The mail horse threw a shoe.',ask:{'iron-ingot':3},pay:50,
+  what:'Rocks from the mine → smelted in the furnace → ingots into the cart.',
+  steps:[
+   {t:'Write onTick',text:'The factory runs a function called onTick every tick. Write it, put console.log("tick") inside, and Deploy.',idea:'A function is a named block of code. Name it onTick.',line:'export function onTick() {\n  console.log("tick")\n}',done:()=>S.printed},
+   {t:'Take a rock',text:'"inherit" gives you three primitives: take, put, look. Import take and log what take("mine") gives you.',idea:'take(place) picks up the finished item from a place. The mine always has a rock ready every few ticks.',line:'import { take } from "inherit"\n// inside onTick:\nconsole.log(take("mine"))',done:()=>S.stats.dug>0},
+   {t:'Write dig()',text:'Your first own verb. Write a function dig() that takes a rock from the mine and returns it. Call it from onTick.',idea:'function dig() { return ___ }',line:'function dig() {\n  return take("mine")\n}',done:()=>/function\s+dig\s*\(/.test(S.deployed||'')&&S.stats.dug>1},
+   {t:'Write smelt()',text:'Import put. Write smelt(): put what dig() gives you into the furnace. The furnace melts ore by itself.',idea:'put(place, item) puts an item you just took somewhere.',line:'function smelt() {\n  put("furnace", dig())\n}',done:()=>S.stats.inFurnace>0},
+   {t:'Write ship()',text:'Write ship(): take the ingot from the furnace and put it into the cart. Call smelt() and ship() from onTick.',idea:'Same pair as before: take from one place, put to another.',line:'function ship() {\n  put("cart", take("furnace"))\n}',done:()=>(S.cart.filled['iron-ingot']||0)>0},
+  ]},
+ {who:'Elsie, baker',why:'Her last loaf fell through the oven grate.',ask:{plate:4},pay:40,unlock:'buy',
+  what:'Ingots → stamped in a press → plates into the cart.',
+  steps:[
+   {t:'Buy the press',text:'Bram sells his old press for 28 coins. Import buy and call buy("press"). It only charges once.',idea:'buy(kind) returns true once you own it.',line:'buy("press")',done:()=>!!S.machines.press},
+   {t:'Write stamp()',text:'Write stamp(): take an ingot from the furnace and put it into the press. Change ship() to take from the press.',idea:'Your ship() takes from the furnace now. Plates come out of the press.',line:'function stamp() {\n  put("press", take("furnace"))\n}\nfunction ship() {\n  put("cart", take("press"))\n}',done:()=>(S.cart.filled.plate||0)>0},
+  ]},
+ {who:'Tomas, lamplighter',why:'Lamp Street has been dark since your uncle left.',ask:{'copper-ingot':2},pay:40,start(){S.vein=true;log('The mine hit a mixed vein: some rocks are copper ore now.')},
+  what:'Copper ore must not go into the iron furnace. Look at each rock and sort it.',
+  steps:[
+   {t:'Sort the rocks',text:'Copper ore jams the iron furnace. Buy a second furnace named "copper" and change smelt(): if the rock is copper ore, put it there.',idea:'const rock = dig(); if (rock === "copper-ore") ... else ...',line:'buy("furnace", "copper")\nfunction smelt() {\n  const rock = dig()\n  if (rock === "copper-ore") put("copper", rock)\n  else put("furnace", rock)\n}',done:()=>!!S.machines.copper&&S.machines.copper.inside.length+(S.machines.copper.ready?1:0)>0},
+   {t:'Unjam and ship copper',text:'If the furnace jammed, take() pulls the wrong rock out. Ship copper ingots from "copper" to the cart.',idea:'look("furnace").status tells you "jammed". Take from "copper" and put into the cart.',line:'put("cart", take("copper"))',done:()=>(S.cart.filled['copper-ingot']||0)>0},
+  ]},
+ {who:'Old Wen, miller',why:'The water wheel lost its teeth.',ask:{gear:2},pay:60,
+  what:'Plates → cut in a cutter (2 plates per gear). Your take/put pairs repeat: make one function for all of them.',
+  steps:[
+   {t:'Write move(from, to)',text:'stamp, ship and the rest are all "take from here, put there". Write move(from, to) and use it everywhere.',idea:'A function with parameters: function move(from, to) { ... }',line:'function move(from, to) {\n  return put(to, take(from))\n}',done:()=>/function\s+move\s*\(\s*\w+\s*,\s*\w+\s*\)/.test(S.deployed||'')},
+   {t:'Cut gears',text:'Buy a cutter, move plates from the press into it, and move gears to the cart.',idea:'buy("cutter"), move("press", "cutter"), move("cutter", "cart")',line:'buy("cutter")\nmove("press", "cutter")\nmove("cutter", "cart")',done:()=>(S.cart.filled.gear||0)>0},
+  ]},
+]
+function wanted(){const t=T[S.task];if(!t)return{};const w={};for(const k in t.ask){const left=t.ask[k]-(S.cart.filled[k]||0);if(left>0)w[k]=left}return w}
+function deliver(item){const w=wanted();if(w[item]){S.cart.filled[item]=(S.cart.filled[item]||0)+1}else{S.cart.stock[item]=(S.cart.stock[item]||0)+1}}
+function startTask(i){S.task=i;S.step=0;S.cart.filled={};const t=T[i];if(!t)return;if(t.unlock)S.unlocked.push(t.unlock);t.start?.()
+  for(const k in t.ask){while(S.cart.stock[k]&&(S.cart.filled[k]||0)<t.ask[k]){S.cart.stock[k]--;S.cart.filled[k]=(S.cart.filled[k]||0)+1}}
+  log('New request from '+t.who+'.')}
+function checkTask(){const t=T[S.task];if(!t)return
+  while(S.step<t.steps.length&&t.steps[S.step].done())S.step++
+  if(Object.keys(wanted()).length===0){S.coins+=t.pay;log(t.who.split(',')[0]+' paid '+t.pay+' coins. Coins only come from people who asked.');startTask(S.task+1)}}
+// ---------- run player code ----------
+function compile(src){const js=src.replace(/^\s*import[^\n]*from\s*["']inherit["'];?/gm,'').replace(/\bexport\s+/g,'')
+  const names=Object.keys(api);return new Function(...names,'console',js+'\n;return typeof onTick==="function"?onTick:null')}
+function deploy(){S.code=el.code.value;try{const f=compile(S.code);S.fn=f(...Object.values(api).map(fn=>(...a)=>fn(...a)),{log:(...a)=>{S.printed=true;log(a.map(String).join(' '))}});S.deployed=S.code
+  el.status.textContent=S.fn?'Deployed · your code now runs every tick':'Deployed, but there is no onTick function yet.'}catch(e){el.status.textContent='Not deployed: '+e.message}}
+function tick(){S.tick++;stepWorld();S.held=[]
+  if(S.fn){try{S.fn()}catch(e){log(e.message,true)}}
+  for(const [it,from,slot] of S.held){const m=S.machines[from];if(!m)continue;if(slot==='ready'&&!m.ready)m.ready=it;else m.inside.push(it)}S.held=[]
+  checkTask();render()}
+function log(t,err){const last=S.logs[S.logs.length-1];if(last&&last.t===t){last.n++}else S.logs.push({t,n:1,err});if(S.logs.length>60)S.logs.shift()}
+// ---------- render ----------
+const el=Object.fromEntries(['task','exports','code','deploy','reset','status','floor','cart','log','coins'].map(i=>[i,document.getElementById(i)]))
+let hint=0,lastKey=''
+function render(){
+  el.coins.innerHTML='Coins <b style="color:var(--gold)">'+S.coins+'</b> · Debt '+S.debt+(S.coins>=S.debt&&S.debt>0?' <button id="pay">Pay debt</button>':'')
+  const t=T[S.task]
+  if(!t){el.task.innerHTML='<h2>Chapter end</h2>'+(S.debt?'All requests done. Pay Uncle\'s debt to finish.':'<b>The shed is yours.</b> Debt paid, the town is lit. Prototype complete.')}
+  else{const st=t.steps[Math.min(S.step,t.steps.length-1)];const key=S.task+':'+S.step;if(key!==lastKey){hint=0;lastKey=key}
+    const checks=t.steps.map((s,i)=>'<div class="check '+(i<S.step?'done':i===S.step?'close':'todo')+'"><span class="dot"></span>'+s.t+'</div>').join('')
+    const ask=Object.entries(t.ask).map(([k,n])=>'<div class="check '+((S.cart.filled[k]||0)>=n?'done':(S.cart.filled[k]?'close':'todo'))+'"><span class="dot"></span>'+k+' in the cart: '+(S.cart.filled[k]||0)+' / '+n+'</div>').join('')
+    el.task.innerHTML='<h2>'+t.who+' · request '+(S.task+1)+'/'+T.length+'</h2><div>'+t.why+' Needs '+Object.entries(t.ask).map(([k,n])=>n+' '+k).join(', ')+'. Pays '+t.pay+'.</div><div class="chain">'+t.what+'</div>'+
+    checks+ask+'<div style="margin-top:8px"><b>'+st.t+'.</b> '+st.text+'</div><div class="row" style="margin-top:6px"><button class="ghost" id="hint">'+(hint===0?'Hint':hint===1?'Show the line':'Hide')+'</button></div>'+
+    (hint>=1?'<div class="chain">'+st.idea+'</div>':'')+(hint>=2?'<pre>'+st.line+'</pre>':'')}
+  el.exports.innerHTML='<b>What "inherit" exports now:</b> '+S.unlocked.map(n=>'<code>'+n+'</code>').join(', ')
+  el.floor.innerHTML=Object.entries(S.machines).map(([id,m])=>{const f=S.flash[id]>0;if(f)S.flash[id]--
+    return '<div class="m'+(f?' flash':'')+'"><b>"'+id+'"</b> '+m.kind+'<br><span class="st-'+m.status+'">'+m.status+'</span><br>inside: '+(m.inside.join(', ')||'—')+'<br>ready: '+(m.ready||'—')+'</div>'}).join('')
+  const stock=Object.entries(S.cart.stock).filter(([,n])=>n>0)
+  el.cart.innerHTML='Wanted now: '+(Object.entries(wanted()).map(([k,n])=>n+' '+k).join(', ')||'nothing')+'<br>'+(stock.length?'In the cart: '+stock.map(([k,n])=>n+' '+k).join(', ')+' · nobody ordered these yet':'')
+  el.log.innerHTML=S.logs.map(l=>'<div'+(l.err?' class="err"':'')+'>'+l.t+(l.n>1?' ×'+l.n:'')+'</div>').join('')
+  document.getElementById('hint')?.addEventListener('click',()=>{hint=(hint+1)%3;render()})
+  document.getElementById('pay')?.addEventListener('click',()=>{S.coins-=S.debt;S.debt=0;log('Debt paid.');render()})
+}
+el.deploy.onclick=deploy;el.reset.onclick=()=>{fresh();el.code.value=S.code;render()}
+el.code.value=S.code;el.code.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();document.execCommand('insertText',false,'  ')}if((e.metaKey||e.ctrlKey)&&e.key==='s'){e.preventDefault();deploy()}})
+startTask(0);render();setInterval(tick,location.search.includes("fast")?30:400)
+</script></body></html>
