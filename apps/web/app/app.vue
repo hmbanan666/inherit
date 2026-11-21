@@ -335,13 +335,13 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         class="resizer"
         role="separator"
         tabindex="0"
-        aria-label="Resize editor"
+        aria-label="Resize Code workshop"
         aria-orientation="vertical"
         @pointerdown="resize"
         @keydown.left.prevent="dockWidth = Math.min(62, dockWidth + 2)"
         @keydown.right.prevent="dockWidth = Math.max(25, dockWidth - 2)"
       ></div>
-      <section class="editor-dock" aria-label="Editor dock">
+      <section class="editor-dock" aria-label="Code workshop">
         <header class="dock-header">
           <span class="eyebrow"><Code2 />Code workshop</span>
         </header>
@@ -350,18 +350,18 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
             <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
           </button>
-          <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />api.d.ts</button>
+          <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
         </div>
         <div v-if="error" class="runtime" role="alert">{{ error }}</div>
         <div v-show="tab === 'controller'" class="editor-host">
-          <LazyCodeEditor ref="editor" :error="error" @focus-ids="highlightMachines" />
+          <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
         </div>
-        <pre v-if="tab === 'api'" class="api-source">{{ g.api.value }}</pre>
-        <div class="editor-foot">
+        <ApiReference v-if="tab === 'api'" />
+        <div v-if="tab === 'controller'" class="editor-foot">
           <span><i class="dot" :class="{ clean: !dirty }" />{{ dirty ? 'Working copy' : 'Deployed' }}</span
           ><small>TypeScript</small>
         </div>
-        <nav class="panel-tabs" aria-label="Editor tools">
+        <nav class="panel-tabs" aria-label="Workshop tools">
           <button :aria-pressed="consoleOpen" @click="consoleOpen = !consoleOpen">Console</button>
         </nav>
         <div v-if="consoleOpen" class="panel-slot"><ConsolePanel /></div>

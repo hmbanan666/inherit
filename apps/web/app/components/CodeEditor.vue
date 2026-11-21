@@ -6,25 +6,23 @@ import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.
 import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { useGame } from '../lib/useGame'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
 const game = useGame()
 const { files, activeFile, campaign, surface, api, dirty } = game
 const props = defineProps<{
-  tab?: 'controller' | 'api'
   ids?: string[]
   selected?: string
   error?: string
   code?: string
 }>()
-const emit = defineEmits<{ ready: []; focusIds: [string[]]; edit: [string] }>()
+const emit = defineEmits<{ reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
 const host = ref<HTMLElement>()
 const shellTabs = shallowRef<HTMLElement>()
 const input = ref<HTMLInputElement>()
 const tabs = ref(['main.ts'])
-const showApi = ref(false)
-const current = computed(() => (showApi.value ? 'api.d.ts' : activeFile.value))
 const otherTabs = computed(() =>
   shellTabs.value ? tabs.value.filter((file) => file !== activeFile.value) : tabs.value,
 )
@@ -34,7 +32,8 @@ const models = new Map<string, monaco.editor.ITextModel>()
 const views = new Map<string, monaco.editor.ICodeEditorViewState | null>()
 let editor: monaco.editor.IStandaloneCodeEditor | undefined
 let opener: monaco.IDisposable
-let library: monaco.editor.ITextModel
+const libraryUri = monaco.Uri.file('/api.d.ts')
+let library: monaco.IDisposable
 let settingSource = false
 
 function syncFiles() {
@@ -71,19 +70,17 @@ function syncFiles() {
 }
 function display() {
   if (!editor) return
-  const file = current.value
-  const model = showApi.value ? library : models.get(file)
+  const file = activeFile.value
+  const model = models.get(file)
   if (!model || editor.getModel() === model) return
   const old = editor.getModel()
   if (old) views.set(old.uri.path.slice(1), editor.saveViewState())
-  if (!showApi.value && !tabs.value.includes(file)) tabs.value.push(file)
+  if (!tabs.value.includes(file)) tabs.value.push(file)
   editor.setModel(model)
-  editor.updateOptions({ readOnly: showApi.value })
   editor.restoreViewState(views.get(file) ?? null)
 }
 function open(file: string) {
-  showApi.value = file === 'api.d.ts'
-  if (!showApi.value) activeFile.value = file
+  activeFile.value = file
   display()
 }
 function close(file: string) {
@@ -92,8 +89,8 @@ function close(file: string) {
   if (activeFile.value === file) open(tabs.value[Math.max(0, index - 1)] ?? 'main.ts')
 }
 function revealLine(file: string, line: number, column = 1) {
-  if (file !== 'api.d.ts' && !Object.hasOwn(files.value, file)) return
-  if (file !== 'api.d.ts' && !models.has(file)) syncFiles()
+  if (!Object.hasOwn(files.value, file)) return
+  if (!models.has(file)) syncFiles()
   open(file)
   mode.value = undefined
   editor?.setPosition({ lineNumber: line, column })
@@ -170,6 +167,13 @@ function runtimeMarker() {
     )
   }
 }
+function updateLibrary(text: string) {
+  library?.dispose()
+  library = monaco.languages.typescript.typescriptDefaults.addExtraLib(text, libraryUri.toString())
+  // A definition lookup can also materialize a model from the extra library.
+  monaco.editor.getModel(libraryUri)?.setValue(text)
+}
+
 onMounted(() => {
   // The shell already shows the active file and API. Add the other open files to that strip.
   shellTabs.value = host.value?.closest('.editor-dock')?.querySelector<HTMLElement>('.file-tabs') ?? undefined
@@ -188,33 +192,8 @@ onMounted(() => {
     allowImportingTsExtensions: true,
   })
   ts.typescriptDefaults.setEagerModelSync(true)
-  library = monaco.editor.createModel(api.value, 'typescript', monaco.Uri.file('/api.d.ts'))
-  const palette = getComputedStyle(host.value!)
-  const color = (token: string) => palette.getPropertyValue(token).trim()
-  monaco.editor.defineTheme('foundry', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: color('--syntax-comment').slice(1), fontStyle: 'italic' },
-      { token: 'keyword', foreground: color('--syntax-keyword').slice(1) },
-      { token: 'string', foreground: color('--accent-soft').slice(1) },
-      { token: 'type.identifier', foreground: color('--syntax-type').slice(1) },
-      { token: 'delimiter', foreground: color('--sub').slice(1) },
-      { token: 'number', foreground: color('--syntax-number').slice(1) },
-      { token: 'identifier', foreground: color('--soft').slice(1) },
-    ],
-    colors: {
-      'editor.background': color('--surface-low'),
-      'editorLineNumber.foreground': color('--editor-muted'),
-      'editorLineNumber.activeForeground': color('--soft'),
-      'editor.lineHighlightBackground': color('--panel'),
-      'editorCursor.foreground': color('--gold'),
-      'editor.selectionBackground': color('--accent-shadow'),
-      'editorIndentGuide.background1': color('--line'),
-      'editorWidget.background': color('--surface-raised'),
-      'editorGutter.background': color('--surface-low'),
-    },
-  })
+  updateLibrary(api.value)
+  defineWorkshopTheme(host.value!)
   editor = monaco.editor.create(host.value!, {
     model: null,
     theme: 'foundry',
@@ -235,11 +214,11 @@ onMounted(() => {
     tabSize: 2,
     fixedOverflowWidgets: true,
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
-    ariaLabel: 'Factory controller TypeScript editor',
+    ariaLabel: 'Factory controller TypeScript',
   })
   editor.onMouseDown(({ target }) => {
     if (!target.position || target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return
-    const file = current.value
+    const file = activeFile.value
     if (files.value[file] !== campaign.value.project.deployed[file]) return
     const line = target.position.lineNumber
     emit('focusIds', Object.keys(game.traces.value).filter(id =>
@@ -251,8 +230,12 @@ onMounted(() => {
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
+      if (resource.toString() === libraryUri.toString()) {
+        emit('reference')
+        return true
+      }
       const file = resource.path.slice(1)
-      if (!models.has(file) && file !== 'api.d.ts') return false
+      if (!models.has(file)) return false
       revealLine(
         file,
         pos && 'lineNumber' in pos ? pos.lineNumber : (pos?.startLineNumber ?? 1),
@@ -265,19 +248,8 @@ onMounted(() => {
   emit('ready')
 })
 watch(files, syncFiles)
-watch(activeFile, () => {
-  showApi.value = false
-  display()
-})
-watch(api, (text) => library?.setValue(text))
-watch(
-  () => props.tab,
-  (tab) => {
-    showApi.value = tab === 'api'
-    display()
-  },
-  { immediate: true },
-)
+watch(activeFile, display)
+watch(api, updateLibrary)
 watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
@@ -285,16 +257,17 @@ onBeforeUnmount(() => {
   editor?.dispose()
   for (const model of models.values()) model.dispose()
   library?.dispose()
+  monaco.editor.getModel(libraryUri)?.dispose()
 })
 </script>
 <template>
-  <section class="project-editor" aria-label="Project editor">
+  <section class="project-editor" aria-label="Controller files">
     <Teleport :to="shellTabs ?? 'body'" :disabled="!shellTabs">
       <nav v-if="!shellTabs || surface.multiFile" class="project-tabs" aria-label="Open files">
-        <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: current === file }">
+        <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: activeFile === file }">
           <button
             :aria-label="file"
-            :aria-current="current === file ? 'page' : undefined"
+            :aria-current="activeFile === file ? 'page' : undefined"
             @click="shellTabs ? game.openFile(file) : open(file)"
           >
             {{ file
@@ -304,9 +277,6 @@ onBeforeUnmount(() => {
             <X :size="11" />
           </button>
         </span>
-        <button v-if="!shellTabs" class="api-tab" :class="{ chosen: showApi }" @click="open('api.d.ts')">
-          api.d.ts
-        </button>
         <span class="space" />
         <span v-if="dirty && !shellTabs" class="draft" title="Working copy differs from the live program"
           >Draft</span
@@ -328,7 +298,6 @@ onBeforeUnmount(() => {
         </button>
       </nav>
     </Teleport>
-    <button v-if="shellTabs && showApi" @click="open(activeFile)">Back to {{ activeFile }}</button>
     <div
       v-if="mode"
       class="finder bench"
