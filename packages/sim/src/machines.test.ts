@@ -1,9 +1,19 @@
 import { expect, test } from 'vitest'
-import { createWorld, levels, step, type Factory, type World } from './index'
+import { createWorld, evaluate, levels, step, type Factory, type World } from './index'
 
 function shift(world: World, ticks: number, handler: (ctx: Factory) => void) {
   for (let t = 0; t < ticks; t++) step(world, handler)
 }
+test('later pickups leave an early order at its original quantity and ship tick', () => {
+  const world = createWorld({ ...levels[4], order: 2 })
+  world.machines.find((m) => m.kind === 'dispatch')!.queue.push('part', 'part', 'part')
+  shift(world, 16, () => {})
+  const truck = { label: 'Load the customer’s truck', status: 'pass', value: '2/2 parts · tick 16/128' }
+  expect(evaluate(world)).toContainEqual(truck)
+  shift(world, 120, () => {})
+  expect(world.shipped).toBe(3)
+  expect(evaluate(world)).toContainEqual(truck)
+})
 test('a furnace requires an instruction and four ticks of work to make one ingot', () => {
   const world = createWorld(levels[0])
   shift(world, 10, (ctx) => {

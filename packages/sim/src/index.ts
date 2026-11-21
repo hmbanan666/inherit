@@ -102,6 +102,7 @@ function processMachine(world: World, m: Machine) {
     ) {
       m.queue.shift()
       world.shipped++
+      if (world.shipped === world.level.order) world.orderFilledTick = world.tick
       world.deliveries.push(world.tick)
       m.processed++
       m.status = 'working'
@@ -203,13 +204,17 @@ export function evaluate(world: World): Check[] {
       ),
     )
   }
-  const closed = level.deadline !== undefined && world.tick >= level.deadline
-  const load = world.shipped + '/' + level.order + ' ' + level.product + 's'
+  const { deadline } = level
+  const { orderFilledTick } = world
+  const loaded = orderFilledTick !== undefined && (deadline === undefined || orderFilledTick <= deadline)
+  const closed = deadline !== undefined && world.tick >= deadline
+  const truckTick = orderFilledTick ?? (closed ? deadline : world.tick)
+  const load = Math.min(world.shipped, level.order) + '/' + level.order + ' ' + level.product + 's'
   checks.push(
     check(
-      closed && world.shipped < level.order ? 'Last truck left. Run to retry' : 'Load the customer’s truck',
-      world.shipped >= level.order,
-      level.deadline === undefined ? load : load + ' · tick ' + world.tick + '/' + level.deadline,
+      closed && !loaded ? 'Last truck left. Run to retry' : 'Load the customer’s truck',
+      loaded,
+      deadline === undefined ? load : load + ' · tick ' + truckTick + '/' + deadline,
       !closed,
     ),
   )
