@@ -163,7 +163,7 @@ onBeforeUnmount(stop)
 <style scoped>
 .summary {
   overflow-x: auto;
-  border-left: 2px solid #b39050;
+  border-left: 2px solid var(--accent-line);
   padding-left: 8px;
 }
 table {
@@ -184,10 +184,10 @@ tbody th {
   font-weight: normal;
 }
 .change {
-  color: #e8c47c;
+  color: var(--accent-soft);
 }
 .test-bar {
-  border-top: 1px solid #41453f;
+  border-top: 1px solid var(--line);
   padding-top: 7px;
 }
 </style>

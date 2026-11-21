@@ -87,8 +87,8 @@ const charts = computed(() => {
             {{ c.label }} <strong>{{ c.value }}</strong>
           </figcaption>
           <svg viewBox="0 0 118 31" preserveAspectRatio="none" aria-hidden="true">
-            <polyline v-if="c.limit" :points="c.limit" stroke-dasharray="3 3" stroke="#949a92" />
-            <polyline :points="c.line" stroke="#d9b166" />
+            <polyline v-if="c.limit" :points="c.limit" stroke-dasharray="3 3" stroke="var(--sub)" />
+            <polyline :points="c.line" stroke="var(--gold)" />
           </svg>
         </figure>
       </div>
@@ -105,8 +105,8 @@ const charts = computed(() => {
 figure {
   margin: 0;
   padding: 5px;
-  background: #242826;
-  border: 1px solid #3b413b;
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 3px;
 }
 figcaption {
@@ -114,10 +114,10 @@ figcaption {
   justify-content: space-between;
   gap: 3px;
   font-size: 10px;
-  color: #bbc3b9;
+  color: var(--sub);
 }
 strong {
-  color: #e6dfc9;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 svg {
