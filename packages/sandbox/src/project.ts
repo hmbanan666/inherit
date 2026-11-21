@@ -10,6 +10,7 @@ export interface ProjectOptions {
   entry?: string
   memory?: JsonObject
   budget?: number
+  chapterExports?: readonly string[]
   unlockedEvents?: readonly string[]
 }
 
@@ -23,19 +24,19 @@ function projectPath(path: string) {
   }
 }
 
-function resolveImport(files: Map<string, string>, from: string, request: string) {
+function resolveImport(files: Map<string, string>, from: string, request: string, location = from) {
   if (request === 'inherit') return request
   const parts = from.split('/').slice(0, -1)
   if (request.length > 128 || !/^\.\.?\//.test(request)) {
-    throw new Error(`${from} · Import from "inherit" or use a relative project path.`)
+    throw new Error(`${location} · Import from "inherit" or use a relative project path.`)
   }
   for (const part of request.split('/')) {
     if (part === '.') continue
     if (part === '..') {
-      if (!parts.length) throw new Error(`${from} · Import escapes the project.`)
+      if (!parts.length) throw new Error(`${location} · Import escapes the project.`)
       parts.pop()
     } else {
-      if (!part || !/^[\w.-]+$/.test(part)) throw new Error(`${from} · Invalid import path.`)
+      if (!part || !/^[\w.-]+$/.test(part)) throw new Error(`${location} · Invalid import path.`)
       parts.push(part)
     }
   }
@@ -43,7 +44,7 @@ function resolveImport(files: Map<string, string>, from: string, request: string
   for (const candidate of [path, path + '.ts', path + '/index.ts']) {
     if (files.has(candidate)) return candidate
   }
-  throw new Error(`${from} · Cannot resolve ${request}.`)
+  throw new Error(`${location} · Cannot resolve ${request}.`)
 }
 
 export function compileProject(options: ProjectOptions, testing: boolean) {
@@ -76,9 +77,14 @@ export function compileProject(options: ProjectOptions, testing: boolean) {
       const line = error.file?.getLineAndCharacterOfPosition(error.start ?? 0).line ?? 0
       throw new Error(`${path}:${line + 1} · ${ts.flattenDiagnosticMessageText(error.messageText, '\n')}`)
     }
-    compiled.set(path, { js: output.outputText, map: new TraceMap(output.sourceMapText!) })
+    const map = new TraceMap(output.sourceMapText!)
+    compiled.set(path, { js: output.outputText, map })
     for (const dependency of ts.preProcessFile(output.outputText, true, true).importedFiles) {
-      compile(resolve(path, dependency.fileName))
+      const prefix = output.outputText.slice(0, dependency.pos)
+      const position = originalPositionFor(map, {
+        line: prefix.split('\n').length, column: prefix.length - prefix.lastIndexOf('\n') - 1,
+      })
+      compile(resolveImport(files, path, dependency.fileName, position.line ? path + ':' + position.line : path))
     }
   }
   compile(entry)

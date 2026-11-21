@@ -24,8 +24,17 @@ export { sandboxDeclarations } from './declarations'
 
 export async function createProgram(source: string | ProjectOptions): Promise<Program> {
   const options = projectOptions(source)
+  return loadProgram(options, options.chapterExports ?? ['take'])
+}
+
+/** Historical levels run against the original engine's callback surface. */
+export function createLegacyProgram(source: string | ProjectOptions) {
+  return loadProgram(projectOptions(source))
+}
+
+async function loadProgram(options: ProjectOptions, exports?: readonly string[]): Promise<Program> {
   const project = compileProject(options, false)
-  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false)
+  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false, exports)
   try {
     const tick = session.handler('onTick')
     if (!tick) throw new Error(`${project.entry} · Export a function named onTick.`)
@@ -72,5 +81,18 @@ export async function runProjectTests(source: string | ProjectOptions): Promise<
         error: error instanceof Error ? error.message : 'Test setup failed.',
       },
     ]
+  }
+}
+
+/** Load only the active verb and its imports. Each case gets fresh module state. */
+export async function runVerb(options: ProjectOptions, name: string, api: FactoryContext, args: readonly string[]) {
+  const project = compileProject(options, false)
+  const session = await openRuntime(project, {}, 1024, false, options.chapterExports ?? ['take'])
+  try {
+    const verb = session.handler(name)
+    if (!verb) throw new Error(project.entry + ' · Export a function named ' + name + '.')
+    return session.callVerb(verb, api, args)
+  } finally {
+    session.dispose()
   }
 }

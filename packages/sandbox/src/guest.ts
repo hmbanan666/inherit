@@ -1,7 +1,7 @@
 // Evaluated inside QuickJS before loading any player modules. The returned helpers
 // stay in host-owned handles. Guest values only cross the boundary as primitives.
 export const guestSetup = String.raw`
-(function install(initial, operations, call, tick, log, testing) {
+(function install(initial, operations, call, tick, log, testing, chapter) {
   "use strict";
   delete Math.random;
   delete globalThis.Date;
@@ -14,7 +14,7 @@ export const guestSetup = String.raw`
   const Fault = Error, same = Object.is, string = String;
   const memory = parse(initial);
   const global = (key, value) => define(globalThis, key, { value, configurable: false, writable: false });
-  global("memory", memory);
+  if (!chapter) global("memory", memory);
 
   // Walk data properties only. Cap work before expanding arrays or constructing
   // the output string. Proxy traps, if present, execute under the VM interrupt.
@@ -112,25 +112,18 @@ export const guestSetup = String.raw`
   Object.defineProperties(blueprintApi, descriptors);
   freeze(blueprintApi);
 
-  const connect = name => to => blueprintApi.connect(name, typeof to === "string" ? to : to.name);
-  const machines = freeze({
-    mine: freeze({ name: "mine", connect: connect("mine"), dig: () => api.dig("mine", "wait-for-space") }),
-    furnace: freeze({ name: "furnace", connect: connect("furnace"),
-      smelt: (recipe = "iron-ingot") => api.work("furnace", recipe) }),
-    cart: freeze({ name: "cart" }),
-  });
-  define(globalThis, "__inheritMachines", { value: machines, configurable: true });
+  define(globalThis, "__inherit", { value: api, configurable: true });
 
   const cases = create(null);
   let count = 0, collecting = testing;
-  global("test", (name, fn) => {
+  if (!chapter) global("test", (name, fn) => {
     if (!collecting) return;
     if (count >= 32) throw new Fault("Maximum 32 player tests.");
     if (typeof name !== "string" || typeof fn !== "function") throw new Fault("Expected test(name, fn).");
     cases[count++] = { name: cut(name, 0, 128), fn };
   });
-  global("assert", (ok, message) => { if (!ok) throw new Fault(label(message ?? "Assertion failed.")); });
-  global("equal", (actual, expected, message) => {
+  if (!chapter) global("assert", (ok, message) => { if (!ok) throw new Fault(label(message ?? "Assertion failed.")); });
+  if (!chapter) global("equal", (actual, expected, message) => {
     if (!same(actual, expected))
       throw new Fault(message === undefined ? "Expected " + label(expected) + ", received " + label(actual) : label(message));
   });
@@ -154,7 +147,7 @@ export const guestSetup = String.raw`
 `
 
 // Install the built-in module before any player module runs. Only its exports survive.
-export const inheritModule = `
-  export const { mine, furnace, cart } = globalThis.__inheritMachines;
-  delete globalThis.__inheritMachines;
-`
+export function inheritModule(names: readonly string[]) {
+  return names.map(name => 'export const ' + name + ' = globalThis.__inherit.' + name).join('\n') +
+    '\ndelete globalThis.__inherit'
+}

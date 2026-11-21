@@ -159,7 +159,7 @@ export function stepCampaign(
     world.events = world.events.concat(world.lastEvents).slice(-256)
   }
 }
-function recordStats(world: CampaignWorld, machine: CampaignMachine) {
+export function recordStats(world: CampaignWorld, machine: CampaignMachine) {
   const stats = machine.stats
   if (machine.status === 'working') stats.activeTicks++
   else if (machine.status === 'blocked') stats.blockedTicks++

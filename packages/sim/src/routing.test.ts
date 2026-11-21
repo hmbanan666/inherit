@@ -60,6 +60,7 @@ test('build costs, owned paths, deposit placement and refunds survive a live exp
   const c = createCampaign()
   connectBelt(c, 'mine', 'furnace')
   step(c.world, (ctx) => ctx.dig('mine'))
+  c.economy.money = 100
   const parcel = structuredClone(c.world.belts[0].items)
   expect(placeMachine(c, 'miner', 'shed', 9, 2, 'copper')).toBeUndefined()
   expect(buyPlot(c, 'shed', 'rail-spur')).toBe(false)
@@ -94,6 +95,7 @@ test('build costs, owned paths, deposit placement and refunds survive a live exp
 })
 test('code switches a furnace to copper and a cutter to wire without changing a running batch', () => {
   const c = createCampaign()
+  c.economy.money = 100
   buyPlot(c, 'shed', 'east-lot')
   placeMachine(c, 'miner', 'shed', 9, 2, 'copper')
   placeMachine(c, 'furnace', 'shed', 10, 2, 'smelt')

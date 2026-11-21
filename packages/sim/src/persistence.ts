@@ -1,7 +1,7 @@
 import { createCampaign, snapshotProject } from './campaign'
 import { COMPETITION_LETTER, INSTALLMENTS, TAB_LETTER } from './town'
 import { MACHINES, MATERIALS, RECIPES } from './catalog'
-import type { Campaign, ProjectFiles } from './model'
+import { workshopSections, type Campaign, type ProjectFiles } from './model'
 
 export function serializeSave(campaign: Campaign): string {
   return JSON.stringify(campaign)
@@ -116,6 +116,7 @@ const world = shape({
   nextMachineId: count,
   sites: list(site),
   machines: list(machine),
+  hops: opt(list(shape({from:str,to:str,item:material}))),
   belts: list(
     shape({
       siteId: str,
@@ -151,7 +152,8 @@ const world = shape({
   extracted: totals,
 })
 const save = shape({
-  version: one(4),
+  version: one(5),
+  seenSections: opt(list(one(...workshopSections))),
   town: shape({
     beat: one(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
     entered: count,
@@ -159,7 +161,7 @@ const save = shape({
     paid: count,
     payments: one(0, 1, 2, 3),
     competition: list(str),
-    nextOrders: dict(count),
+    wired: bool, offered: list(str), solved: list(str), waiting: totals,
     changes: list(
       shape({
         tick: count,
@@ -237,7 +239,7 @@ function validate(campaign: Campaign) {
   if (
     machines.size !== world.machines.length ||
     sites.size !== world.sites.length ||
-    !sites.has('shed') ||
+    !sites.has('shed') || machines.get('mine')?.kind !== 'miner' ||
     world.machines.some(
       (machine) =>
         !sites.has(machine.siteId) ||
@@ -275,6 +277,7 @@ function validate(campaign: Campaign) {
 }
 
 function restoreTown(c: Campaign) {
+  c.seenSections ??= ['code']
   const town = c.town as Campaign['town'] & { due?: number; interest?: boolean[]; installments?: number[] }
   if ('interest' in town || 'installments' in town || 'due' in town) {
     const principalPaid = INSTALLMENTS.slice(0, town.payments).reduce((sum, amount) => sum + amount, 0)
@@ -307,12 +310,12 @@ function archiveLegacy(data: Record<string, unknown>) {
   }
   if (record(data.project)) {
     const { working, deployed, snapshots, history } = data.project
-    archive('v2 code', record(working) && Object.keys(working).length ? working : deployed)
-    if (JSON.stringify(working) !== JSON.stringify(deployed)) archive('v2 deployed', deployed)
+    archive(data.version === 4 ? 'Previous chapter code' : 'v2 code', record(working) && Object.keys(working).length ? working : deployed)
+    if (JSON.stringify(working) !== JSON.stringify(deployed)) archive(data.version === 4 ? 'Previous deployment' : 'v2 deployed', deployed)
     for (const group of [snapshots, history]) {
       if (Array.isArray(group))
         for (const rev of group) {
-          if (record(rev) && typeof rev.name === 'string') archive('v2 · ' + rev.name, rev.files)
+          if (record(rev) && typeof rev.name === 'string') archive((data.version === 4 ? 'Previous · ' : 'v2 · ') + rev.name, rev.files)
         }
     }
   } else if (record(data.entries)) {
@@ -330,7 +333,7 @@ export function loadSave(input: unknown): Campaign {
   try {
     const data: unknown = typeof input === 'string' ? JSON.parse(input) : structuredClone(input)
     if (!record(data)) return createCampaign()
-    if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3)
+    if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3 || data.version === 4)
       return archiveLegacy(data)
     if (save(data) && gameFields(data)) return restoreTown(validate(data as unknown as Campaign))
   } catch {

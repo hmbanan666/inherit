@@ -2,7 +2,7 @@ import ts from 'typescript'
 import type { GameFactory, ProjectFiles } from '@inherit/sim'
 import type { CallSite } from './gameProtocol'
 
-const commands = ['dig', 'work', 'route', 'clear', 'repair', 'connect', 'build'] as const
+const commands = ['take', 'put', 'look', 'repair', 'buy'] as const
 type Command = (typeof commands)[number]
 interface Candidate extends CallSite {
   op: Command
@@ -24,25 +24,17 @@ function collect(files: ProjectFiles) {
       }
       if (ts.isCallExpression(node)) {
         const member = node.expression
-        const key = ts.isPropertyAccessExpression(member)
-          ? member.name
-          : ts.isElementAccessExpression(member) && ts.isStringLiteralLike(member.argumentExpression)
-            ? member.argumentExpression
-            : undefined
-        const op = (key?.text === 'smelt' ? 'work' : key?.text) as Command
-        const first = node.arguments[0],
-          last = node.arguments.at(-1)
-        const handleCall = key?.text === 'smelt' || (op === 'dig' && !first) ||
-          (op === 'connect' && node.arguments.length === 1)
-        // Zero-argument handle verbs can tag their receiver instead of an argument.
-        const tag = last ?? (handleCall && ts.isPropertyAccessExpression(member) ? member.expression : undefined)
+        const key = ts.isIdentifier(member) ? member : undefined
+        const op = key?.text as Command
+        const first = node.arguments[0]
+        const tag = node.arguments.at(-1)
         if (key && tag && commands.includes(op) && !ts.isSpreadElement(tag)) {
           candidates.push({
             op,
             file,
             fn,
             line: tree.getLineAndCharacterOfPosition(key.getStart(tree)).line + 1,
-            target: !handleCall && first && ts.isStringLiteralLike(first) ? first.text : undefined,
+            target: first && ts.isStringLiteralLike(first) ? first.text : undefined,
             start: tag.getStart(tree),
             end: tag.end,
           })
@@ -126,10 +118,10 @@ export function commandSites(files: ProjectFiles) {
           const result: unknown = Reflect.apply(method, ctx, [id, ...args])
           if (matches.length !== 1) return result
           const { file, line, fn } = matches[0]!
-          const targets = op === 'connect' ? [id, args[0]] : [op === 'build' ? result : id]
+          const targets = [op === 'buy' ? args[0] ?? id : id]
           for (const target of targets) {
             if (typeof target !== 'string') continue
-            if (op === 'build') machines.add(target)
+            if (op === 'buy') machines.add(target)
             if (!machines.has(target)) continue
             const sites = (traces[target] ??= [])
             if (!sites.some((s) => s.file === file && s.line === line && s.fn === fn))

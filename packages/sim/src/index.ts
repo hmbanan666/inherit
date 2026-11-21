@@ -265,3 +265,5 @@ export { referenceFiles, referenceActions, applyReferenceAction, type ReferenceA
 
 export * from './town-view'
 export { payInstallment, activeRequest, DAY } from './town'
+export * from './bench'
+export type { ChapterFactory } from './primitives'

@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createCampaign, DAY, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
-import { chapterFiles } from '../../packages/sim/src/reference/chapter-one'
+import { advanceGame, createCampaign, DAY, lessons, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
+import { chapterFiles } from '../chapter-controllers'
 import oldWorkshop from './fixtures/v2-workshop.json'
 
-test.use({ viewport: { width: 1600, height: 900 } })
+test.use({ viewport: { width: 1440, height: 900 } })
 
 function browserErrors(page: Page) {
   const errors: string[] = []
@@ -23,196 +23,99 @@ async function photo(page: Page, name: string) {
   await page.screenshot({ path: join(dir, name + '.png') })
 }
 async function edit(page: Page, text: string) {
-  await page.locator('.monaco-editor .view-lines').first().click()
+  await page.getByRole('textbox', { name: 'Factory controller TypeScript' }).focus()
   await page.keyboard.press('Control+a')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((value) => navigator.clipboard.writeText(value), text)
   await page.keyboard.press('Control+v')
   await expect(page.locator('.editor-foot')).toContainText('Working copy')
 }
-test('a new player rebuilds Kettlewick with one growing controller', async ({ page }) => {
-  // For the beginner pacing pass, leave the previous deployment running during reading and editing.
-  const paced = process.env.INHERIT_PLAYTEST_PACE === 'beginner'
-  test.setTimeout(paced ? 1_200_000 : 240_000)
+async function typeHint(page: Page) {
+  const card = page.getByRole('region', { name:'Current request' })
+  await card.getByRole('button', {name:'Hint',exact:true}).click()
+  await card.getByRole('button', {name:'Show exact step'}).click()
+  const source = (await card.locator('code.exact').textContent())!
+  await card.getByRole('button', {name:'Hide hint'}).click()
+  await page.getByRole('textbox', {name:'Factory controller TypeScript'}).focus()
+  await page.keyboard.press('Control+a')
+  for (const [i, line] of source.trimEnd().split('\n').entries()) {
+    if (i) {
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Shift+Home')
+    }
+    if (line) await page.keyboard.insertText(line)
+    // Discard any closing brace Monaco supplied after the caret. The hint includes its own.
+    await page.keyboard.press('Control+Shift+End')
+    await page.keyboard.press('Delete')
+  }
+}
+test('type the growing library from the hints and rebuild Riverside', async ({page}) => {
+  test.setTimeout(240000)
   const errors = browserErrors(page)
-  const saved = () => page.evaluate((): Campaign => JSON.parse(localStorage.getItem('inherit.workshop.v1')!))
-  const waitForMinute = async (minute: number) => {
-    if (paced)
-      await expect
-        .poll(async () => (await saved()).world.tick, {
-          intervals: [1000],
-          timeout: 240_000,
-        })
-        .toBeGreaterThanOrEqual(minute * 240)
-  }
-  const button = (name: string) => page.getByRole('button', { name, exact: true })
+  const nav = page.getByRole('navigation', {name:'Workshop sections'})
+  const card = page.getByRole('region',{name:'Current request'})
+  const checks = page.getByRole('tabpanel',{name:'Checks'})
   await page.goto('/')
-  const card = page.getByRole('region', { name: 'Current request' })
-  await expect(card).toContainText('Horseshoes for the mail horse')
-  await expect(card).not.toContainText(/by evening|day \d|late/i)
-  await expect(page.locator('.pixi-mount canvas')).toBeVisible()
-  await expect(page.locator('.live')).toHaveText('Ready')
-  await expect(page.locator('.view-lines')).toBeVisible()
-  await photo(page, '01-fresh-shed')
-  await button('8×').click()
-  await waitForMinute(2.5)
-  await button('1×').click()
-  const exactHint = async (step: number) => {
-    await expect(card).toContainText(step + '/7')
-    await expect(card.locator('code')).toContainText('____')
-    await button('Hint').click()
-    await expect(button('Show exact step')).toBeVisible()
-    await button('Show exact step').click()
-    return card.locator('code').allTextContents()
+  await expect(page.locator('.view-lines')).toContainText('export function dig')
+  await expect(nav.getByRole('button')).toHaveText(['Code'])
+  await expect(page.locator('.world-shell, .wallet, .bank-chip, .speeds')).toHaveCount(0)
+  await expect(page.getByRole('button',{name:'Deploy',exact:true})).toBeEnabled()
+  await expect(page.locator('.view-line').getByText('export',{exact:true})).toHaveCSS('color','rgb(222, 169, 237)')
+  await photo(page,'first-launch')
+  for (const task of lessons) {
+    await expect(card).toContainText(task.title,{timeout:30000})
+    await expect(page.locator('.file-tabs')).toContainText(task.file)
+    if (task.id === 'smelt') {
+      await expect(page.locator('.my-library')).not.toHaveAttribute('open','')
+      await photo(page,'smelt-kata')
+    }
+    await typeHint(page)
+    if (task.cases.length) {
+      await expect(checks.locator('.done-count')).toContainText(task.cases.length + ' done')
+      if (task.id === 'dig') {
+        await checks.locator('.done-count').click()
+        await expect(checks.locator('[data-state="done"]')).toBeVisible()
+        await photo(page,'dig-green')
+      }
+      continue
+    }
+    await page.keyboard.press('Control+Enter')
+    if (task.beat === 1) {
+      await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
+      await expect(nav.getByRole('button',{name:'Factory'})).toContainText('new')
+      await expect(page.locator('.pixi-mount canvas')).toBeVisible()
+      await photo(page,'wire-up-deploy')
+      await expect(checks.locator('.done-count')).toContainText('3 done')
+      await expect(card).toContainText('The family tab',{timeout:15000})
+      await expect(nav.getByRole('button',{name:'Town'})).toContainText('new')
+      await expect(nav.getByRole('button',{name:'Inbox'})).toBeVisible()
+      await expect(nav.getByRole('button',{name:'Orders'})).toBeVisible()
+      await expect(page.locator('.wallet')).toContainText('coins')
+      await page.getByRole('button',{name:'See it'}).click()
+      await expect(page.getByRole('img',{name:/Bram’s forge working/})).toBeVisible()
+      await nav.getByRole('button',{name:'Factory'}).click()
+      await page.getByRole('button',{name:'Pay later'}).click()
+    }
   }
-  const [handler] = await exactHint(1)
-  await edit(page, handler!)
-  await exactHint(2)
-  await button('Deploy').click()
-  await expect(card).toContainText('3/7')
-  const body = ['console.log("tick")']
-  let header = ''
-  for (const step of [3, 4, 5, 6]) {
-    const code = await exactHint(step)
-    if (code[0]!.startsWith('import')) header = code.shift()!
-    body.push(code[0]!)
-    await edit(page, header + '\nexport function onTick() {\n  ' + body.join('\n  ') + '\n}')
-    await button('Deploy').click()
-  }
-  await expect(card).toContainText('7/7')
-  await expect(card).toContainText('The family tab', { timeout: 15000 })
-  await expect(button('See it')).toBeVisible()
-  expect((await saved()).world.tick).toBeLessThan(8 * 240)
-  const art = page.getByRole('img', { name: /Bram’s forge/ })
-  const visitChange = async (building: string, notice: RegExp, shot: string) => {
-    await expect(page.locator('.town-change')).toContainText(notice, { timeout: 90_000 })
-    await button('See it').click()
-    await expect(page.locator('.town-print canvas')).toBeVisible()
-    await expect(art).toHaveAccessibleName(new RegExp(building + ' working'))
-    await expect(page.locator('.town-notice').filter({ hasText: notice })).toBeVisible()
-    const directory = await page.locator('.town-directory').boundingBox()
-    const frame = await page.locator('.map-frame').boundingBox()
-    expect(directory!.y + directory!.height).toBeLessThanOrEqual(frame!.y + frame!.height)
-    await photo(page, shot)
-  }
-  const deployBeat = async (beat: number) => {
-    await edit(page, chapterFiles(beat)['main.ts']!)
-    await button('Deploy').click()
-    await expect(page.locator('.editor-foot')).toContainText('Deployed')
-    await expect(page.locator('.runtime')).toHaveCount(0)
-  }
-  const clue = async (text: RegExp) => {
-    await button('Hint').click()
-    await expect(card.locator('.request-hint p')).toContainText(text)
-    await button('Hint').click()
-  }
-  const pay = async () => {
-    await button('Pay debt').click()
-    const payment = page.getByRole('button', { name: /^Pay [0-9]+ coins$/ })
-    await expect(payment).toBeEnabled({ timeout: 100_000 })
-    await payment.click()
-  }
-  await visitChange('Bram’s forge', /forge lights up/, '02-forge')
-  await expect(page.locator('.town-notice').filter({ hasText: 'bank window' })).toBeVisible()
-  await photo(page, '03-bank-tab')
-  await page.getByRole('button', { name: /^Bram,/ }).click()
-  await page.locator('.town-ribbon .bubble').click()
-  await expect(page.locator('.town-voice')).toContainText('Mrs Harrow')
-  await clue(/Pay debt/)
-  if (paced) await pay()
-  else await button('Pay later').click()
-  await expect(card).toContainText('A grate for the bread oven')
-  await clue(/press → cart/)
-  await button('Factory').click()
-  await button('8×').click()
-  await waitForMinute(18)
-  await deployBeat(3)
-  await visitChange('Bakery', /bakery/, '04-bakery')
-  await expect(card).toContainText('Light for Lamp Street', { timeout: 15_000 })
-  await clue(/copper-ingot/)
-  await button('Factory').click()
-  await deployBeat(4)
-  if (paced) {
-    await waitForMinute(25)
-    // Keep the same equipment reserve as the beginner reference before paying the bank early.
-    await expect.poll(async () => (await saved()).economy.money, { timeout: 120_000 }).toBeGreaterThanOrEqual(250)
-    await pay()
-  }
-  await waitForMinute(29)
-  await button('1×').click()
-  await deployBeat(5)
-  await expect(card).toContainText(/[1-4] \/ 5 coils of wire/, { timeout: 30_000 })
-  await button('Pause').click()
-  await photo(page, '05-midgame-wire')
-  await button('Settings').click()
-  await button('Swap sides').click()
-  await button('Settings').click()
-  await photo(page, '06-swap-sides')
-  await page.reload()
-  await expect(page.locator('.desk')).toHaveClass(/swapped/)
-  await expect(card).toContainText('Light for Lamp Street')
-  await button('Settings').click()
-  await button('Swap sides').click()
-  await button('Settings').click()
-  await button('8×').click()
-  await visitChange('Lamp Street', /glows/, '07-lamp-street')
-  await button('Factory').click()
-  await deployBeat(6)
-  await expect(card).toContainText('Teeth for the water wheel', { timeout: 30_000 })
-  await clue(/gear/)
-  await waitForMinute(40)
-  await deployBeat(7)
-  await visitChange('Water mill', /wheel turns/, '08-mill')
-  await expect(card).toContainText('One press, two regulars')
-  await clue(/Elsie/)
-  await button('Factory').click()
-  await waitForMinute(44)
-  await deployBeat(8)
-  await expect(card).toContainText('The bridge to Riverside', { timeout: 60_000 })
-  await clue(/assembler/)
-  await waitForMinute(56)
-  const tree = page.getByRole('region', { name: 'Project files' })
-  await tree.getByRole('button', { name: 'New file' }).click()
-  await tree.getByLabel('Project path').fill('jobs.ts')
-  await button('Create').click()
-  await edit(page, chapterFiles(9)['jobs.ts']!)
-  await tree.getByRole('button', { name: 'main.ts' }).click()
-  await deployBeat(9)
-  await visitChange('Riverside bridge', /bridge stands/, '09-bridge')
-  await expect(page.locator('.town-notice').filter({ hasText: 'Riverside opens' })).toBeVisible()
-  await expect(art).toHaveAccessibleName(/Riverside working/)
-  await page.getByRole('button', { name: /^Ines,/ }).click()
-  await expect(page.locator('.town-voice')).toContainText('Riverside')
-  await expect(page.getByRole('button', { name: /^Pell,/ })).toBeVisible()
-  await photo(page, '10-riverside')
-  await expect(card).toContainText('The family tab')
-  await clue(/remaining installments/)
-  await button('Factory').click()
-  if (paced) await pay()
-  else {
-    await button('Pay debt').click()
-    const balance = button('Pay balance (600 coins)')
-    await expect(balance).toBeEnabled({ timeout: 100_000 })
-    await balance.click()
-  }
+  await expect(card).toContainText('The family tab',{timeout:30000})
+  await page.getByRole('button',{name:'Pay debt'}).click()
+  await page.getByRole('button',{name:'Pay balance (600 coins)'}).click()
   await expect(card).toContainText('The shed is yours.')
-  await visitChange('Kettlewick Bank', /shed is yours/, '11-chapter-end')
-  await expect(art).toHaveAccessibleName(/Paid in full/)
-  const end = await saved()
-  expect(end.town.beat).toBe(11)
-  expect(end.town.paid).toBe(600)
-  if (paced) {
-    console.log(
-      'Town change ticks:',
-      end.town.changes.map((c) => [c.buildingId, c.tick]),
-    )
-    expect(end.world.tick).toBeLessThan(60 * 240)
-  }
   expect(errors).toEqual([])
 })
 
+async function seedWireUp(page: Page) {
+  const c = createCampaign()
+  c.town.solved = ['dig','smelt','ship']
+  c.project.working = chapterFiles(1,'ship')
+  await page.addInitScript(save => {
+    if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1',save)
+  },serializeSave(c))
+}
 test('the town clock changes the light without printing a day or phase', async ({ page }) => {
   const campaign = createCampaign()
+  campaign.town.changes.push({ buildingId: 'forge', text: 'The forge lights up.', tick: 10 })
+  campaign.progress.messages.push({ ...campaign.progress.messages[0]!, id: 'tab', from: 'Mrs Harrow' })
   campaign.world.tick = 2 * DAY
   campaign.town.beat = 3
   await page.addInitScript((save) => localStorage.setItem('inherit.workshop.v1', save), serializeSave(campaign))
@@ -249,9 +152,9 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
     if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
   }, JSON.stringify(oldWorkshop))
   await page.goto('/')
-  await expect(page.locator('.live')).toHaveText('Ready')
+  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
   await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
-  await expect(page.locator('.statusbar')).toContainText('3 machines · 0 belts')
+  await expect(page.locator('.world-shell')).toHaveCount(0)
   await page.reload()
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
@@ -261,12 +164,13 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
   )
   expect(archive.project.working).toEqual(oldWorkshop.project.working)
   expect(archive.project.deployed).not.toEqual(oldWorkshop.project.deployed)
-  await expect(page.locator('.live')).toHaveText('Ready')
+  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
   expect(errors).toEqual([])
 })
 test('a controller fault leaves the world ticking and a previous revision can resume digging', async ({
   page,
 }) => {
+  await seedWireUp(page)
   await page.goto('/')
   const button = (name: string) => page.getByRole('button', { name, exact: true })
   await expect(button('Deploy')).toBeEnabled()
@@ -281,9 +185,7 @@ test('a controller fault leaves the world ticking and a previous revision can re
   await button('Deploy history').click()
   await page.getByRole('button', { name: /Restore #1 / }).click()
   await expect(page.locator('.runtime')).toHaveCount(0)
-  await expect(page.locator('.view-lines')).toContainText('mine.dig()')
-  await button('Pause').click()
-  await expect(button('Resume')).toBeVisible()
+  await expect(page.locator('.view-lines')).toContainText('smelt()')
   await button('Settings').click()
   await button('New game').click()
   await button('Keep playing').click()
@@ -316,19 +218,19 @@ test('a missing worker refreshes once and preserves the notebook draft', async (
       : route.continue(),
   )
   await page.goto('/')
-  await expect(page.locator('.live')).toHaveText('Ready', { timeout: 20000 })
-  expect(navigations).toBe(2)
+  await expect.poll(() => navigations, { timeout: 20000 }).toBe(2)
+  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
   await expect(page.locator('.view-lines')).toContainText('inherited draft')
-  await edit(page, chapterFiles(1)['main.ts']!)
-  await page.getByRole('button', { name: 'Deploy', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'The family tab' })).toBeVisible({ timeout: 15000 })
   expect(attempts).toBe(2)
 })
 test.describe('a high-density mobile display', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true })
   test('panels stack beneath an inspectable floor', async ({ page }) => {
+    const c = createCampaign()
+    advanceGame(c, ctx => ctx.take('mine'))
+    await page.addInitScript(save => localStorage.setItem('inherit.workshop.v1', save), serializeSave(c))
     await page.goto('/')
     const canvas = page.locator('.pixi-mount canvas')
     await expect(canvas).toBeVisible()
@@ -342,11 +244,12 @@ test.describe('a high-density mobile display', () => {
 test('a machine remembers the actual helper lines that commanded it', async ({ page }) => {
   const campaign = createCampaign()
   campaign.town.beat = 9
+  campaign.town.changes.push({ buildingId: 'forge', text: 'The forge lights up.', tick: 0 })
   campaign.project.working = {
     'main.ts':
-      'import { morning, evening } from "./lib/crew"\nexport function onTick(ctx) { (ctx.tick % 2 ? morning : evening)(ctx) }',
+      'import { morning, evening } from "./lib/crew"\nlet tick = 0; export function onTick() { if (++tick < 5) (tick % 2 ? morning : evening)() }',
     'lib/crew.ts':
-      'export function morning(ctx) {\n  ctx.dig("mine")\n}\nexport function evening(ctx) {\n  ctx.dig("mine")\n}',
+      'import {take} from "inherit"; export function morning() {\n  take("mine")\n}\nexport function evening() {\n  take("mine")\n}',
   }
   deployGameProject(campaign)
   await page.addInitScript(
@@ -358,7 +261,6 @@ test('a machine remembers the actual helper lines that commanded it', async ({ p
   const inspector = page.getByRole('region', { name: 'Machine inspector' })
   await expect(inspector).toContainText('morning · lib/crew.ts:2')
   await expect(inspector).toContainText('evening · lib/crew.ts:5')
-  await page.getByRole('button', { name: 'Pause', exact: true }).click()
   await page.getByRole('button', { name: 'evening · lib/crew.ts:5' }).click()
   await expect(page.locator('.view-lines')).toContainText('function evening')
   // Sample the mine's canvas pixels without the inspector or Monaco selection overlay.
@@ -390,10 +292,14 @@ test('a machine remembers the actual helper lines that commanded it', async ({ p
       (await mine.boundingBox())!,
     )
   await page.getByRole('button', { name: 'Close inspector' }).click()
-  // Return to the paused shed with the first pulse cleared.
+  // Let this short controller finish its digs before comparing the pulse with an idle mine.
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('inherit.workshop.v1')!).world.tick as number,
+  )).toBeGreaterThan(5)
   await page.getByRole('button', { name: 'Town', exact: true }).click()
   await page.getByRole('button', { name: 'Factory', exact: true }).click()
   await expect(floor).toBeVisible()
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   const rest = await pixels()
   const pulses = async () => {
     await expect.poll(async () => (await pixels()) !== rest, { intervals: [20] }).toBe(true)
@@ -403,7 +309,7 @@ test('a machine remembers the actual helper lines that commanded it', async ({ p
   await pulses()
   await page.getByRole('button', { name: 'Close inspector' }).click()
   await page.getByRole('button', { name: 'Town', exact: true }).click()
-  await page.locator('.project-editor .view-line').getByText('dig', { exact: true }).last().click()
+  await page.locator('.project-editor .view-line').getByText('take', { exact: true }).last().click()
   await expect(floor).toBeVisible()
   await pulses()
   await expect(page.locator('.runtime')).toHaveCount(0)
@@ -417,6 +323,7 @@ test('Run retries an unavailable worker without refreshing the same page', async
     failed = true
     return route.abort()
   })
+  await seedWireUp(page)
   await page.goto('/')
   await expect(page.locator('.runtime')).toContainText('Could not start the controller worker')
   await edit(page, chapterFiles(1)['main.ts']!)

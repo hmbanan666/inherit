@@ -1,38 +1,54 @@
 import { expect, test } from 'vitest'
-import { advanceGame, apiReference, createCampaign, loadSave, onboardingStep, serializeSave } from './index'
+import { runVerb } from '../../sandbox/src'
+import {
+  createCampaign,
+  currentLesson,
+  getSurface,
+  lessons,
+  runBench,
+  loadSave,
+  serializeSave,
+} from './index'
+import { chapterFiles } from './reference/chapter-one'
 
-test('Bram follows the draft, the first printed tick, and what happens on the floor', () => {
+test('the exact edits pass in a fresh bench and each empty function still needs work', async () => {
   const c = createCampaign()
-  const examples = () => apiReference(c).map(entry => entry.example)
-  expect(examples().join('\n')).not.toMatch(/Factory|ctx\.|mine\.|furnace\./)
-  expect(onboardingStep(c)).toBe(1)
-  expect(onboardingStep(c, true)).toBe(2)
-  c.progress.signals.printedTick = true
-  expect(onboardingStep(loadSave(serializeSave(c)))).toBe(3)
-  expect(examples()).toContain('mine.dig()')
-  expect(examples()).not.toContain('mine.connect(furnace)')
-  advanceGame(c, ctx => ctx.dig('mine'))
-  expect(onboardingStep(c)).toBe(4)
-  expect(examples()).toContain('mine.connect(furnace)')
-  expect(examples()).not.toContain('furnace.smelt()')
-  advanceGame(c, ctx => ctx.connect('mine', 'furnace'))
-  expect(onboardingStep(c)).toBe(5)
-  expect(examples()).toContain('furnace.smelt()')
-  expect(examples()).not.toContain('furnace.connect(cart)')
-  for (let i = 0; i < 8; i++) advanceGame(c, ctx => {
-    ctx.dig('mine')
-    ctx.work('furnace')
-  })
-  expect(onboardingStep(c)).toBe(6)
-  expect(examples()).toContain('furnace.connect(cart)')
-  advanceGame(c, ctx => ctx.connect('furnace', 'cart'))
-  expect(onboardingStep(c)).toBe(7)
+  for (const lesson of lessons) {
+    c.town.beat = lesson.beat
+    expect(currentLesson(c)?.id).toBe(lesson.id)
+    if (lesson.cases.length) {
+      const files = chapterFiles(lesson.beat, lesson.id)
+      const run = () =>
+        runBench(lesson, files, (api, args, files) =>
+          runVerb(
+            { files, entry: lesson.file, chapterExports: getSurface(c).exports },
+            lesson.name,
+            api,
+            args,
+          ),
+        )
+      expect(
+        (await run()).every((c) => c.state === 'done'),
+        lesson.id,
+      ).toBe(true)
+      files[lesson.file] = lesson.stub
+      expect(
+        (await run()).every((c) => c.state === 'todo'),
+        lesson.id,
+      ).toBe(true)
+    }
+    c.town.solved.push(lesson.id)
+    expect(loadSave(serializeSave(c)).town.solved).toEqual(c.town.solved)
+  }
 })
-
-test('a silent deploy still needs a printed tick; an older save keeps its floor progress', () => {
-  const c = createCampaign()
-  advanceGame(c, ctx => ctx.dig('mine'))
-  expect(onboardingStep(c, true)).toBe(2)
-  delete c.progress.signals.printedTick
-  expect(onboardingStep(loadSave(serializeSave(c)))).toBe(4)
+test('a nested transfer passes the same behavioral bench', async () => {
+  const lesson = lessons.find((l) => l.id === 'smelt')!
+  const files = {
+    'verbs/smelt.ts':
+      'import { take, put } from "inherit"; export const smelt = () => put("furnace", take("mine"))',
+  }
+  const checks = await runBench(lesson, files, (api, args, files) =>
+    runVerb({ files, entry: lesson.file, chapterExports: ['take', 'put'] }, lesson.name, api, args),
+  )
+  expect(checks[0].state).toBe('done')
 })

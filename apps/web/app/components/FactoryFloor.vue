@@ -7,7 +7,7 @@ import { center, FloorScene, tile } from '../lib/floor'
 
 const props = defineProps<{ highlighted: string[] }>()
 const g = useGame(),
-  { campaign, selected, paused, speed } = g
+  { campaign, selected } = g
 const world = computed(() => campaign.value.world)
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
@@ -156,7 +156,7 @@ onMounted(async () => {
     observer = new ResizeObserver(resize)
     observer.observe(host.value!)
     renderer.ticker.maxFPS = 40
-    renderer.ticker.add(() => scene?.animate(performance.now(), TICK_MS / speed.value, paused.value))
+    renderer.ticker.add(() => scene?.animate(performance.now(), TICK_MS, false))
   } catch {
     renderError.value = 'Could not open the floor renderer. Reload to retry.'
   }
@@ -227,6 +227,10 @@ onBeforeUnmount(() => {
           <dd>{{ bins.map(([k, n]) => n + ' ' + k).join(', ') || 'Empty' }}</dd>
           <dt v-if="machine.recipe">Recipe</dt>
           <dd v-if="machine.recipe">{{ machine.recipe }}</dd>
+          <template v-if="machine.kind === 'dock' && Object.keys(campaign.town.waiting).length">
+            <dt>Nobody ordered these yet</dt>
+            <dd>{{ Object.entries(campaign.town.waiting).map(([item,n]) => n + ' ' + item).join(', ') }}</dd>
+          </template>
           <dt>Processed</dt>
           <dd>{{ machine.stats.processed }} · {{ machine.stats.rate }}/min</dd>
         </dl>

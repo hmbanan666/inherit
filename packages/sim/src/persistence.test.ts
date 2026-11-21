@@ -124,3 +124,14 @@ test('an existing chapter keeps its work, clears old terms and refunds paid inte
   expect(clean).not.toMatch(/"(due|interest|installments|deadline|duration)":/)
   expect(loadSave(clean)).toEqual(restored)
 })
+
+test.each(['import { mine } from "inherit"; mine.dig()', 'export function onTick(ctx) {ctx.work("furnace")}'])(
+  'the previous chapter restarts with its working and deployed code archived', source => {
+    const old = createCampaign()
+    old.town.beat = 9
+    old.project.working = {'main.ts':source,'verbs/unfinished.ts':'// draft'}
+    const fresh = loadSave({...old,version:4})
+    expect(fresh.town.beat).toBe(1)
+    expect(fresh.project.working).toEqual(createCampaign().project.working)
+    expect(fresh.project.snapshots.find(s => s.name === 'Previous chapter code')?.files).toEqual(old.project.working)
+  })

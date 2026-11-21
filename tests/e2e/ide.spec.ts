@@ -3,26 +3,21 @@ import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import { createCampaign, deployGameProject, serializeSave } from '../../packages/sim/src/index'
 
-const main = [
-  'import type { Factory } from "inherit"',
-  'import { feed } from "./lib/drive"',
-  'export function onTick(ctx: Factory) {',
-  '  feed(ctx)',
-  '  ctx.work("furnace")',
-  '}',
-].join('\n')
-const helper = [
-  'import type { Factory } from "inherit"',
-  'export function feed(ctx: Factory) {',
-  '  ctx.dig("mine")',
-  '  console.log("ore moving")',
-  '}',
-].join('\n')
+const main = 'import { feed } from "./lib/drive"\nexport function onTick() {\n  feed()\n}'
+const helper = 'import {take} from "inherit"\nexport function feed() {\n  take("mine")\n  console.log("ore moving")\n}'
+async function projectFiles(page: Page) {
+  const tree = page.getByRole('region', {name:'Project files'})
+  if (!await tree.isVisible()) {
+    await button(page,'Settings').click()
+    await button(page,'Project files').click()
+  }
+  return tree
+}
 
 async function workshop(page: Page, unlock = true) {
   if (unlock) {
     const c = createCampaign()
-    c.town.beat = 9
+    c.town.beat = 10
     c.project.working = { 'main.ts': main, 'lib/drive.ts': helper }
     deployGameProject(c)
     await page.addInitScript((save) => {
@@ -51,19 +46,19 @@ async function replaceCode(page: Page, text: string) {
 
 test('first shift opens a single player file', async ({ page }) => {
   await workshop(page, false)
-  await expect(tab(page, 'main.ts')).toBeVisible()
+  await expect(tab(page, 'verbs/dig.ts')).toBeVisible()
   await expect(
-    page.locator('.editor-dock').getByRole('button', { name: 'main.ts', exact: true }),
+    page.locator('.editor-dock').getByRole('button', { name: 'verbs/dig.ts', exact: true }),
   ).toHaveCount(1)
   await expect(page.getByRole('region', { name: 'Project files' })).toHaveCount(0)
-  await expect(button(page, 'Quick open')).toHaveCount(0)
+  await expect(page.locator('.my-library')).toHaveCount(0)
 })
 
 test('first shift distinguishes TypeScript tokens and explains the available calls', async ({ page }) => {
   await workshop(page, false)
   const tokens = page.locator('.project-editor .view-line span[class*="mtk"]')
-  await replaceCode(page, '// The shed is yours.\nimport type { Factory } from "inherit"\nexport function onTick(ctx: Factory) { console.log("tick") }')
-  const samples = ['import', '"inherit"', 'Factory', 'onTick', 'ctx', '// The shed']
+  await replaceCode(page, '// The shed is yours.\nimport { take } from "inherit"\nexport function dig(): string { return "rock" }\nconst n = 42')
+  const samples = ['import', '"inherit"', 'dig', '42', '// The shed']
   await expect.poll(() => tokens.evaluateAll((spans, samples) => {
     const colors = new Set<string>()
     for (const sample of samples) {
@@ -75,12 +70,9 @@ test('first shift distinguishes TypeScript tokens and explains the available cal
   await photo(page, 'main-ts')
   await tab(page, 'API reference').click()
   const panel = page.getByRole('region', { name: 'API reference' })
-  await expect(panel).toContainText('onTick(): void')
-  await expect(panel).not.toContainText(/Factory|ctx\.|mine\.|repair|orders\(/)
-  await button(page, 'Deploy').click()
-  await expect(panel.getByRole('heading', { name: 'mine.dig(): boolean' })).toBeVisible()
-  await expect(panel).toContainText('Dig one rock. Wait when the belt is full.')
-  await expect(panel).not.toContainText(/connect|smelt|ctx\./)
+  await expect(panel).toContainText('What inherit exports')
+  await expect(panel.getByRole('heading', {name:/^take/})).toBeVisible()
+  await expect(panel.locator('article')).toHaveCount(1)
   expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   await photo(page, 'api-reference')
 })
@@ -101,7 +93,7 @@ test('the compact workshop panel leaves every API card reachable at 1440 × 900'
     expect(rect.y + rect.height).toBeLessThanOrEqual((await footer.boundingBox())!.y + 1)
     const refRect = (await reference.boundingBox())!
     expect(refRect.y + refRect.height).toBeLessThanOrEqual((await tabs.boundingBox())!.y)
-    const floor = reference.locator('section').filter({ has: page.getByRole('heading', { name: 'Floor', exact: true }) })
+    const floor = reference.locator('section').filter({ has: page.getByRole('heading', { name: 'What inherit exports', exact: true }) })
     for (const example of [floor.locator('.example').last(), reference.locator('.example').last()]) {
       await example.scrollIntoViewIfNeeded()
       expect(await example.evaluate(el => {
@@ -117,42 +109,15 @@ test('the compact workshop panel leaves every API card reachable at 1440 × 900'
   }
 })
 
-test('Bram waits for a callable draft and a message from the running tick', async ({ page }) => {
-  await workshop(page, false)
-  const card = page.getByRole('region', { name: 'Current request' })
-  const checks = page.getByRole('tabpanel', { name: 'Checks' })
-  const tick = checks.getByRole('listitem').filter({ hasText: 'Your onTick prints a message' })
-  await expect(page.getByRole('tab', { name: 'Checks' })).toHaveAttribute('aria-selected', 'true')
-  await expect(tick).toHaveCSS('color', 'rgb(231, 163, 139)')
-  await replaceCode(page, 'const shift = () => {}; export { shift as onTick }')
-  await expect(card).toContainText('2/7')
-  await expect(tick).toHaveCSS('color', 'rgb(234, 190, 80)')
-  await replaceCode(page, 'export const onTick = 42')
-  await expect(card).toContainText('1/7')
-  await replaceCode(page, 'export function onTick() { missing() }')
-  await expect(page.locator('.squiggly-error').first()).toBeVisible()
-  await expect(card).toContainText('1/7')
-  await replaceCode(page, 'console.log("loaded"); export function onTick() {}')
-  await expect(card).toContainText('2/7')
-  await button(page, 'Deploy').click()
-  const consoleTab = page.getByRole('tab', { name: 'Console' })
-  await consoleTab.click()
-  const output = page.getByRole('tabpanel', { name: 'Console' })
-  await expect(output).toContainText('loaded')
-  await expect(card).toContainText('2/7')
-  await replaceCode(page, 'export function onTick() { console.log("tick") }')
-  await button(page, 'Deploy').click()
-  await expect(card).toContainText('3/7')
-  await expect(output.getByRole('listitem').filter({ hasText: /tick\s*×\d+/ })).toHaveCount(1)
-  await card.getByRole('button', { name: 'Check · The mine digs iron ore' }).click()
-  const summary = checks.getByRole('button', { name: '1 done' })
-  await expect(summary).toHaveAttribute('aria-expanded', 'false')
-  await expect(tick).toHaveCount(0)
-  await summary.click()
-  await expect(tick).toHaveCSS('color', 'rgb(148, 197, 167)')
-  await expect(checks.getByRole('listitem').filter({ hasText: 'The mine digs iron ore' })).toHaveAttribute('aria-current', 'step')
-  await page.reload()
-  await expect(card).toContainText('3/7')
+test('import completion inside braces lists the unlocked workshop exports', async ({page}) => {
+  await workshop(page,false)
+  await replaceCode(page,'import {  } from "inherit"')
+  await page.keyboard.press('Home')
+  for (let i=0;i<9;i++) await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('Control+Space')
+  const list = page.locator('.suggest-widget.visible')
+  await expect(list).toContainText('take')
+  await expect(list).not.toContainText(/repair|buy|put/)
 })
 
 test('invalid or missing palette values preserve distinct syntax colors', async ({ page }) => {
@@ -171,30 +136,14 @@ test('invalid or missing palette values preserve distinct syntax colors', async 
   await expect(number).toHaveCSS('color', 'rgb(246, 173, 143)')
 })
 
-for (const file of ['main.ts', 'lib/drive.ts']) {
-  test(`sandbox globals have zero error markers in ${file}`, async ({ page }) => {
-    // Editing works even while optional preview assets are unavailable.
-    await page.route('**/preview.worker-*.js', (route) => route.abort())
-    await workshop(page, file !== 'main.ts')
-    if (file !== 'main.ts') {
-      await page.getByRole('region', { name: 'Project files' }).getByRole('button', { name: file }).click()
-    }
-    const program = [
-      'import type { Factory } from "inherit"',
-      `export function ${file === 'main.ts' ? 'onTick' : 'feed'}(ctx: Factory) {`,
-      '  memory.room = ctx.space("mine")',
-      '  console.log(memory.room)',
-      '}',
-      'test("room", ctx => { assert(ctx.tick >= 0); equal(memory.room, true) })',
-    ].join('\n')
-    const markers = page.locator('.project-editor .squiggly-error')
-    // Wait for a semantic error first so a worker still starting up cannot give a false pass.
-    await replaceCode(page, program.replace('ctx.space', 'ctx.dispatch'))
-    await expect(markers.first()).toBeVisible()
-    await replaceCode(page, program)
-    await expect(markers).toHaveCount(0)
-  })
-}
+test('an unknown import is marked until the player uses an unlocked name', async ({page}) => {
+  await workshop(page,false)
+  const markers = page.locator('.project-editor .squiggly-error')
+  await replaceCode(page,'import {repair} from "inherit"; repair("mine")')
+  await expect(markers.first()).toBeVisible()
+  await replaceCode(page,'import {take} from "inherit"; console.log(take("mine"))')
+  await expect(markers).toHaveCount(0)
+})
 
 test('follow definitions and references across files, search the draft and organize a folder', async ({
   page,
@@ -203,7 +152,7 @@ test('follow definitions and references across files, search the draft and organ
   const editor = page.getByRole('region', { name: 'Controller files' })
   await editor
     .locator('.view-line')
-    .filter({ hasText: 'feed(ctx)' })
+    .filter({ hasText: 'feed()' })
     .getByText('feed', { exact: true })
     .click()
   await page.keyboard.press('F12')
@@ -226,15 +175,16 @@ test('follow definitions and references across files, search the draft and organ
   await photo(page, 'ide-project-search')
   await editor.getByRole('button', { name: /lib\/drive.ts:4/ }).click()
   await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
-  await replaceCode(page, helper.replace('ctx.dig', 'ctx.unknownCommand'))
+  await replaceCode(page, helper.replace('take("mine")', 'unknownCommand("mine")'))
   await expect(editor.locator('.squiggly-error').first()).toBeVisible()
-  await expect(page.getByText('Working copy', { exact: true })).toBeVisible()
+  await expect(page.locator('.editor-foot')).toContainText('Working copy')
 
-  const tree = page.getByRole('region', { name: 'Project files' })
+  const tree = await projectFiles(page)
   await tree.getByRole('button', { name: 'New folder' }).click()
   await tree.getByLabel('Project path').fill('parts')
   await tree.getByRole('button', { name: 'Create' }).click()
   await page.reload()
+  await projectFiles(page)
   await expect(tree.getByRole('button', { name: 'parts/index.ts' })).toBeVisible()
   await tree.getByRole('button', { name: 'New file' }).click()
   await tree.getByLabel('Project path').fill('parts/press.ts')
@@ -256,19 +206,18 @@ test('follow definitions and references across files, search the draft and organ
 
 test('jump from a controller error to its module and clear the log ring', async ({ page }) => {
   await workshop(page)
-  await page
-    .getByRole('region', { name: 'Project files' })
+  await (await projectFiles(page))
     .getByRole('button', { name: 'lib/drive.ts' })
     .click()
   await replaceCode(page, 'export function feed() {\n  throw new Error("stuck valve")\n}')
-  await expect(page.getByText('Working copy', { exact: true })).toBeVisible()
+  await expect(page.locator('.editor-foot')).toContainText('Working copy')
   await page.keyboard.press('Control+s')
   await page.getByRole('tab', { name: 'Console' }).click()
   const output = page.getByRole('region', { name: 'Program console' })
   const location = output.getByRole('button', { name: 'lib/drive.ts:2' })
   await expect(location).toBeVisible()
   await expect(output.getByRole('listitem').filter({ hasText: 'stuck valve' })).toHaveCSS('color', 'rgb(231, 163, 139)')
-  await tab(page, 'main.ts').click()
+  await (await projectFiles(page)).getByRole('button',{name:'main.ts',exact:true}).click()
   await location.click()
   await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.project-editor .squiggly-error').first()).toBeVisible()
@@ -281,7 +230,7 @@ test('switching modules while Monaco highlights a word leaves the editor healthy
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await workshop(page)
-  const tree = page.getByRole('region', { name: 'Project files' })
+  const tree = await projectFiles(page)
   for (const path of ['lib/drive.ts', 'main.ts', 'lib/drive.ts']) {
     await page.locator('.project-editor .view-lines').first().click()
     await page.keyboard.press('ArrowLeft')

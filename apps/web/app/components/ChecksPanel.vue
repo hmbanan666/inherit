@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useGame } from '../lib/useGame'
 
-const { checks, lessonCheck } = useGame()
+const { checks, lessonCheck, benchResult } = useGame()
 const expanded = ref(false)
 const done = computed(() => checks.value.filter(check => check.state === 'done').length)
 const visible = computed(() => expanded.value ? checks.value : checks.value.filter(check => check.state !== 'done'))
@@ -14,6 +14,7 @@ const labels = { todo: 'Still to do', close: 'Getting closer', done: 'Done' }
     <button v-if="done" class="done-count" :aria-expanded="expanded" @click="expanded = !expanded">
       <span aria-hidden="true">{{ expanded ? '▾' : '▸' }}</span>{{ done }} done
     </button>
+    <p v-if="benchResult?.error">{{ benchResult.error }}</p>
     <ul v-if="visible.length">
       <li v-for="check in visible" :key="check.id" :data-state="check.state"
         :aria-current="check.id === lessonCheck?.id ? 'step' : undefined">

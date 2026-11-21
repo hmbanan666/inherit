@@ -7,27 +7,46 @@ import {
   Factory,
   FileCode2,
   Mail,
-  Pause,
   Play,
   Radio,
   Settings2,
   X,
 } from '@lucide/vue'
-import type { TownSnapshot, Townsperson } from '@inherit/sim'
+import type { TownSnapshot, Townsperson, WorkshopSection, StoryMessage } from '@inherit/sim'
 import { provideGame } from './lib/useGame'
 import TownView from './components/town/TownView.vue'
 import TownPortrait from './components/town/TownPortrait.vue'
 
 const g = provideGame()
-const { campaign, files, activeFile, dirty, ready, paused, speed, saved, error, surface, town } = g
+const { campaign, files, activeFile, dirty, ready, saved, error, surface, town } = g
 const townPerson = ref<Townsperson['id']>()
 const replay = shallowRef<TownSnapshot['changes']>([])
 const highlighted = shallowRef<string[]>([])
 const requester = computed(() => town.value.people.find((p) => p.ask))
-const area = ref<'Factory' | 'Town'>('Factory')
+const section = ref<WorkshopSection>('code')
+const unread = computed(() => campaign.value.progress.messages.filter(m => m.unread).length)
+const sectionNames: Record<WorkshopSection, string> = {
+  code: 'Code', factory: 'Factory', town: 'Town', inbox: 'Inbox', orders: 'Orders',
+}
+function sectionDescription(item: WorkshopSection) {
+  const details = []
+  if (!campaign.value.seenSections.includes(item)) details.push('New section')
+  if (item === 'inbox' && unread.value) details.push(unread.value + ' unread letters')
+  return details.join('. ') || undefined
+}
+const hasFloor = computed(() => surface.value.sections.includes('factory'))
+const drawer = computed(() => section.value === 'inbox' || section.value === 'orders' ? sectionNames[section.value] : '')
+const floorPane = ref<HTMLElement>()
+const drawerPane = ref<HTMLElement>()
+const editorStatus = computed(() => {
+  if (g.lesson.value?.cases.length) return 'Working copy · checks run as you type'
+  if (dirty.value) return 'Working copy · deploy to run your edits'
+  if (error.value) return 'Check the error above'
+  return g.active.value ? 'Deployed · your code now runs every tick' : 'Waiting for your first deploy'
+})
 const tab = ref<'controller' | 'api'>('controller')
+const showFiles = ref(false)
 const menu = ref<'' | 'history' | 'settings' | 'bank'>('')
-const drawer = ref<'' | 'Inbox' | 'Orders'>('')
 const confirmNew = ref(false)
 const swapped = ref(false)
 const dockWidth = ref(40)
@@ -55,13 +74,13 @@ function movePanel(event: KeyboardEvent) {
   event.preventDefault()
   focusPanel(next)
 }
-const editor = ref<{ revealLine(file: string, line: number): void }>()
+const editor = ref<{ focus(): void; revealLine(file: string, line: number): void }>()
 const celebration = shallowRef<TownSnapshot['changes']>([])
 const story = ref('')
-const unread = computed(() => campaign.value.progress.messages.filter((m) => m.unread).length)
-const latest = computed(() => campaign.value.progress.messages.at(-1))
+const letters = ref<StoryMessage[]>([])
+const letter = computed(() => letters.value[0])
 const archives = computed(() =>
-  campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ')),
+  campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ') || r.name.startsWith('Previous')),
 )
 const coinPop = ref<{ tick: number; amount: number }>()
 watch(
@@ -75,9 +94,6 @@ let toastTimer: ReturnType<typeof setTimeout>
 function toggleMenu(name: typeof menu.value) {
   menu.value = menu.value === name ? '' : name
 }
-function toggleDrawer(name: typeof drawer.value) {
-  drawer.value = drawer.value === name ? '' : name
-}
 function notify(value: string) {
   story.value = value
   clearTimeout(toastTimer)
@@ -88,15 +104,21 @@ function notify(value: string) {
 watch(
   () => town.value.changes.length,
   (n, last) => {
-    if (ready.value && area.value === 'Factory' && n > last) celebration.value = town.value.changes.slice(last)
+    if (ready.value && n > last) celebration.value = town.value.changes.slice(last)
   },
 )
 watch(
-  () => latest.value?.id,
-  (id) => {
-    if (ready.value && id && latest.value) notify(latest.value.title + ' · ' + latest.value.body)
+  () => campaign.value.progress.messages.length,
+  (n, previous) => {
+    if (ready.value && n > previous && surface.value.sections.includes('inbox'))
+      letters.value.push(...campaign.value.progress.messages.slice(previous).filter(m => m.kind === 'email'))
   },
 )
+let letterTimer: ReturnType<typeof setTimeout>
+watch(letter, value => {
+  clearTimeout(letterTimer)
+  if (value) letterTimer = setTimeout(() => letters.value.shift(), 12000)
+})
 watch(g.notice, (message) => {
   if (message) {
     notify(message)
@@ -112,10 +134,6 @@ function payBank(inFull = false) {
   g.act({ kind: 'pay', inFull })
   menu.value = ''
 }
-function setSpeed(value: number) {
-  speed.value = value
-  paused.value = false
-}
 function restoreRevision(id: number) {
   g.rollback(id)
   menu.value = ''
@@ -128,21 +146,32 @@ function askNewGame() {
   confirmNew.value = true
   menu.value = ''
 }
-function highlightMachines(ids: string[]) {
-  if (!ids.length) return
-  highlighted.value = ids
-  drawer.value = ''
-  area.value = 'Factory'
+function openSection(next: WorkshopSection, person?: Townsperson['id']) {
+  if (!surface.value.sections.includes(next)) return
+  section.value = next
+  g.visitSection(next)
+  menu.value = ''
+  if (next === 'town') {
+    replay.value = celebration.value
+    const building = celebration.value[0]?.buildingId
+    const residence = building === 'bridge' ? 'town-hall' : building
+    townPerson.value = person ?? town.value.people.find(p => p.buildingId === residence)?.id
+    celebration.value = []
+    highlighted.value = []
+  } else if (next === 'inbox') letters.value = []
+  else if (next === 'code') {
+    tab.value = 'controller'
+    nextTick(() => editor.value?.focus())
+  }
 }
-function openTown(person?: Townsperson['id']) {
-  replay.value = celebration.value
-  const building = celebration.value[0]?.buildingId
-  const residence = building === 'bridge' ? 'town-hall' : building
-  townPerson.value = person ?? town.value.people.find((p) => p.buildingId === residence)?.id
-  celebration.value = []
-  highlighted.value = []
-  drawer.value = ''
-  area.value = 'Town'
+function navigateTo(next: WorkshopSection) {
+  openSection(next)
+  if (next !== 'code') nextTick(() => (drawerPane.value ?? floorPane.value)?.focus())
+}
+function highlightMachines(ids: string[]) {
+  if (!ids.length || !hasFloor.value) return
+  highlighted.value = ids
+  if (section.value !== 'code') openSection('factory')
 }
 function swap() {
   swapped.value = !swapped.value
@@ -151,11 +180,12 @@ function swap() {
 function hotkey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key === 'Enter')) {
     e.preventDefault()
+    e.stopPropagation()
     g.deploy()
   }
   if (e.key === 'Escape') {
     menu.value = ''
-    drawer.value = ''
+    if (drawer.value) openSection('code')
     confirmNew.value = false
   }
 }
@@ -173,9 +203,10 @@ function resize(e: PointerEvent) {
 }
 function reset() {
   confirmNew.value = false
+  showFiles.value = false
   menu.value = ''
-  area.value = 'Factory'
-  drawer.value = ''
+  section.value = 'code'
+  letters.value = []
   celebration.value = []
   replay.value = []
   townPerson.value = undefined
@@ -191,6 +222,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', hotkey, true)
   clearTimeout(toastTimer)
+  clearTimeout(letterTimer)
 })
 useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inherit' })
 </script>
@@ -198,13 +230,21 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
   <div class="workshop" :style="{ '--dock-width': dockWidth + '%' }">
     <header class="hud">
       <div class="brand"><img src="/mark.svg" alt="" />inherit<span>.</span></div>
-      <div class="wallet" title="Workshop money">
-        <Coins /><b>{{ campaign.economy.money.toLocaleString() }}</b
+      <nav class="section-nav" aria-label="Workshop sections">
+        <button v-for="item in surface.sections" :key="item" :aria-label="sectionNames[item]"
+          :aria-description="sectionDescription(item)" :aria-pressed="section === item" @click="navigateTo(item)">
+          {{ sectionNames[item] }}
+          <small v-if="item === 'inbox' && unread" :title="unread + ' unread letters'">{{ unread }}</small>
+          <small v-if="!campaign.seenSections.includes(item)" class="section-new">new</small>
+        </button>
+      </nav>
+      <div v-if="surface.showMoney" class="wallet" title="Workshop money">
+        <Coins /><b>{{ campaign.economy.money.toLocaleString() }} coins</b
         ><small v-if="coinPop" :key="coinPop.tick" class="coin-pop" @animationend="coinPop = undefined"
           >+{{ coinPop.amount }}</small
         >
       </div>
-      <div v-if="campaign.town.beat >= 2" class="settings bank-chip">
+      <div v-if="surface.showMoney" class="settings bank-chip">
         <button aria-label="Pay debt" @click="toggleMenu('bank')">
           Debt {{ town.debt.owed }} <b v-if="town.debt.next">Pay</b>
         </button>
@@ -228,21 +268,143 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           </template>
         </aside>
       </div>
-      <div class="clock">
-        <div class="speeds">
-          <button :aria-label="paused ? 'Resume' : 'Pause'" @click="paused = !paused">
-            <Play v-if="paused" /><Pause v-else />
+      <div class="settings">
+        <button aria-label="Settings" @click="toggleMenu('settings')"><Settings2 /></button>
+        <aside v-if="menu === 'settings'" class="hud-menu">
+          <button :aria-pressed="swapped" @click="swap">Swap sides</button>
+          <button @click="showFiles = !showFiles; menu = ''">Project files</button>
+          <button @click="askNewGame">
+            New game
           </button>
-          <button
-            v-for="s in [1, 2, 4, 8]"
-            :key="s"
-            :aria-pressed="!paused && speed === s"
-            @click="setSpeed(s)"
-          >
-            {{ s }}×
+        </aside>
+      </div>
+    </header>
+    <main class="desk" :class="{ swapped: swapped && hasFloor, 'code-only': !hasFloor }">
+      <section v-if="hasFloor" ref="floorPane" tabindex="-1" aria-label="Factory and town" class="world-shell">
+        <header class="world-title">
+          <div class="floor-heading">
+            <small class="eyebrow"><Factory />Kettlewick · Chapter 1</small>
+            <h1>{{ section === 'town' ? 'Kettlewick' : 'Uncle’s shed' }}</h1>
+          </div>
+          <div class="live" :class="{ off: !g.active.value }">
+            <i />{{ !ready ? 'Starting' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
+          </div>
+        </header>
+        <div v-if="surface.sections.includes('town')" class="town-ribbon">
+          <button v-if="requester" class="bubble" @click="openSection('town', requester.id)">
+            <TownPortrait :person="requester" />
+            {{ requester.name }} · {{ requester.ask?.title }}
+          </button>
+          <button v-else-if="surface.sections.includes('orders') && campaign.economy.orders.length" class="bubble" @click="openSection('orders')">
+            {{ campaign.economy.orders.length }} open orders
           </button>
         </div>
+        <div class="map-frame" :data-phase="section !== 'town' ? town.phase : undefined">
+          <LazyFactoryFloor v-if="section !== 'town'" :highlighted="highlighted" @focusin="g.visitSection('factory')" />
+          <TownView v-else v-model:selection="townPerson" :snapshot="town" :replay="replay" />
+          <aside v-if="celebration.length" class="town-change" role="status">
+            <div>
+              <small class="eyebrow">Town change</small>
+              <b>{{ celebration.map((change) => change.text).join(' ') }}</b>
+            </div>
+            <button @click="openSection('town')">See it</button>
+            <button aria-label="Dismiss celebration" @click="celebration = []"><X /></button>
+          </aside>
+          <aside v-if="drawer" ref="drawerPane" tabindex="-1" class="drawer" :aria-label="drawer">
+            <header>
+              <h2>{{ drawer }}</h2>
+              <button aria-label="Close drawer" @click="openSection('code')"><X /></button>
+            </header>
+            <div v-if="drawer === 'Inbox'" class="drawer-body">
+              <article v-for="m in [...campaign.progress.messages].reverse()" :key="m.id" class="ticket">
+                <small>{{ m.from }}</small>
+                <h3>{{ m.title }}</h3>
+                <p>{{ m.body }}</p>
+                <button v-if="m.unread" @click="g.act({ kind: 'read', id: m.id })">Mark read</button>
+              </article>
+            </div>
+            <div v-else class="drawer-body">
+              <p v-if="!campaign.economy.orders.length">All current orders are filled.</p>
+              <p v-if="Object.keys(campaign.town.waiting).length">Nobody ordered these yet:
+                <span v-for="(n, item) in campaign.town.waiting" :key="item">{{ n }} {{ item }} </span>
+              </p>
+              <article v-for="o in campaign.economy.orders" :key="o.id" class="ticket">
+                <h3>{{ town.people.find((p) => p.id === o.customer)?.name }}</h3>
+                <p v-for="(n, item) in o.items" :key="item">{{ o.filled[item] ?? 0 }} / {{ n }} {{ item }}</p>
+                <small>{{ o.pay }} coins</small>
+              </article>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <div
+        v-if="hasFloor"
+        class="resizer"
+        role="separator"
+        tabindex="0"
+        aria-label="Resize Code workshop"
+        aria-orientation="vertical"
+        @pointerdown="resize"
+        @keydown.left.prevent="dockWidth = Math.min(62, dockWidth + 2)"
+        @keydown.right.prevent="dockWidth = Math.max(25, dockWidth - 2)"
+      ></div>
+      <section class="editor-dock" aria-label="Code workshop">
+        <header class="dock-header">
+          <span class="eyebrow"><Code2 />Code workshop</span>
+        </header>
+        <RequestCard :person="requester" />
+        <FileTree v-if="showFiles" />
+        <details v-if="g.library.value.length" class="my-library">
+          <summary>My library</summary>
+          <button v-for="verb in g.library.value" :key="verb.file" @click="g.openFile(verb.file)">{{ verb.signature }}</button>
+        </details>
+        <div class="file-tabs">
+          <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
+            <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
+          </button>
+          <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
+        </div>
+        <div v-if="error" class="runtime" role="alert">{{ error }}</div>
+        <div class="editor-pane">
+          <div v-show="tab === 'controller'" class="editor-host">
+            <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
+          </div>
+          <ApiReference v-if="tab === 'api'" />
+        </div>
+        <div class="editor-foot" role="status">
+          <span><i class="dot" :class="{ clean: !dirty }" />{{ editorStatus }}</span
+          ><small>TypeScript</small>
+        </div>
+        <div class="panel-tabs">
+          <div role="tablist" aria-label="Workshop tools" @keydown="movePanel">
+            <button v-for="name in panels" :id="'tab-' + name" :key="name" role="tab"
+              :aria-selected="panel === name" :aria-controls="'panel-' + name"
+              :tabindex="panel === name ? 0 : -1" @click="openPanel(name)">{{ name }}</button>
+          </div>
+          <button class="panel-toggle" :aria-expanded="panelOpen" :aria-controls="'panel-' + panel"
+            :aria-label="panelOpen ? 'Collapse workshop panel' : 'Expand workshop panel'"
+            @click="panelOpen = !panelOpen"><ChevronDown /></button>
+        </div>
+        <div v-show="panelOpen" class="panel-slot">
+          <div v-show="panel === 'Checks'" id="panel-Checks" role="tabpanel" aria-labelledby="tab-Checks" tabindex="0">
+            <ChecksPanel :key="campaign.town.beat" />
+          </div>
+          <div v-show="panel === 'Console'" id="panel-Console" role="tabpanel" aria-labelledby="tab-Console" tabindex="0">
+            <ConsolePanel />
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="statusbar">
+      <span><Radio />{{ saved ? 'Saved locally' : 'Save unavailable' }}</span>
+      <div v-if="letter" class="toast" role="status">
+        <Mail />New letter from {{ letter.from }} · <button @click="navigateTo('inbox')">Open</button>
+        <button aria-label="Dismiss letter notice" @click="letters.shift()"><X /></button>
       </div>
+      <div v-else-if="story" class="toast" role="status">
+        <Mail />{{ story }}<button aria-label="Dismiss notification" @click="story = ''"><X /></button>
+      </div>
+      <span v-if="hasFloor">{{ campaign.world.machines.length }} machines</span>
       <div class="deploy-group">
         <button class="deploy" :disabled="!ready && !error" @click="g.deploy">
           <Play />{{ error ? 'Run' : 'Deploy' }}
@@ -268,146 +430,6 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           </button>
         </aside>
       </div>
-      <div class="settings">
-        <button aria-label="Settings" @click="toggleMenu('settings')"><Settings2 /></button>
-        <aside v-if="menu === 'settings'" class="hud-menu">
-          <button :aria-pressed="swapped" @click="swap">Swap sides</button>
-          <button
-            @click="askNewGame"
-          >
-            New game
-          </button>
-        </aside>
-      </div>
-    </header>
-    <main class="desk" :class="{ swapped }">
-      <section class="world-shell">
-        <header class="world-title">
-          <div class="floor-heading">
-            <small class="eyebrow"><Factory />Kettlewick · Chapter 1</small>
-            <h1>{{ area === 'Factory' ? 'Uncle’s shed' : 'Kettlewick' }}</h1>
-          </div>
-          <nav class="world-actions">
-            <button v-if="campaign.town.beat > 1" @click="toggleDrawer('Orders')">Orders</button>
-            <button @click="toggleDrawer('Inbox')"><Mail />Inbox<i v-if="unread" class="dot" /></button>
-          </nav>
-          <div class="live" :class="{ off: paused || !g.active.value }">
-            <i />{{ !ready ? 'Starting' : paused ? 'Paused' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
-          </div>
-        </header>
-        <RequestCard :person="requester" @checks="focusPanel('Checks')" />
-        <div class="town-ribbon">
-          <nav aria-label="Game view">
-            <button
-              v-for="view in ['Factory', 'Town'] as const"
-              :key="view"
-              :aria-pressed="area === view"
-              @click="view === 'Town' ? openTown() : (area = view)"
-            >
-              {{ view }}
-            </button>
-          </nav>
-          <button v-if="requester" class="bubble" @click="openTown(requester.id)">
-            <TownPortrait :person="requester" />
-            {{ requester.name }} · {{ requester.ask?.title }}
-          </button>
-          <button v-else-if="campaign.economy.orders.length" class="bubble" @click="toggleDrawer('Orders')">
-            {{ campaign.economy.orders.length }} open orders
-          </button>
-        </div>
-        <div class="map-frame" :data-phase="area === 'Factory' ? town.phase : undefined">
-          <LazyFactoryFloor v-if="area === 'Factory'" :highlighted="highlighted" />
-          <TownView v-else v-model:selection="townPerson" :snapshot="town" :replay="replay" />
-          <aside v-if="celebration.length" class="town-change" role="status">
-            <div>
-              <small class="eyebrow">Town change</small>
-              <b>{{ celebration.map((change) => change.text).join(' ') }}</b>
-            </div>
-            <button @click="openTown()">See it</button>
-            <button aria-label="Dismiss celebration" @click="celebration = []"><X /></button>
-          </aside>
-          <aside v-if="drawer" class="drawer" :aria-label="drawer">
-            <header>
-              <h2>{{ drawer }}</h2>
-              <button aria-label="Close drawer" @click="drawer = ''"><X /></button>
-            </header>
-            <div v-if="drawer === 'Inbox'" class="drawer-body">
-              <article v-for="m in [...campaign.progress.messages].reverse()" :key="m.id" class="ticket">
-                <small>{{ m.from }}</small>
-                <h3>{{ m.title }}</h3>
-                <p>{{ m.body }}</p>
-                <button v-if="m.unread" @click="g.act({ kind: 'read', id: m.id })">Mark read</button>
-              </article>
-            </div>
-            <div v-else class="drawer-body">
-              <p v-if="!campaign.economy.orders.length">Your regulars will write again soon.</p>
-              <article v-for="o in campaign.economy.orders" :key="o.id" class="ticket">
-                <h3>{{ town.people.find((p) => p.id === o.customer)?.name }}</h3>
-                <p v-for="(n, item) in o.items" :key="item">{{ o.filled[item] ?? 0 }} / {{ n }} {{ item }}</p>
-                <small>{{ o.pay }} coins</small>
-              </article>
-            </div>
-          </aside>
-        </div>
-      </section>
-      <div
-        class="resizer"
-        role="separator"
-        tabindex="0"
-        aria-label="Resize Code workshop"
-        aria-orientation="vertical"
-        @pointerdown="resize"
-        @keydown.left.prevent="dockWidth = Math.min(62, dockWidth + 2)"
-        @keydown.right.prevent="dockWidth = Math.max(25, dockWidth - 2)"
-      ></div>
-      <section class="editor-dock" aria-label="Code workshop">
-        <header class="dock-header">
-          <span class="eyebrow"><Code2 />Code workshop</span>
-        </header>
-        <FileTree v-if="surface.multiFile" />
-        <div class="file-tabs">
-          <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
-            <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
-          </button>
-          <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
-        </div>
-        <div v-if="error" class="runtime" role="alert">{{ error }}</div>
-        <div class="editor-pane">
-          <div v-show="tab === 'controller'" class="editor-host">
-            <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
-          </div>
-          <ApiReference v-if="tab === 'api'" />
-        </div>
-        <div v-if="tab === 'controller'" class="editor-foot">
-          <span><i class="dot" :class="{ clean: !dirty }" />{{ dirty ? 'Working copy' : 'Deployed' }}</span
-          ><small>TypeScript</small>
-        </div>
-        <div class="panel-tabs">
-          <div role="tablist" aria-label="Workshop tools" @keydown="movePanel">
-            <button v-for="name in panels" :id="'tab-' + name" :key="name" role="tab"
-              :aria-selected="panel === name" :aria-controls="'panel-' + name"
-              :tabindex="panel === name ? 0 : -1" @click="openPanel(name)">{{ name }}</button>
-          </div>
-          <button class="panel-toggle" :aria-expanded="panelOpen" :aria-controls="'panel-' + panel"
-            :aria-label="panelOpen ? 'Collapse workshop panel' : 'Expand workshop panel'"
-            @click="panelOpen = !panelOpen"><ChevronDown /></button>
-        </div>
-        <div v-show="panelOpen" class="panel-slot">
-          <div v-show="panel === 'Checks'" id="panel-Checks" role="tabpanel" aria-labelledby="tab-Checks" tabindex="0">
-            <ChecksPanel :key="campaign.town.beat" />
-          </div>
-          <div v-show="panel === 'Console'" id="panel-Console" role="tabpanel" aria-labelledby="tab-Console" tabindex="0">
-            <ConsolePanel />
-          </div>
-        </div>
-      </section>
-    </main>
-    <footer class="statusbar">
-      <span><Radio />{{ saved ? 'Saved locally' : 'Save unavailable' }}</span>
-      <div v-if="story" class="toast" role="status">
-        <Mail />{{ story }}<button aria-label="Dismiss notification" @click="story = ''"><X /></button>
-      </div>
-      <span>{{ campaign.world.machines.length }} machines · {{ campaign.world.belts.length }} belts</span>
     </footer>
     <div v-if="confirmNew" class="scrim">
       <section class="confirm" role="dialog" aria-label="New game">
@@ -420,6 +442,9 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
   </div>
 </template>
 <style scoped>
+.my-library { padding: 5px 14px; font: 12px var(--mono); color: var(--soft); max-height: 95px; overflow: auto; }
+.my-library summary { cursor: pointer; }
+.my-library button { margin: 4px 6px 0 0; }
 .wallet {
   position: relative;
 }
@@ -472,21 +497,38 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
     grid-row: 1;
   }
 }
-.town-ribbon,
-.town-ribbon nav,
-.town-change {
+.section-nav, .town-ribbon, .town-change {
   display: flex;
   align-items: center;
   gap: 7px;
 }
-.town-ribbon {
-  margin-bottom: 8px;
+.section-nav {
+  margin-right: auto;
   flex-wrap: wrap;
 }
-.town-ribbon nav button[aria-pressed='true'] {
+.section-nav button[aria-pressed='true'] {
   color: var(--gold);
   border-color: var(--gold);
 }
+.section-new { color: var(--accent-soft); }
+.town-ribbon { margin-bottom: 8px; }
+.desk.code-only { display: flex; }
+.code-only .editor-dock { flex: 1; }
+.editor-dock .request {
+  margin: 8px 12px;
+  max-height: 38%;
+  overflow: auto;
+}
+.statusbar .deploy, .statusbar .revisions {
+  height: 23px;
+  font-size: 12px;
+}
+.statusbar .deploy-group .hud-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
+  z-index: 10;
+}
+.statusbar { padding-block: 0; }
 .bubble canvas {
   width: 20px;
   border-radius: 3px;

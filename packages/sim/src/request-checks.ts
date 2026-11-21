@@ -1,6 +1,5 @@
 import type { Campaign } from './model'
-import { bramActivity } from './onboarding'
-import { activeRequest } from './town'
+import { activeRequest, debtRemaining } from './town'
 
 export interface RequestCheck {
   id: string
@@ -8,35 +7,53 @@ export interface RequestCheck {
   state: 'todo' | 'close' | 'done'
   progress?: [number, number]
 }
+const check = (id: string, text: string, done: boolean, close = false): RequestCheck => ({
+  id,
+  text,
+  state: done ? 'done' : close ? 'close' : 'todo',
+})
 
-function state(done: boolean, close = false): RequestCheck['state'] {
-  if (done) return 'done'
-  return close ? 'close' : 'todo'
-}
-
-export function requestChecks(c: Campaign, draftExportsOnTick = false): RequestCheck[] {
+export function requestChecks(c: Campaign): RequestCheck[] {
+  const t = c.town
   const request = activeRequest(c)
-  if (!request) return []
-  const { filled } = c.town
-  const delivery: RequestCheck = {
-    id: request.id,
-    text: request.check,
-    state: state(filled >= request.quantity, filled > 0),
-    progress: [filled, request.quantity],
+  if (request) {
+    const machineId = (
+      { 1: 'furnace', 3: 'press', 5: 'cutter', 7: 'gears', 9: 'assembler' } as Record<number, string>
+    )[t.beat]
+    const m = c.world.machines.find((m) => m.id === machineId)
+    return [
+      ...(t.beat === 1
+        ? [
+            check('onTick', 'Your onTick prints a message', !!c.progress.signals.printedTick),
+            check('dig', 'Your code takes ore from the mine', !!c.world.extracted['iron-ore']),
+          ]
+        : []),
+      check('produce', 'The ' + machineId + ' makes ' + request.item, !!m?.stats.processed, !!m?.remaining),
+      {
+        ...check(request.id, request.check, t.filled === request.quantity, t.filled > 0),
+        progress: [t.filled, request.quantity],
+      },
+    ]
   }
-  if (request.id !== 'horseshoes') return [delivery]
-
-  const { dug, printed } = bramActivity(c)
-  const furnace = c.world.machines.find(m => m.id === 'furnace')
-  const connected = c.world.belts.some(b => b.from === 'mine' && b.to === 'furnace')
-  const smelted = (furnace?.stats.processed ?? 0) > 0
-  const smelting = (furnace?.remaining ?? 0) > 0
-  const received = smelted || smelting || !!furnace?.queue.some(i => i.kind === 'iron-ore')
-  return [
-    { id: 'onTick', text: 'Your onTick prints a message', state: state(printed, draftExportsOnTick) },
-    { id: 'dig', text: 'The mine digs iron ore', state: state(dug) },
-    { id: 'ore', text: 'Ore reaches the furnace', state: state(received, connected) },
-    { id: 'smelt', text: 'The furnace smelts ingots', state: state(smelted, smelting) },
-    delivery,
-  ]
+  if (t.beat === 2) return [check('tab', 'Acknowledge Mrs Harrow’s letter', false)]
+  if (t.beat === 4)
+    return [
+      check(
+        'copper',
+        'The copper furnace makes an ingot',
+        c.world.machines.some((m) => m.id === 'copper' && m.stats.processed > 0),
+      ),
+    ]
+  if (t.beat === 6) return [check('repair', 'A broken furnace runs again', c.progress.signals.recovered)]
+  if (t.beat === 8)
+    return ['elsie', 'wen'].map((who) =>
+      check(
+        who,
+        'Fill ' + (who === 'elsie' ? 'Elsie’s plate' : 'Wen’s gear') + ' order',
+        t.competition.includes(who),
+        !!Object.values(c.economy.orders.find((o) => o.id === 'order-8-' + who)?.filled ?? {}).some(Boolean),
+      ),
+    )
+  if (t.beat === 10) return [check('debt', 'Settle the family tab', !debtRemaining(c), t.paid > 0)]
+  return []
 }

@@ -22,7 +22,7 @@ const emit = defineEmits<{ reference: []; ready: []; focusIds: [string[]]; edit:
 const host = ref<HTMLElement>()
 const shellTabs = shallowRef<HTMLElement>()
 const input = ref<HTMLInputElement>()
-const tabs = ref(['main.ts'])
+const tabs = ref<string[]>([])
 const otherTabs = computed(() =>
   shellTabs.value ? tabs.value.filter((file) => file !== activeFile.value) : tabs.value,
 )
@@ -75,7 +75,7 @@ function display() {
   if (!model || editor.getModel() === model) return
   const old = editor.getModel()
   if (old) views.set(old.uri.path.slice(1), editor.saveViewState())
-  if (!tabs.value.includes(file)) tabs.value.push(file)
+  tabs.value = [file]
   editor.setModel(model)
   editor.restoreViewState(views.get(file) ?? null)
 }
@@ -97,7 +97,7 @@ function revealLine(file: string, line: number, column = 1) {
   editor?.revealLineInCenterIfOutsideViewport(line)
   editor?.focus()
 }
-defineExpose({ revealLine })
+defineExpose({ revealLine, focus: () => editor?.focus() })
 
 const results = computed(() => {
   const needle = query.value.trim().toLowerCase()
@@ -196,6 +196,7 @@ onMounted(() => {
   defineWorkshopTheme(host.value!)
   editor = monaco.editor.create(host.value!, {
     model: null,
+    wordBasedSuggestions: 'off',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
@@ -226,39 +227,6 @@ onMounted(() => {
     ))
   })
   syncFiles()
-  // Ask the same compiler that checks the player's editor whether main.ts exports a callable onTick.
-  const probe = monaco.Uri.file('/.onboarding/check.ts')
-  const main = monaco.Uri.file('/main.ts')
-  watch([files, () => campaign.value.town.beat === 1 && game.lessonStep.value <= 2], ([, needed], _, onCleanup) => {
-    if (!needed) {
-      game.draftExportsOnTick.value = false
-      return
-    }
-    const check = ts.typescriptDefaults.addExtraLib(
-      'import { onTick } from "../main"; const handler: (...args: never[]) => unknown = onTick', probe.toString(),
-    )
-    let stale = false
-    const timer = setTimeout(async () => {
-      try {
-        const getWorker = await ts.getTypeScriptWorker()
-        const worker = await getWorker(main, probe)
-        const diagnostics = await Promise.all([
-          worker.getSyntacticDiagnostics(main.toString()),
-          worker.getSemanticDiagnostics(main.toString()),
-          worker.getSemanticDiagnostics(probe.toString()),
-        ])
-        if (!stale) game.draftExportsOnTick.value = diagnostics.every(list => list.length === 0)
-      } catch {
-        // The language worker may be restarting as the editor closes.
-        if (!stale) game.draftExportsOnTick.value = false
-      }
-    }, 150)
-    onCleanup(() => {
-      stale = true
-      clearTimeout(timer)
-      check.dispose()
-    })
-  }, { immediate: true })
   runtimeMarker()
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {

@@ -1,5 +1,8 @@
 # Workshop game API
 
+This document records the earlier campaign engine. For the current chapter’s player and worker contracts, see [the chapter spec](specs/v3-meaningful-mvp.md) and [ADR 0013](adr/0013-core-loop-from-scratch.md).
+
+
 The game host imports from `@inherit/sim`. One Campaign owns the floor, player project, ledger, research, board and mail. Shop and research between ticks. Licensed controllers can also build during a tick. Call `advanceGame` once per simulation tick. The factory starts idle with Uncle’s note in `main.ts`. The player writes and deploys `onTick()`, then imports machine handles from `"inherit"`. A dock shipment and every objective stamp pay coins.
 
 ## Worker loop

@@ -72,6 +72,7 @@ export interface CampaignWorld {
   nextIncidentId: number
   sites: Site[]
   machines: CampaignMachine[]
+  hops?: { from: string; to: string; item: MaterialId }[]
   belts: CampaignBelt[]
   lost: number
   delivered: Partial<Record<MaterialId, number>>
@@ -149,8 +150,12 @@ export interface ObjectiveRun {
   memoryKey?: string
   memoryValue?: number
 }
+export const workshopSections = ['code', 'factory', 'town', 'inbox', 'orders'] as const
+export type WorkshopSection = typeof workshopSections[number]
+
 export interface Campaign {
-  version: 4
+  seenSections: WorkshopSection[]
+  version: 5
   town: TownState
   world: CampaignWorld
   economy: Economy

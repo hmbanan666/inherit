@@ -2,16 +2,16 @@
 import { useGame } from '../lib/useGame'
 
 const { reference } = useGame()
-const groups = computed(() => Object.groupBy(reference.value, entry => entry.group))
+
 </script>
 
 <template>
   <section class="reference" aria-label="API reference" tabindex="0">
-    <section v-for="(entries, group) in groups" :key="group">
-      <h2>{{ group }}</h2>
-      <article v-for="entry in entries" :key="(entry.receiver ?? '') + entry.name">
+    <section>
+      <h2>What inherit exports</h2>
+      <article v-for="entry in reference" :key="entry.name">
         <h3>
-          <code><b>{{ entry.receiver ? entry.receiver + '.' : '' }}{{ entry.name }}</b>{{ entry.signature.slice(entry.name.length) }}</code>
+          <code><b>{{ entry.name }}</b>{{ entry.signature.slice(entry.name.length) }}</code>
         </h3>
         <p>{{ entry.description }}</p>
         <code class="example">{{ entry.example }}</code>
