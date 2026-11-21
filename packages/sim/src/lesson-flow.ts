@@ -61,6 +61,8 @@ export interface CallRecord {
   ok: boolean
   result?: unknown
   message?: string
+  /** Short machine bubble for a routine outcome on the live clock. */
+  floorStatus?: string
   within?: string
   hand: string | null
 }

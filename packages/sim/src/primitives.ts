@@ -52,8 +52,8 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
     const copper = c.town.beat >= 4 && (lesson === 'vein-sample' || mixedOre)
     mine.output = { kind: copper ? 'copper-ore' : 'iron-ore' }
   }
-  function record<T>(fn: CallRecord['fn'], args: string[], result: T, message?: string): T {
-    calls.push({ ...site, fn, args, ok: !message, result, message, hand: w.hand?.item ?? null })
+  function record<T>(fn: CallRecord['fn'], args: string[], result: T, message?: string, floorStatus?: string): T {
+    calls.push({ ...site, fn, args, ok: !message, result, message, floorStatus, hand: w.hand?.item ?? null })
     return result
   }
   const unknown = (place: string) =>
@@ -80,11 +80,11 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
     take(place: string): MaterialId | undefined {
       const m = machine(place)
       if (!m) return record('take', [place], undefined, unknown(place))
-      if (w.hand) return record('take', [place], undefined, 'The hand is full. Put down the item first.')
+      if (w.hand) return record('take', [place], undefined, 'The hand is full. Put down the item first.', 'Hand full')
       const jam = m.fault === 'jammed'
       const item = jam ? m.queue.pop() : m.output
       if (!item || m.fault === 'broken')
-        return record('take', [place], undefined, `Nothing ready yet at ${place}.`)
+        return record('take', [place], undefined, `Nothing ready yet at ${place}.`, 'Nothing ready')
       if (jam) delete m.fault
       else delete m.output
       w.hand = { origin: place, item: item.kind, jam }
@@ -99,7 +99,7 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
       const m = machine(place)
       const held = w.hand
       if (!m) return record('put', [place], false, unknown(place))
-      if (!held) return record('put', [place], false, 'The hand is empty. Pick something up first.')
+      if (!held) return record('put', [place], false, 'The hand is empty. Pick something up first.', 'Hand empty')
       const { item } = held
       if (m.kind === 'dock') {
         if (c.town.beat === 1 && c.town.wired && item === 'iron-ingot') machine('furnace')!.batchTicks = 64
@@ -115,6 +115,7 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
             [place],
             false,
             `The ${place} cannot accept ${item.replaceAll('-', ' ')} right now.`,
+            !recipe ? 'Item returned' : m.fault ?? 'Busy',
           )
         }
         if (
@@ -146,7 +147,7 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
       const m = machine(place)
       if (!m) return record('repair', [place], false, unknown(place))
       if (c.town.beat < 6 || m.fault !== 'broken')
-        return record('repair', [place], false, 'This machine does not need a repair.')
+        return record('repair', [place], false, 'This machine does not need a repair.', 'No repair needed')
       delete m.fault
       delete m.coolAt
       c.progress.signals.recovered = true

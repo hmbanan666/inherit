@@ -1,10 +1,11 @@
-import type { CallRecord } from '@inherit/sim'
+import { TICK_MS, type CallRecord } from '@inherit/sim'
 
 export function usePlayback() {
   const watching = ref(false)
   const call = shallowRef<CallRecord>()
   const last = shallowRef<CallRecord>()
   const hand = ref<string | null>(null)
+  const stationStatuses = shallowRef(new Map<string, string>())
   const messages = ref<string[]>([])
   let finishWait: (() => void) | undefined
   let generation = 0
@@ -12,6 +13,7 @@ export function usePlayback() {
     generation++
     watching.value = false
     finishWait?.()
+    stationStatuses.value = new Map()
     call.value = last.value = undefined
     messages.value = []
   }
@@ -21,12 +23,22 @@ export function usePlayback() {
       finishWait = () => { clearTimeout(timer); resolve() }
     })
   }
-  async function play(calls: CallRecord[], interval: number, watched: boolean) {
+  async function play(calls: CallRecord[], mode: 'run' | 'tick' | 'setup', speed: number) {
+    const watched = mode === 'run'
+    if (!calls.length && !watched && !stationStatuses.value.size) return
+    const statuses = new Map<string, string>()
+    const visible: CallRecord[] = []
+    for (const record of calls) {
+      if (mode === 'tick' && record.floorStatus) statuses.set(record.args[0]!, record.floorStatus)
+      else visible.push(record)
+    }
+    stationStatuses.value = statuses
+    const interval = (watched ? 500 : TICK_MS / (2 * Math.max(1, visible.length))) / speed
     const ticket = generation
     watching.value = watched
     if (watched) hand.value = null
     messages.value = []
-    for (const record of calls) {
+    for (const record of visible) {
       call.value = last.value = record
       // A watched call has two visible moments: reach the place, then lift or release.
       if (watched) {
@@ -42,5 +54,5 @@ export function usePlayback() {
     watching.value = false
     call.value = undefined
   }
-  return { watching, call, last, hand, messages, play, clear }
+  return { watching, call, last, hand, messages, stationStatuses, play, clear }
 }

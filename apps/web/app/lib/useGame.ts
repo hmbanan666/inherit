@@ -160,15 +160,9 @@ function createGameStore() {
     clearTimeout(watchdog)
     const action = current!
     const instance = worker
-    const watched = action.type === 'run'
-    // Empty pickups are routine while the clock is running. Watched runs show every attempt.
-    const visibleCalls = action.type === 'step' ? frame.calls.filter(record => record.ok || (
-      !record.message?.startsWith('Nothing ready yet') && !record.message?.startsWith('The hand is empty')
-    )) : frame.calls
-    if (visibleCalls.length || watched) {
-      await playback.play(visibleCalls, watched ? 500 / speed : TICK_MS / (2 * visibleCalls.length * speed), watched)
-      if (worker !== instance) return
-    }
+    const mode = action.type === 'run' ? 'run' : action.type === 'step' ? 'tick' : 'setup'
+    await playback.play(frame.calls, mode, speed)
+    if (worker !== instance) return
     current = undefined
     const c = {
       ...frame.campaign,

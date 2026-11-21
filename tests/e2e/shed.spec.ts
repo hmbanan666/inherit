@@ -132,6 +132,40 @@ test('Bram’s three edits wrap the highlighted calls and run the job', async ({
   await expect(page.getByTestId('solved-card')).toContainText('You named the two moves')
 })
 
+test('a busy furnace on the live clock reports at the furnace and in Console', async ({ page }) => {
+  await openShed(page, '?step=elsie-press')
+  // Leave the ingots in the furnace until its input fills. Each later deposit will fail.
+  await edit(page, 'import { take, put } from "inherit"\nexport function onTick() {\n  if (take("mine"))\n    put("furnace")\n}')
+  await page.getByTestId('primary-button').click()
+  const message = 'The furnace cannot accept iron ore right now.'
+  await page.getByRole('tab', { name: 'Console' }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Console' })).toContainText(message, { timeout: 30000 })
+  // Observe a second refused deposit, including transient highlights during playback.
+  const consoleRows = page.getByRole('region', { name: 'Program console' }).getByRole('listitem')
+  const refusals = consoleRows.filter({ hasText: message })
+  const tick = refusals.first().locator('.tick')
+  const previous = await tick.innerText()
+  const prominent = await page.evaluateHandle(() => {
+    const seen = new Set<string>()
+    const put = Array.from(document.querySelectorAll('.view-line')).find(line => line.textContent?.includes('put("furnace")'))!
+    const observer = new MutationObserver(() => {
+      const light = document.querySelector('.machine-line')
+      if (light && Math.abs(light.getBoundingClientRect().top - put.getBoundingClientRect().top) < 2)
+        seen.add('editor highlight')
+      if (document.querySelector('.call-message')) seen.add('arm warning')
+      if (document.querySelector('[data-testid="checks"] p')?.textContent?.includes('cannot accept')) seen.add('Checks warning')
+    })
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true })
+    return { seen, observer }
+  })
+  await expect(tick).not.toHaveText(previous)
+  await expect(page.getByRole('button', { name: 'Inspect furnace' }).locator('..')).toContainText('Busy')
+  expect(await prominent.evaluate(({ seen, observer }) => {
+    observer.disconnect()
+    return [...seen]
+  })).toEqual([])
+})
+
 test('the loop marks only the calls left outside the clock after Deploy', async ({ page }) => {
   await openShed(page, '?step=bram-loop')
   const primary = page.getByTestId('primary-button')
