@@ -16,6 +16,7 @@ interface Request {
   title: string
   text: string
   item: MaterialId
+  check: string
   quantity: number
   building: BuildingId
   change: string
@@ -26,6 +27,7 @@ export const REQUESTS: Request[] = [
     beat: 1,
     who: 'bram',
     id: 'horseshoes',
+    check: 'Ingots reach Bram’s cart',
     title: 'Horseshoes for the mail horse',
     text: 'The mail horse threw a shoe. Send three iron ingots to my forge and the post can ride again.',
     item: 'iron-ingot',
@@ -38,6 +40,7 @@ export const REQUESTS: Request[] = [
     beat: 3,
     who: 'elsie',
     id: 'oven-grate',
+    check: 'Plates reach Elsie for the oven grate',
     title: 'A grate for the bread oven',
     text: 'My last loaf fell through the grate. Bram has a press for 28 coins. Stamp four iron ingots into plates for me?',
     item: 'plate',
@@ -50,6 +53,7 @@ export const REQUESTS: Request[] = [
     beat: 5,
     who: 'tomas',
     id: 'lamp-wire',
+    check: 'Coils of wire reach Tomas for the lamps',
     title: 'Light for Lamp Street',
     text: 'Folks have been feeling their way home. Draw five coils of wire from copper ingots with a cutter.',
     item: 'wire',
@@ -62,6 +66,7 @@ export const REQUESTS: Request[] = [
     beat: 7,
     who: 'wen',
     id: 'wheel-teeth',
+    check: 'Gears reach Wen for the water wheel',
     title: 'Teeth for the water wheel',
     text: 'My wheel has fewer teeth than I do. Can your cutter make three gears? Two plates buy one good gear.',
     item: 'gear',
@@ -74,6 +79,7 @@ export const REQUESTS: Request[] = [
     beat: 9,
     who: 'odile',
     id: 'bridge-brackets',
+    check: 'Brackets reach the bridge crew',
     title: 'The bridge to Riverside',
     text: 'Six brackets will hold the span. Fit a plate and a wire together in an assembler. Take my filing cabinet for your helpers.',
     item: 'bracket',

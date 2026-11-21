@@ -3,6 +3,7 @@ import { bramLessons, type TownSnapshot } from '@inherit/sim'
 import TownPortrait from './town/TownPortrait.vue'
 import { useGame } from '../lib/useGame'
 const props = defineProps<{ person?: TownSnapshot['people'][number] }>()
+const emit = defineEmits<{ checks: [] }>()
 const g = useGame()
 const ask = computed(() => props.person?.ask)
 const c = computed(() => g.campaign.value)
@@ -61,6 +62,9 @@ const interlude = computed(() => {
         {{ ['Hint', 'Show exact step', 'Hide hint'][hint] }}
       </button>
       <p>{{ lesson.text }}</p>
+      <button v-if="g.lessonCheck.value" class="lesson-check" @click="emit('checks')">
+        Check · {{ g.lessonCheck.value.text }}
+      </button>
       <code v-if="hint < 2">{{ lesson.blank }}</code>
       <p v-if="hint >= 1">{{ lesson.idea }}</p>
       <template v-if="hint === 2">
@@ -125,6 +129,14 @@ const interlude = computed(() => {
 .lesson p, .lesson code {
   flex-basis: 100%;
   margin: 0;
+}
+.lesson-check {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .lesson code {
   white-space: pre-wrap;

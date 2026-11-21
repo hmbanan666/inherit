@@ -31,7 +31,30 @@ const drawer = ref<'' | 'Inbox' | 'Orders'>('')
 const confirmNew = ref(false)
 const swapped = ref(false)
 const dockWidth = ref(40)
-const consoleOpen = ref(true)
+const panels = ['Checks', 'Console'] as const
+type Panel = typeof panels[number]
+const panel = ref<Panel>('Checks')
+const panelOpen = ref(true)
+function openPanel(next: Panel) {
+  panel.value = next
+  panelOpen.value = true
+}
+function focusPanel(next: Panel) {
+  openPanel(next)
+  document.getElementById('tab-' + next)?.focus()
+}
+function movePanel(event: KeyboardEvent) {
+  let next: Panel
+  switch (event.key) {
+    case 'Home': next = 'Checks'; break
+    case 'End': next = 'Console'; break
+    case 'ArrowLeft':
+    case 'ArrowRight': next = panel.value === 'Checks' ? 'Console' : 'Checks'; break
+    default: return
+  }
+  event.preventDefault()
+  focusPanel(next)
+}
 const editor = ref<{ revealLine(file: string, line: number): void }>()
 const celebration = shallowRef<TownSnapshot['changes']>([])
 const story = ref('')
@@ -158,6 +181,7 @@ function reset() {
   townPerson.value = undefined
   story.value = ''
   highlighted.value = []
+  openPanel('Checks')
   g.newGame()
 }
 onMounted(() => {
@@ -271,7 +295,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
             <i />{{ !ready ? 'Starting' : paused ? 'Paused' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
           </div>
         </header>
-        <RequestCard :person="requester" />
+        <RequestCard :person="requester" @checks="focusPanel('Checks')" />
         <div class="town-ribbon">
           <nav aria-label="Game view">
             <button
@@ -348,18 +372,34 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
         </div>
         <div v-if="error" class="runtime" role="alert">{{ error }}</div>
-        <div v-show="tab === 'controller'" class="editor-host">
-          <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
+        <div class="editor-pane">
+          <div v-show="tab === 'controller'" class="editor-host">
+            <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
+          </div>
+          <ApiReference v-if="tab === 'api'" />
         </div>
-        <ApiReference v-if="tab === 'api'" />
         <div v-if="tab === 'controller'" class="editor-foot">
           <span><i class="dot" :class="{ clean: !dirty }" />{{ dirty ? 'Working copy' : 'Deployed' }}</span
           ><small>TypeScript</small>
         </div>
-        <nav class="panel-tabs" aria-label="Workshop tools">
-          <button :aria-pressed="consoleOpen" @click="consoleOpen = !consoleOpen">Console</button>
-        </nav>
-        <div v-if="consoleOpen" class="panel-slot"><ConsolePanel /></div>
+        <div class="panel-tabs">
+          <div role="tablist" aria-label="Workshop tools" @keydown="movePanel">
+            <button v-for="name in panels" :id="'tab-' + name" :key="name" role="tab"
+              :aria-selected="panel === name" :aria-controls="'panel-' + name"
+              :tabindex="panel === name ? 0 : -1" @click="openPanel(name)">{{ name }}</button>
+          </div>
+          <button class="panel-toggle" :aria-expanded="panelOpen" :aria-controls="'panel-' + panel"
+            :aria-label="panelOpen ? 'Collapse workshop panel' : 'Expand workshop panel'"
+            @click="panelOpen = !panelOpen"><ChevronDown /></button>
+        </div>
+        <div v-show="panelOpen" class="panel-slot">
+          <div v-show="panel === 'Checks'" id="panel-Checks" role="tabpanel" aria-labelledby="tab-Checks" tabindex="0">
+            <ChecksPanel :key="campaign.town.beat" />
+          </div>
+          <div v-show="panel === 'Console'" id="panel-Console" role="tabpanel" aria-labelledby="tab-Console" tabindex="0">
+            <ConsolePanel />
+          </div>
+        </div>
       </section>
     </main>
     <footer class="statusbar">

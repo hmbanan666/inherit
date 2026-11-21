@@ -6,6 +6,7 @@ import { posix } from 'node:path'
 import {
   createCampaign,
   onboardingStep,
+  requestChecks,
   type OnboardingStep,
   deployGameProject,
   advanceGame,
@@ -106,19 +107,36 @@ test.each(['immediate edits', 'beginner pace', 'long breaks'])(
         })
       }
       if (beat === 1) {
+        const checks = () => requestChecks(c)
+        const check = (id: string) => checks().find(row => row.id === id)
+        expect(checks().map(row => row.state)).toEqual(['todo', 'todo', 'todo', 'todo', 'todo'])
         expect(onboardingStep(c)).toBe(1)
         c.project.working = chapterFiles(1, 1)
         expect(onboardingStep(c, true)).toBe(2)
+        expect(requestChecks(c, true)[0].state).toBe('close')
         run = await deployed(1, 2)
         advance()
         expect(guest!.drainLogs()).toEqual(['tick'])
         c.progress.signals.printedTick = true
+        expect(check('onTick')?.state).toBe('done')
         for (const step of [3, 4, 5, 6] as const) {
           expect(onboardingStep(c)).toBe(step)
           run = await deployed(1, step)
           until(() => onboardingStep(c) === step + 1, 30)
+          if (step === 3) expect(check('dig')?.state).toBe('done')
+          if (step === 4) expect(check('ore')?.state).toBe('close')
+          if (step === 5) {
+            expect(check('ore')?.state).toBe('done')
+            expect(check('smelt')?.state).toBe('close')
+          }
+        }
+        for (const n of [1, 2]) {
+          until(() => c.town.filled === n, 30)
+          expect(check('smelt')?.state).toBe('done')
+          expect(check('horseshoes')).toMatchObject({ state: 'close', progress: [n, 3] })
         }
         until(() => c.town.beat === 2, 1920)
+        expect(check('horseshoes')).toBeUndefined()
       } else if (slow && beat === 2) {
         markMessageRead(c, 'tab')
         expect(c.town.beat).toBe(3)
