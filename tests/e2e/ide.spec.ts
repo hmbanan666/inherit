@@ -267,7 +267,7 @@ test('jump from a controller error to its module and clear the log ring', async 
   const output = page.getByRole('region', { name: 'Program console' })
   const location = output.getByRole('button', { name: 'lib/drive.ts:2' })
   await expect(location).toBeVisible()
-  await expect(output.getByRole('listitem').filter({ has: location })).toHaveCSS('color', 'rgb(231, 163, 139)')
+  await expect(output.getByRole('listitem').filter({ hasText: 'stuck valve' })).toHaveCSS('color', 'rgb(231, 163, 139)')
   await tab(page, 'main.ts').click()
   await location.click()
   await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
