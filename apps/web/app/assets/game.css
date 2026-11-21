@@ -1767,6 +1767,7 @@ button.revisions:hover {
 .lesson-card header { justify-content: space-between; }
 .lesson-card h2 { margin: 0; font-size: 19px; }
 .lesson-card p { margin: 7px 0 0; font-size: 14px; line-height: 1.45; }
+.lesson-card .task { white-space: pre-line; }
 .lesson-card .idea, .lesson-card .hint { color: var(--soft); }
 .lesson-card .idea strong { color: var(--text); }
 .lesson-card pre { white-space: pre-wrap; color: var(--accent-soft); font: 12px/1.5 var(--mono); }

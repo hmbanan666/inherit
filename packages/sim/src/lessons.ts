@@ -84,7 +84,9 @@ put("cart")`,
     who: 'bram',
     title: 'Give the hearth work a name',
     story: 'Uncle called feeding the furnace smelting. Can you show me his trick?',
-    task: 'Wrap the two highlighted lines in a function named smelt, like the shape below. Leave the two cart lines underneath.',
+    task: `1. Click at the start of the first highlighted line and type function smelt() { on a new line above it.
+2. After the second highlighted line add } on its own line.
+3. On the next line type smelt() — this line runs the job. Press Run.`,
     callsToMove: [{ name: 'take', place: 'mine' }, { name: 'put', place: 'furnace' }],
     idea: {
       name: 'Function',

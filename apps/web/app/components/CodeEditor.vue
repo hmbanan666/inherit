@@ -231,6 +231,7 @@ onMounted(() => {
   editor = monaco.editor.create(host.value!, {
     model: null,
     wordBasedSuggestions: 'off',
+    autoClosingBrackets: 'never',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
