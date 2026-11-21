@@ -23,7 +23,7 @@ async function photo(page: Page, name: string) {
   await page.screenshot({ path: join(dir, name + '.png') })
 }
 async function edit(page: Page, text: string) {
-  await page.locator('.monaco-editor .view-lines').first().click()
+  await page.getByRole('textbox', { name: 'Factory controller TypeScript' }).focus()
   await page.keyboard.press('Control+a')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((value) => navigator.clipboard.writeText(value), text)
