@@ -13,7 +13,7 @@ A named person in the town with a job, a building and a mood. Every request and 
 _Avoid_: customer, NPC, client
 
 **Request**:
-A one-time, story-carrying ask from a townsperson with a reason, a deadline and a town change when fulfilled ("Bram needs 3 ingots to shoe the mail horse by evening").
+A one-time, story-carrying ask from a townsperson with a reason and a town change when fulfilled. Bram asks for three ingots to shoe the mail horse. His request waits until the forge can supply them.
 _Avoid_: objective, quest, goal, mission
 
 **Order**:
@@ -32,16 +32,13 @@ The first handful of guided steps, wrapped inside the first request. The only pl
 _Avoid_: tutorial levels
 
 **Debt**:
-What the uncle owed the bank. Paid in installments with due days. Missing one costs interest, never the game.
+What the uncle owed the bank. The player pays when ready, in full or in optional installments. The balance has no due days or interest.
 
 **Installment**:
-One debt payment with an amount and a due day.
+An optional payment toward the debt, defined only by its amount.
 
 **Day**:
-The town clock. Deadlines are said in town time ("by evening", "by day 3").
-
-**Late**:
-A request or order past its deadline. It still counts, it pays less, and the townsperson's mood drops. An order left too long may be withdrawn.
+One cycle of the internal town clock. Chapter one shows its phases only through the changing light on the town and factory.
 
 **Hiccup**:
 Something unplanned on the floor that code has to handle: a mixed ore vein, a furnace that overheats, a jam.

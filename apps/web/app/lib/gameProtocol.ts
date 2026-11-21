@@ -23,7 +23,8 @@ export interface MetricSample {
 }
 export type Action =
   | { kind: 'init'; campaign: Campaign }
-  | { kind: 'step' | 'pay' }
+  | { kind: 'step' }
+  | { kind: 'pay'; inFull?: boolean }
   | { kind: 'deploy'; files: ProjectFiles }
   | { kind: 'rollback'; id: number }
   | { kind: 'snapshot'; name: string; files: ProjectFiles }

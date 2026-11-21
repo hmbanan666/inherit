@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createCampaign, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
+import { createCampaign, DAY, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
 import { chapterFiles } from '../../packages/sim/src/reference/chapter-one'
 import oldWorkshop from './fixtures/v2-workshop.json'
 
@@ -49,6 +49,7 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await page.goto('/')
   const card = page.getByRole('region', { name: 'Current request' })
   await expect(card).toContainText('Horseshoes for the mail horse')
+  await expect(card).not.toContainText(/by evening|day \d|late/i)
   await expect(page.locator('.pixi-mount canvas')).toBeVisible()
   await expect(page.locator('.live')).toHaveText('Live')
   await expect(page.locator('.view-lines')).toBeVisible()
@@ -119,7 +120,8 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await page.locator('.town-ribbon .bubble').click()
   await expect(page.locator('.town-voice')).toContainText('Mrs Harrow')
   await clue(/Pay debt/)
-  await pay()
+  if (paced) await pay()
+  else await button('Pay later').click()
   await expect(card).toContainText('A grate for the bread oven')
   await clue(/press → cart/)
   await button('Factory').click()
@@ -187,13 +189,19 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await expect(card).toContainText('The family tab')
   await clue(/remaining installments/)
   await button('Factory').click()
-  if (!paced) await pay()
-  await pay()
+  if (paced) await pay()
+  else {
+    await button('Pay debt').click()
+    const balance = button('Pay balance (600 coins)')
+    await expect(balance).toBeEnabled({ timeout: 100_000 })
+    await balance.click()
+  }
   await expect(card).toContainText('The shed is yours.')
   await visitChange('Kettlewick Bank', /shed is yours/, '11-chapter-end')
   await expect(art).toHaveAccessibleName(/Paid in full/)
   const end = await saved()
   expect(end.town.beat).toBe(11)
+  expect(end.town.paid).toBe(600)
   if (paced) {
     console.log(
       'Town change ticks:',
@@ -202,6 +210,37 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
     expect(end.world.tick).toBeLessThan(60 * 240)
   }
   expect(errors).toEqual([])
+})
+
+test('the town clock changes the light without printing a day or phase', async ({ page }) => {
+  const campaign = createCampaign()
+  campaign.world.tick = 2 * DAY
+  campaign.town.beat = 3
+  await page.addInitScript((save) => localStorage.setItem('inherit.workshop.v1', save), serializeSave(campaign))
+  await page.goto('/')
+  const calendar = /\b(day|morning|evening|night)\b/i
+  const button = (name: string) => page.getByRole('button', { name, exact: true })
+  await expect(page.getByRole('heading', { name: 'A grate for the bread oven' })).toBeVisible()
+  await expect(page.locator('.map-frame')).toHaveAttribute('data-phase', 'morning')
+  await expect(page.locator('.world-shell')).not.toContainText(calendar)
+
+  await button('Pay debt').click()
+  await expect(button('Pay 100 coins')).toBeVisible()
+  await expect(page.locator('.hud')).not.toContainText(calendar)
+  await button('Pay debt').click()
+
+  for (const drawer of ['Inbox', 'Orders']) {
+    await button(drawer).click()
+    const panel = page.getByRole('complementary', { name: drawer })
+    await expect(panel.locator('article').first()).toBeVisible()
+    await expect(panel).not.toContainText(calendar)
+    await button('Close drawer').click()
+  }
+  await button('Town').click()
+  const town = page.getByRole('region', { name: 'Kettlewick' })
+  await expect(town.getByRole('img', { name: /Bram’s forge/ })).toBeVisible()
+  await expect(town.locator('header')).toHaveText('Kettlewick')
+  await expect(town).not.toContainText(calendar)
 })
 
 test('a saved v2 workshop starts with Bram and keeps the original controller files', async ({ page }) => {

@@ -6,6 +6,7 @@ import {
   removeMachine,
   cloneCampaign,
   createCampaign,
+  townSnapshot,
   deployProject,
   loadSave,
   rollbackProject,
@@ -85,4 +86,41 @@ test('an unfinished file rename can be saved without changing the deployed entry
   expect(() => deployProject(c)).toThrow(/main.ts/)
   expect(rollbackProject(c, snapshot.id)).toBe(false)
   expect(serializeSave(c)).toBe(before)
+})
+
+test('an existing chapter keeps its work, clears old terms and refunds paid interest once', () => {
+  const c = createCampaign(91)
+  c.town.beat = 8
+  c.town.payments = 1
+  c.town.paid = 110
+  c.economy.money = 45
+  c.world.tick = 13000
+  c.town.filled = 2
+  Object.assign(c.town, { due: 700, interest: [true, true, true], installments: [110, 220, 330] })
+  c.economy.orders.push({
+    id: 'order-4',
+    customer: 'elsie',
+    items: { plate: 8 },
+    filled: { plate: 2 },
+    status: 'accepted',
+    pay: 32,
+    reputation: 1,
+    line: 'Oven grate',
+    duration: 700,
+    deadline: 12000,
+  })
+  for (const id of ['tab', 'interest-0', 'competition'])
+    c.progress.messages.push({ ...c.progress.messages[0], id, body: 'Old terms', unread: false })
+
+  const restored = loadSave(serializeSave(c))
+  expect(restored.world.tick).toBe(13000)
+  expect(restored.town).toMatchObject({ beat: 8, filled: 2, payments: 1, paid: 100 })
+  expect(restored.economy.money).toBe(55)
+  expect(townSnapshot(restored).debt).toEqual({ paid: 100, owed: 500, next: { amount: 200 } })
+  expect(restored.economy.orders[0]).toMatchObject({ id: 'order-4', filled: { plate: 2 }, pay: 32 })
+  expect(restored.progress.messages.map((m) => m.id)).toEqual(['uncle', 'tab', 'competition'])
+  expect(restored.progress.messages.slice(1).every((m) => !m.unread && m.body !== 'Old terms')).toBe(true)
+  const clean = serializeSave(restored)
+  expect(clean).not.toMatch(/"(due|interest|installments|deadline|duration)":/)
+  expect(loadSave(clean)).toEqual(restored)
 })

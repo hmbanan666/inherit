@@ -89,8 +89,6 @@ export function blueprintCommands(c: Campaign): BlueprintAPI {
         who: o.customer,
         items: { ...o.items },
         filled: { ...o.filled },
-        due: o.deadline!,
-        late: c.world.tick > o.deadline!,
       })),
     lastError: () => error,
   }

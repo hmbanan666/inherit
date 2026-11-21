@@ -1,4 +1,5 @@
 import type { Campaign, StoryMessage } from './model'
+import { acknowledgeTab } from './town'
 
 const letters: Record<string, [string, string, string]> = {
   shovel: [
@@ -99,7 +100,8 @@ export function binderNudge(c: Campaign): StoryMessage | undefined {
 }
 export function markMessageRead(c: Campaign, id: string) {
   const msg = c.progress.messages.find((m) => m.id === id)
-  if (!msg?.unread) return false
+  if (!msg || (!msg.unread && !(id === 'tab' && c.town.beat === 2))) return false
+  if (id === 'tab') acknowledgeTab(c)
   msg.unread = false
   return true
 }

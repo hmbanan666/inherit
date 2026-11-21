@@ -1,5 +1,5 @@
 import type { Campaign } from './model'
-import { activeRequest, DAY, dueLabel, nextInstallment, REQUESTS } from './town'
+import { activeRequest, DAY, debtRemaining, nextInstallment, REQUESTS, TAB_LETTER } from './town'
 
 export type BuildingId =
   | 'forge'
@@ -17,8 +17,6 @@ export interface TownAsk {
   text: string
   items: Partial<Record<string, number>>
   filled: Partial<Record<string, number>>
-  dueLabel: string
-  late: boolean
 }
 export interface TownSnapshot {
   day: number
@@ -30,10 +28,10 @@ export interface TownSnapshot {
     name: string
     role: string
     buildingId: BuildingId
-    mood: 'happy' | 'waiting' | 'worried' | 'gone'
+    mood: 'happy' | 'waiting' | 'gone'
     ask?: TownAsk
   }[]
-  debt: { owed: number; paid: number; next?: { amount: number; dueDay: number; late: boolean } }
+  debt: { owed: number; paid: number; next?: { amount: number } }
   changes: { tick: number; buildingId: BuildingId; text: string }[]
 }
 const buildings: Record<BuildingId, string> = {
@@ -64,7 +62,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
   } = c
   const clock = (tick % DAY) / DAY
   const next = nextInstallment(c)
-  const owed = town.installments.slice(town.payments).reduce((a, b) => a + b, 0)
+  const owed = debtRemaining(c)
   const request = activeRequest(c)
   return {
     day: Math.floor(tick / DAY) + 1,
@@ -92,32 +90,28 @@ export function townSnapshot(c: Campaign): TownSnapshot {
                 text: request.text,
                 items: { [request.item]: request.quantity },
                 filled: { [request.item]: town.filled },
-                dueLabel: dueLabel(c),
-                late: tick > town.due,
               }
             : undefined
         const bank = id === 'harrow' && next && (town.beat === 2 || town.beat === 10)
-        const order = c.economy.orders.find((o) => o.customer === id)
-        const late = ask?.late || (id === 'harrow' && next?.late) || (order && tick > order.deadline!)
-        const helped = REQUESTS.some((r) => r.who === id && r.beat < town.beat)
+        const hasOrder = c.economy.orders.some((o) => o.customer === id)
+        const helped =
+          town.beat > 10 || (id === 'harrow' && !owed) || REQUESTS.some((r) => r.who === id && r.beat < town.beat)
         return {
           id,
           name,
           role,
           buildingId,
-          mood: late ? 'worried' : ask || bank ? 'waiting' : helped || town.beat > 10 ? 'happy' : 'waiting',
+          mood: helped && !ask && !bank && !hasOrder ? 'happy' : 'waiting',
           ask: bank
             ? {
                 requestId: 'installment-' + town.payments,
                 title: 'The family tab',
                 text:
                   town.beat === 2
-                    ? 'Your uncle borrowed 600 coins. Pay 100 by day 3, 200 by day 6 and 300 by day 10. Bram pays for regular ingots.'
+                    ? TAB_LETTER
                     : 'The bridge stands. Settle the remaining installments and the shed is yours.',
                 items: { coins: next.amount },
                 filled: { coins: Math.min(c.economy.money, next.amount) },
-                dueLabel: 'by day ' + next.dueDay,
-                late: next.late,
               }
             : ask,
         }

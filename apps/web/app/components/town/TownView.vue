@@ -1,19 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { Application } from 'pixi.js'
-import {
-  Clock3,
-  Coins,
-  MapPin,
-  Moon,
-  Sun,
-  Sunrise,
-  Sunset,
-  Smile,
-  Frown,
-  Hourglass,
-  Footprints,
-} from '@lucide/vue'
+import { Coins, MapPin, Smile, MessageCircle, Footprints } from '@lucide/vue'
 import { TownScene } from '../../lib/townScene'
 import type { TownSnapshot, Townsperson } from '@inherit/sim'
 import TownPortrait from './TownPortrait.vue'
@@ -30,8 +18,7 @@ const person = computed(
     props.snapshot.people[0],
 )
 const readyBuilding = computed(() => props.snapshot.buildings.find((b) => b.id === person.value?.buildingId))
-const phaseIcon = { morning: Sunrise, day: Sun, evening: Sunset, night: Moon }
-const moodIcon = { happy: Smile, worried: Frown, waiting: Hourglass, gone: Footprints }
+const moodIcon = { happy: Smile, waiting: MessageCircle, gone: Footprints }
 const amounts = computed(() =>
   Object.entries(person.value?.ask?.items ?? {}).map(([kind, amount]) => ({
     kind: kind.replaceAll('-', ' '),
@@ -85,10 +72,6 @@ onBeforeUnmount(() => {
   <section class="town-view" aria-label="Kettlewick" :data-phase="snapshot.phase">
     <header class="town-heading">
       <h2>Kettlewick</h2>
-      <span
-        ><component :is="phaseIcon[snapshot.phase]" /> Day {{ snapshot.day }} <i>·</i>
-        {{ snapshot.phase }}</span
-      >
     </header>
     <div class="town-picture">
       <div
@@ -124,9 +107,6 @@ onBeforeUnmount(() => {
               <span v-for="a in amounts" :key="a.kind"
                 ><b>{{ a.filled }}/{{ a.required }}</b> {{ a.kind }}</span
               >
-              <span :class="{ overdue: person.ask.late }"
-                ><Clock3 />{{ person.ask.late ? 'Late · ' : '' }}{{ person.ask.dueLabel }}</span
-              >
             </div>
           </template>
           <template v-else-if="person.id === 'harrow' && readyBuilding?.label">
@@ -135,8 +115,7 @@ onBeforeUnmount(() => {
             >
             <p>
               {{ snapshot.debt.paid }} coins paid<span v-if="snapshot.debt.next">
-                · {{ snapshot.debt.next.amount }} due by day {{ snapshot.debt.next.dueDay
-                }}{{ snapshot.debt.next.late ? ' · Late' : '' }}</span
+                · Next installment {{ snapshot.debt.next.amount }} coins</span
               >
             </p>
           </template>
@@ -188,10 +167,6 @@ onBeforeUnmount(() => {
   aspect-ratio: auto;
 }
 .town-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   padding: 9px 20px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
@@ -201,20 +176,6 @@ onBeforeUnmount(() => {
     700 clamp(21px, 3cqw, 30px) / 1.2 Georgia,
     serif;
   letter-spacing: -1.2px;
-}
-.town-heading span {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  text-transform: capitalize;
-  font: 12px var(--mono);
-  color: var(--sub);
-}
-.town-heading i {
-  color: var(--line-strong);
-}
-.town-heading svg {
-  color: var(--gold);
 }
 .town-picture {
   position: relative;
@@ -305,17 +266,12 @@ onBeforeUnmount(() => {
   color: var(--sub);
   text-transform: capitalize;
 }
-.speaker small svg,
-.town-terms svg {
+.speaker small svg {
   width: 12px;
   height: 12px;
 }
 .speaker [data-mood='happy'] {
   color: var(--mint);
-}
-.speaker [data-mood='worried'],
-.overdue {
-  color: var(--alert);
 }
 .town-bubble {
   flex: 1;

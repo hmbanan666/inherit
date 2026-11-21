@@ -38,7 +38,7 @@ export function portrait(p: Paint, id: Townsperson['id'], mood: Townsperson['moo
   p.oval(ink, 29.5, 28, 1.05, 1.45)
   p.oval(ink, 38.5, 27.6, 0.9, 1.35)
   p.line('#9d6951', 1, 34, 28, 33, 32, 35, 32)
-  p.line(ink, 1.2, 31, 36, 34, mood === 'worried' ? 34.4 : 36.6, 37, mood === 'happy' ? 34.5 : 36)
+  p.line(ink, 1.2, 31, 36, 34, 36.6, 37, mood === 'happy' ? 34.5 : 36)
   switch (id) {
     case 'bram':
       p.poly(hair, 20, 31, 25, 34, 29, 37, 33, 35, 38, 34, 40, 33, 40, 39, 36, 44, 29, 46, 22, 41)

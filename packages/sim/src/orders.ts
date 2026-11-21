@@ -113,7 +113,7 @@ export function acceptOrder(c: Campaign, id: string) {
   )
     return false
   order.status = 'accepted'
-  order.deadline = c.world.tick + order.duration
+  if (order.duration !== undefined) order.deadline = c.world.tick + order.duration
   return true
 }
 export function declineOrder(c: Campaign, id: string) {
@@ -145,7 +145,7 @@ export function offerMotorOrder(c: Campaign): OrderState | undefined {
 export function settleOrders(c: Campaign): OrderState[] {
   const changed = new Set<OrderState>()
   for (const order of c.economy.orders) {
-    if (order.status === 'accepted' && c.world.tick > order.deadline!) {
+    if (order.status === 'accepted' && order.deadline !== undefined && c.world.tick > order.deadline) {
       order.status = 'failed'
       c.economy.reputation--
       changed.add(order)

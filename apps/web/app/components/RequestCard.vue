@@ -31,7 +31,7 @@ const clues: Record<number, string> = {
   5: 'Route copper ore from the splitter to a named furnace on the copper-ingot recipe. Feed its ingots to a cutter on wire, then connect the cutter to the cart.',
   6: 'Loop over ctx.machines("furnace"). If ctx.inspect(id)?.status is "broken", call ctx.repair(id).',
   7: 'Feed plates to a second cutter named "gears" and send its gears to the cart. If a furnace stops, check its status and repair it or wait for it to cool.',
-  8: 'Connect a splitter after the press. Send plates to the cart for Elsie or the gear cutter for Wen. Check the due tick in ctx.orders().',
+  8: 'Connect a splitter after the press. Send plates to the cart for Elsie or the gear cutter for Wen. Use ctx.orders() to see who still needs a delivery.',
   9: 'Feed plates and wire into the assembler and call ctx.work("assembler", "bracket"). Connect the assembler to the cart.',
   10: 'Regular orders keep paying. Open Orders to see what the town still needs, then use Pay debt for the remaining installments.',
 }
@@ -69,7 +69,6 @@ const interlude = computed(() => {
       <b v-for="(count, item) in ask.items" :key="item"
         >{{ ask.filled[item] ?? 0 }} / {{ count }} {{ units[item] ?? item }}</b
       >
-      <small>{{ ask.late ? 'Late · ' : '' }}{{ ask.dueLabel }}</small>
     </div>
     <div v-if="c.town.beat === 1" class="lesson">
       <span>{{ step + 1 }}/6 · {{ lessons[step]![0] }}</span>
@@ -78,6 +77,9 @@ const interlude = computed(() => {
     </div>
     <div v-else-if="clues[c.town.beat]" class="request-hint">
       <button class="hint" :aria-expanded="hint" @click="hint = !hint">Hint</button>
+      <button v-if="c.town.beat === 2" class="hint" @click="g.act({ kind: 'read', id: 'tab' })">
+        Pay later
+      </button>
       <p v-if="hint">{{ clues[c.town.beat] }}</p>
     </div>
   </section>
@@ -105,9 +107,6 @@ const interlude = computed(() => {
   gap: 6px;
   text-align: right;
   font: 12px var(--mono);
-}
-.request-count small {
-  color: var(--sub);
 }
 .request-hint {
   grid-column: 1/-1;
