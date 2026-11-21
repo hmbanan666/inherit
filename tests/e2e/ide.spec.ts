@@ -43,10 +43,10 @@ async function photo(page: Page, name: string) {
 }
 async function replaceCode(page: Page, text: string) {
   await page.locator('.project-editor .view-lines').first().click()
-  await page.keyboard.press('Control+a')
+  await page.keyboard.press('ControlOrMeta+a')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((source) => navigator.clipboard.writeText(source), text)
-  await page.keyboard.press('Control+v')
+  await page.keyboard.press('ControlOrMeta+v')
 }
 
 test('first shift opens a single player file', async ({ page }) => {

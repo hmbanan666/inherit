@@ -21,10 +21,10 @@ async function photo(page: Page, name: string) {
 }
 async function edit(page: Page, text: string) {
   await page.locator('.monaco-editor .view-lines').first().click()
-  await page.keyboard.press('Control+a')
+  await page.keyboard.press('ControlOrMeta+a')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.evaluate((value) => navigator.clipboard.writeText(value), text)
-  await page.keyboard.press('Control+v')
+  await page.keyboard.press('ControlOrMeta+v')
   await expect(page.locator('.editor-foot')).toContainText('Working copy')
 }
 test('grow one factory from a rock to a second furnace', async ({ page }) => {
