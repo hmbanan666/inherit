@@ -17,8 +17,11 @@ A one-time, story-carrying ask from a townsperson with a reason and a town chang
 _Avoid_: objective, quest, goal, mission
 
 **Order**:
-A repeatable paid job from a townsperson whose request is already done. Orders pay coins and keep the factory busy between requests.
+A small paid job from a townsperson whose request is already done. Orders are finite and paced by the story; a filled order does not come back on its own.
 _Avoid_: ticket, contract
+
+**Coins**:
+Money the factory earns only by filling a request or order. Spent on `buy` and on the debt. Items nobody asked for earn nothing and wait in the cart.
 
 **Town change**:
 The visible effect of a fulfilled request: a forge lights, a street gets lamps, a bridge is built, a district opens.
@@ -31,7 +34,7 @@ A part of the town that is closed until a town change opens it, bringing new tow
 The guided steps inside Bram's request. The player starts from an empty main.ts and writes every line himself, one new thing per step. The only place with step-by-step hints.
 
 **Onboarding step**:
-One onboarding step: a short card naming one new thing (for example the `smelt` verb), an example with a blank, and a two-rung hint (the idea, then the exact line).
+One onboarding step: a short card naming one new thing (for example writing `function smelt()`), an example with a blank, and a two-rung hint (the idea, then the exact line).
 _Avoid_: tutorial levels
 
 **Debt**:
@@ -57,12 +60,21 @@ A machine that stopped from wear. It recovers by repair (costs coins) or by cool
 The player's TypeScript project. It exports `onTick`, which the factory runs every tick. It starts as a comment from Uncle and the player writes all of it. One codebase for the whole game.
 _Avoid_: script, solution
 
-**Handle**:
-A machine as an object the controller can use, imported from the `"inherit"` module (`mine`, `furnace`, `cart`) or returned by `build` and `machine`.
-_Avoid_: machine id, ctx (the low-level API, kept only for old controllers)
+**Primitive**:
+One of the three physical actions the world exposes from `"inherit"`: `take(place)`, `put(place, item)`, `look(place)`. Everything else the player builds from them.
+_Avoid_: API, handle, ctx
+
+**Story action**:
+A non-physical action the story unlocks and exports from `"inherit"`: `buy(kind, name?)` with the press, `repair(machine)` with the breakdowns.
+
+**Place**:
+Anything you can take from, put into or look at, named by a string: the mine, a machine, the cart.
 
 **Verb**:
-A method on a handle, such as `dig`, `connect`, `smelt`, `stamp`, `cut`, `send`, `repair`. A word for an action in a request, hint or check is always the verb's exact name.
+A function the player writes himself from primitives, such as `dig`, `smelt`, `ship`, `stamp`, `move`, `fixBroken`. A word for an action in a request, hint or check is always the name of the function the player is asked to write.
+
+**Framework**:
+The player's own collection of verbs. It grows over chapter 1 and moves into its own file at the bridge request.
 
 **Check**:
 A live plain sentence about what the current request needs ("Ore reaches the furnace"), coloured red (not yet), amber (getting closer) or green (done). Checks guide, they never block.
@@ -72,7 +84,7 @@ _Avoid_: test, assertion
 A part of the screen in the top navigation (Code, Factory, Town, Inbox, Orders). Each appears when the story reaches it and carries a "new" mark until opened.
 
 **Floor view**:
-The animated canvas that shows the factory. It visualizes what the controller does. You inspect it, you do not build on it.
+The animated canvas that shows the factory. It visualizes what the controller does, animating every take and put. You inspect it, you do not build on it.
 _Avoid_: board, editor
 
 **Deploy**:
