@@ -171,6 +171,7 @@ test('follow definitions and references across files, search the draft and organ
   await tree.getByLabel('Project path').fill('parts')
   await tree.getByRole('button', { name: 'Create' }).click()
   await page.reload()
+  await expect(page.getByTestId('primary-button')).toBeEnabled()
   await projectFiles(page)
   await expect(tree.getByRole('button', { name: 'parts/index.ts' })).toBeVisible()
   await tree.getByRole('button', { name: 'New file' }).click()
