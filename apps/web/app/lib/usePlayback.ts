@@ -5,7 +5,7 @@ export function usePlayback() {
   const call = shallowRef<CallRecord>()
   const last = shallowRef<CallRecord>()
   const hand = ref<string | null>(null)
-  const stationStatuses = shallowRef(new Map<string, string>())
+  const stationStatuses = shallowRef(new Map<string, Set<string>>())
   const messages = ref<string[]>([])
   let finishWait: (() => void) | undefined
   let generation = 0
@@ -26,11 +26,15 @@ export function usePlayback() {
   async function play(calls: CallRecord[], mode: 'run' | 'tick' | 'setup', speed: number) {
     const watched = mode === 'run'
     if (!calls.length && !watched && !stationStatuses.value.size) return
-    const statuses = new Map<string, string>()
+    const statuses = new Map<string, Set<string>>()
     const visible: CallRecord[] = []
     for (const record of calls) {
-      if (mode === 'tick' && record.floorStatus) statuses.set(record.args[0]!, record.floorStatus)
-      else visible.push(record)
+      if (mode === 'tick' && record.floorStatus) {
+        const place = record.args[0]!
+        const atPlace = statuses.get(place) ?? new Set<string>()
+        atPlace.add(record.floorStatus)
+        statuses.set(place, atPlace)
+      } else visible.push(record)
     }
     stationStatuses.value = statuses
     const interval = (watched ? 500 : TICK_MS / (2 * Math.max(1, visible.length))) / speed

@@ -135,7 +135,7 @@ test('Bram’s three edits wrap the highlighted calls and run the job', async ({
 test('a busy furnace on the live clock reports at the furnace and in Console', async ({ page }) => {
   await openShed(page, '?step=elsie-press')
   // Leave the ingots in the furnace until its input fills. Each later deposit will fail.
-  await edit(page, 'import { take, put } from "inherit"\nexport function onTick() {\n  if (take("mine"))\n    put("furnace")\n}')
+  await edit(page, 'import { take, put } from "inherit"\nexport function onTick() {\n  if (take("mine")) {\n    put("furnace")\n    put("furnace")\n  }\n}')
   await page.getByTestId('primary-button').click()
   const message = 'The furnace cannot accept iron ore right now.'
   await page.getByRole('tab', { name: 'Console' }).click()
@@ -159,7 +159,8 @@ test('a busy furnace on the live clock reports at the furnace and in Console', a
     return { seen, observer }
   })
   await expect(tick).not.toHaveText(previous)
-  await expect(page.getByRole('button', { name: 'Inspect furnace' }).locator('..')).toContainText('Busy')
+  const furnace = page.getByRole('button', { name: 'Inspect furnace' }).locator('..')
+  await expect(furnace).toContainText(/Busy\s*Hand empty/)
   expect(await prominent.evaluate(({ seen, observer }) => {
     observer.disconnect()
     return [...seen]

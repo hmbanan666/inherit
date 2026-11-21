@@ -226,7 +226,9 @@ onBeforeUnmount(() => {
             >"{{ m.id }}"<b v-if="m.fault"> · {{ m.fault }}</b></span
           >
         </button>
-        <span v-if="g.playback.stationStatuses.value.has(m.id)" class="station-status">{{ g.playback.stationStatuses.value.get(m.id) }}</span>
+        <span v-if="g.playback.stationStatuses.value.has(m.id)" class="station-status">
+          <span v-for="status in g.playback.stationStatuses.value.get(m.id)" :key="status">{{ status }}</span>
+        </span>
         <span v-if="m.id === 'cart' && g.step.value?.checks[0]?.progress" class="cart-load">{{ g.step.value?.checks[0]?.progress }} delivered</span>
       </div>
       <div v-if="travelRail" class="travel-rail" :style="travelRail" aria-hidden="true"></div>
@@ -287,7 +289,7 @@ onBeforeUnmount(() => {
 .shed-street { position: absolute; left: 465px; bottom: 0; width: 300px; pointer-events: none; }
 .cart-load { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); color: var(--gold); background: var(--panel); font: 13px var(--mono); padding: 3px 6px; white-space: nowrap; }
 .station-status {
-  position: absolute; bottom: 40px; left: 0; transform: translateX(-50%);
+  display: grid; text-align: center; position: absolute; top: -44px; left: 0; transform: translateX(-50%);
   padding: 2px 6px; border-radius: 6px; background: var(--overlay); color: var(--soft);
   white-space: nowrap; font: 11px/1.3 var(--mono); pointer-events: none;
 }
