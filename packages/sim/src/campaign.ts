@@ -1,6 +1,6 @@
 import { PRICES } from './prices'
-import { restartQuest } from './quests'
-import { connectBelt, placeMachine } from './construction'
+import { letter, newTown } from './town'
+import { placeMachine } from './construction'
 import type { Campaign, ProjectRevision, Site } from './model'
 
 function sites(): Site[] {
@@ -59,10 +59,11 @@ export const initialSignals = () => ({
 export function createCampaign(seed = 1): Campaign {
   const files = {
     'main.ts':
-      'import type { Factory } from "inherit"\n\nexport function onTick(ctx: Factory) {\n  // Try ctx.dig("mine") here.\n}\n',
+      'import type { Factory } from "inherit"\n\nexport function onTick(ctx: Factory) {\n  // The shed is yours. So is my tab. — Uncle\n}\n',
   }
   const campaign: Campaign = {
-    version: 3,
+    version: 4,
+    town: newTown(),
     world: {
       tick: 0,
       seed: seed >>> 0,
@@ -104,11 +105,15 @@ export function createCampaign(seed = 1): Campaign {
     memory: {},
   }
   placeMachine(campaign, 'miner', 'shed', 1, 2, 'mine')
-  placeMachine(campaign, 'furnace', 'shed', 4, 2, 'furnace-a')!.batchTicks = 4
-  placeMachine(campaign, 'dock', 'shed', 7, 2, 'dock')
-  connectBelt(campaign, 'mine', 'furnace-a')
-  connectBelt(campaign, 'furnace-a', 'dock')
-  restartQuest(campaign)
+  placeMachine(campaign, 'furnace', 'shed', 4, 2, 'furnace')!.batchTicks = 4
+  placeMachine(campaign, 'dock', 'shed', 7, 2, 'cart')
+  letter(
+    campaign,
+    'uncle',
+    'Uncle',
+    'The shed keys',
+    'The shed is yours. So is my tab at the bank. Bram will come knocking.',
+  )
   return campaign
 }
 export function cloneCampaign(campaign: Campaign): Campaign {

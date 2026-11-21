@@ -16,8 +16,8 @@ import {
 test('a seeded sorter sends rejects through scrap and keeps quality intact through storage and a merger', () => {
   const c = createCampaign(13)
   c.world.defectsEnabled = true
-  removeBelt(c, 'mine', 'furnace-a')
-  removeBelt(c, 'furnace-a', 'dock')
+  removeBelt(c, 'mine', 'furnace')
+  removeBelt(c, 'furnace', 'cart')
   placeMachine(c, 'sorter', 'shed', 2, 2, 'sort')
   placeMachine(c, 'scrap', 'shed', 3, 1, 'scrap')
   placeMachine(c, 'storage', 'shed', 3, 3, 'bin')
@@ -28,7 +28,7 @@ test('a seeded sorter sends rejects through scrap and keeps quality intact throu
     ['sort', 'bin'],
     ['scrap', 'join'],
     ['bin', 'join'],
-    ['join', 'dock'],
+    ['join', 'cart'],
   ])
     expect(connectBelt(c, a, b)).toBeTruthy()
   const controller = (ctx: CampaignFactory) => {
@@ -36,7 +36,7 @@ test('a seeded sorter sends rejects through scrap and keeps quality intact throu
     ctx.route('sort', ctx.peek('sort')?.defect ? 'scrap' : 'bin')
     ctx.work('scrap', 'recycle')
     ctx.route('bin', 'join')
-    ctx.route('join', 'dock')
+    ctx.route('join', 'cart')
   }
   for (let i = 0; i < 30; i++) step(c.world, controller)
   const replay = loadSave(serializeSave(c))
@@ -58,6 +58,7 @@ test('a seeded sorter sends rejects through scrap and keeps quality intact throu
 })
 test('build costs, owned paths, deposit placement and refunds survive a live expansion', () => {
   const c = createCampaign()
+  connectBelt(c, 'mine', 'furnace')
   step(c.world, (ctx) => ctx.dig('mine'))
   const parcel = structuredClone(c.world.belts[0].items)
   expect(placeMachine(c, 'miner', 'shed', 9, 2, 'copper')).toBeUndefined()
@@ -99,7 +100,7 @@ test('code switches a furnace to copper and a cutter to wire without changing a 
   placeMachine(c, 'cutter', 'shed', 11, 2, 'draw')
   connectBelt(c, 'copper', 'smelt')
   connectBelt(c, 'smelt', 'draw')
-  connectBelt(c, 'draw', 'dock')
+  connectBelt(c, 'draw', 'cart')
   for (let i = 0; i < 45; i++)
     step(c.world, (ctx) => {
       if (ctx.tick === 1) ctx.dig('copper')
@@ -113,16 +114,16 @@ test('code switches a furnace to copper and a cutter to wire without changing a 
 })
 test('a saturated merger shares its freed slots between both incoming belts', () => {
   const c = createCampaign()
-  removeBelt(c, 'mine', 'furnace-a')
+  removeBelt(c, 'mine', 'furnace')
   placeMachine(c, 'miner', 'shed', 1, 4, 'coal')
   placeMachine(c, 'merger', 'shed', 2, 3, 'merge')
   connectBelt(c, 'mine', 'merge')
   connectBelt(c, 'coal', 'merge')
-  connectBelt(c, 'merge', 'dock')
+  connectBelt(c, 'merge', 'cart')
   for (let i = 0; i < 100; i++)
     step(c.world, (ctx) => {
       for (const id of ctx.machines('miner')) if (ctx.space(id)) ctx.dig(id)
-      ctx.route('merge', 'dock')
+      ctx.route('merge', 'cart')
     })
   expect(c.world.delivered['iron-ore']).toBeGreaterThan(35)
   expect(c.world.delivered.coal).toBeGreaterThan(35)

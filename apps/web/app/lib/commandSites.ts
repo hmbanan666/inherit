@@ -2,7 +2,7 @@ import ts from 'typescript'
 import type { GameFactory, ProjectFiles } from '@inherit/sim'
 import type { CallSite } from './gameProtocol'
 
-const commands = ['dig', 'work', 'route', 'dispatch'] as const
+const commands = ['dig', 'work', 'route', 'clear', 'repair', 'connect', 'build'] as const
 type Command = (typeof commands)[number]
 interface Candidate extends CallSite {
   op: Command
@@ -119,13 +119,19 @@ export function commandSites(files: ProjectFiles) {
             tag?.op === op
               ? [tag]
               : candidates.filter((c) => c.op === op && (c.target === undefined || c.target === id))
-          if (matches.length === 1 && machines.has(id)) {
-            const { file, line, fn } = matches[0]!
-            const sites = (traces[id] ??= [])
+          const result: unknown = Reflect.apply(method, ctx, [id, ...args])
+          if (matches.length !== 1) return result
+          const { file, line, fn } = matches[0]!
+          const targets = op === 'connect' ? [id, args[0]] : [op === 'build' ? result : id]
+          for (const target of targets) {
+            if (typeof target !== 'string') continue
+            if (op === 'build') machines.add(target)
+            if (!machines.has(target)) continue
+            const sites = (traces[target] ??= [])
             if (!sites.some((s) => s.file === file && s.line === line && s.fn === fn))
               sites.push({ file, line, fn })
           }
-          return Reflect.apply(method, ctx, [id, ...args])
+          return result
         },
       })
     }

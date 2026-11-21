@@ -36,6 +36,9 @@ const mockFactory = {
   peek: () => undefined,
   dispatch: () => false,
   build: () => undefined,
+  clear: () => false,
+  repair: () => false,
+  orders: () => [],
   connect: () => false,
   dismantle: () => false,
   lastError: () => undefined,
@@ -167,8 +170,8 @@ export async function openRuntime(
           if (type === 'string') return JSON.parse(vm.getString(h))
         })
         if (key === 'build') {
-          const [siteId, recipe, deposit] = params.splice(3)
-          params.push({ siteId, recipe, deposit })
+          const [name, x, y, recipe, deposit] = params.splice(1)
+          params.push({ name, x, y, recipe, deposit })
         }
         const result = Reflect.apply(method, current, params)
         return result === undefined ? vm.undefined : vm.newString(hostJson(result))

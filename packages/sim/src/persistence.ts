@@ -1,8 +1,6 @@
-import { createCampaign, snapshotProject, initialSignals } from './campaign'
+import { createCampaign, snapshotProject } from './campaign'
 import { MACHINES, MATERIALS, RECIPES } from './catalog'
-import { questStatus } from './quests'
-import { RESEARCH } from './research'
-import type { Campaign } from './model'
+import type { Campaign, ProjectFiles } from './model'
 
 export function serializeSave(campaign: Campaign): string {
   return JSON.stringify(campaign)
@@ -67,6 +65,11 @@ const machine = shape({
   siteId: str,
   queue: list(shape(item)),
   status: one('working', 'ready', 'blocked', 'starved', 'idle'),
+  fault: opt(one('broken', 'jammed')),
+  heatLimit: opt(count),
+  heat: opt(count),
+  coolAt: opt(count),
+  repairing: opt(one(true)),
   recipe: opt(recipe),
   remaining: count,
   output: opt(shape(item)),
@@ -148,7 +151,26 @@ const world = shape({
   extracted: totals,
 })
 const save = shape({
-  version: one(2, 3),
+  version: one(4),
+  town: shape({
+    beat: one(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+    entered: count,
+    due: count,
+    filled: count,
+    paid: count,
+    payments: one(0, 1, 2, 3),
+    installments: (v) => Array.isArray(v) && v.length === 3 && v.every(count),
+    interest: (v) => Array.isArray(v) && v.length === 3 && v.every(bool),
+    competition: list(str),
+    nextOrders: dict(count),
+    changes: list(
+      shape({
+        tick: count,
+        buildingId: one('forge', 'bank', 'bakery', 'mill', 'lamp-street', 'bridge', 'town-hall', 'riverside'),
+        text: str,
+      }),
+    ),
+  }),
   world,
   progress: shape({ activeQuest: opt(activeQuest), completedQuests: list(str) }),
   memory: record,
@@ -210,61 +232,6 @@ const gameFields = shape({
   }),
 })
 
-function migrateEngine(c: Campaign) {
-  c.version = 3
-  c.progress.completedObjectives = []
-  c.progress.messages = []
-  const oldRun = c.progress.activeQuest
-  const status = questStatus(c)
-  if (oldRun && status) {
-    const { id, elapsed, shipped, lost, coal } = status
-    const furnaceActive = Object.fromEntries(
-      c.world.machines
-        .filter((m) => m.kind === 'furnace')
-        .map((m) => [m.id, Math.max(0, m.stats.activeTicks - (oldRun.furnaceActive[m.id] ?? 0))]),
-    )
-    c.progress.pausedQuest = { id, elapsed, shipped, lost, coal, furnaceActive }
-  }
-  c.progress.signals = initialSignals()
-  const e = c.economy
-  e.researchPoints = 1
-  e.orderSeed = c.world.seed
-  e.nextOrder = 1
-  e.road = c.world.machines.some((m) => m.siteId === 'yard' || m.kind === 'truck')
-  const files = c.project.deployed
-  const code = Object.values(files).join('\n')
-  // Grandfather equipment and operations already in use on the unlicensed v2 floor.
-  const licenses = new Set(e.research)
-  function allow(id: string) {
-    if (licenses.has(id)) return
-    licenses.add(id)
-    RESEARCH.find((n) => n.id === id)?.requires.forEach(allow)
-  }
-  for (const node of RESEARCH) {
-    if (node.id === 'blueprints') continue // Construction methods did not exist on v2 controllers.
-    if (
-      node.machines?.some((kind) => c.world.machines.some((m) => m.kind === kind)) ||
-      node.methods?.some((method) => code.includes('.' + method + '(')) ||
-      node.events?.some((name) => code.includes(name))
-    )
-      allow(node.id)
-  }
-  if (Object.keys(files).length > 1) allow('binder')
-  if (e.road) allow('road')
-  if (c.world.defectsEnabled) allow('quality')
-  if (c.world.machines.some((m) => m.deposit === 'copper')) allow('copper')
-  if (c.world.machines.some((m) => m.deposit === 'coal')) allow('press')
-  e.research = [...licenses]
-  if (licenses.has('quality')) c.world.defectsEnabled = true
-  for (const order of e.orders) {
-    order.line = 'One more delivery from the old order book.'
-    order.duration = Math.max(1, (order.deadline ?? c.world.tick + 480) - c.world.tick)
-    if (order.status === 'accepted') order.deadline ??= c.world.tick + order.duration
-    order.filled = order.status === 'done' ? { ...order.items } : {}
-  }
-  return c
-}
-
 function validate(campaign: Campaign) {
   const world = campaign.world
   const machines = new Map(world.machines.map((machine) => [machine.id, machine]))
@@ -272,10 +239,12 @@ function validate(campaign: Campaign) {
   if (
     machines.size !== world.machines.length ||
     sites.size !== world.sites.length ||
+    !sites.has('shed') ||
     world.machines.some(
       (machine) =>
         !sites.has(machine.siteId) ||
         machine.builtAt > world.tick ||
+        (machine.fault === 'broken' && machine.coolAt === undefined) ||
         (machine.recipe && RECIPES[machine.recipe].machine !== machine.kind),
     )
   ) {
@@ -304,38 +273,48 @@ function validate(campaign: Campaign) {
       throw new Error('Invalid campaign trip.')
     }
   }
-  if (
-    campaign.version === 3 &&
-    campaign.economy.orders.some((o) => o.status === 'accepted' && o.deadline === undefined)
-  ) {
+  if (campaign.economy.orders.some((o) => o.status === 'accepted' && o.deadline === undefined)) {
     throw new Error('Invalid accepted order without deadline.')
   }
   return campaign
 }
-function importNotebook(data: Record<string, unknown>): Campaign {
-  const campaign = createCampaign()
-  if (!record(data.entries)) return campaign
-  let selected: string | undefined
-  for (const [key, entry] of Object.entries(data.entries)) {
-    if (!record(entry) || typeof entry.code !== 'string') continue
-    campaign.project.working = { 'main.ts': entry.code }
-    snapshotProject(campaign, 'Chapter ' + (Number(key) + 1))
-    if (key === String(data.current ?? 0)) selected = entry.code
+function archiveLegacy(data: Record<string, unknown>) {
+  const c = createCampaign()
+  function archive(name: string, old: unknown) {
+    if (!record(old) || !Object.keys(old).length || !files(old)) return
+    c.project.working = old as ProjectFiles
+    snapshotProject(c, name)
   }
-  campaign.project.working =
-    selected !== undefined ? { 'main.ts': selected } : { ...campaign.project.deployed }
-  return campaign
+  if (record(data.project)) {
+    const { working, deployed, snapshots, history } = data.project
+    archive('v2 code', record(working) && Object.keys(working).length ? working : deployed)
+    if (JSON.stringify(working) !== JSON.stringify(deployed)) archive('v2 deployed', deployed)
+    for (const group of [snapshots, history]) {
+      if (Array.isArray(group))
+        for (const rev of group) {
+          if (record(rev) && typeof rev.name === 'string') archive('v2 · ' + rev.name, rev.files)
+        }
+    }
+  } else if (record(data.entries)) {
+    for (const [key, entry] of Object.entries(data.entries)) {
+      if (record(entry) && typeof entry.code === 'string')
+        archive(key === String(data.current ?? 0) ? 'v2 code' : 'Chapter ' + (Number(key) + 1), {
+          'main.ts': entry.code,
+        })
+    }
+  }
+  c.project.working = { ...c.project.deployed }
+  return c
 }
-/** Browser storage and the decision to replace a rejected save belong to the caller. */
 export function loadSave(input: unknown): Campaign {
-  if (input === null || input === undefined) return createCampaign()
-  const data: unknown = typeof input === 'string' ? JSON.parse(input) : JSON.parse(JSON.stringify(input))
-  if (!record(data)) throw new Error('Invalid factory save.')
-  if (data.version === undefined || data.version === 1) return importNotebook(data)
-  if (data.version !== 2 && data.version !== 3)
-    throw new Error('Unsupported factory save version: ' + String(data.version))
-  if (!save(data) || (data.version === 3 && !gameFields(data)))
-    throw new Error('Invalid version ' + data.version + ' factory save.')
-  const c = validate(data as unknown as Campaign)
-  return data.version === 2 ? migrateEngine(c) : c
+  try {
+    const data: unknown = typeof input === 'string' ? JSON.parse(input) : structuredClone(input)
+    if (!record(data)) return createCampaign()
+    if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3)
+      return archiveLegacy(data)
+    if (save(data) && gameFields(data)) return validate(data as unknown as Campaign)
+  } catch {
+    /* An incomplete write starts a fresh shift. */
+  }
+  return createCampaign()
 }

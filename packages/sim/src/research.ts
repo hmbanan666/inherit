@@ -187,18 +187,40 @@ export function research(c: Campaign, id: string): boolean {
   return true
 }
 export function getSurface(c: Campaign): UnlockedSurface {
-  const nodes = RESEARCH.filter((n) => c.economy.research.includes(n.id))
+  const { beat } = c.town
+  const machines: MachineKind[] = ['miner', 'dock', 'furnace']
+  if (beat >= 3) machines.push('press')
+  if (beat >= 4) machines.push('splitter')
+  if (beat >= 5) machines.push('cutter')
+  if (beat >= 9) machines.push('assembler')
   return {
-    methods: ['dig', 'work', 'space', ...nodes.flatMap((n) => n.methods ?? [])],
-    events: nodes.flatMap((n) => n.events ?? []),
-    budget: Math.max(96, ...nodes.map((n) => n.budget ?? 0)),
-    machines: ['miner', 'furnace', 'dock', ...nodes.flatMap((n) => n.machines ?? [])],
-    multiFile: c.economy.research.includes('binder'),
+    methods: [
+      'dig',
+      'work',
+      'space',
+      'stock',
+      'inspect',
+      'machines',
+      'route',
+      'peek',
+      'recipes',
+      'build',
+      'connect',
+      'clear',
+      'repair',
+      'orders',
+      'lastError',
+      'dismantle',
+    ],
+    events: beat >= 6 ? ['onItemArrived', 'onMachineIdle'] : [],
+    budget: 1024,
+    machines,
+    multiFile: beat >= 9,
   }
 }
 function checkFiles(c: Campaign, files: ProjectFiles) {
   if (!getSurface(c).multiFile && Object.keys(files).some((path) => path !== 'main.ts'))
-    throw new Error('Research Workshop binder to deploy extra files.')
+    throw new Error('The mayor brings a filing cabinet with the bridge request.')
 }
 export function deployGameProject(c: Campaign) {
   checkFiles(c, c.project.working)

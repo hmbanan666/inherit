@@ -1,15 +1,17 @@
 import { expect, test } from 'vitest'
-import { createCampaign, referenceFiles, serializeSave } from '@inherit/sim'
+import { createCampaign, serializeSave } from '@inherit/sim'
 import { previewProject } from './preview'
 
 test('compare the draft with deployed code from the same live floor and memory', async () => {
   const live = createCampaign()
   live.memory.start = 7
-  live.project.working = referenceFiles('fire')
-  live.project.working['main.ts'] = live.project.working['main.ts'].replace(
-    '  ctx.dig',
-    '  if (memory.start !== 7) throw new Error("missing ledger")\n  memory.ore = ctx.tick\n  ctx.dig',
-  )
+  live.project.working['main.ts'] = `export function onTick(ctx) {
+    if (memory.start !== 7) throw new Error("missing ledger")
+    ctx.connect("mine","furnace")
+    ctx.connect("furnace","cart")
+    ctx.dig("mine")
+    ctx.work("furnace")
+  }`
   const before = serializeSave(live)
   const result = await previewProject(live, 100)
   expect(result.baseline.shipped).toBe(0)

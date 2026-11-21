@@ -1,27 +1,17 @@
 import { createProgram, type Program } from '@inherit/sandbox'
 import {
-  OBJECTIVES,
-  referenceActions,
-  acceptOrder,
   advanceGame,
   deployGameProject,
-  getSurface,
-  markMessageRead,
-  purchaseBelt,
-  purchaseMachine,
-  purchasePlot,
-  purchaseRoad,
-  research,
-  retryObjective,
   rollbackGameProject,
-  sellBelt,
-  sellMachine,
+  getSurface,
+  loadSave,
+  payInstallment,
+  markMessageRead,
   snapshotProject,
   type Campaign,
   type GameTick,
   type ProjectFiles,
   type GameProgram,
-  type MachineKind,
 } from '@inherit/sim'
 import { commandSites } from './commandSites'
 import type { Action, Frame } from './gameProtocol'
@@ -34,13 +24,13 @@ let logs: string[] = []
 let cpu = { calls: 0, interrupts: 0, used: 0, budget: 96 }
 
 async function compile(files: ProjectFiles) {
-  const { budget, events } = getSurface(campaign)
+  const { budget } = getSurface(campaign)
   const sites = commandSites(files)
   const program = await createProgram({
     files: sites.compiledFiles,
     memory: campaign.memory,
     budget,
-    unlockedEvents: events,
+    unlockedEvents: ['onItemArrived', 'onMachineIdle'],
   })
   return { program, sites }
 }
@@ -76,26 +66,10 @@ function step(): GameTick | undefined {
   live.dispose()
   program = undefined
 }
-// The notebook examples use these equipment IDs. Prefer their names on matching
-// deposits and sites, even when the player lays out a different floor.
-function machineName(kind: MachineKind, site: string, x: number, y: number) {
-  const deposits = campaign.world.sites.find((s) => s.id === site)?.deposits
-  const seam = (x: number, y: number) => deposits?.find((d) => d.x === x && d.y === y)?.kind
-  const names = OBJECTIVES.flatMap((o) => referenceActions(o.id)).filter(
-    (a) =>
-      a[0] === 'machine' &&
-      a[1] === kind &&
-      a[2] === site &&
-      (kind !== 'miner' || seam(a[3], a[4]) === seam(x, y)) &&
-      !campaign.world.machines.some((m) => m.id === a[5]),
-  )
-  const match = names.find((a) => a[0] === 'machine' && a[3] === x && a[4] === y) ?? names[0]
-  return match?.[0] === 'machine' ? match[5] : undefined
-}
 async function apply(a: Action) {
   switch (a.kind) {
     case 'init':
-      campaign = a.campaign
+      campaign = loadSave(a.campaign)
       install(await compile(campaign.project.deployed))
       return true
     case 'deploy':
@@ -115,38 +89,13 @@ async function apply(a: Action) {
       install(next)
       return true
     }
-    case 'research': {
-      const before = getSurface(campaign)
-      if (!research(campaign, a.id)) return false
-      const after = getSurface(campaign)
-      if (before.budget !== after.budget || before.events.length !== after.events.length)
-        install(await compile(campaign.project.deployed))
-      return true
-    }
+    case 'pay':
+      return payInstallment(campaign)
     case 'snapshot':
       campaign.project.working = a.files
       return snapshotProject(campaign, a.name)
-    case 'machine':
-      return purchaseMachine(campaign, a.machine, a.site, a.x, a.y, machineName(a.machine, a.site, a.x, a.y))
-    case 'plot':
-      return purchasePlot(campaign, a.site, a.id)
-    case 'road':
-      return purchaseRoad(campaign)
-    case 'belt':
-      return purchaseBelt(campaign, a.from, a.to)
-    case 'sellBelt':
-      return sellBelt(campaign, a.from, a.to)
-    case 'sellMachine': {
-      const sold = sellMachine(campaign, a.id)
-      if (sold) delete sites.traces[a.id]
-      return sold
-    }
     case 'read':
       return markMessageRead(campaign, a.id)
-    case 'accept':
-      return acceptOrder(campaign, a.id)
-    case 'retry':
-      return retryObjective(campaign)
   }
 }
 // The host waits for each reply before sending another mutation or tick.

@@ -51,7 +51,7 @@ export interface MachineView {
   siteId: string
   x: number
   y: number
-  status: 'idle' | 'working' | 'starved' | 'blocked' | 'ready'
+  status: 'idle' | 'working' | 'starved' | 'blocked' | 'ready' | 'broken' | 'jammed'
   deposit?: 'iron' | 'copper' | 'coal'
   recipe?: RecipeId
   remaining: number
@@ -67,13 +67,26 @@ export type FactoryEvent =
   | { type: 'truckReturned'; tick: number; machineId: string; key: string; outcome: TruckOutcome }
 
 export interface BuildOptions {
-  siteId?: string
+  name?: string
+  x?: number
+  y?: number
   recipe?: RecipeId
   deposit?: NonNullable<MachineView['deposit']>
 }
+export interface OrderView {
+  readonly id: string
+  readonly who: string
+  readonly items: Readonly<Partial<Record<MaterialId, number>>>
+  readonly filled: Readonly<Partial<Record<MaterialId, number>>>
+  readonly due: number
+  readonly late: boolean
+}
 export interface BlueprintAPI {
-  build(kind: MachineKind, x: number, y: number, opts?: BuildOptions): string | undefined
+  build(kind: MachineKind, opts?: BuildOptions): string | undefined
   connect(from: string, to: string): boolean
+  orders(): OrderView[]
+  clear(id: string): boolean
+  repair(id: string): boolean
   dismantle(id: string): boolean
   lastError(): string | undefined
 }

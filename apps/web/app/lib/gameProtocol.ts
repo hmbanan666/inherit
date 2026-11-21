@@ -1,4 +1,4 @@
-import type { Campaign, GameTick, MachineKind, ProjectFiles } from '@inherit/sim'
+import type { Campaign, GameTick, ProjectFiles } from '@inherit/sim'
 import type { CpuStats } from '@inherit/sandbox'
 
 export interface CallSite {
@@ -23,14 +23,11 @@ export interface MetricSample {
 }
 export type Action =
   | { kind: 'init'; campaign: Campaign }
-  | { kind: 'step' | 'road' | 'retry' }
+  | { kind: 'step' | 'pay' }
   | { kind: 'deploy'; files: ProjectFiles }
   | { kind: 'rollback'; id: number }
   | { kind: 'snapshot'; name: string; files: ProjectFiles }
-  | { kind: 'research' | 'accept' | 'read' | 'sellMachine'; id: string }
-  | { kind: 'machine'; machine: MachineKind; site: string; x: number; y: number }
-  | { kind: 'plot'; site: string; id: string }
-  | { kind: 'belt' | 'sellBelt'; from: string; to: string }
+  | { kind: 'read'; id: string }
 export interface Frame {
   campaign: Omit<Campaign, 'project'>
   project?: Campaign['project']

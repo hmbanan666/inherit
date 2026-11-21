@@ -13,16 +13,16 @@ import {
 
 test('research licenses equipment and the shop charges the actual belt path once', () => {
   const c = createCampaign()
-  expect(getSurface(c).methods).not.toContain('peek')
+  expect(getSurface(c).machines).not.toContain('assembler')
   expect(purchaseMachine(c, 'sorter', 'shed', 0, 1)).toBeUndefined()
   expect(research(c, 'quality')).toBe(false)
   const furnace = purchaseMachine(c, 'furnace', 'shed', 4, 3)!
   const before = c.economy.money
-  const belt = purchaseBelt(c, furnace.id, 'dock')!
+  const belt = purchaseBelt(c, furnace.id, 'cart')!
   expect(belt.paid).toBe(belt.path.length * 2)
   expect(c.economy.money).toBe(before - belt.paid)
-  expect(sellBelt(c, furnace.id, 'dock')).toBe(true)
-  expect(sellBelt(c, furnace.id, 'dock')).toBe(false)
+  expect(sellBelt(c, furnace.id, 'cart')).toBe(true)
+  expect(sellBelt(c, furnace.id, 'cart')).toBe(false)
   expect(c.economy.money).toBe(before)
 })
 

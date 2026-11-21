@@ -1,17 +1,41 @@
 import { dispatch, advanceTrips } from './freight'
-import type { Factory, MaterialItem, FactoryEvent } from './campaign-api'
+import type { Factory, MaterialItem, FactoryEvent, RecipeId } from './campaign-api'
 import { MACHINES, RECIPES, machineRecipes } from './catalog'
 import type { CampaignMachine, CampaignWorld } from './model'
 import { markDefect, work, finishProduction } from './production'
 import { emit, feed, moveBelts, openIncident, produce } from './transport'
 
-export function stepCampaign(world: CampaignWorld, onTick: (ctx: Factory, events: FactoryEvent[]) => void) {
+function checkFurnaceInput(machine: CampaignMachine, recipe: RecipeId | undefined, beat: number) {
+  if (beat < 4 || machine.kind !== 'furnace' || machine.fault || !recipe) return
+  const ore = machine.queue[0]?.kind
+  if (
+    (recipe === 'iron-ingot' && ore === 'copper-ore') ||
+    (recipe === 'copper-ingot' && ore === 'iron-ore')
+  ) {
+    machine.fault = 'jammed'
+    machine.status = 'blocked'
+  }
+}
+
+export function stepCampaign(
+  world: CampaignWorld,
+  onTick: (ctx: Factory, events: FactoryEvent[]) => void,
+  beat = 0,
+) {
   const findMachine = (id: string) => world.machines.find((m) => m.id === id)
   const previous = world.lastEvents
   world.lastEvents = []
   world.tick++
   const active = new Set(world.machines.filter((machine) => machine.status === 'working'))
-  for (const machine of world.machines) machine.status = 'idle'
+  for (const machine of world.machines) {
+    if (machine.coolAt && world.tick >= machine.coolAt) {
+      machine.status = 'idle'
+      delete machine.fault
+      delete machine.coolAt
+      delete machine.repairing
+    }
+    machine.status = machine.fault ? 'blocked' : 'idle'
+  }
   moveBelts(world, new Map(world.machines.map((m) => [m.id, m])))
   const belt = (id: string, to?: string) =>
     world.belts.find((b) => b.from === id && (to === undefined || b.to === to))
@@ -24,9 +48,22 @@ export function stepCampaign(world: CampaignWorld, onTick: (ctx: Factory, events
     inspect(id) {
       const machine = findMachine(id)
       if (!machine) return
-      const { lastInput, recentProduction, batchDefect, builtAt, builtByCode, paid, batchTicks, ...view } =
-        machine
-      return structuredClone(view)
+      const {
+        lastInput,
+        recentProduction,
+        batchDefect,
+        builtAt,
+        builtByCode,
+        paid,
+        batchTicks,
+        fault,
+        heat,
+        heatLimit,
+        coolAt,
+        repairing,
+        ...view
+      } = machine
+      return structuredClone({ ...view, status: machine.fault ?? machine.status })
     },
     recipe(id) {
       return Object.hasOwn(RECIPES, id) ? structuredClone(RECIPES[id]) : undefined
@@ -46,6 +83,10 @@ export function stepCampaign(world: CampaignWorld, onTick: (ctx: Factory, events
       const item: MaterialItem = {
         kind: machine.deposit === 'coal' ? 'coal' : machine.deposit === 'iron' ? 'iron-ore' : 'copper-ore',
       }
+      if (beat >= 4 && id === 'mine') {
+        world.seed = (Math.imul(1664525, world.seed) + 1013904223) >>> 0
+        if (world.seed % 3 === 0) item.kind = 'copper-ore'
+      }
       if (!feed(belt(id), markDefect(world, item))) {
         machine.status = 'blocked'
         world.lost++
@@ -56,7 +97,11 @@ export function stepCampaign(world: CampaignWorld, onTick: (ctx: Factory, events
       return true
     },
     work(id, recipe) {
-      return work(findMachine(id), recipe)
+      const m = findMachine(id)
+      if (!m) return false
+      checkFurnaceInput(m, recipe ?? m.recipe, beat)
+      if (m.fault) return false
+      return work(m, recipe)
     },
     stock(id, kind) {
       const material = kind === 'ore' ? 'iron-ore' : kind === 'ingot' ? 'iron-ingot' : kind
@@ -86,7 +131,21 @@ export function stepCampaign(world: CampaignWorld, onTick: (ctx: Factory, events
   } finally {
     advanceTrips(world, findMachine)
     for (const machine of world.machines) {
-      finishProduction(world, machine)
+      checkFurnaceInput(machine, machine.recipe, beat)
+      if (!machine.fault) {
+        finishProduction(world, machine)
+        if (beat >= 6 && machine.kind === 'furnace') {
+          machine.heat =
+            machine.status === 'working' ? (machine.heat ?? 0) + 1 : Math.max(0, (machine.heat ?? 0) - 1)
+          machine.heatLimit ??= 180 + ((world.seed + machine.builtAt) % 100)
+          if (machine.heat >= machine.heatLimit) {
+            machine.fault = 'broken'
+            machine.status = 'blocked'
+            machine.heat = 0
+            machine.coolAt = world.tick + 240
+          }
+        }
+      }
       recordStats(world, machine)
     }
     for (const machine of world.machines) {
