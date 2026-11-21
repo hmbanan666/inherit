@@ -72,10 +72,7 @@ export function continueStep(c: Campaign): Campaign {
   }
   else if (f.reveals < reveals.length) {
     f.reveals++
-    if (f.reveals === reveals.length) {
-      f.index++
-      c.town.beat = 2
-    }
+    if (f.reveals === reveals.length) f.index++
   }
   return c
 }
@@ -91,6 +88,7 @@ export function finishCalls(c: Campaign, calls: CallRecord[], deliveredIngots: n
   ][f.index]
   f.phase = solved ? 'solved' : 'working'
   if (solved && f.index === 5) {
+    c.town.beat = 2
     c.economy.money += 64
     c.town.changes.push({ buildingId: 'forge', tick: c.world.tick, text: 'Bram lights his forge.' })
     c.progress.messages.push({ id: 'tab', kind: 'email', tick: c.world.tick, from: 'Mrs Harrow', title: 'The family tab', body: 'Your uncle left a tab with the bank. Pay when you are ready.', unread: true })

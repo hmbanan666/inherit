@@ -21,7 +21,6 @@ const { campaign, files, activeFile, dirty, ready, saved, error, surface, town, 
 const townPerson = ref<Townsperson['id']>()
 const replay = shallowRef<TownSnapshot['changes']>([])
 const highlighted = shallowRef<string[]>([])
-const requester = computed(() => town.value.people.find((p) => p.ask))
 const section = ref<WorkshopSection>('factory')
 const unread = computed(() => letters.value.filter(m => m.unread).length)
 const sectionNames: Record<WorkshopSection, string> = {
@@ -204,7 +203,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', hotkey, true)
   clearTimeout(toastTimer)
 })
-useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inherit' })
+useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' })
 </script>
 <template>
   <div class="workshop" :style="{ '--dock-width': dockWidth + '%' }">
