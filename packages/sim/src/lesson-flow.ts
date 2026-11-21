@@ -14,7 +14,7 @@ import {
   settleTown,
   TAB_LETTER,
 } from './town'
-import { lessons } from './lessons'
+import { firstIngotAfterRetry, lessons } from './lessons'
 
 export type StepPhase = 'brief' | 'working' | 'solved'
 export type Reveal =
@@ -30,6 +30,7 @@ export interface LessonStep {
   story: string
   task: string
   idea?: { name: string; explain: string }
+  example?: string
   starter?: string
   hints: [idea: string, places: string, lines: string]
   checks: { id: string; text: string }[]
@@ -69,12 +70,16 @@ export interface LessonProgress {
   passed: string[]
   queue: Reveal[]
   released: Reveal[]
+  firstCartRunEmpty?: boolean
 }
 
 export function currentStep(c: Campaign): StepView | undefined {
   const { index, phase, passed, queue } = c.lesson
-  const step = lessons[index]
+  let step = lessons[index]
   if (!step) return
+  if (step.id === 'bram-cart' && phase === 'solved' && c.lesson.firstCartRunEmpty) {
+    step = { ...step, solved: { ...step.solved, idea: firstIngotAfterRetry } }
+  }
   const request = activeRequest(c)
   const progress =
     request && deliverySteps.has(step.id) ? c.town.filled + ' / ' + request.quantity : undefined
@@ -134,8 +139,14 @@ export function updateBankStep(c: Campaign) {
   return c.lesson
 }
 
-export function beginLessonAttempt(c: Campaign): LessonProgress {
-  return c.lesson.phase === 'brief' ? { ...c.lesson, phase: 'working' } : c.lesson
+export function beginLessonAttempt(c: Campaign, calls: CallRecord[] = []): LessonProgress {
+  if (c.lesson.phase !== 'brief') return c.lesson
+  const lesson: LessonProgress = { ...c.lesson, phase: 'working' }
+  if (lessons[lesson.index]?.id === 'bram-cart') {
+    const pickup = calls.find(call => call.fn === 'take' && call.args[0] === 'furnace')
+    if (pickup && !pickup.ok && pickup.hand === null) lesson.firstCartRunEmpty = true
+  }
+  return lesson
 }
 
 /** Only observed floor effects count. A refactor also has to run in the player's named function. */
@@ -253,6 +264,7 @@ export function continueStep(c: Campaign): Campaign {
   }
   next.town.solved.push(lessons[flow.index].id)
   const step = lessons[++flow.index]
+  delete flow.firstCartRunEmpty
   flow.phase = 'brief'
   flow.passed = []
   const beat = step?.beat ?? 11

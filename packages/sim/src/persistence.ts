@@ -163,7 +163,7 @@ const save = shape({
   lesson: shape({
     index: v => count(v) && Number(v) <= lessons.length,
     phase: one('brief', 'working', 'solved'), passed: list(str),
-    released: list(reveal), queue: list(reveal),
+    released: list(reveal), queue: list(reveal), firstCartRunEmpty: opt(bool),
   }),
   seenSections: opt(list(one(...workshopSections))),
   town: shape({

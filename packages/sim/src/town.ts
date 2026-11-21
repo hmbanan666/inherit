@@ -8,7 +8,7 @@ import type { BuildingId, TownSnapshot } from './town-view'
 export const DAY = 1200
 export const INSTALLMENTS: readonly number[] = [100, 200, 300]
 export const TAB_LETTER =
-  'Your uncle borrowed 600 coins. Pay when you’re ready. You can start with 100 coins and keep the rest for the factory. Bram has one more job for the forge.'
+  'Your uncle borrowed 600 coins. Pay when you’re ready. You can start with 100 coins and keep the rest for the factory. Bram wants three more ingots for his forge. He’ll pay 12 coins for the order.'
 export const COMPETITION_LETTER =
   'Wen needs gears and I need plates. Read look("cart").wanted to see which delivery we still need.'
 type PersonId = TownSnapshot['people'][number]['id']

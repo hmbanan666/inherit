@@ -7,6 +7,7 @@ import {
   getSurface,
   jumpToStep,
   loadSave,
+  markMessageRead,
   revealed,
   serializeSave,
 } from './index'
@@ -49,4 +50,26 @@ test('Bram pays once and each Continue releases one saved reveal', () => {
     expect(c.progress.messages.some((m) => m.id === 'tab')).toBe(i >= 3)
   }
   expect(currentStep(c)).toMatchObject({ step: { id: 'harrow-tab' }, phase: 'brief' })
+})
+
+test('Bram pays for three more ingots only after his order has been shown and filled', () => {
+  let c = jumpToStep(createCampaign(), 'harrow-tab')
+  markMessageRead(c, 'tab')
+  c.town.waiting['iron-ingot'] = 2
+  advanceGame(c)
+  expect(c.economy.money).toBe(64)
+  expect(currentStep(c)?.step.solved.idea).toContain('12 coins for three more ingots')
+  expect(c.economy.orders).toHaveLength(0)
+
+  c = continueStep(c)
+  advanceGame(c)
+  expect(c.economy.orders).toMatchObject([{ customer: 'bram', items: { 'iron-ingot': 3 }, filled: { 'iron-ingot': 2 }, pay: 12 }])
+  expect(c.economy.money).toBe(64)
+  c.town.waiting['iron-ingot'] = 1
+  advanceGame(c)
+  expect(c.economy.money).toBe(76)
+  c.town.waiting['iron-ingot'] = 3
+  advanceGame(c)
+  expect(c.economy.money).toBe(76)
+  expect(c.economy.orders).toHaveLength(0)
 })

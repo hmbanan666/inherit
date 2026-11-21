@@ -133,3 +133,32 @@ test('Run once continues the deployed clock and keeps draft setup off the floor'
     program?.dispose()
   }
 })
+
+test.each([true, false])('the cart remembers whether the first Run found an unfinished ingot (%s)', async (ready) => {
+  let c = jumpToStep(createCampaign(), 'bram-cart')
+  const files = { 'main.ts': c.project.working['main.ts'] + 'take("furnace")\nput("cart")\n' }
+  if (ready) for (let i = 0; i < 6; i++) advanceGame(c)
+  const first = await startChapter(c, files, 'run')
+  expect(first.calls.find(call => call.fn === 'take' && call.args[0] === 'furnace')?.ok).toBe(ready)
+  c = loadSave(serializeSave(c))
+  if (!ready) {
+    for (let i = 0; i < 6; i++) advanceGame(c)
+    await startChapter(c, files, 'run')
+  }
+  expect(currentStep(c)).toMatchObject({ phase: 'solved', step: { solved: {
+    idea: ready ? 'The arm carried the ingot from the furnace to the cart.'
+      : 'Your first Run found the furnace still working, so take came back empty. Running again collected the finished ingot.',
+  } } })
+})
+
+test('deploying the press purchase twice buys one press for 28 coins', async () => {
+  const c = jumpToStep(createCampaign(), 'elsie-press')
+  const start = c.economy.money
+  const files = { 'main.ts': 'import { buy } from "inherit"\nbuy("press")\nexport function onTick() {}' }
+  for (let i = 0; i < 2; i++) {
+    const { program } = await startChapter(c, files, 'deploy')
+    program!.dispose()
+    expect(c.economy.money).toBe(start - 28)
+    expect(c.world.machines.filter(m => m.id === 'press')).toHaveLength(1)
+  }
+})

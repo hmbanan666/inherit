@@ -4,6 +4,9 @@ export const starter = `// Uncle's workshop. His arm can take from a place and p
 import { take, put } from "inherit"
 
 `
+export const firstIngotAfterRetry =
+  'Your first Run found the furnace still working, so take came back empty. Running again collected the finished ingot.'
+
 export const lessons: LessonStep[] = [
   {
     id: 'bram-take',
@@ -51,21 +54,21 @@ Press Run and watch the hearth.`,
     beat: 1,
     who: 'bram',
     title: 'Bring me the first ingot',
-    story: 'I’ll hold the cart steady. Is the first shoe blank ready?',
-    task: `Below your two lines, take finished iron from "furnace", then put it in "cart".
+    story: 'I’ll hold the cart steady. Is the first ingot ready?',
+    task: `Below your two lines, take the ingot from "furnace", then put it in "cart".
 Press Run. If the cart check stays empty, press Run again.`,
     idea: { name: 'Nothing ready yet', explain: 'A pickup can come back empty while a machine is working.' },
     hints: [
-      'Wait for the finished metal before loading.',
+      'Try the furnace again if the ingot is still taking shape.',
       'Take from the furnace, then put into the cart.',
       `take("furnace")
 put("cart")`,
     ],
     checks: [{ id: 'bram-cart', text: "First ingot in Bram's cart" }],
     solved: {
-      reaction: 'Just the iron I need for a horseshoe.',
+      reaction: 'I can hammer this ingot into a horseshoe.',
       did: 'Bram caught your first ingot.',
-      idea: 'You waited for the furnace to finish before collecting.',
+      idea: 'The arm carried the ingot from the furnace to the cart.',
       reward: 'Bram’s sample ingot',
     },
     button: 'run',
@@ -76,12 +79,15 @@ put("cart")`,
     who: 'bram',
     title: 'Give the hearth work a name',
     story: 'Uncle called feeding the furnace smelting. Can you show me his trick?',
-    task: `Keep Uncle’s import. Put the mine pickup and furnace drop inside the braces of a function named smelt.
-Call smelt() below the closing }, before the two cart lines. Press Run.`,
+    task: `Move your mine pickup and furnace drop inside the braces below. Keep the two cart lines after smelt() and press Run.`,
     idea: {
       name: 'Function',
-      explain: 'A function gives a name to steps you wrote so one call can run them together.',
+      explain: 'The first part names the job, and smelt() below asks the arm to do it.',
     },
+    example: `function smelt() {
+  // your two lines go here
+}
+smelt()`,
     hints: [
       'Keep the same two moves inside the braces.',
       'Put the mine pickup and furnace drop inside smelt, then call smelt.',
@@ -105,7 +111,7 @@ smelt()`,
     beat: 1,
     who: 'bram',
     title: 'Give loading the cart a name',
-    story: 'I can call for a load now. What shall I shout when the iron is ready?',
+    story: 'I can call for a load now. What shall I shout when the ingot is ready?',
     task: `Keep smelt and its call. Group the last two lines, from "furnace" to "cart", in a function named ship.
 Call ship() below it and press Run for another sample.`,
     idea: { name: 'Practice', explain: 'Each function keeps its own set of steps.' },
@@ -120,7 +126,7 @@ ship()`,
     ],
     checks: [{ id: 'bram-ship', text: 'Calling ship brings an ingot to the cart' }],
     solved: {
-      reaction: 'That’s another good shoe blank.',
+      reaction: 'Another ingot for my forge!',
       did: 'Your ship call loaded an ingot.',
       idea: 'You can now ask for either job by name.',
       reward: 'ship in your library',
@@ -133,11 +139,11 @@ ship()`,
     who: 'bram',
     title: 'Three ingots for the mail horse',
     story: 'Will you press Run all day? I’ve taken the samples. My forge needs a load of three.',
-    task: `Keep both function definitions. Move the calls smelt() and ship() into a new exported function named onTick at the bottom. Press Deploy.
-Watch three new ingots go into my cart.`,
+    task: `Move these two lines into a new block at the bottom: export function onTick() { ... }. The clock calls onTick() for you; you never call it yourself.
+Keep both named jobs and press Deploy.`,
     idea: {
       name: 'The factory clock',
-      explain: 'The clock calls onTick every tick, and export lets the clock see it.',
+      explain: 'The highlighted calls are smelt() and ship(). The word export lets the clock see onTick().',
     },
     hints: [
       'Let the clock repeat both jobs you already wrote.',
@@ -170,7 +176,7 @@ Choose Pay later to keep Bram’s coins for a press.`,
     solved: {
       reaction: 'I’ll keep your place in the book.',
       did: 'Mrs Harrow pencilled in your reply.',
-      idea: 'You can pay in installments as the town places orders.',
+      idea: 'Bram offers 12 coins for three more ingots. Your cart can fill his order when Orders opens.',
       reward: 'The press is for sale',
     },
     button: 'deploy',
@@ -181,9 +187,9 @@ Choose Pay later to keep Bram’s coins for a press.`,
     who: 'elsie',
     title: 'A press for the bread oven',
     story: 'My last loaf fell through the grate. Bram will sell you his press for 28 coins.',
-    task: `Type “, buy” just after put in Uncle’s import. On the next line, use buy with "press" in parentheses.
-Deploy and find the new machine.`,
-    idea: { name: 'Top level', explain: 'Lines outside a function run once when you deploy.' },
+    task: `Add “, buy” after put in Uncle’s import. On the next line, write buy("press") and press Deploy.
+This buys the press once for 28 coins. Deploying again won’t spend more coins.`,
+    idea: { name: 'When you deploy', explain: 'Lines outside your functions run once before the clock starts.' },
     hints: [
       'Place the order when the program starts.',
       'Add buy to the import and order a press at the top.',
@@ -204,7 +210,7 @@ buy("press")`,
     beat: 3,
     who: 'elsie',
     title: 'Stamp the first plate',
-    story: 'That die can flatten hot iron to the width of my grate.',
+    story: 'That die can flatten an ingot to the width of my grate.',
     task: `Rename ship to stamp and change its drop from "cart" to "press".
 Change its name in the clock too.`,
     idea: {
@@ -221,10 +227,10 @@ Change its name in the clock too.`,
 
 stamp()`,
     ],
-    checks: [{ id: 'elsie-stamp', text: 'An iron ingot reaches the press' }],
+    checks: [{ id: 'elsie-stamp', text: 'An ingot reaches the press' }],
     solved: {
-      reaction: 'Look at that iron flatten.',
-      did: 'You fed hot iron between the dies.',
+      reaction: 'Look at that ingot flatten.',
+      did: 'You fed an ingot between the dies.',
       idea: 'Your old route now makes a different product.',
       reward: 'A working press',
     },
@@ -236,11 +242,11 @@ stamp()`,
     who: 'elsie',
     title: 'Try the first plate',
     story: 'There’s a corner of my grate to test. Send that plate down and I’ll see if it fits.',
-    task: `Extend stamp with a collection after the iron delivery.
+    task: `Extend stamp with a collection after the ingot delivery.
 Bring Elsie her first plate from the press.`,
     idea: { name: 'Practice', explain: 'A finished plate waits at the press until the arm collects it.' },
     hints: [
-      'Drop off the iron before collecting a plate.',
+      'Drop off the ingot before collecting a plate.',
       'Take from press and put into cart at the end of stamp.',
       `take("press")
 put("cart")`,
@@ -427,7 +433,7 @@ put("cutter")`,
     solved: {
       reaction: 'I see the coil taking shape.',
       did: 'The cutter drew its first copper feed.',
-      idea: 'The arm put the iron down before picking up copper.',
+      idea: 'The arm put down the iron ingot before picking up the copper ingot.',
       reward: 'A coil in the making',
     },
     button: 'deploy',
@@ -623,10 +629,10 @@ Replace the first take and put in stamp with a call from "furnace" to "press".`,
 
 move("furnace", "press")`,
     ],
-    checks: [{ id: 'wen-move', text: 'The named move carries hot iron to the press' }],
+    checks: [{ id: 'wen-move', text: 'The named move carries an ingot to the press' }],
     solved: {
       reaction: 'Those same two moves will serve my mill.',
-      did: 'Your move brought iron to the press.',
+      did: 'Your move brought an ingot to the press.',
       idea: 'You chose the pickup and drop when you called move.',
       reward: 'move in your library',
     },

@@ -18,10 +18,6 @@ export async function startChapter(c: Campaign, files: ProjectFiles, mode: 'run'
   next.project.working = { ...files }
   if (mode === 'deploy') deployGameProject(next)
   const attempt = mode === primaryButton(next)
-  if (attempt) {
-    next.lesson = beginLessonAttempt(next)
-    if (next.lesson.phase === 'working' && mode === 'deploy') next.lesson.passed = []
-  }
   const tick = primitiveTick(next, mode === 'run' ? 'run' : 'deploy')
   const surface = getSurface(next)
   const options = { files, budget: surface.budget, chapterExports: surface.exports }
@@ -47,7 +43,11 @@ export async function startChapter(c: Campaign, files: ProjectFiles, mode: 'run'
     } else logs = await runOnce(options, tick.api)
     tick.finish()
     if (mode !== 'resume') {
-      if (attempt) next.lesson = observeLesson(next, tick.calls, logs)
+      if (attempt) {
+        next.lesson = beginLessonAttempt(next, tick.calls)
+        if (mode === 'deploy' && next.lesson.phase === 'working') next.lesson.passed = []
+        next.lesson = observeLesson(next, tick.calls, logs)
+      }
       Object.assign(c, next)
     }
     return { program, calls: mode === 'resume' ? [] : tick.calls, logs }
@@ -55,6 +55,7 @@ export async function startChapter(c: Campaign, files: ProjectFiles, mode: 'run'
     program?.dispose()
     if (mode === 'run' && tick.calls.length) {
       tick.finish()
+      if (attempt) next.lesson = beginLessonAttempt(next, tick.calls)
       Object.assign(c, next)
     } else if (attempt && mode === 'run') c.lesson = beginLessonAttempt(c)
     throw new ChapterRunError(error, tick.calls, [])
