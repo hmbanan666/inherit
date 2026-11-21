@@ -1,7 +1,7 @@
 import { createCampaign, snapshotProject } from './campaign'
 import { COMPETITION_LETTER, INSTALLMENTS, TAB_LETTER } from './town'
 import { MACHINES, MATERIALS, RECIPES } from './catalog'
-import type { Campaign, ProjectFiles } from './model'
+import { workshopSections, type Campaign, type ProjectFiles } from './model'
 
 export function serializeSave(campaign: Campaign): string {
   return JSON.stringify(campaign)
@@ -152,6 +152,7 @@ const world = shape({
 })
 const save = shape({
   version: one(4),
+  seenSections: opt(list(one(...workshopSections))),
   town: shape({
     beat: one(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
     entered: count,
@@ -275,6 +276,7 @@ function validate(campaign: Campaign) {
 }
 
 function restoreTown(c: Campaign) {
+  c.seenSections ??= ['code']
   const town = c.town as Campaign['town'] & { due?: number; interest?: boolean[]; installments?: number[] }
   if ('interest' in town || 'installments' in town || 'due' in town) {
     const principalPaid = INSTALLMENTS.slice(0, town.payments).reduce((sum, amount) => sum + amount, 0)

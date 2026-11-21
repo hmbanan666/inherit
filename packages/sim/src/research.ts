@@ -1,6 +1,6 @@
-import { onboardingStep } from './onboarding'
+import { bramActivity, onboardingStep } from './onboarding'
 import type { BlueprintAPI, Factory, MachineKind } from './campaign-api'
-import type { Campaign, ProjectFiles } from './model'
+import type { Campaign, ProjectFiles, WorkshopSection } from './model'
 import { deployProject, rollbackProject } from './campaign'
 
 export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'> | keyof BlueprintAPI
@@ -11,6 +11,8 @@ export interface HandleSurface {
   members: ('name' | 'dig' | 'connect' | 'smelt')[]
 }
 export interface UnlockedSurface {
+  sections: WorkshopSection[]
+  showMoney: boolean
   handles: HandleSurface[]
   methods: FactoryMethod[]
   events: GameEventName[]
@@ -195,6 +197,12 @@ export function research(c: Campaign, id: string): boolean {
 }
 export function getSurface(c: Campaign): UnlockedSurface {
   const { beat } = c.town
+  const sections: WorkshopSection[] = ['code']
+  if (beat > 1 || bramActivity(c).dug) sections.push('factory')
+  if (c.town.changes.length) sections.push('town')
+  if (beat > 1 && c.progress.messages.some(m => m.kind === 'email' && m.id !== 'uncle')) sections.push('inbox')
+  if (Object.keys(c.town.nextOrders).length || c.economy.orders.some(o => o.id.startsWith('order-')))
+    sections.push('orders')
   const step = onboardingStep(c)
   const handles: HandleSurface[] = []
   if (step >= 3) handles.push({
@@ -218,6 +226,8 @@ export function getSurface(c: Campaign): UnlockedSurface {
   if (beat >= 6) methods.push('inspect', 'machines', 'repair')
   if (beat >= 8) methods.push('orders')
   return {
+    sections,
+    showMoney: beat > 1,
     handles,
     methods,
     events: beat >= 6 ? ['onItemArrived', 'onMachineIdle'] : [],

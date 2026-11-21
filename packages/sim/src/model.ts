@@ -149,7 +149,11 @@ export interface ObjectiveRun {
   memoryKey?: string
   memoryValue?: number
 }
+export const workshopSections = ['code', 'factory', 'town', 'inbox', 'orders'] as const
+export type WorkshopSection = typeof workshopSections[number]
+
 export interface Campaign {
+  seenSections: WorkshopSection[]
   version: 4
   town: TownState
   world: CampaignWorld

@@ -68,6 +68,7 @@ export function createCampaign(seed = 1): Campaign {
   const files = { 'main.ts': uncleNote }
   const campaign: Campaign = {
     version: 4,
+    seenSections: ['code'],
     town: newTown(),
     world: {
       tick: 0,
