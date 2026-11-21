@@ -1,5 +1,7 @@
 # Persistent factory engine
 
+The game worker uses the licensed construction, objective and tick entry points in [the workshop game API](campaign-game.md). The lower-level interfaces below remain available for engine callers.
+
 Import these entry points from `@inherit/sim`. The old `World`, `Factory`, chapter levels and `createWorld(level, layout?)` still serve the chapter app. The campaign uses `CampaignWorld` and `CampaignFactory`. The self-contained player declarations at `@inherit/sim/campaign-api` export the campaign controller as `Factory` for Monaco. The chapter editor continues to use `@inherit/sim/api`.
 
 ```ts
@@ -7,7 +9,7 @@ createCampaign(seed?: number): Campaign
 cloneCampaign(campaign: Campaign): Campaign
 step(world: CampaignWorld, onTick: (ctx: CampaignFactory, events: FactoryEvent[]) => void): void
 serializeSave(campaign: Campaign): string
-loadSave(data: unknown): Campaign  // JSON text, parsed v2 or MVP notebook, null for a new game
+loadSave(data: unknown): Campaign  // JSON text, parsed v3/v2 or MVP notebook, null for a new game
 deployProject(campaign: Campaign): ProjectRevision
 rollbackProject(campaign: Campaign, revisionId: number): boolean
 snapshotProject(campaign: Campaign, name: string): ProjectRevision
@@ -18,7 +20,7 @@ removeMachine(campaign: Campaign, id: string): boolean
 removeBelt(campaign: Campaign, from: string, to: string): boolean
 ```
 
-`Campaign` (alias `SaveGame`) contains `version: 2`, `world`, `economy: { money, reputation, research: string[], orders: OrderState[] }`, `progress: { completedQuests: string[] }`, `memory: JsonObject` and `project: { working: ProjectFiles, deployed: ProjectFiles, history: ProjectRevision[], snapshots: ProjectRevision[] }`. A ProjectFiles is a flat Record<string,string> with entry 'main.ts'. Revisions have id, tick, name and files. Deploy, snapshots and rollback copy files. Working copies and snapshots may be unfinished. Deploy requires main.ts. An incomplete snapshot cannot be deployed by rollback. The worker compiles deployed files between ticks. Preview clones the entire campaign before compiling a separate program.
+`Campaign` (alias `SaveGame`) contains `version: 3`, `world`, `economy: { money, reputation, research: string[], orders: OrderState[], ... }`, `progress: { completedQuests: string[], ... }`, `memory: JsonObject` and `project: { working: ProjectFiles, deployed: ProjectFiles, history: ProjectRevision[], snapshots: ProjectRevision[] }`. A ProjectFiles is a flat Record<string,string> with entry 'main.ts'. Revisions have id, tick, name and files. Deploy, snapshots and rollback copy files. Working copies and snapshots may be unfinished. Deploy requires main.ts. An incomplete snapshot cannot be deployed by rollback. The worker compiles deployed files between ticks. Preview clones the entire campaign before compiling a separate program.
 
 `world` has tick, seed (current PRNG state), sites, machines, belts, trips, receipts, events (prior complete ticks, bounded), incidents, lost and delivered (material totals). Sites have id, name, plots, deposits and road connections. Plots are rectangles with x,y,width,height,status ('owned'/'sale'/'locked') and price. Coordinates are integer site-local tiles. Tile is {x,y}. Machine IDs are unique across sites. A belt is identified by its ordered pair of machine IDs. Machines have id,kind,siteId,x,y,queue: MaterialItem[], recipe?, status, remaining, output?, stats. A MaterialItem is {kind: MaterialId, defect?: true}. Belts have from,to,siteId,path: Tile[],items with id,kind,defect?,position. Initial shed IDs are 'shed', 'mine', 'furnace-a' and 'dock'. Second site is 'yard'. Set world.defectsEnabled when sorter research lands. Catalog exports are MATERIALS, RECIPES and MACHINES keyed by ID. Recipe IDs match their output material except scrap uses 'recycle'.
 
@@ -70,4 +72,4 @@ Machine and belt construction accepts a nonnegative integer purchase price. The 
 
 Every delivered event contains the actual parcel and its quality. The economy module can advance accepted orders from these events, apply prices and rewards, enable defects on sorter research and fill incident affectedOrders from its order board. The incident journal evicts the oldest closed record once it has 128 entries and retains open records. Incidents record blockage transitions, breakdowns and outstanding acknowledgements. Receipt keys are global across the save. Reusing a key for a different truck or route is rejected. Retrying a confirmed key succeeds immediately. A full destination holds the loaded truck at the roadhead until a slot opens.
 
-A fresh game accepts null or undefined. Loading a valid version 2 save returns detached JSON state. The unversioned MVP notebook imports the selected controller as working main.ts and archives chapter controllers as named project snapshots. Unsupported versions and invalid version 2 state throw so the host can preserve the original storage entry.
+A fresh game accepts null or undefined. Loading a valid version 3 save returns detached JSON state. Version 2 saves migrate to the game schema. The unversioned MVP notebook imports the selected controller as working main.ts and archives chapter controllers as named project snapshots. Unsupported versions and invalid versioned state throw so the host can preserve the original storage entry.
