@@ -228,7 +228,7 @@ test('follow definitions and references across files, search the draft and organ
   await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
   await replaceCode(page, helper.replace('ctx.dig', 'ctx.unknownCommand'))
   await expect(editor.locator('.squiggly-error').first()).toBeVisible()
-  await expect(page.getByText('Working copy', { exact: true })).toBeVisible()
+  await expect(page.locator('.editor-foot')).toContainText('Working copy')
 
   const tree = page.getByRole('region', { name: 'Project files' })
   await tree.getByRole('button', { name: 'New folder' }).click()
@@ -261,7 +261,7 @@ test('jump from a controller error to its module and clear the log ring', async 
     .getByRole('button', { name: 'lib/drive.ts' })
     .click()
   await replaceCode(page, 'export function feed() {\n  throw new Error("stuck valve")\n}')
-  await expect(page.getByText('Working copy', { exact: true })).toBeVisible()
+  await expect(page.locator('.editor-foot')).toContainText('Working copy')
   await page.keyboard.press('Control+s')
   await page.getByRole('tab', { name: 'Console' }).click()
   const output = page.getByRole('region', { name: 'Program console' })

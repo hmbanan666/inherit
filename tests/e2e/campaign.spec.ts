@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createCampaign, DAY, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
+import { advanceGame, createCampaign, DAY, TICK_MS, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
 import { chapterFiles } from '../../packages/sim/src/reference/chapter-one'
 import oldWorkshop from './fixtures/v2-workshop.json'
 
@@ -30,33 +30,79 @@ async function edit(page: Page, text: string) {
   await page.keyboard.press('Control+v')
   await expect(page.locator('.editor-foot')).toContainText('Working copy')
 }
+test('the workshop grows from Code to Factory after the first dig', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  const nav = page.getByRole('navigation', { name: 'Workshop sections' })
+  const factory = nav.getByRole('button', { name: 'Factory', exact: true })
+  const card = page.getByRole('region', { name: 'Current request' })
+  const editor = page.locator('.project-editor')
+  const deploy = page.locator('footer').getByRole('button', { name: 'Deploy', exact: true })
+  await expect(deploy).toBeEnabled()
+  await expect(editor.locator('.view-lines')).toContainText('The shed is yours')
+  await expect(nav.getByRole('button')).toHaveText(['Code'])
+  await expect(page.locator('.world-shell, .wallet, .bank-chip, .clock, .speeds')).toHaveCount(0)
+  await expect(page.getByRole('tabpanel', { name: 'Checks' })).toBeVisible()
+  const box = (await card.boundingBox())!
+  expect(box.y + box.height).toBeLessThanOrEqual((await editor.boundingBox())!.y)
+  await photo(page, 'first-launch')
+
+  await edit(page, chapterFiles(1, 2)['main.ts']!)
+  await expect(card).toContainText('2/7')
+  await deploy.click()
+  await expect(card).toContainText('3/7')
+  await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
+  await page.getByRole('tab', { name: 'Console' }).click()
+  await expect(page.getByRole('tabpanel', { name: 'Console' })).toContainText('tick')
+  await expect(nav.getByRole('button')).toHaveText(['Code'])
+  await photo(page, 'after-step-2')
+
+  await page.getByRole('tab', { name: 'Checks' }).click()
+  await edit(page, chapterFiles(1, 3)['main.ts']!)
+  await deploy.click()
+  await expect(card).toContainText('4/7')
+  await expect(factory).toContainText('new')
+  await expect(page.locator('.pixi-mount canvas')).toBeVisible()
+  await expect(page.locator('.wallet, .bank-chip')).toHaveCount(0)
+  await photo(page, 'after-step-3')
+  await page.reload()
+  await expect(factory).toContainText('new')
+  await factory.click()
+  await expect(factory).toHaveText('Factory')
+  await page.reload()
+  await expect(factory).toHaveText('Factory')
+  await edit(page, 'export function onTick() {\n  const rock = ;\n}')
+  await deploy.click()
+  await expect(page.locator('.runtime')).toContainText('Deploy failed · main.ts:2')
+  await expect(page.locator('.live')).toHaveText('Live')
+})
 test('a new player rebuilds Kettlewick with one growing controller', async ({ page }) => {
   // For the beginner pacing pass, leave the previous deployment running during reading and editing.
   const paced = process.env.INHERIT_PLAYTEST_PACE === 'beginner'
-  test.setTimeout(paced ? 1_200_000 : 240_000)
+  test.setTimeout(paced ? 1_200_000 : 300_000)
   const errors = browserErrors(page)
   const saved = () => page.evaluate((): Campaign => JSON.parse(localStorage.getItem('inherit.workshop.v1')!))
+  // While waiting for a shipment, advance the browser clock one ordinary factory tick at a time.
+  await page.clock.install()
+  const advanceUntil = async (condition: () => Promise<boolean>) => {
+    await expect.poll(async () => {
+      await page.clock.fastForward(TICK_MS)
+      return condition()
+    }, { intervals: [10], timeout: 120_000 }).toBe(true)
+  }
   const waitForMinute = async (minute: number) => {
-    if (paced)
-      await expect
-        .poll(async () => (await saved()).world.tick, {
-          intervals: [1000],
-          timeout: 240_000,
-        })
-        .toBeGreaterThanOrEqual(minute * 240)
+    if (paced) await advanceUntil(async () => (await saved()).world.tick >= minute * 240)
   }
   const button = (name: string) => page.getByRole('button', { name, exact: true })
   await page.goto('/')
   const card = page.getByRole('region', { name: 'Current request' })
   await expect(card).toContainText('Horseshoes for the mail horse')
   await expect(card).not.toContainText(/by evening|day \d|late/i)
-  await expect(page.locator('.pixi-mount canvas')).toBeVisible()
-  await expect(page.locator('.live')).toHaveText('Ready')
+  await expect(page.locator('.world-shell')).toHaveCount(0)
+  await expect(button('Deploy')).toBeEnabled()
   await expect(page.locator('.view-lines')).toBeVisible()
   await photo(page, '01-fresh-shed')
-  await button('8×').click()
   await waitForMinute(2.5)
-  await button('1×').click()
   const exactHint = async (step: number) => {
     await expect(card).toContainText(step + '/7')
     await expect(card.locator('code')).toContainText('____')
@@ -85,7 +131,7 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   expect((await saved()).world.tick).toBeLessThan(8 * 240)
   const art = page.getByRole('img', { name: /Bram’s forge/ })
   const visitChange = async (building: string, notice: RegExp, shot: string) => {
-    await expect(page.locator('.town-change')).toContainText(notice, { timeout: 90_000 })
+    await advanceUntil(async () => notice.test((await page.locator('.town-change').allTextContents()).join(' ')))
     await button('See it').click()
     await expect(page.locator('.town-print canvas')).toBeVisible()
     await expect(art).toHaveAccessibleName(new RegExp(building + ' working'))
@@ -95,6 +141,7 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
     expect(directory!.y + directory!.height).toBeLessThanOrEqual(frame!.y + frame!.height)
     await photo(page, shot)
   }
+  const waitForRequest = (title: string) => advanceUntil(async () => (await card.innerText()).includes(title))
   const deployBeat = async (beat: number) => {
     await edit(page, chapterFiles(beat)['main.ts']!)
     await button('Deploy').click()
@@ -109,9 +156,23 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   const pay = async () => {
     await button('Pay debt').click()
     const payment = page.getByRole('button', { name: /^Pay [0-9]+ coins$/ })
-    await expect(payment).toBeEnabled({ timeout: 100_000 })
+    await advanceUntil(() => payment.isEnabled())
     await payment.click()
   }
+  const nav = page.getByRole('navigation', { name: 'Workshop sections' })
+  const inbox = nav.getByRole('button', { name: 'Inbox' })
+  await expect(nav.getByRole('button', { name: 'Town' })).toContainText('new')
+  await expect(nav.getByRole('button', { name: 'Orders' })).toContainText('new')
+  await expect(page.locator('.wallet')).toContainText('coins')
+  await expect(page.locator('.bank-chip')).toContainText('Debt 600')
+  const letter = page.getByRole('status').filter({ hasText: 'New letter from Mrs Harrow' })
+  await letter.getByRole('button', { name: 'Open', exact: true }).click()
+  const mail = page.getByRole('complementary', { name: 'Inbox' })
+  const unread = await mail.getByRole('button', { name: 'Mark read' }).count()
+  await expect(inbox).toHaveText('Inbox ' + unread)
+  await mail.locator('article').filter({ hasText: 'Uncle' }).last().getByRole('button', { name: 'Mark read' }).click()
+  await expect(inbox).toHaveText('Inbox ' + (unread - 1))
+  await button('Close drawer').click()
   await visitChange('Bram’s forge', /forge lights up/, '02-forge')
   await expect(page.locator('.town-notice').filter({ hasText: 'bank window' })).toBeVisible()
   await photo(page, '03-bank-tab')
@@ -122,27 +183,25 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   if (paced) await pay()
   else await button('Pay later').click()
   await expect(card).toContainText('A grate for the bread oven')
+  await expect(card.locator('.request-work')).toContainText('ctx.work("press", "plate")')
   await clue(/press → cart/)
   await button('Factory').click()
-  await button('8×').click()
   await waitForMinute(18)
   await deployBeat(3)
   await visitChange('Bakery', /bakery/, '04-bakery')
-  await expect(card).toContainText('Light for Lamp Street', { timeout: 15_000 })
+  await waitForRequest('Light for Lamp Street')
   await clue(/copper-ingot/)
   await button('Factory').click()
   await deployBeat(4)
   if (paced) {
     await waitForMinute(25)
     // Keep the same equipment reserve as the beginner reference before paying the bank early.
-    await expect.poll(async () => (await saved()).economy.money, { timeout: 120_000 }).toBeGreaterThanOrEqual(250)
+    await advanceUntil(async () => (await saved()).economy.money >= 250)
     await pay()
   }
   await waitForMinute(29)
-  await button('1×').click()
   await deployBeat(5)
   await expect(card).toContainText(/[1-4] \/ 5 coils of wire/, { timeout: 30_000 })
-  await button('Pause').click()
   await photo(page, '05-midgame-wire')
   await button('Settings').click()
   await button('Swap sides').click()
@@ -154,11 +213,10 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await button('Settings').click()
   await button('Swap sides').click()
   await button('Settings').click()
-  await button('8×').click()
   await visitChange('Lamp Street', /glows/, '07-lamp-street')
   await button('Factory').click()
   await deployBeat(6)
-  await expect(card).toContainText('Teeth for the water wheel', { timeout: 30_000 })
+  await waitForRequest('Teeth for the water wheel')
   await clue(/gear/)
   await waitForMinute(40)
   await deployBeat(7)
@@ -168,7 +226,7 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await button('Factory').click()
   await waitForMinute(44)
   await deployBeat(8)
-  await expect(card).toContainText('The bridge to Riverside', { timeout: 60_000 })
+  await waitForRequest('The bridge to Riverside')
   await clue(/assembler/)
   await waitForMinute(56)
   const tree = page.getByRole('region', { name: 'Project files' })
@@ -192,7 +250,7 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   else {
     await button('Pay debt').click()
     const balance = button('Pay balance (600 coins)')
-    await expect(balance).toBeEnabled({ timeout: 100_000 })
+    await advanceUntil(async () => await balance.count() > 0 && await balance.isEnabled())
     await balance.click()
   }
   await expect(card).toContainText('The shed is yours.')
@@ -213,6 +271,8 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
 
 test('the town clock changes the light without printing a day or phase', async ({ page }) => {
   const campaign = createCampaign()
+  campaign.town.changes.push({ buildingId: 'forge', text: 'The forge lights up.', tick: 10 })
+  campaign.progress.messages.push({ ...campaign.progress.messages[0]!, id: 'tab', from: 'Mrs Harrow' })
   campaign.world.tick = 2 * DAY
   campaign.town.beat = 3
   await page.addInitScript((save) => localStorage.setItem('inherit.workshop.v1', save), serializeSave(campaign))
@@ -249,9 +309,9 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
     if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
   }, JSON.stringify(oldWorkshop))
   await page.goto('/')
-  await expect(page.locator('.live')).toHaveText('Ready')
+  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
   await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
-  await expect(page.locator('.statusbar')).toContainText('3 machines · 0 belts')
+  await expect(page.locator('.world-shell')).toHaveCount(0)
   await page.reload()
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
@@ -261,7 +321,7 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
   )
   expect(archive.project.working).toEqual(oldWorkshop.project.working)
   expect(archive.project.deployed).not.toEqual(oldWorkshop.project.deployed)
-  await expect(page.locator('.live')).toHaveText('Ready')
+  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
   expect(errors).toEqual([])
 })
 test('a controller fault leaves the world ticking and a previous revision can resume digging', async ({
@@ -282,8 +342,6 @@ test('a controller fault leaves the world ticking and a previous revision can re
   await page.getByRole('button', { name: /Restore #1 / }).click()
   await expect(page.locator('.runtime')).toHaveCount(0)
   await expect(page.locator('.view-lines')).toContainText('mine.dig()')
-  await button('Pause').click()
-  await expect(button('Resume')).toBeVisible()
   await button('Settings').click()
   await button('New game').click()
   await button('Keep playing').click()
@@ -316,8 +374,8 @@ test('a missing worker refreshes once and preserves the notebook draft', async (
       : route.continue(),
   )
   await page.goto('/')
-  await expect(page.locator('.live')).toHaveText('Ready', { timeout: 20000 })
-  expect(navigations).toBe(2)
+  await expect.poll(() => navigations, { timeout: 20000 }).toBe(2)
+  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
   await expect(page.locator('.view-lines')).toContainText('inherited draft')
@@ -329,6 +387,9 @@ test('a missing worker refreshes once and preserves the notebook draft', async (
 test.describe('a high-density mobile display', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true })
   test('panels stack beneath an inspectable floor', async ({ page }) => {
+    const c = createCampaign()
+    advanceGame(c, ctx => ctx.dig('mine'))
+    await page.addInitScript(save => localStorage.setItem('inherit.workshop.v1', save), serializeSave(c))
     await page.goto('/')
     const canvas = page.locator('.pixi-mount canvas')
     await expect(canvas).toBeVisible()
@@ -342,9 +403,10 @@ test.describe('a high-density mobile display', () => {
 test('a machine remembers the actual helper lines that commanded it', async ({ page }) => {
   const campaign = createCampaign()
   campaign.town.beat = 9
+  campaign.town.changes.push({ buildingId: 'forge', text: 'The forge lights up.', tick: 0 })
   campaign.project.working = {
     'main.ts':
-      'import { morning, evening } from "./lib/crew"\nexport function onTick(ctx) { (ctx.tick % 2 ? morning : evening)(ctx) }',
+      'import { morning, evening } from "./lib/crew"\nexport function onTick(ctx) { if (ctx.tick < 5) (ctx.tick % 2 ? morning : evening)(ctx) }',
     'lib/crew.ts':
       'export function morning(ctx) {\n  ctx.dig("mine")\n}\nexport function evening(ctx) {\n  ctx.dig("mine")\n}',
   }
@@ -358,7 +420,6 @@ test('a machine remembers the actual helper lines that commanded it', async ({ p
   const inspector = page.getByRole('region', { name: 'Machine inspector' })
   await expect(inspector).toContainText('morning · lib/crew.ts:2')
   await expect(inspector).toContainText('evening · lib/crew.ts:5')
-  await page.getByRole('button', { name: 'Pause', exact: true }).click()
   await page.getByRole('button', { name: 'evening · lib/crew.ts:5' }).click()
   await expect(page.locator('.view-lines')).toContainText('function evening')
   // Sample the mine's canvas pixels without the inspector or Monaco selection overlay.
@@ -390,10 +451,14 @@ test('a machine remembers the actual helper lines that commanded it', async ({ p
       (await mine.boundingBox())!,
     )
   await page.getByRole('button', { name: 'Close inspector' }).click()
-  // Return to the paused shed with the first pulse cleared.
+  // Let this short controller finish its digs before comparing the pulse with an idle mine.
+  await expect.poll(() => page.evaluate(() =>
+    JSON.parse(localStorage.getItem('inherit.workshop.v1')!).world.tick as number,
+  )).toBeGreaterThan(5)
   await page.getByRole('button', { name: 'Town', exact: true }).click()
   await page.getByRole('button', { name: 'Factory', exact: true }).click()
   await expect(floor).toBeVisible()
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   const rest = await pixels()
   const pulses = async () => {
     await expect.poll(async () => (await pixels()) !== rest, { intervals: [20] }).toBe(true)
