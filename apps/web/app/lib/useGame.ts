@@ -5,6 +5,7 @@ import {
   loadSave,
   serializeSave,
   TICK_MS,
+  townSnapshot,
   type ProjectFiles,
 } from '@inherit/sim'
 import { sandboxDeclarations } from '@inherit/sandbox/declarations'
@@ -32,6 +33,7 @@ export function provideGame() {
 function createGameStore() {
   const { buildId } = useRuntimeConfig().app
   const state = shallowRef(createCampaign())
+  const town = shallowRef(townSnapshot(state.value))
   const files = shallowRef(state.value.project.working)
   const activeFile = ref('main.ts'),
     selected = ref(''),
@@ -151,6 +153,7 @@ function createGameStore() {
     }
     c.project.working = files.value
     state.value = c
+    town.value = frame.town
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
     if (frame.error && error.value !== frame.error) {
@@ -276,6 +279,7 @@ function createGameStore() {
   function newGame() {
     stop()
     state.value = createCampaign()
+    town.value = townSnapshot(state.value)
     files.value = state.value.project.working
     blockedSave.value = false
     logs.value = []
@@ -294,6 +298,7 @@ function createGameStore() {
   onMounted(() => {
     try {
       state.value = loadSave(localStorage.getItem(saveKey))
+      town.value = townSnapshot(state.value)
       files.value = state.value.project.working
     } catch {
       blockedSave.value = true
@@ -312,6 +317,7 @@ function createGameStore() {
     window.removeEventListener('pagehide', persist)
   })
   return {
+    town,
     campaign: computed(() => state.value),
     files: computed(() => files.value),
     activeFile,

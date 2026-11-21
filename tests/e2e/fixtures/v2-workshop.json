@@ -1,0 +1,300 @@
+{
+  "version": 3,
+  "world": {
+    "tick": 0,
+    "seed": 1,
+    "nextMachineId": 1,
+    "nextIncidentId": 1,
+    "sites": [
+      {
+        "id": "shed",
+        "name": "Uncle’s shed",
+        "plots": [
+          {
+            "id": "shed-floor",
+            "x": 0,
+            "y": 0,
+            "width": 8,
+            "height": 5,
+            "status": "owned",
+            "price": 0
+          },
+          {
+            "id": "east-lot",
+            "x": 8,
+            "y": 0,
+            "width": 6,
+            "height": 5,
+            "status": "sale",
+            "price": 80
+          },
+          {
+            "id": "south-lot",
+            "x": 0,
+            "y": 5,
+            "width": 8,
+            "height": 5,
+            "status": "sale",
+            "price": 60
+          },
+          {
+            "id": "rail-spur",
+            "x": 8,
+            "y": 5,
+            "width": 6,
+            "height": 5,
+            "status": "locked",
+            "price": 180
+          }
+        ],
+        "deposits": [
+          {
+            "x": 1,
+            "y": 2,
+            "kind": "iron"
+          },
+          {
+            "x": 1,
+            "y": 4,
+            "kind": "coal"
+          },
+          {
+            "x": 9,
+            "y": 2,
+            "kind": "copper"
+          },
+          {
+            "x": 2,
+            "y": 7,
+            "kind": "iron"
+          }
+        ],
+        "roads": [
+          "yard"
+        ]
+      },
+      {
+        "id": "yard",
+        "name": "Freight yard",
+        "plots": [
+          {
+            "id": "roadhead",
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 5,
+            "status": "owned",
+            "price": 0
+          }
+        ],
+        "deposits": [
+          {
+            "x": 4,
+            "y": 2,
+            "kind": "copper"
+          }
+        ],
+        "roads": [
+          "shed"
+        ]
+      }
+    ],
+    "machines": [
+      {
+        "id": "mine",
+        "kind": "miner",
+        "siteId": "shed",
+        "x": 1,
+        "y": 2,
+        "paid": 0,
+        "builtAt": 0,
+        "remaining": 0,
+        "queue": [],
+        "status": "idle",
+        "recentProduction": [],
+        "stats": {
+          "processed": 0,
+          "activeTicks": 0,
+          "idleTicks": 0,
+          "blockedTicks": 0,
+          "rate": 0
+        },
+        "deposit": "iron"
+      },
+      {
+        "id": "furnace-a",
+        "kind": "furnace",
+        "siteId": "shed",
+        "x": 4,
+        "y": 2,
+        "paid": 0,
+        "builtAt": 0,
+        "remaining": 0,
+        "queue": [],
+        "status": "idle",
+        "recentProduction": [],
+        "stats": {
+          "processed": 0,
+          "activeTicks": 0,
+          "idleTicks": 0,
+          "blockedTicks": 0,
+          "rate": 0
+        },
+        "recipe": "iron-ingot",
+        "batchTicks": 4
+      },
+      {
+        "id": "dock",
+        "kind": "dock",
+        "siteId": "shed",
+        "x": 7,
+        "y": 2,
+        "paid": 0,
+        "builtAt": 0,
+        "remaining": 0,
+        "queue": [],
+        "status": "idle",
+        "recentProduction": [],
+        "stats": {
+          "processed": 0,
+          "activeTicks": 0,
+          "idleTicks": 0,
+          "blockedTicks": 0,
+          "rate": 0
+        }
+      }
+    ],
+    "belts": [
+      {
+        "siteId": "shed",
+        "from": "mine",
+        "to": "furnace-a",
+        "path": [
+          {
+            "x": 1,
+            "y": 2
+          },
+          {
+            "x": 2,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 2
+          },
+          {
+            "x": 4,
+            "y": 2
+          }
+        ],
+        "items": [],
+        "sequence": 0,
+        "paid": 0
+      },
+      {
+        "siteId": "shed",
+        "from": "furnace-a",
+        "to": "dock",
+        "path": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 6,
+            "y": 2
+          },
+          {
+            "x": 7,
+            "y": 2
+          }
+        ],
+        "items": [],
+        "sequence": 0,
+        "paid": 0
+      }
+    ],
+    "lost": 0,
+    "delivered": {},
+    "extracted": {},
+    "dockInterval": 1,
+    "defectsEnabled": false,
+    "trips": [],
+    "receipts": [],
+    "tripScript": [
+      "breakdown",
+      "lostAck"
+    ],
+    "events": [],
+    "lastEvents": [],
+    "incidents": []
+  },
+  "economy": {
+    "money": 100,
+    "reputation": 0,
+    "research": [],
+    "orders": [],
+    "researchPoints": 1,
+    "orderSeed": 1,
+    "nextOrder": 1,
+    "road": false
+  },
+  "progress": {
+    "completedQuests": [],
+    "completedObjectives": [],
+    "messages": [],
+    "signals": {
+      "choseRecipe": false,
+      "inspectedParcel": false,
+      "arrival": false,
+      "idle": false,
+      "breakdown": false,
+      "recovered": false,
+      "confirmed": false
+    },
+    "activeQuest": {
+      "id": "shed",
+      "startTick": 0,
+      "shipped": 0,
+      "lost": 0,
+      "coal": 0,
+      "furnaceActive": {
+        "furnace-a": 0
+      }
+    }
+  },
+  "project": {
+    "working": {
+      "main.ts": "import { feed } from \"./feed\"\nexport function onTick(ctx) { feed(ctx) }",
+      "feed.ts": "export function feed(ctx) { ctx.work(\"furnace-a\") }"
+    },
+    "deployed": {
+      "main.ts": "export function onTick(ctx) { ctx.dig(\"mine\") }"
+    },
+    "history": [
+      {
+        "id": 0,
+        "tick": 0,
+        "name": "Inherited program",
+        "files": {
+          "main.ts": "import type { Factory } from \"inherit\"\n\nexport function onTick(ctx: Factory) {\n  // Try ctx.dig(\"mine\") here.\n}\n"
+        }
+      },
+      {
+        "id": 1,
+        "tick": 0,
+        "name": "Deploy",
+        "files": {
+          "main.ts": "export function onTick(ctx) { ctx.dig(\"mine\") }"
+        }
+      }
+    ],
+    "snapshots": [],
+    "nextRevision": 2
+  },
+  "memory": {}
+}

@@ -48,6 +48,6 @@ const groups = computed(() => {
 <style scoped src="../lib/devtools/panels.css"></style>
 <style scoped>
 button[aria-pressed='true'] {
-  border-color: #dfba78;
+  border-color: var(--accent-soft);
 }
 </style>

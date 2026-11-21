@@ -46,8 +46,8 @@ const buildings: Record<BuildingId, string> = {
   'town-hall': 'Town hall',
   riverside: 'Riverside',
 }
-type Person = TownSnapshot['people'][number]
-const people: [Person['id'], string, string, BuildingId][] = [
+export type Townsperson = TownSnapshot['people'][number]
+const people: [Townsperson['id'], string, string, BuildingId][] = [
   ['bram', 'Bram', 'Blacksmith', 'forge'],
   ['elsie', 'Elsie', 'Baker', 'bakery'],
   ['tomas', 'Tomas', 'Lamplighter', 'lamp-street'],
@@ -110,7 +110,10 @@ export function townSnapshot(c: Campaign): TownSnapshot {
             ? {
                 requestId: 'installment-' + town.payments,
                 title: 'The family tab',
-                text: 'Your uncle borrowed 600 coins. Pay 100 by day 3, 200 by day 6 and 300 by day 10. Your regulars can cover it.',
+                text:
+                  town.beat === 2
+                    ? 'Your uncle borrowed 600 coins. Pay 100 by day 3, 200 by day 6 and 300 by day 10. Bram pays for regular ingots.'
+                    : 'The bridge stands. Settle the remaining installments and the shed is yours.',
                 items: { coins: next.amount },
                 filled: { coins: Math.min(c.economy.money, next.amount) },
                 dueLabel: 'by day ' + next.dueDay,

@@ -3,3 +3,5 @@ packages:
   - packages/*
 onlyBuiltDependencies:
   - esbuild
+patchedDependencies:
+  monaco-editor@0.52.2: patches/monaco-editor@0.52.2.patch

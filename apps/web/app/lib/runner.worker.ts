@@ -5,6 +5,7 @@ import {
   rollbackGameProject,
   getSurface,
   loadSave,
+  townSnapshot,
   payInstallment,
   markMessageRead,
   snapshotProject,
@@ -112,6 +113,7 @@ self.onmessage ??= async ({ data }: MessageEvent<Action>) => {
   const changed = ['init', 'deploy', 'rollback', 'snapshot'].includes(data.kind)
   self.postMessage({
     campaign: live,
+    town: townSnapshot(campaign),
     project: changed ? project : undefined,
     active: !!program,
     feedback,

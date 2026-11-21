@@ -1,6 +1,6 @@
 const title = 'inherit — a factory you program'
 const description =
-  'Program the machines in your uncle’s shed. Write a TypeScript controller, route materials and ship each customer’s order.'
+  'Your uncle left a factory and a debt. Build machines and belts with TypeScript to fill Kettlewick’s requests and rebuild its bridge.'
 
 export default defineNuxtConfig({
   ssr: false,

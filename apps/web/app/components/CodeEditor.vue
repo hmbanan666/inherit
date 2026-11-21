@@ -189,28 +189,30 @@ onMounted(() => {
   })
   ts.typescriptDefaults.setEagerModelSync(true)
   library = monaco.editor.createModel(api.value, 'typescript', monaco.Uri.file('/api.d.ts'))
+  const palette = getComputedStyle(host.value!)
+  const color = (token: string) => palette.getPropertyValue(token).trim()
   monaco.editor.defineTheme('foundry', {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'comment', foreground: '818982', fontStyle: 'italic' },
-      { token: 'keyword', foreground: 'c99bd5' },
-      { token: 'string', foreground: 'e2b879' },
-      { token: 'type.identifier', foreground: '87bfb6' },
-      { token: 'delimiter', foreground: '9da6a7' },
-      { token: 'number', foreground: 'e7a675' },
-      { token: 'identifier', foreground: 'd5d9d3' },
+      { token: 'comment', foreground: color('--syntax-comment').slice(1), fontStyle: 'italic' },
+      { token: 'keyword', foreground: color('--syntax-keyword').slice(1) },
+      { token: 'string', foreground: color('--accent-soft').slice(1) },
+      { token: 'type.identifier', foreground: color('--syntax-type').slice(1) },
+      { token: 'delimiter', foreground: color('--sub').slice(1) },
+      { token: 'number', foreground: color('--syntax-number').slice(1) },
+      { token: 'identifier', foreground: color('--soft').slice(1) },
     ],
     colors: {
-      'editor.background': '#1d2022',
-      'editorLineNumber.foreground': '#737b7c',
-      'editorLineNumber.activeForeground': '#d1d5cb',
-      'editor.lineHighlightBackground': '#25292a',
-      'editorCursor.foreground': '#efbf4d',
-      'editor.selectionBackground': '#56533d',
-      'editorIndentGuide.background1': '#343a3a',
-      'editorWidget.background': '#24282a',
-      'editorGutter.background': '#1d2022',
+      'editor.background': color('--surface-low'),
+      'editorLineNumber.foreground': color('--editor-muted'),
+      'editorLineNumber.activeForeground': color('--soft'),
+      'editor.lineHighlightBackground': color('--panel'),
+      'editorCursor.foreground': color('--gold'),
+      'editor.selectionBackground': color('--accent-shadow'),
+      'editorIndentGuide.background1': color('--line'),
+      'editorWidget.background': color('--surface-raised'),
+      'editorGutter.background': color('--surface-low'),
     },
   })
   editor = monaco.editor.create(host.value!, {
@@ -234,6 +236,15 @@ onMounted(() => {
     fixedOverflowWidgets: true,
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: 'Factory controller TypeScript editor',
+  })
+  editor.onMouseDown(({ target }) => {
+    if (!target.position || target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return
+    const file = current.value
+    if (files.value[file] !== campaign.value.project.deployed[file]) return
+    const line = target.position.lineNumber
+    emit('focusIds', Object.keys(game.traces.value).filter(id =>
+      game.traces.value[id]?.some(site => site.file === file && site.line === line),
+    ))
   })
   syncFiles()
   runtimeMarker()
@@ -368,12 +379,12 @@ onBeforeUnmount(() => {
   overflow-x: auto;
   flex: none;
   min-height: 29px;
-  border-bottom: 1px solid #3b403c;
-  background: #1a1d1e;
+  border-bottom: 1px solid var(--line);
+  background: var(--base);
 }
 .project-tabs button {
   padding: 3px 7px;
-  color: #bcc4bc;
+  color: var(--sub);
   font:
     11px 'IBM Plex Mono',
     monospace;
@@ -386,12 +397,12 @@ onBeforeUnmount(() => {
   display: flex;
 }
 .chosen {
-  box-shadow: inset 0 -2px #d1a34f;
-  background: #272a29;
+  box-shadow: inset 0 -2px var(--gold);
+  background: var(--surface-raised);
 }
 .tab i,
 .draft {
-  color: #e6bc68;
+  color: var(--gold);
   font-style: normal;
 }
 .space {
@@ -409,9 +420,9 @@ onBeforeUnmount(() => {
   left: 4px;
   right: 4px;
   max-height: 65%;
-  border: 1px solid #62614c;
-  background: #222625;
-  box-shadow: 0 4px 12px #111a;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 .finder.docked {
   top: 3px;

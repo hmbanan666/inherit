@@ -22,23 +22,23 @@
   margin: 0;
   font-size: 12px;
   font-weight: 700;
-  color: #e2e4da;
+  color: var(--text);
 }
 .bench input,
 .bench select {
   min-width: 0;
   max-width: 100%;
-  background: #181b1d;
-  color: #e0e2d9;
-  border: 1px solid #49504d;
+  background: var(--surface-low);
+  color: var(--soft);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px 6px;
   font: inherit;
 }
 .bench button {
-  color: #d4b77d;
-  background: #262927;
-  border: 1px solid #424743;
+  color: var(--accent-soft);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
   padding: 3px 7px;
   border-radius: 4px;
   font: inherit;
@@ -46,8 +46,8 @@
 }
 .bench button:hover,
 .bench button:focus-visible {
-  color: #ffe09b;
-  border-color: #bb965a;
+  color: var(--gold);
+  border-color: var(--accent-line);
 }
 .bench button:disabled {
   opacity: 0.55;
@@ -58,7 +58,7 @@
 }
 .quiet,
 .tick {
-  color: #a2aba6;
+  color: var(--sub);
 }
 .tick,
 .mono {
@@ -68,10 +68,10 @@
   overflow-wrap: anywhere;
 }
 .bad {
-  color: #ffa594;
+  color: var(--alert);
 }
 .good {
-  color: #94d4ab;
+  color: var(--mint);
 }
 .rows {
   list-style: none;
@@ -82,5 +82,5 @@
 }
 .row {
   padding: 4px 0;
-  border-bottom: 1px solid #353a37;
+  border-bottom: 1px solid var(--line);
 }

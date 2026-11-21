@@ -162,3 +162,17 @@ test('jump from a controller error to its module and clear the log ring', async 
   await output.getByRole('button', { name: 'Clear' }).click()
   await expect(output.getByRole('listitem')).toHaveCount(0)
 })
+
+test('switching modules while Monaco highlights a word leaves the editor healthy', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await workshop(page)
+  const tree = page.getByRole('region', { name: 'Project files' })
+  for (const path of ['lib/drive.ts', 'main.ts', 'lib/drive.ts']) {
+    await page.locator('.project-editor .view-lines').first().click()
+    await page.keyboard.press('ArrowLeft')
+    await tree.getByRole('button', { name: path, exact: true }).dispatchEvent('click')
+    await expect(tab(page, path)).toHaveAttribute('aria-pressed', 'true')
+  }
+  expect(errors).toEqual([])
+})

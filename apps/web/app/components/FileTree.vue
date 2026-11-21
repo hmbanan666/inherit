@@ -155,7 +155,7 @@ function submit() {
   gap: 5px;
   width: 100%;
   text-align: left;
-  color: #c5cbc4;
+  color: var(--soft);
   background: transparent;
   border: none;
   font:
@@ -164,14 +164,14 @@ function submit() {
   overflow-wrap: anywhere;
 }
 .tree .rows button.chosen {
-  background: #34352d;
-  color: #f4ce87;
+  background: var(--accent-surface);
+  color: var(--accent-soft);
 }
 .tree form {
   display: grid;
   gap: 5px;
 }
 .tree small {
-  color: #b0935a;
+  color: var(--accent-line);
 }
 </style>

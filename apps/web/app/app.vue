@@ -13,18 +13,16 @@ import {
   Settings2,
   X,
 } from '@lucide/vue'
-import { townSnapshot } from '@inherit/sim'
+import type { TownSnapshot, Townsperson } from '@inherit/sim'
 import { provideGame } from './lib/useGame'
-import TownRegister from './components/TownRegister.vue'
-const townViews = import.meta.glob<typeof TownRegister>('./components/town/TownView.vue', {
-  eager: true,
-  import: 'default',
-})
-const TownView = townViews['./components/town/TownView.vue'] ?? TownRegister
+import TownView from './components/town/TownView.vue'
+import TownPortrait from './components/town/TownPortrait.vue'
 
 const g = provideGame()
-const { campaign, files, activeFile, dirty, ready, paused, speed, saved, error, surface } = g
-const town = computed(() => townSnapshot(campaign.value))
+const { campaign, files, activeFile, dirty, ready, paused, speed, saved, error, surface, town } = g
+const townPerson = ref<Townsperson['id']>()
+const replay = shallowRef<TownSnapshot['changes']>([])
+const highlighted = shallowRef<string[]>([])
 const requester = computed(() => town.value.people.find((p) => p.ask))
 const area = ref<'Factory' | 'Town'>('Factory')
 const tab = ref<'controller' | 'api'>('controller')
@@ -35,7 +33,7 @@ const swapped = ref(false)
 const dockWidth = ref(40)
 const consoleOpen = ref(true)
 const editor = ref<{ revealLine(file: string, line: number): void }>()
-const celebration = ref('')
+const celebration = shallowRef<TownSnapshot['changes']>([])
 const story = ref('')
 const unread = computed(() => campaign.value.progress.messages.filter((m) => m.unread).length)
 const latest = computed(() => campaign.value.progress.messages.at(-1))
@@ -67,11 +65,7 @@ function notify(value: string) {
 watch(
   () => town.value.changes.length,
   (n, last) => {
-    if (ready.value && n > last)
-      celebration.value = town.value.changes
-        .slice(last)
-        .map((change) => change.text)
-        .join(' ')
+    if (ready.value && area.value === 'Factory' && n > last) celebration.value = town.value.changes.slice(last)
   },
 )
 watch(
@@ -111,10 +105,21 @@ function askNewGame() {
   confirmNew.value = true
   menu.value = ''
 }
-function seeTownChange() {
-  area.value = 'Town'
-  celebration.value = ''
+function highlightMachines(ids: string[]) {
+  if (!ids.length) return
+  highlighted.value = ids
   drawer.value = ''
+  area.value = 'Factory'
+}
+function openTown(person?: Townsperson['id']) {
+  replay.value = celebration.value
+  const building = celebration.value[0]?.buildingId
+  const residence = building === 'bridge' ? 'town-hall' : building
+  townPerson.value = person ?? town.value.people.find((p) => p.buildingId === residence)?.id
+  celebration.value = []
+  highlighted.value = []
+  drawer.value = ''
+  area.value = 'Town'
 }
 function swap() {
   swapped.value = !swapped.value
@@ -148,8 +153,11 @@ function reset() {
   menu.value = ''
   area.value = 'Factory'
   drawer.value = ''
-  celebration.value = ''
+  celebration.value = []
+  replay.value = []
+  townPerson.value = undefined
   story.value = ''
+  highlighted.value = []
   g.newGame()
 }
 onMounted(() => {
@@ -268,31 +276,29 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
               v-for="view in ['Factory', 'Town'] as const"
               :key="view"
               :aria-pressed="area === view"
-              @click="area = view"
+              @click="view === 'Town' ? openTown() : (area = view)"
             >
               {{ view }}
             </button>
           </nav>
-          <button v-if="requester" class="bubble" @click="area = 'Town'">
+          <button v-if="requester" class="bubble" @click="openTown(requester.id)">
+            <TownPortrait :person="requester" />
             {{ requester.name }} · {{ requester.ask?.title }}
           </button>
           <button v-else-if="campaign.economy.orders.length" class="bubble" @click="toggleDrawer('Orders')">
             {{ campaign.economy.orders.length }} open orders
           </button>
         </div>
-        <div class="map-frame" :data-phase="town.phase">
-          <LazyFactoryFloor v-if="area === 'Factory'" />
-          <TownView v-else :town="town" />
-          <aside v-if="celebration" class="town-change" role="status">
+        <div class="map-frame" :data-phase="area === 'Factory' ? town.phase : undefined">
+          <LazyFactoryFloor v-if="area === 'Factory'" :highlighted="highlighted" />
+          <TownView v-else v-model:selection="townPerson" :snapshot="town" :replay="replay" />
+          <aside v-if="celebration.length" class="town-change" role="status">
             <div>
-              <small class="eyebrow">Town change</small><b>{{ celebration }}</b>
+              <small class="eyebrow">Town change</small>
+              <b>{{ celebration.map((change) => change.text).join(' ') }}</b>
             </div>
-            <button
-              @click="seeTownChange"
-            >
-              See it
-            </button>
-            <button aria-label="Dismiss celebration" @click="celebration = ''"><X /></button>
+            <button @click="openTown()">See it</button>
+            <button aria-label="Dismiss celebration" @click="celebration = []"><X /></button>
           </aside>
           <aside v-if="drawer" class="drawer" :aria-label="drawer">
             <header>
@@ -348,7 +354,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         </div>
         <div v-if="error" class="runtime" role="alert">{{ error }}</div>
         <div v-show="tab === 'controller'" class="editor-host">
-          <LazyCodeEditor ref="editor" :error="error" />
+          <LazyCodeEditor ref="editor" :error="error" @focus-ids="highlightMachines" />
         </div>
         <pre v-if="tab === 'api'" class="api-source">{{ g.api.value }}</pre>
         <div class="editor-foot">
@@ -446,7 +452,14 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
   color: var(--gold);
   border-color: var(--gold);
 }
+.bubble canvas {
+  width: 20px;
+  border-radius: 3px;
+}
 .bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 16px 16px 16px 3px;
   font-size: 12px;
   color: var(--sub);
@@ -467,6 +480,16 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
 }
 .town-change button {
   flex: none;
+}
+.bank-chip > button {
+  gap: 8px;
+  font: 12px var(--mono);
+}
+.bank-chip b {
+  padding: 3px 7px;
+  border: 1px solid var(--accent-line);
+  border-radius: 4px;
+  color: var(--gold);
 }
 .bank-chip .hud-menu {
   min-width: 200px;
