@@ -51,36 +51,35 @@ test('a new player rebuilds Kettlewick with one growing controller', async ({ pa
   await expect(card).toContainText('Horseshoes for the mail horse')
   await expect(card).not.toContainText(/by evening|day \d|late/i)
   await expect(page.locator('.pixi-mount canvas')).toBeVisible()
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.locator('.live')).toHaveText('Ready')
   await expect(page.locator('.view-lines')).toBeVisible()
   await photo(page, '01-fresh-shed')
   await button('8×').click()
   await waitForMinute(2.5)
   await button('1×').click()
-  await button('Hint').click()
-  await expect(card.locator('code')).toHaveText('ctx.dig("mine")')
-  const lines: string[] = []
-  for (const [line, next] of [
-    ['ctx.dig("mine")', 'Add the mine’s belt'],
-    ['ctx.connect("mine", "furnace")', 'Tell the furnace to smelt'],
-    ['ctx.work("furnace")', 'Connect the furnace to the cart'],
-    ['ctx.connect("furnace", "cart")', 'Leave the controller running'],
-  ] as const) {
-    lines.push(line)
-    await edit(
-      page,
-      'import type { Factory } from "inherit"\nexport function onTick(ctx: Factory) {\n  ' +
-        lines.join('\n  ') +
-        '\n}',
-    )
-    await button('Deploy').click()
-    await expect(card).toContainText(next)
-    // Leave time to read the final onboarding hint before the third ingot ships.
-    if (lines.length < 4) {
-      await button('Hint').click()
-      await expect(card.locator('code')).toBeVisible()
-    }
+  const exactHint = async (step: number) => {
+    await expect(card).toContainText(step + '/7')
+    await expect(card.locator('code')).toContainText('____')
+    await button('Hint').click()
+    await expect(button('Show exact step')).toBeVisible()
+    await button('Show exact step').click()
+    return card.locator('code').allTextContents()
   }
+  const [handler] = await exactHint(1)
+  await edit(page, handler!)
+  await exactHint(2)
+  await button('Deploy').click()
+  await expect(card).toContainText('3/7')
+  const body = ['console.log("tick")']
+  let header = ''
+  for (const step of [3, 4, 5, 6]) {
+    const code = await exactHint(step)
+    if (code[0]!.startsWith('import')) header = code.shift()!
+    body.push(code[0]!)
+    await edit(page, header + '\nexport function onTick() {\n  ' + body.join('\n  ') + '\n}')
+    await button('Deploy').click()
+  }
+  await expect(card).toContainText('7/7')
   await expect(card).toContainText('The family tab', { timeout: 15000 })
   await expect(button('See it')).toBeVisible()
   expect((await saved()).world.tick).toBeLessThan(8 * 240)
@@ -250,7 +249,7 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
     if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
   }, JSON.stringify(oldWorkshop))
   await page.goto('/')
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.locator('.live')).toHaveText('Ready')
   await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
   await expect(page.locator('.statusbar')).toContainText('3 machines · 0 belts')
   await page.reload()
@@ -262,7 +261,7 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
   )
   expect(archive.project.working).toEqual(oldWorkshop.project.working)
   expect(archive.project.deployed).not.toEqual(oldWorkshop.project.deployed)
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.locator('.live')).toHaveText('Ready')
   expect(errors).toEqual([])
 })
 test('a controller fault leaves the world ticking and a previous revision can resume digging', async ({
@@ -282,7 +281,7 @@ test('a controller fault leaves the world ticking and a previous revision can re
   await button('Deploy history').click()
   await page.getByRole('button', { name: /Restore #1 / }).click()
   await expect(page.locator('.runtime')).toHaveCount(0)
-  await expect(page.locator('.view-lines')).toContainText('ctx.dig("mine")')
+  await expect(page.locator('.view-lines')).toContainText('mine.dig()')
   await button('Pause').click()
   await expect(button('Resume')).toBeVisible()
   await button('Settings').click()
@@ -317,7 +316,7 @@ test('a missing worker refreshes once and preserves the notebook draft', async (
       : route.continue(),
   )
   await page.goto('/')
-  await expect(page.locator('.live')).toHaveText('Live', { timeout: 20000 })
+  await expect(page.locator('.live')).toHaveText('Ready', { timeout: 20000 })
   expect(navigations).toBe(2)
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
