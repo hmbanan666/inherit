@@ -27,7 +27,6 @@ function request(
   item: string,
   total: number,
   filled: number,
-  dueLabel: string,
 ): TownAsk {
   return {
     requestId,
@@ -35,8 +34,6 @@ function request(
     text,
     items: { [item]: total },
     filled: { [item]: filled },
-    dueLabel,
-    late: false,
   }
 }
 const asks = [
@@ -47,7 +44,6 @@ const asks = [
     'iron-ingot',
     3,
     1,
-    'by evening',
   ),
   request(
     'oven-grate',
@@ -56,7 +52,6 @@ const asks = [
     'plate',
     4,
     2,
-    'by morning',
   ),
   request(
     'lamp-wire',
@@ -65,7 +60,6 @@ const asks = [
     'wire',
     5,
     3,
-    'by evening',
   ),
   request(
     'water-wheel',
@@ -74,7 +68,6 @@ const asks = [
     'gear',
     3,
     1,
-    'by day 7',
   ),
   request(
     'bridge-brackets',
@@ -83,7 +76,6 @@ const asks = [
     'bracket',
     6,
     4,
-    'by day 10',
   ),
 ]
 type Change = TownSnapshot['changes'][number]
@@ -142,28 +134,14 @@ export const townFrames = milestones.map(([name, day, phase, clock], step) => {
       name,
       role,
       buildingId,
-      mood:
-        i === step && step === 2
-          ? 'worried'
-          : i < step || step >= 5
-            ? 'happy'
-            : i === 3 && step === 0
-              ? 'gone'
-              : 'waiting',
-      ask: i === step && asks[step] ? { ...asks[step], late: step === 2 } : undefined,
+      mood: i < step || step >= 5 ? 'happy' : i === 3 && step === 0 ? 'gone' : 'waiting',
+      ask: i === step ? asks[step] : undefined,
     }))
   const paid = step === 6 ? 600 : step >= 4 ? 300 : step >= 2 ? 100 : 0
   const debt = {
     paid,
     owed: 600 - paid,
-    next:
-      paid === 600
-        ? undefined
-        : {
-            amount: paid === 300 ? 300 : paid === 100 ? 200 : 100,
-            dueDay: paid === 300 ? 10 : paid === 100 ? 6 : 3,
-            late: false,
-          },
+    next: paid === 600 ? undefined : { amount: paid === 300 ? 300 : paid === 100 ? 200 : 100 },
   }
   const bank = buildings.find(b => b.id === 'bank')!
   if (step > 0) bank.label = debt.owed ? debt.owed + ' coins owed' : 'Paid in full'

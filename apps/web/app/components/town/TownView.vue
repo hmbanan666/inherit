@@ -2,7 +2,6 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { Application } from 'pixi.js'
 import {
-  Clock3,
   Coins,
   MapPin,
   Moon,
@@ -10,8 +9,7 @@ import {
   Sunrise,
   Sunset,
   Smile,
-  Frown,
-  Hourglass,
+  MessageCircle,
   Footprints,
 } from '@lucide/vue'
 import { TownScene } from '../../lib/townScene'
@@ -31,7 +29,7 @@ const person = computed(
 )
 const readyBuilding = computed(() => props.snapshot.buildings.find((b) => b.id === person.value?.buildingId))
 const phaseIcon = { morning: Sunrise, day: Sun, evening: Sunset, night: Moon }
-const moodIcon = { happy: Smile, worried: Frown, waiting: Hourglass, gone: Footprints }
+const moodIcon = { happy: Smile, waiting: MessageCircle, gone: Footprints }
 const amounts = computed(() =>
   Object.entries(person.value?.ask?.items ?? {}).map(([kind, amount]) => ({
     kind: kind.replaceAll('-', ' '),
@@ -124,9 +122,6 @@ onBeforeUnmount(() => {
               <span v-for="a in amounts" :key="a.kind"
                 ><b>{{ a.filled }}/{{ a.required }}</b> {{ a.kind }}</span
               >
-              <span :class="{ overdue: person.ask.late }"
-                ><Clock3 />{{ person.ask.late ? 'Late · ' : '' }}{{ person.ask.dueLabel }}</span
-              >
             </div>
           </template>
           <template v-else-if="person.id === 'harrow' && readyBuilding?.label">
@@ -135,8 +130,7 @@ onBeforeUnmount(() => {
             >
             <p>
               {{ snapshot.debt.paid }} coins paid<span v-if="snapshot.debt.next">
-                · {{ snapshot.debt.next.amount }} due by day {{ snapshot.debt.next.dueDay
-                }}{{ snapshot.debt.next.late ? ' · Late' : '' }}</span
+                · Next installment {{ snapshot.debt.next.amount }} coins</span
               >
             </p>
           </template>
@@ -305,17 +299,12 @@ onBeforeUnmount(() => {
   color: var(--sub);
   text-transform: capitalize;
 }
-.speaker small svg,
-.town-terms svg {
+.speaker small svg {
   width: 12px;
   height: 12px;
 }
 .speaker [data-mood='happy'] {
   color: var(--mint);
-}
-.speaker [data-mood='worried'],
-.overdue {
-  color: var(--alert);
 }
 .town-bubble {
   flex: 1;

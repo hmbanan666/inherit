@@ -85,8 +85,8 @@ watch(g.navigation, async ({ file, line }) => {
   await nextTick()
   editor.value?.revealLine(file, line)
 })
-function payBank() {
-  g.act({ kind: 'pay' })
+function payBank(inFull = false) {
+  g.act({ kind: 'pay', inFull })
   menu.value = ''
 }
 function setSpeed(value: number) {
@@ -188,21 +188,23 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           <h3>Kettlewick Bank</h3>
           <p>{{ town.debt.paid }} paid · {{ town.debt.owed }} owed</p>
           <template v-if="town.debt.next">
-            <p>{{ town.debt.next.late ? 'Late · ' : '' }}Installment by day {{ town.debt.next.dueDay }}</p>
             <button
               class="gold"
               :disabled="campaign.economy.money < town.debt.next.amount"
-              @click="payBank"
+              @click="payBank()"
             >
               Pay {{ town.debt.next.amount }} coins
+            </button>
+            <button
+              v-if="town.debt.owed > town.debt.next.amount && campaign.economy.money >= town.debt.owed"
+              @click="payBank(true)"
+            >
+              Pay balance ({{ town.debt.owed }} coins)
             </button>
           </template>
         </aside>
       </div>
       <div class="clock">
-        <span class="tick"
-          >Day <b>{{ town.day }}</b> · {{ town.phase }}</span
-        >
         <div class="speeds">
           <button :aria-label="paused ? 'Resume' : 'Pause'" @click="paused = !paused">
             <Play v-if="paused" /><Pause v-else />
@@ -307,7 +309,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
             </header>
             <div v-if="drawer === 'Inbox'" class="drawer-body">
               <article v-for="m in [...campaign.progress.messages].reverse()" :key="m.id" class="ticket">
-                <small>{{ m.from }} · Day {{ Math.floor(m.tick / 1200) + 1 }}</small>
+                <small>{{ m.from }}</small>
                 <h3>{{ m.title }}</h3>
                 <p>{{ m.body }}</p>
                 <button v-if="m.unread" @click="g.act({ kind: 'read', id: m.id })">Mark read</button>
@@ -318,14 +320,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
               <article v-for="o in campaign.economy.orders" :key="o.id" class="ticket">
                 <h3>{{ town.people.find((p) => p.id === o.customer)?.name }}</h3>
                 <p v-for="(n, item) in o.items" :key="item">{{ o.filled[item] ?? 0 }} / {{ n }} {{ item }}</p>
-                <small
-                  >{{
-                    campaign.world.tick > o.deadline!
-                      ? 'Late · half pay'
-                      : 'By day ' + (1 + Math.floor(o.deadline! / 1200))
-                  }}
-                  · {{ campaign.world.tick > o.deadline! ? Math.ceil(o.pay / 2) : o.pay }} coins</small
-                >
+                <small>{{ o.pay }} coins</small>
               </article>
             </div>
           </aside>

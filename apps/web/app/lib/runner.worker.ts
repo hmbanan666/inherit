@@ -91,7 +91,7 @@ async function apply(a: Action) {
       return true
     }
     case 'pay':
-      return payInstallment(campaign)
+      return payInstallment(campaign, a.inFull)
     case 'snapshot':
       campaign.project.working = a.files
       return snapshotProject(campaign, a.name)

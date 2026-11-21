@@ -245,7 +245,7 @@ function civic(p: Paint, bank: boolean, lit: boolean, owed: number | undefined) 
     }
     p.line('#a89a84', 1, -60, -7, 49, -7)
     plaque(p, 'BANK', 0, -30, 34)
-    if (owed !== undefined) plaque(p, owed ? owed + ' DUE' : 'PAID', 0, -12, 52, '#513d32')
+    if (owed !== undefined) plaque(p, owed ? owed + ' OWED' : 'PAID', 0, -12, 52, '#513d32')
     p.box('#9e927d', -24, -3, 48, 3)
   } else {
     p.box('#dac19f', -26, -83, 26, 58)
