@@ -1,11 +1,13 @@
 import {
   apiDeclarations,
   apiReference,
+  bramLessons,
   type ApiEntry,
   createCampaign,
   getSurface,
   loadSave,
   onboardingStep,
+  requestChecks,
   serializeSave,
   TICK_MS,
   townSnapshot,
@@ -13,6 +15,7 @@ import {
 } from '@inherit/sim'
 import { sandboxDeclarations } from '@inherit/sandbox/declarations'
 import type { CpuStats } from '@inherit/sandbox'
+import { appendConsoleLines, type ConsoleRow } from './console-log'
 import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
 export type { CallSite, GameLog, MetricSample } from './gameProtocol'
 
@@ -49,12 +52,16 @@ function createGameStore() {
   const active = ref(false)
   const saved = ref(true),
     blockedSave = ref(false)
-  const logs = shallowRef<GameLog[]>([]),
+  const logs = shallowRef<ConsoleRow[]>([]),
     metrics = shallowRef<MetricSample[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
   const draftExportsOnTick = ref(false)
   const lessonStep = computed(() => onboardingStep(state.value, draftExportsOnTick.value))
+  const checks = computed(() => requestChecks(state.value, draftExportsOnTick.value))
+  const lessonCheck = computed(() => state.value.town.beat === 1
+    ? checks.value.find(check => check.id === bramLessons[lessonStep.value].check)
+    : undefined)
   const surface = computed(() => getSurface(state.value))
   const reference = shallowRef<ApiEntry[]>([])
   const api = ref('')
@@ -177,7 +184,7 @@ function createGameStore() {
       })
       errors++
     }
-    if (lines.length) logs.value = [...logs.value, ...lines].slice(-256)
+    logs.value = appendConsoleLines(logs.value, lines)
     error.value = frame.error
     if (frame.notice) notice.value = frame.notice
     cpu.value = frame.cpu
@@ -345,6 +352,8 @@ function createGameStore() {
     restoreSnapshot,
     draftExportsOnTick,
     lessonStep,
+    lessonCheck,
+    checks,
     surface,
     reference,
     api,

@@ -27,7 +27,9 @@ const entries = computed(() =>
     </p>
     <ol v-else class="rows mono">
       <li v-for="(entry, i) in entries" :key="i" class="row" :class="{ bad: entry.level === 'error' }">
-        <span class="tick">t{{ entry.tick }}</span> {{ entry.text }}
+        <span class="tick">t{{ entry.tick }}</span>
+        <span v-if="entry.level === 'error'">Error · </span>{{ entry.text }}
+        <span v-if="entry.count > 1" class="repeat">×{{ entry.count }}</span>
         <button
           v-if="entry.file && entry.line"
           :disabled="!Object.hasOwn(game.files.value, entry.file)"
@@ -40,3 +42,8 @@ const entries = computed(() =>
   </section>
 </template>
 <style scoped src="../lib/devtools/panels.css"></style>
+<style scoped>
+.row { color: var(--soft); }
+.row.bad { color: var(--alert); }
+.repeat { color: var(--accent-soft); }
+</style>
