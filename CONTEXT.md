@@ -57,6 +57,10 @@ A machine that stopped from wear. It recovers by repair (costs coins) or by cool
 The player's TypeScript project that runs every tick. One codebase for the whole game.
 _Avoid_: script, solution
 
+**Floor view**:
+The animated canvas that shows the factory. It visualizes what the controller does. You inspect it, you do not build on it.
+_Avoid_: board, editor
+
 **Deploy**:
 Making the working copy the running controller. Can be rolled back.
 
