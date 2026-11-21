@@ -71,8 +71,8 @@ export const QUESTS: readonly Quest[] = [
   },
 ]
 /** Take fresh order counters on the existing floor, including work already in flight. */
-export function restartQuest(campaign: Campaign): boolean {
-  const q = QUESTS.find((q) => !campaign.progress.completedQuests.includes(q.id))
+export function restartQuest(campaign: Campaign, id?: string): boolean {
+  const q = QUESTS.find((q) => (id ? q.id === id : !campaign.progress.completedQuests.includes(q.id)))
   if (!q) return false
   const world = campaign.world
   campaign.progress.activeQuest = {
@@ -136,10 +136,14 @@ export function updateQuests(campaign: Campaign): string | undefined {
   if (!restartQuest(campaign)) campaign.world.dockInterval = 1
   return status.id
 }
-export function advanceCampaign(campaign: Campaign, onTick: (ctx: Factory, events: FactoryEvent[]) => void) {
+export function advanceCampaign(
+  campaign: Campaign,
+  onTick: (ctx: Factory, events: FactoryEvent[]) => void,
+  legacyQuests = true,
+) {
   try {
     stepCampaign(campaign.world, onTick)
   } finally {
-    updateQuests(campaign)
+    if (legacyQuests) updateQuests(campaign)
   }
 }
