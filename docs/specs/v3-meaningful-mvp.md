@@ -22,7 +22,7 @@ See CONTEXT.md for terms and docs/adr/ for the decisions.
 6. Layout: editor stays on the right, plus a cheap "swap sides" toggle in settings that is remembered.
 7. A Town view sits next to the factory floor as a tab ("Factory | Town"), with a slim town ribbon above the floor that shows open requests as speech bubbles. When a town change happens, the game shows it with a short celebration and a "See it" button that opens the Town tab.
 8. Palette: near-black neutral background, much less green, the warm v1 accent (ADR 0006). Compare with v1 at commit 26defa1.
-9. Town clock: one day is about 5 minutes at 1x speed, with a morning, day, evening and night tint. The clock only changes the light on the town and factory.
+9. An internal town day lasts about five minutes at 1× speed. Chapter one shows the passing day only through the tint on the town and factory. A visible day counter or phase label requires a story reason and a new ADR (ADR 0008).
 
 ## Chapter 1 script (about 60 minutes at 1x, a beginner pace)
 

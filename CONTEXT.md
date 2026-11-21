@@ -38,7 +38,7 @@ What the uncle owed the bank. The player pays when ready, in full or in optional
 An optional payment toward the debt, defined only by its amount.
 
 **Day**:
-The town clock. Morning, day, evening and night change the tint of the town and factory.
+One cycle of the internal town clock. Chapter one shows its phases only through the changing light on the town and factory.
 
 **Hiccup**:
 Something unplanned on the floor that code has to handle: a mixed ore vein, a furnace that overheats, a jam.
