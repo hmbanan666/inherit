@@ -8,6 +8,8 @@ import {
   advanceGame,
   townSnapshot,
   payInstallment,
+  markMessageRead,
+  DAY,
   loadSave,
   serializeSave,
   type Campaign,
@@ -51,10 +53,10 @@ function referenceController(files: ProjectFiles, campaign: Campaign): GameProgr
   }
 }
 
-test.each(['immediate edits', 'beginner pace', 'missed deadlines'])(
+test.each(['immediate edits', 'beginner pace', 'long breaks'])(
   'every chapter request on one growing controller with %s',
   (pace) => {
-    const lazy = pace === 'missed deadlines'
+    const slow = pace === 'long breaks'
     // At beginner pace the current deployment keeps running while the player edits the next one.
     const editAtMinute: Record<number, number> = { 1: 2.5, 3: 18, 5: 29, 7: 40, 8: 44, 9: 56 }
     let c = createCampaign(831)
@@ -86,23 +88,26 @@ test.each(['immediate edits', 'beginner pace', 'missed deadlines'])(
           if (c.town.payments === 1 && c.world.tick >= 5 * 1200 && c.economy.money >= 250) payInstallment(c)
         }
       }
-      if (lazy && person?.ask) {
-        // Leave the controller off through every deadline, then finish the same request.
+      if (slow && person?.ask) {
         run = referenceController({ 'main.ts': 'export function onTick(){}' }, c)
-        const due = person.id === 'harrow' ? townSnapshot(c).debt.next!.dueDay * 1200 : c.town.due
-        until(() => c.world.tick > due, 15000)
+        const resumeAt = c.world.tick + 2 * DAY
+        until(() => c.world.tick === resumeAt, 2 * DAY)
         expect(townSnapshot(c).people.find((p) => p.id === person.id)).toMatchObject({
-          mood: 'worried',
-          ask: { late: true },
+          mood: 'waiting',
+          ask: { requestId: person.ask.requestId },
         })
       }
-      if (beat === 2 || beat === 10) {
+      if (slow && beat === 2) {
+        markMessageRead(c, 'tab')
+        expect(c.town.beat).toBe(3)
+        expect(c.town.paid).toBe(0)
+      } else if (beat === 2 || beat === 10) {
         run = deployed(beat === 2 ? 1 : 9)
         while (c.town.beat === beat) {
-          const payment = townSnapshot(c).debt.next!
-          if (lazy) until(() => c.world.tick > payment.dueDay * 1200, 15000)
-          until(() => c.economy.money >= townSnapshot(c).debt.next!.amount, 10000)
-          expect(payInstallment(c)).toBe(true)
+          const debt = townSnapshot(c).debt
+          const amount = slow ? debt.owed : debt.next!.amount
+          until(() => c.economy.money >= amount, 10000)
+          expect(payInstallment(c, slow)).toBe(true)
         }
       } else {
         run = deployed(beat)
@@ -118,7 +123,7 @@ test.each(['immediate edits', 'beginner pace', 'missed deadlines'])(
       'lamp-wire',
       'wheel-teeth',
       'bridge-brackets',
-      pace === 'beginner pace' ? 'installment-2' : 'installment-1',
+      slow ? 'installment-0' : pace === 'beginner pace' ? 'installment-2' : 'installment-1',
     ])
     expect(c.town.changes.map((change) => change.buildingId)).toEqual([
       'forge',
@@ -131,7 +136,7 @@ test.each(['immediate edits', 'beginner pace', 'missed deadlines'])(
       'bank',
     ])
     expect(c.town.beat).toBe(11)
-    expect(c.town.paid).toBe(lazy ? 660 : c.town.installments.reduce((a, b) => a + b))
+    expect(c.town.paid).toBe(600)
     expect(townSnapshot(c).debt.owed).toBe(0)
     expect(townSnapshot(c).people.map((p) => p.name)).toEqual(expect.arrayContaining(['Ines', 'Pell']))
     expect(c.progress.messages.map((m) => m.id)).toEqual(
@@ -143,7 +148,7 @@ test.each(['immediate edits', 'beginner pace', 'missed deadlines'])(
         tick: c.world.tick,
         changes: c.town.changes.map((change) => [change.buildingId, change.tick]),
       })
-    if (!lazy) expect(c.world.tick).toBeLessThanOrEqual(14400)
+    if (!slow) expect(c.world.tick).toBeLessThanOrEqual(14400)
     const deliveries = c.world.delivered.bracket!
     for (let i = 0; i < 100; i++) advance()
     expect(c.world.delivered.bracket).toBeGreaterThan(deliveries)

@@ -110,7 +110,7 @@ export interface OrderState {
   quality?: 'good'
   line: string
   filled: Partial<Record<MaterialId, number>>
-  duration: number
+  duration?: number
   status: 'open' | 'accepted' | 'done' | 'failed' | 'declined'
   deadline?: number
   pay: number

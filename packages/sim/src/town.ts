@@ -3,6 +3,11 @@ import type { Campaign, OrderState } from './model'
 import type { BuildingId, TownSnapshot } from './town-view'
 
 export const DAY = 1200
+export const INSTALLMENTS: readonly number[] = [100, 200, 300]
+export const TAB_LETTER =
+  'Your uncle borrowed 600 coins. Pay when you’re ready. You can start with 100 coins and keep the rest for the factory. Bram pays for regular ingots.'
+export const COMPETITION_LETTER =
+  'Wen needs gears and I need plates. Check who still has an order in ctx.orders(). Send plates to my cart or to his gear cutter.'
 type PersonId = TownSnapshot['people'][number]['id']
 interface Request {
   beat: number
@@ -22,7 +27,7 @@ export const REQUESTS: Request[] = [
     who: 'bram',
     id: 'horseshoes',
     title: 'Horseshoes for the mail horse',
-    text: 'The mail horse threw a shoe. Send three iron ingots to my forge and the post can ride tonight.',
+    text: 'The mail horse threw a shoe. Send three iron ingots to my forge and the post can ride again.',
     item: 'iron-ingot',
     quantity: 3,
     building: 'forge',
@@ -82,12 +87,9 @@ export const REQUESTS: Request[] = [
 export interface TownState {
   beat: number
   entered: number
-  due: number
   filled: number
-  installments: number[]
   payments: number
   paid: number
-  interest: boolean[]
   nextOrders: Partial<Record<PersonId, number>>
   competition: string[]
   changes: TownSnapshot['changes']
@@ -96,23 +98,15 @@ export function newTown(): TownState {
   return {
     beat: 1,
     entered: 0,
-    due: DAY * 0.6,
     filled: 0,
-    installments: [100, 200, 300],
     payments: 0,
     paid: 0,
-    interest: [false, false, false],
     nextOrders: {},
     competition: [],
     changes: [],
   }
 }
 export const activeRequest = (c: Campaign) => REQUESTS.find((r) => r.beat === c.town.beat)
-export function dueLabel(c: Campaign) {
-  if (c.town.beat === 1) return 'by evening'
-  if (c.town.beat === 3) return 'by morning · day ' + (1 + Math.floor(c.town.due / DAY))
-  return 'by day ' + Math.ceil(c.town.due / DAY)
-}
 export function letter(c: Campaign, id: string, from: string, title: string, body: string) {
   if (!c.progress.messages.some((m) => m.id === id))
     c.progress.messages.push({ kind: 'email', id, from, title, body, tick: c.world.tick, unread: true })
@@ -125,18 +119,10 @@ function enter(c: Campaign, beat: number) {
   t.beat = beat
   t.entered = c.world.tick
   t.filled = 0
-  const morning = (Math.floor(c.world.tick / DAY) + 1) * DAY
-  t.due = beat === 3 ? morning : beat === 7 ? 7 * DAY : beat === 9 ? 10 * DAY : morning + DAY
   switch (beat) {
     case 2:
       change(c, 'bank', 'Mrs Harrow hangs the family tab in the bank window.')
-      letter(
-        c,
-        'tab',
-        'Mrs Harrow',
-        'Your uncle’s tab',
-        '600 coins. Pay 100 by day 3, 200 by day 6, and 300 by day 10. Bram pays for regular deliveries.',
-      )
+      letter(c, 'tab', 'Mrs Harrow', 'Your uncle’s tab', TAB_LETTER)
       break
     case 4:
       letter(
@@ -157,13 +143,7 @@ function enter(c: Campaign, beat: number) {
       )
       break
     case 8:
-      letter(
-        c,
-        'competition',
-        'Elsie',
-        'One press, two regulars',
-        'Wen needs gears and I need plates. Read ctx.orders() and route plates to whoever is due first.',
-      )
+      letter(c, 'competition', 'Elsie', 'One press, two regulars', COMPETITION_LETTER)
       const breadOrder = c.economy.orders.find((o) => o.customer === 'elsie')
       if (breadOrder) {
         breadOrder.items.plate = 8
@@ -186,21 +166,28 @@ function enter(c: Campaign, beat: number) {
       break
   }
 }
-const dueDays = [3, 6, 10]
+// The bank introduction can be acknowledged before making a payment.
+export function acknowledgeTab(c: Campaign) {
+  if (c.town.beat === 2) enter(c, 3)
+}
+export function debtRemaining(c: Campaign) {
+  return INSTALLMENTS.slice(c.town.payments).reduce((sum, amount) => sum + amount, 0)
+}
 export function nextInstallment(c: Campaign) {
   const t = c.town
-  if (t.beat < 2 || t.payments >= 3) return
-  const dueDay = dueDays[t.payments]
-  return { amount: t.installments[t.payments], dueDay, late: c.world.tick > dueDay * DAY }
+  if (t.beat < 2 || t.payments >= INSTALLMENTS.length) return
+  return { amount: INSTALLMENTS[t.payments] }
 }
-export function payInstallment(c: Campaign) {
+export function payInstallment(c: Campaign, inFull = false) {
   const next = nextInstallment(c)
-  if (!next || c.economy.money < next.amount) return false
-  c.economy.money -= next.amount
-  c.town.paid += next.amount
-  c.town.payments++
-  if (c.town.beat === 2) enter(c, 3)
-  if (c.town.beat === 10 && c.town.payments === 3) enter(c, 11)
+  if (!next) return false
+  const amount = inFull ? debtRemaining(c) : next.amount
+  if (c.economy.money < amount) return false
+  c.economy.money -= amount
+  c.town.paid += amount
+  c.town.payments = inFull ? INSTALLMENTS.length : c.town.payments + 1
+  acknowledgeTab(c)
+  if (c.town.beat === 10 && c.town.payments === INSTALLMENTS.length) enter(c, 11)
   return true
 }
 function offerOrders(c: Campaign) {
@@ -212,7 +199,6 @@ function offerOrders(c: Campaign) {
     )
       continue
     const quantity = r.who === 'elsie' && c.town.beat >= 8 ? 8 : r.quantity
-    const duration = r.who === 'wen' ? 450 : 700
     c.economy.orders.push({
       id: 'order-' + c.economy.nextOrder++,
       customer: r.who,
@@ -222,15 +208,13 @@ function offerOrders(c: Campaign) {
       pay: quantity * 4,
       reputation: 1,
       line: r.title,
-      duration,
-      deadline: c.world.tick + duration,
     })
   }
 }
 function fillOrder(c: Campaign, item: MaterialId, o: OrderState) {
   o.filled[item] = (o.filled[item] ?? 0) + 1
   if (o.filled[item] !== o.items[item]) return
-  c.economy.money += c.world.tick > o.deadline! ? Math.ceil(o.pay / 2) : o.pay
+  c.economy.money += o.pay
   c.economy.reputation++
   c.economy.orders.splice(c.economy.orders.indexOf(o), 1)
   c.town.nextOrders[o.customer as PersonId] = c.world.tick + DAY / 3
@@ -245,7 +229,7 @@ export function settleTown(c: Campaign) {
     if (r && r.item === e.item.kind) {
       if (++t.filled === r.quantity) {
         change(c, r.building, r.change)
-        c.economy.money += tick > t.due ? Math.ceil(r.pay / 2) : r.pay
+        c.economy.money += r.pay
         enter(c, r.beat + 1)
       }
     } else {
@@ -257,21 +241,6 @@ export function settleTown(c: Campaign) {
   if (t.beat === 6 && (c.world.machines.some((m) => m.fault === 'broken') || tick - t.entered >= 240))
     enter(c, 7)
   if (t.beat === 8 && ['elsie', 'wen'].every((who) => t.competition.includes(who))) enter(c, 9)
-  if (t.beat === 10 && t.payments === 3) enter(c, 11)
-  if (t.beat >= 2) {
-    for (let i = t.payments; i < dueDays.length; i++) {
-      if (tick <= dueDays[i] * DAY || t.interest[i]) continue
-      t.interest[i] = true
-      const interest = t.installments[i] / 10
-      t.installments[i] += interest
-      letter(
-        c,
-        'interest-' + i,
-        'Mrs Harrow',
-        'A little interest',
-        'The day ' + dueDays[i] + ' payment picked up ' + interest + ' coins in interest. Pay when you can.',
-      )
-    }
-  }
+  if (t.beat === 10 && t.payments === INSTALLMENTS.length) enter(c, 11)
   offerOrders(c)
 }

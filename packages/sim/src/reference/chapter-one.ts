@@ -52,8 +52,8 @@ export function chapterFiles(beat: number): ProjectFiles {
     if (beat === 7) lines.push('ctx.route("plates", "gears")')
     if (beat === 8)
       lines.push(
-        'const first = ctx.orders().sort((a,b) => a.due-b.due).find(o => o.who === "wen" || o.who === "elsie")',
-        'ctx.route("plates", first?.who === "elsie" ? "cart" : "gears")',
+        'const bakery = ctx.orders().find(o => o.who === "elsie")',
+        'ctx.route("plates", bakery ? "cart" : "gears")',
       )
     if (beat >= 9) {
       lines.unshift('ctx.build("assembler")', 'ctx.build("splitter", {name:"coils"})')

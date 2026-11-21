@@ -1,4 +1,5 @@
 import { createCampaign, snapshotProject } from './campaign'
+import { COMPETITION_LETTER, INSTALLMENTS, TAB_LETTER } from './town'
 import { MACHINES, MATERIALS, RECIPES } from './catalog'
 import type { Campaign, ProjectFiles } from './model'
 
@@ -106,7 +107,6 @@ const order = shape({
   status: one('open', 'accepted', 'done', 'failed', 'declined'),
   pay: count,
   reputation: integer,
-  deadline: opt(count),
   quality: opt(one('good')),
 })
 const world = shape({
@@ -155,12 +155,9 @@ const save = shape({
   town: shape({
     beat: one(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
     entered: count,
-    due: count,
     filled: count,
     paid: count,
     payments: one(0, 1, 2, 3),
-    installments: (v) => Array.isArray(v) && v.length === 3 && v.every(count),
-    interest: (v) => Array.isArray(v) && v.length === 3 && v.every(bool),
     competition: list(str),
     nextOrders: dict(count),
     changes: list(
@@ -228,7 +225,7 @@ const gameFields = shape({
     orderSeed: count,
     road: bool,
     researchPoints: count,
-    orders: list(shape({ line: str, filled: totals, duration: count })),
+    orders: list(shape({ line: str, filled: totals })),
   }),
 })
 
@@ -273,11 +270,33 @@ function validate(campaign: Campaign) {
       throw new Error('Invalid campaign trip.')
     }
   }
-  if (campaign.economy.orders.some((o) => o.status === 'accepted' && o.deadline === undefined)) {
-    throw new Error('Invalid accepted order without deadline.')
-  }
   return campaign
 }
+
+function restoreTown(c: Campaign) {
+  const town = c.town as Campaign['town'] & { due?: number; interest?: boolean[]; installments?: number[] }
+  if ('interest' in town || 'installments' in town || 'due' in town) {
+    const principalPaid = INSTALLMENTS.slice(0, town.payments).reduce((sum, amount) => sum + amount, 0)
+    c.economy.money += Math.max(0, town.paid - principalPaid)
+    town.paid = principalPaid
+    delete town.installments
+    delete town.interest
+    delete town.due
+    c.progress.messages = c.progress.messages.filter((m) => !m.id.startsWith('interest-'))
+    for (const m of c.progress.messages) {
+      if (m.id === 'tab') m.body = TAB_LETTER
+      if (m.id === 'competition') m.body = COMPETITION_LETTER
+    }
+  }
+  for (const order of c.economy.orders) {
+    // Freight tickets belong to the older order board and keep their pickup windows.
+    if (order.id.startsWith('ticket-')) continue
+    delete order.deadline
+    delete order.duration
+  }
+  return c
+}
+
 function archiveLegacy(data: Record<string, unknown>) {
   const c = createCampaign()
   function archive(name: string, old: unknown) {
@@ -312,7 +331,7 @@ export function loadSave(input: unknown): Campaign {
     if (!record(data)) return createCampaign()
     if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3)
       return archiveLegacy(data)
-    if (save(data) && gameFields(data)) return validate(data as unknown as Campaign)
+    if (save(data) && gameFields(data)) return restoreTown(validate(data as unknown as Campaign))
   } catch {
     /* An incomplete write starts a fresh shift. */
   }

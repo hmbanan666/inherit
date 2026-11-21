@@ -78,8 +78,6 @@ export interface OrderView {
   readonly who: string
   readonly items: Readonly<Partial<Record<MaterialId, number>>>
   readonly filled: Readonly<Partial<Record<MaterialId, number>>>
-  readonly due: number
-  readonly late: boolean
 }
 export interface BlueprintAPI {
   build(kind: MachineKind, opts?: BuildOptions): string | undefined
