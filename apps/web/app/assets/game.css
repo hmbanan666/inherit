@@ -1747,3 +1747,25 @@ button.revisions:hover {
 .cannot-connect .port.input {
   background: var(--alert);
 }
+
+.lesson-card {
+  flex: none;
+  max-height: 36%;
+  overflow: auto;
+  margin: 10px 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--gold);
+  border-radius: 5px;
+  background: var(--panel);
+}
+.lesson-card header, .solved-card h2 { display: flex; align-items: center; gap: 8px; }
+.lesson-card header { justify-content: space-between; }
+.lesson-card h2 { margin: 0; font-size: 19px; }
+.lesson-card p { margin: 7px 0 0; font-size: 14px; line-height: 1.45; }
+.lesson-card .idea, .lesson-card .hint { color: var(--soft); }
+.lesson-card .idea strong { color: var(--text); }
+.lesson-card pre { white-space: pre-wrap; color: var(--accent-soft); font: 12px/1.5 var(--mono); }
+.solved-card { border-left-color: var(--mint); }
+.solved-card h2 { color: var(--mint); }
+.solved-card .reward { color: var(--gold); }

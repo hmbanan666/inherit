@@ -22,16 +22,13 @@ let program: Program | undefined
 let traces: Frame['traces'] = Object.create(null)
 let error = ''
 
-self.onmessage ??= async ({
-  data,
-}: MessageEvent<Action | { type: 'run'; files?: Campaign['project']['working'] }>) => {
-  const action: Action = 'type' in data ? { kind: 'run', files: data.files } : data
+self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
   let calls: CallRecord[] = [],
     logs: string[] = [],
     feedback: GameTick | undefined,
     notice: string | undefined
   try {
-    switch (action.kind) {
+    switch (action.type) {
       case 'init':
         campaign = loadSave(action.campaign)
         program?.dispose()
@@ -49,11 +46,11 @@ self.onmessage ??= async ({
       case 'deploy':
       case 'rollback': {
         const files =
-          action.kind === 'rollback'
+          action.type === 'rollback'
             ? campaign.project.history.find((r) => r.id === action.id)?.files
             : (action.files ?? campaign.project.working)
         if (!files) throw new Error('Unknown revision.')
-        if (action.kind === 'rollback' && isStarterProject(files)) {
+        if (action.type === 'rollback' && isStarterProject(files)) {
           rollbackGameProject(campaign, action.id)
           program?.dispose()
           program = undefined
@@ -61,12 +58,12 @@ self.onmessage ??= async ({
           error = ''
           break
         }
-        const next = await startChapter(campaign, files, action.kind === 'run' ? 'run' : 'deploy')
-        if (action.kind !== 'run') {
+        const next = await startChapter(campaign, files, action.type === 'run' ? 'run' : 'deploy')
+        if (action.type !== 'run') {
           program?.dispose()
           program = next.program
           traces = Object.create(null)
-          if (action.kind === 'rollback') campaign.project.history.at(-1)!.name = 'Restore #' + action.id
+          if (action.type === 'rollback') campaign.project.history.at(-1)!.name = 'Restore #' + action.id
         }
         calls = next.calls
         logs = next.logs
@@ -93,9 +90,9 @@ self.onmessage ??= async ({
       logs = e.logs
     }
     error =
-      (action.kind === 'deploy' ? 'Deploy failed · ' : '') +
+      (action.type === 'deploy' ? 'Deploy failed · ' : '') +
       (e instanceof Error ? e.message : 'Controller stopped.')
-    if (action.kind === 'step') {
+    if (action.type === 'step') {
       program?.dispose()
       program = undefined
     }
@@ -119,7 +116,7 @@ self.onmessage ??= async ({
     notice,
     traces,
     feedback,
-    project: ['init', 'run', 'deploy', 'rollback', 'snapshot'].includes(action.kind) ? project : undefined,
+    project: ['init', 'run', 'deploy', 'rollback', 'snapshot'].includes(action.type) ? project : undefined,
     cpu: program?.stats ?? {
       calls: calls.length,
       interrupts: 0,

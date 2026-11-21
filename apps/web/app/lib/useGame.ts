@@ -1,26 +1,18 @@
 import {
-  apiDeclarations,
-  apiReference,
-  currentStep,
-  primaryButton,
-  placeNames,
-  type RequestCheck,
-  type ApiEntry,
-  createCampaign,
-  getSurface,
-  loadSave,
-  serializeSave,
+  apiDeclarations, apiReference, createCampaign, currentStep, getSurface, jumpToStep,
+  loadSave, placeNames, primaryButton, revealed, serializeSave,
   TICK_MS,
   townSnapshot,
   type ProjectFiles,
   type WorkshopSection,
 } from '@inherit/sim'
+import { usePlayback } from './usePlayback'
 import type { CpuStats } from '@inherit/sandbox'
 import { appendConsoleLines, type ConsoleRow } from './console-log'
 import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
 export type { CallSite, GameLog, MetricSample } from './gameProtocol'
 
-const saveKey = 'inherit.workshop.v1' // The sim migrates the old notebook in place.
+const saveKey = 'inherit.workshop.v1'
 const reloadKey = 'inherit.workshop.reloadedBuild'
 const key: InjectionKey<GameStore> = Symbol('campaign')
 export type GameStore = ReturnType<typeof createGameStore>
@@ -55,28 +47,26 @@ function createGameStore() {
     metrics = shallowRef<MetricSample[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
-  const view = computed(() => currentStep(state.value))
-  const lesson = computed(() => view.value?.step)
-  const library = computed(() => Object.entries(files.value).flatMap(([file, code]) =>
-    [...code.matchAll(/function (\w+\([^)]*\))/g)].map(match => ({ file, signature: match[1] }))))
-  const checks = computed<RequestCheck[]>(() => view.value?.checks.map(row => ({
-    id: row.id, text: row.text, state: row.status === 'green' ? 'done' : row.status === 'red' ? 'todo' : 'close',
-  })) ?? [])
-  const lessonCheck = computed(() => checks.value[0])
+  const step = computed(() => currentStep(state.value))
+  const button = computed(() => primaryButton(state.value))
+  const places = computed(() => placeNames(state.value))
+  const reveals = computed(() => revealed(state.value))
+  const sections = computed(() => surface.value.sections)
+  const letters = computed(() => state.value.progress.messages.filter(m =>
+    m.id === 'uncle' || reveals.value.some(r => r.kind === 'letter' && r.id === m.id),
+  ))
   const surface = computed(() => getSurface(state.value))
-  const reference = shallowRef<ApiEntry[]>([])
-  const api = ref('')
-  watch(
-    [() => state.value.town.beat, () => lesson.value?.id, () => JSON.stringify(placeNames(state.value))],
-    () => {
-      reference.value = apiReference(state.value)
-      api.value = apiDeclarations(state.value)
-    },
-    { immediate: true },
-  )
+  const reference = computed(() => apiReference(state.value))
+  const api = computed(() => apiDeclarations(state.value))
+  const playback = usePlayback()
+  const hand = computed(() => playback.call.value ? playback.hand.value : (state.value.world.hand?.item ?? null))
+  const busy = ref(false)
+  let speed = 1
+  let storageKey = saveKey
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
   let worker: Worker | undefined, current: Action | undefined, rollbackDraft: ProjectFiles | undefined
+  let nextTickAt = 0
   let timer: ReturnType<typeof setTimeout>,
     watchdog: ReturnType<typeof setTimeout>,
     autosave: ReturnType<typeof setInterval>
@@ -89,13 +79,15 @@ function createGameStore() {
         ...state.value,
         project: { ...state.value.project, working: files.value },
       }
-      localStorage.setItem(saveKey, serializeSave(save))
+      localStorage.setItem(storageKey, serializeSave(save))
       saved.value = true
     } catch {
       saved.value = false
     }
   }
   function stop() {
+    playback.clear()
+    busy.value = false
     buildCheck?.abort()
     clearTimeout(timer)
     clearTimeout(watchdog)
@@ -145,16 +137,17 @@ function createGameStore() {
     if (!worker || current) return
     current = queue.shift()
     if (!current) {
-      timer = setTimeout(() => act({ kind: 'step' }), TICK_MS)
+      timer = setTimeout(() => act({ type: 'step' }), Math.max(0, nextTickAt - performance.now()))
       return
     }
-    if (current.kind === 'rollback') rollbackDraft = files.value
+    if (current.type === 'step') nextTickAt = performance.now() + TICK_MS / speed
+    if (current.type === 'rollback') rollbackDraft = files.value
     watchdog = setTimeout(
       () => {
         stop()
         error.value = 'Controller worker timed out. Run to retry.'
       },
-      current.kind === 'step' ? 3000 : 30000,
+      current.type === 'step' ? 3000 : 30000,
     )
     worker.postMessage(current)
   }
@@ -163,9 +156,15 @@ function createGameStore() {
     queue.push(action)
     pump()
   }
-  function receive(frame: Frame) {
+  async function receive(frame: Frame) {
     clearTimeout(watchdog)
     const action = current!
+    const instance = worker
+    const watched = action.type === 'run'
+    if (frame.calls.length || watched) {
+      await playback.play(frame.calls, watched ? 500 / speed : TICK_MS / (2 * frame.calls.length * speed), watched)
+      if (worker !== instance) return
+    }
     current = undefined
     const c = {
       ...frame.campaign,
@@ -173,15 +172,25 @@ function createGameStore() {
       seenSections: state.value.seenSections,
     }
     active.value = frame.active
-    if (action.kind === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
+    if (action.type === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
       files.value = c.project.working
       if (!(activeFile.value in files.value)) openFile('main.ts')
+    }
+    if (action.type === 'continue') {
+      const starter = currentStep(c)?.step.starter
+      if (starter && currentStep(c)?.step.id !== step.value?.step.id) {
+        files.value = { ...files.value, 'main.ts': starter }
+        openFile('main.ts')
+      }
     }
     c.project.working = files.value
     state.value = c
     town.value = frame.town
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
+    for (const record of frame.calls) {
+      if (record.message) lines.push({ tick, level: 'log', text: record.message, file: record.file, line: record.line })
+    }
     if (frame.error && error.value !== frame.error) {
       const loc = /^(?:Deploy failed · )?([\w./-]+\.ts):(\d+)/.exec(frame.error)
       lines.push({
@@ -198,7 +207,7 @@ function createGameStore() {
     if (frame.notice) notice.value = frame.notice
     cpu.value = frame.cpu
     traces.value = frame.traces
-    if (action.kind === 'step') {
+    if (action.type === 'step') {
       const machines = Object.fromEntries(
         c.world.machines.map((m) => {
           const elapsed = Math.max(1, tick - m.builtAt)
@@ -219,6 +228,7 @@ function createGameStore() {
       ]
     } else persist()
     ready.value = true
+    if (['run', 'deploy', 'continue'].includes(action.type)) busy.value = false
     pump()
   }
   function start() {
@@ -233,15 +243,24 @@ function createGameStore() {
       instance.onmessage = ({ data }: MessageEvent<Frame>) => {
         if (worker === instance) receive(data)
       }
-      act({ kind: 'init', campaign: state.value })
+      act({ type: 'init', campaign: state.value })
     } catch {
       void assetFailed(failed)
     }
   }
-  function deploy() {
+  function submit(type: 'deploy' | 'run' = button.value) {
+    if (busy.value || (!ready.value && !error.value)) return
     if (!worker) start()
-    act({ kind: primaryButton(state.value), files: files.value })
+    busy.value = true
+    playback.messages.value = []
+    act({ type, files: files.value })
     persist()
+  }
+  function advance() {
+    if (busy.value || step.value?.phase !== 'solved') return
+    busy.value = true
+    playback.clear()
+    act({ type: 'continue' })
   }
   function openFile(file: string, line = 1) {
     if (!Object.hasOwn(files.value, file)) return
@@ -304,9 +323,14 @@ function createGameStore() {
   }
   // Visits belong to the browser. Persist them even if the next worker frame is still in flight.
   function visitSection(section: WorkshopSection) {
-    if (!surface.value.sections.includes(section) || state.value.seenSections.includes(section)) return
+    if (!sections.value.includes(section) || state.value.seenSections.includes(section)) return
     state.value = { ...state.value, seenSections: [...state.value.seenSections, section] }
     persist()
+  }
+  function openDraft() {
+    const source = files.value['main.ts'] ?? ''
+    const line = source === step.value?.step.starter ? source.split('\n').length : 1
+    openFile('main.ts', line)
   }
   function newGame() {
     stop()
@@ -321,13 +345,19 @@ function createGameStore() {
     error.value = ''
     selected.value = ''
     notice.value = ''
-    openFile('main.ts')
+    openDraft()
     persist()
     start()
   }
   onMounted(() => {
     try {
-      state.value = loadSave(localStorage.getItem(saveKey))
+      const local = import.meta.dev || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+      const query = new URLSearchParams(local ? location.search : '')
+      const id = query.get('step')
+      if (id) storageKey = saveKey + '.preview.' + id
+      speed = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
+      const stored = localStorage.getItem(storageKey)
+      state.value = id && !stored ? jumpToStep(createCampaign(), id) : loadSave(stored)
       town.value = townSnapshot(state.value)
       files.value = state.value.project.working
     } catch {
@@ -335,7 +365,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
-    openFile('main.ts')
+    openDraft()
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)
@@ -359,15 +389,11 @@ function createGameStore() {
     createFile,
     renameFile,
     deleteFile,
-    deploy,
-    rollback: (id: number) => act({ kind: 'rollback', id }),
-    snapshot: (name: string) => act({ kind: 'snapshot', name, files: files.value }),
+    submit, advance, busy, playback, hand,
+    rollback: (id: number) => act({ type: 'rollback', id }),
+    snapshot: (name: string) => act({ type: 'snapshot', name, files: files.value }),
     restoreSnapshot,
-    lesson,
-    library,
-    view,
-    lessonCheck,
-    checks,
+    step, button, places, reveals, sections, letters,
     surface,
     reference,
     api,

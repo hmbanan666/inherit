@@ -1,7 +1,5 @@
-import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { edit as replaceCode, photo, openShed } from './workshop'
 import { expect, test, type Page } from '@playwright/test'
-import { createCampaign, jumpToStep, deployGameProject, serializeSave } from '../../packages/sim/src/index'
 
 const main = 'import { feed } from "./lib/drive"\nexport function onTick() {\n  feed()\n}'
 const helper = 'import {take} from "inherit"\nexport function feed() {\n  take("mine")\n  console.log("ore moving")\n}'
@@ -15,34 +13,23 @@ async function projectFiles(page: Page) {
 }
 
 async function workshop(page: Page, unlock = true) {
-  if (unlock) {
-    const c = jumpToStep(createCampaign(), 'harrow-deed')
-    c.project.working = { 'main.ts': main, 'lib/drive.ts': helper }
-    deployGameProject(c)
-    await page.addInitScript((save) => {
-      if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
-    }, serializeSave(c))
-  }
-  await page.goto('/')
-  await expect(page.locator('.project-editor .view-lines').first()).toBeVisible()
+  await openShed(page, unlock ? '?step=mayor-tools&speed=8' : '')
+  if (!unlock) return
+  await replaceCode(page, main)
+  const tree = await projectFiles(page)
+  await tree.getByRole('button', { name: 'New file' }).click()
+  await tree.getByLabel('Project path').fill('lib/drive.ts')
+  await tree.getByRole('button', { name: 'Create' }).click()
+  await replaceCode(page, helper)
+  await tree.getByRole('button', { name: 'main.ts', exact: true }).click()
+  await page.getByTestId('primary-button').click()
+  await expect(page.locator('.live')).toHaveText('Live')
+  await button(page, 'Settings').click()
+  await button(page, 'Project files').click()
 }
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
 const tab = (page: Page, name: string) =>
   page.locator('.editor-dock .file-tabs').getByRole('button', { name, exact: true })
-async function photo(page: Page, name: string) {
-  const directory = process.env.INHERIT_SHOTS
-  if (!directory) return
-  await mkdir(directory, { recursive: true })
-  await page.screenshot({ path: join(directory, name + '.png'), animations: 'disabled' })
-}
-async function replaceCode(page: Page, text: string) {
-  await page.locator('.project-editor .view-lines').first().click()
-  await page.keyboard.press('Control+a')
-  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-  await page.evaluate((source) => navigator.clipboard.writeText(source), text)
-  await page.keyboard.press('Control+v')
-}
-
 test('first shift opens a single player file', async ({ page }) => {
   await workshop(page, false)
   await expect(tab(page, 'main.ts')).toBeVisible()
@@ -117,6 +104,7 @@ test('import completion inside braces lists the unlocked workshop exports', asyn
   const list = page.locator('.suggest-widget.visible')
   await expect(list).toContainText('take')
   await expect(list).not.toContainText(/repair|buy/)
+  await expect(list).toContainText('put')
 })
 
 test('invalid or missing palette values preserve distinct syntax colors', async ({ page }) => {
@@ -210,8 +198,8 @@ test('jump from a controller error to its module and clear the log ring', async 
     .click()
   await replaceCode(page, 'export function feed() {\n  throw new Error("stuck valve")\n}')
   await expect(page.locator('.editor-foot')).toContainText('Working copy')
-  await page.keyboard.press('Control+s')
   await page.getByRole('tab', { name: 'Console' }).click()
+  await page.keyboard.press('Control+s')
   const output = page.getByRole('region', { name: 'Program console' })
   const location = output.getByRole('button', { name: 'lib/drive.ts:2' })
   await expect(location).toBeVisible()
