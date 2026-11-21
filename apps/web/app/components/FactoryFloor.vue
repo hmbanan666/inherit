@@ -388,6 +388,12 @@ function choose(id: string) {
 }
 const belt = computed(() => world.value.belts.find((b) => b.from + ' → ' + b.to === selected.value))
 const machine = computed(() => world.value.machines.find((m) => m.id === selected.value))
+const inspectorOnRight = computed(() => {
+  const m = machine.value
+  if (!m) return false
+  const x = center(m.siteId, m).x * scale.value + camera.value.x
+  return x < size.value.w / 2
+})
 const bins = computed(() =>
   Object.entries(
     machine.value?.queue.reduce<Record<string, number>>((r, i) => {
@@ -655,7 +661,13 @@ function buyPlot() {
         {{ campaign.economy.research.includes('survey') ? 'Buy plot' : 'Research Tape measure' }}
       </button>
     </aside>
-    <aside v-else-if="machine || belt" class="inspect" role="region" aria-label="Machine inspector">
+    <aside
+      v-else-if="machine || belt"
+      class="inspect"
+      :class="{ opposite: inspectorOnRight }"
+      role="region"
+      aria-label="Machine inspector"
+    >
       <header>
         <strong>{{ selected }}</strong
         ><button aria-label="Close inspector" @click="selected = ''"><X /></button>
