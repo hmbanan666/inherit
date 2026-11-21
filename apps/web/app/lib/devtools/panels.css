@@ -1,0 +1,86 @@
+.bench {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  min-width: 0;
+  max-height: 100%;
+  overflow: auto;
+}
+.bar,
+.tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bar {
+  justify-content: space-between;
+}
+.bench h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e4da;
+}
+.bench input,
+.bench select {
+  min-width: 0;
+  max-width: 100%;
+  background: #181b1d;
+  color: #e0e2d9;
+  border: 1px solid #49504d;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+}
+.bench button {
+  color: #d4b77d;
+  background: #262927;
+  border: 1px solid #424743;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+.bench button:hover,
+.bench button:focus-visible {
+  color: #ffe09b;
+  border-color: #bb965a;
+}
+.bench button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.bench p {
+  margin: 0;
+}
+.quiet,
+.tick {
+  color: #a2aba6;
+}
+.tick,
+.mono {
+  font:
+    11px/1.55 'IBM Plex Mono',
+    monospace;
+  overflow-wrap: anywhere;
+}
+.bad {
+  color: #ffa594;
+}
+.good {
+  color: #94d4ab;
+}
+.rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.row {
+  padding: 4px 0;
+  border-bottom: 1px solid #353a37;
+}

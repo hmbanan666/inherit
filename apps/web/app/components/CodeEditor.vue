@@ -1,75 +1,205 @@
 <script setup lang="ts">
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import 'monaco-editor/esm/vs/editor/editor.all.js'
+import 'monaco-editor/esm/vs/editor/standalone/browser/referenceSearch/standaloneReferenceSearch.js'
 import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js'
 import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
-import apiText from '@inherit/sim/api?raw'
+import { createBenchWorker } from '../lib/devtools/worker'
+import type { BenchReply } from '../lib/preview.worker'
+import { useGame } from '../lib/useGame'
+import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
+const game = useGame()
+const { files, activeFile, campaign, surface, api, dirty } = game
 const props = defineProps<{
-  code: string
-  selected: string
-  error: string
-  ids: string[]
-  tab: 'controller' | 'api'
+  tab?: 'controller' | 'api'
+  ids?: string[]
+  selected?: string
+  error?: string
+  code?: string
 }>()
-const emit = defineEmits<{ edit: [string]; focusIds: [string[]]; ready: [] }>()
+const emit = defineEmits<{ ready: []; focusIds: [string[]]; edit: [string] }>()
 const host = ref<HTMLElement>()
-let editor: monaco.editor.IStandaloneCodeEditor
-let source: monaco.editor.ITextModel, library: monaco.editor.ITextModel
-let highlights: monaco.editor.IEditorDecorationsCollection
-let extra: monaco.IDisposable
-const idPatterns = computed(
-  () =>
-    new Map(
-      props.ids.map((id) => [
-        id,
-        new RegExp('(?<![\\w-])' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])'),
-      ]),
-    ),
+const shellTabs = shallowRef<HTMLElement>()
+const input = ref<HTMLInputElement>()
+const tabs = ref(['main.ts'])
+const showApi = ref(false)
+const current = computed(() => (showApi.value ? 'api.d.ts' : activeFile.value))
+const otherTabs = computed(() =>
+  shellTabs.value ? tabs.value.filter((file) => file !== activeFile.value) : tabs.value,
 )
-function mentions(line: string, id: string) {
-  return idPatterns.value.get(id)?.test(line)
+const mode = ref<'open' | 'search'>()
+const query = ref('')
+const models = new Map<string, monaco.editor.ITextModel>()
+const views = new Map<string, monaco.editor.ICodeEditorViewState | null>()
+let editor: monaco.editor.IStandaloneCodeEditor | undefined
+let opener: monaco.IDisposable
+let library: monaco.editor.ITextModel
+let globals = ''
+const typesUnavailable = ref(false)
+let declarationsWorker: Worker | undefined
+let settingSource = false
+
+function syncFiles() {
+  if (!editor) return
+  for (const [file, code] of Object.entries(files.value)) {
+    const model = models.get(file)
+    if (model) {
+      if (model.getValue() !== code) {
+        settingSource = true
+        try {
+          model.setValue(code)
+        } finally {
+          settingSource = false
+        }
+      }
+    } else {
+      const next = monaco.editor.createModel(code, 'typescript', monaco.Uri.file('/' + file))
+      models.set(file, next)
+      next.onDidChangeContent(() => {
+        if (!settingSource) game.setFile(file, next.getValue())
+      })
+    }
+  }
+  for (const [file, model] of models) {
+    if (Object.hasOwn(files.value, file)) continue
+    if (editor.getModel() === model) editor.setModel(null)
+    models.delete(file)
+    views.delete(file)
+    model.dispose()
+  }
+  tabs.value = tabs.value.filter((file) => models.has(file))
+  if (!models.has(activeFile.value)) activeFile.value = 'main.ts'
+  display()
 }
-function diagnostics() {
-  if (!source) return
-  const line = Number(/^controller\.ts:(\d+)/.exec(props.error)?.[1])
-  monaco.editor.setModelMarkers(
-    source,
-    'factory-runtime',
-    line && line <= source.getLineCount()
-      ? [
-          {
-            severity: monaco.MarkerSeverity.Error,
-            source: 'Factory runtime',
-            message: props.error,
-            startLineNumber: line,
-            startColumn: source.getLineFirstNonWhitespaceColumn(line) || 1,
-            endLineNumber: line,
-            endColumn: source.getLineMaxColumn(line),
-          },
-        ]
-      : [],
-  )
+function display() {
+  if (!editor) return
+  const file = current.value
+  const model = showApi.value ? library : models.get(file)
+  if (!model || editor.getModel() === model) return
+  const old = editor.getModel()
+  if (old) views.set(old.uri.path.slice(1), editor.saveViewState())
+  if (!showApi.value && !tabs.value.includes(file)) tabs.value.push(file)
+  editor.setModel(model)
+  editor.updateOptions({ readOnly: showApi.value })
+  editor.restoreViewState(views.get(file) ?? null)
 }
-function highlight() {
-  if (!highlights || props.tab !== 'controller') return
-  const ids = props.selected.split(' → ').filter(Boolean)
-  highlights.set(
-    source.getLinesContent().flatMap((line, i) =>
-      ids.some((id) => mentions(line, id))
+function open(file: string) {
+  showApi.value = file === 'api.d.ts'
+  if (!showApi.value) activeFile.value = file
+  display()
+}
+function close(file: string) {
+  const index = tabs.value.indexOf(file)
+  tabs.value.splice(index, 1)
+  if (activeFile.value === file) open(tabs.value[Math.max(0, index - 1)] ?? 'main.ts')
+}
+function revealLine(file: string, line: number, column = 1) {
+  if (file !== 'api.d.ts' && !Object.hasOwn(files.value, file)) return
+  if (file !== 'api.d.ts' && !models.has(file)) syncFiles()
+  open(file)
+  mode.value = undefined
+  editor?.setPosition({ lineNumber: line, column })
+  editor?.revealLineInCenterIfOutsideViewport(line)
+  editor?.focus()
+}
+defineExpose({ revealLine })
+
+const results = computed(() => {
+  const needle = query.value.trim().toLowerCase()
+  const hits: { file: string; line: number; text?: string; column: number }[] = []
+  for (const file of Object.keys(files.value).sort()) {
+    if (!surface.value.multiFile && file !== 'main.ts') continue
+    if (mode.value === 'open') {
+      if (file.toLowerCase().includes(needle)) hits.push({ file, line: 1, column: 1 })
+    } else if (needle) {
+      for (const [i, text] of files.value[file]!.split('\n').entries()) {
+        const offset = text.toLowerCase().indexOf(needle)
+        if (offset >= 0) hits.push({ file, line: i + 1, text: text.trim(), column: offset + 1 })
+      }
+    }
+  }
+  return hits
+})
+function choose(hit = results.value[0]) {
+  if (hit) revealLine(hit.file, hit.line, hit.column)
+}
+function dismissSearch() {
+  mode.value = undefined
+  editor?.focus()
+}
+function find(next: 'open' | 'search') {
+  function showFinder() {
+    mode.value = next
+    query.value = ''
+    nextTick(() => input.value?.focus())
+  }
+  if (shellTabs.value && !host.value?.getClientRects().length) {
+    game.openFile(activeFile.value)
+    // The dock reveals the requested line on its next render.
+    requestAnimationFrame(showFinder)
+  } else showFinder()
+}
+function keys(e: KeyboardEvent) {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+  const key = e.key.toLowerCase()
+  if (!(key === 'p' && !e.shiftKey) && !(key === 'f' && e.shiftKey)) return
+  e.preventDefault()
+  e.stopPropagation()
+  find(key === 'p' ? 'open' : 'search')
+}
+function runtimeMarker() {
+  const message = props.error ?? game.error.value
+  const match = /([\w./-]+\.ts):(\d+)/.exec(message)
+  for (const [file, model] of models) {
+    const line = Number(match?.[2])
+    const live = files.value[file] === campaign.value.project.deployed[file]
+    monaco.editor.setModelMarkers(
+      model,
+      'factory-runtime',
+      live && match?.[1] === file && line > 0 && line <= model.getLineCount()
         ? [
             {
-              range: new monaco.Range(i + 1, 1, i + 1, 1),
-              options: { isWholeLine: true, className: 'machine-line' },
+              severity: monaco.MarkerSeverity.Error,
+              message,
+              source: 'Factory runtime',
+              startLineNumber: line,
+              endLineNumber: line,
+              startColumn: 1,
+              endColumn: model.getLineMaxColumn(line),
             },
           ]
         : [],
-    ),
-  )
+    )
+  }
+}
+function loadSandboxTypes() {
+  // Keep the sandbox compiler off the UI thread.
+  typesUnavailable.value = false
+  try {
+    declarationsWorker = createBenchWorker()
+    declarationsWorker.onmessage = ({ data }: MessageEvent<BenchReply>) => {
+      if (data.kind === 'declarations') {
+        globals = data.text
+        library.setValue(api.value + '\n' + globals)
+      } else typesUnavailable.value = true
+      declarationsWorker?.terminate()
+    }
+    declarationsWorker.onerror = () => {
+      typesUnavailable.value = true
+      declarationsWorker?.terminate()
+    }
+    declarationsWorker.postMessage({ kind: 'declarations' })
+  } catch {
+    typesUnavailable.value = true
+    declarationsWorker?.terminate()
+  }
 }
 onMounted(() => {
+  // The shell already shows the active file and API. Add the other open files to that strip.
+  shellTabs.value = host.value?.closest('.editor-dock')?.querySelector<HTMLElement>('.file-tabs') ?? undefined
   self.MonacoEnvironment = {
     getWorker: (_, label) =>
       label === 'typescript' || label === 'javascript' ? new TsWorker() : new EditorWorker(),
@@ -78,14 +208,14 @@ onMounted(() => {
   ts.typescriptDefaults.setCompilerOptions({
     target: ts.ScriptTarget.ES2020,
     module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.NodeJs,
     strict: true,
-    noLib: false,
     lib: ['lib.es2020.d.ts'],
+    noEmit: true,
+    allowImportingTsExtensions: true,
   })
-  extra = ts.typescriptDefaults.addExtraLib(
-    'declare module "inherit" {\n' + apiText + '\n}',
-    'file:///inherit.d.ts',
-  )
+  ts.typescriptDefaults.setEagerModelSync(true)
+  library = monaco.editor.createModel(api.value, 'typescript', monaco.Uri.file('/api.d.ts'))
   monaco.editor.defineTheme('foundry', {
     base: 'vs-dark',
     inherit: true,
@@ -110,12 +240,10 @@ onMounted(() => {
       'editorGutter.background': '#1d2022',
     },
   })
-  source = monaco.editor.createModel(props.code, 'typescript', monaco.Uri.parse('file:///controller.ts'))
-  library = monaco.editor.createModel(apiText, 'typescript', monaco.Uri.parse('file:///api.ts'))
   editor = monaco.editor.create(host.value!, {
-    model: props.tab === 'controller' ? source : library,
-    readOnly: props.tab === 'api',
+    model: null,
     theme: 'foundry',
+    gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
     minimap: { enabled: false },
     fontFamily: 'IBM Plex Mono, monospace',
@@ -128,70 +256,212 @@ onMounted(() => {
     glyphMargin: false,
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
-    renderLineHighlight: 'none',
+    renderLineHighlight: 'line',
     tabSize: 2,
     fixedOverflowWidgets: true,
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: 'Factory controller TypeScript editor',
   })
-  highlights = editor.createDecorationsCollection()
-  source.onDidChangeContent(() => {
-    highlight()
-    if (source.getValue() !== props.code) emit('edit', source.getValue())
+  syncFiles()
+  runtimeMarker()
+  opener = monaco.editor.registerEditorOpener({
+    openCodeEditor(source, resource, pos) {
+      if (source !== editor) return false
+      const file = resource.path.slice(1)
+      if (!models.has(file) && file !== 'api.d.ts') return false
+      revealLine(
+        file,
+        pos && 'lineNumber' in pos ? pos.lineNumber : (pos?.startLineNumber ?? 1),
+        pos && 'column' in pos ? pos.column : (pos?.startColumn ?? 1),
+      )
+      return true
+    },
   })
-  let hovered: number | undefined
-  function focusLine(line = editor.getPosition()?.lineNumber) {
-    emit(
-      'focusIds',
-      props.tab === 'controller' && line
-        ? props.ids.filter((id) => mentions(source.getLineContent(line), id))
-        : [],
-    )
-  }
-  editor.onMouseMove(({ target }) => {
-    if (target.position?.lineNumber === hovered) return
-    hovered = target.position?.lineNumber
-    focusLine(hovered)
-  })
-  editor.onMouseLeave(() => {
-    hovered = undefined
-    focusLine()
-  })
-  editor.onDidChangeCursorPosition(({ position }) => focusLine(position.lineNumber))
-  diagnostics()
+  window.addEventListener('keydown', keys, true)
+  loadSandboxTypes()
   emit('ready')
-  highlight()
 })
-watch(
-  () => props.code,
-  (v) => {
-    if (source && source.getValue() !== v) source.setValue(v)
-  },
-)
-watch(
-  () => props.selected,
-  () => {
-    highlight()
-    const first = highlights?.getRange(0)
-    if (first && props.tab === 'controller') editor.revealLineInCenterIfOutsideViewport(first.startLineNumber)
-  },
-)
-watch(() => props.error, diagnostics)
+watch(files, syncFiles)
+watch(activeFile, () => {
+  showApi.value = false
+  display()
+})
+watch(api, (text) => library?.setValue(text + '\n' + globals))
 watch(
   () => props.tab,
-  (v) => {
-    if (!editor) return
-    emit('focusIds', [])
-    editor.setModel(v === 'controller' ? source : library)
-    editor.updateOptions({ readOnly: v === 'api' })
-    highlight()
+  (tab) => {
+    showApi.value = tab === 'api'
+    display()
   },
+  { immediate: true },
 )
+watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', keys, true)
+  declarationsWorker?.terminate()
+  opener?.dispose()
   editor?.dispose()
-  source?.dispose()
+  for (const model of models.values()) model.dispose()
   library?.dispose()
-  extra?.dispose()
 })
 </script>
-<template><div ref="host" class="code-editor" /></template>
+<template>
+  <section class="project-editor" aria-label="Project editor">
+    <Teleport :to="shellTabs ?? 'body'" :disabled="!shellTabs">
+      <nav v-if="!shellTabs || surface.multiFile" class="project-tabs" aria-label="Open files">
+        <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: current === file }">
+          <button
+            :aria-label="file"
+            :aria-current="current === file ? 'page' : undefined"
+            @click="shellTabs ? game.openFile(file) : open(file)"
+          >
+            {{ file
+            }}<i v-if="files[file] !== campaign.project.deployed[file]" title="Undeployed edits"> ●</i>
+          </button>
+          <button v-if="file !== 'main.ts'" :aria-label="'Close ' + file" @click="close(file)">
+            <X :size="11" />
+          </button>
+        </span>
+        <button v-if="!shellTabs" class="api-tab" :class="{ chosen: showApi }" @click="open('api.d.ts')">
+          api.d.ts
+        </button>
+        <span class="space" />
+        <span v-if="dirty && !shellTabs" class="draft" title="Working copy differs from the live program"
+          >Draft</span
+        >
+        <template v-if="surface.multiFile">
+          <button title="Quick open (Ctrl/Cmd+P)" aria-label="Quick open" @click="find('open')">
+            <FolderSearch :size="14" />
+          </button>
+          <button title="Search files (Ctrl/Cmd+Shift+F)" aria-label="Search files" @click="find('search')">
+            <FileSearch :size="14" />
+          </button>
+        </template>
+        <button
+          v-if="shellTabs && activeFile !== 'main.ts'"
+          :aria-label="'Close ' + activeFile"
+          @click="close(activeFile)"
+        >
+          <X :size="11" />
+        </button>
+      </nav>
+    </Teleport>
+    <button v-if="shellTabs && showApi" @click="open(activeFile)">Back to {{ activeFile }}</button>
+    <div
+      v-if="mode"
+      class="finder bench"
+      :class="{ docked: shellTabs }"
+      @keydown.esc.stop="dismissSearch"
+    >
+      <div class="tools">
+        <input
+          ref="input"
+          v-model="query"
+          :aria-label="mode === 'open' ? 'Find file' : 'Search project'"
+          :placeholder="mode === 'open' ? 'Find a file…' : 'Search all files…'"
+          @keydown.enter.prevent="choose()"
+        /><button
+          aria-label="Close search"
+          @click="dismissSearch"
+        >
+          ×
+        </button>
+      </div>
+      <ul v-if="results.length" class="rows">
+        <li v-for="hit in results.slice(0, 80)" :key="hit.file + ':' + hit.line">
+          <button @click="choose(hit)">
+            {{ hit.file }}<template v-if="hit.text !== undefined">:{{ hit.line }} · {{ hit.text }}</template>
+          </button>
+        </li>
+      </ul>
+      <p v-else-if="query" class="quiet">No matches.</p>
+      <small v-if="results.length > 80">First 80 of {{ results.length }} matches</small>
+    </div>
+    <button v-if="typesUnavailable" @click="loadSandboxTypes">Retry sandbox type hints</button>
+    <div ref="host" class="code-editor" />
+  </section>
+</template>
+<style scoped src="../lib/devtools/panels.css"></style>
+<style scoped>
+.project-editor {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.project-tabs {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  flex: none;
+  min-height: 29px;
+  border-bottom: 1px solid #3b403c;
+  background: #1a1d1e;
+}
+.project-tabs button {
+  padding: 3px 7px;
+  color: #bcc4bc;
+  font:
+    11px 'IBM Plex Mono',
+    monospace;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab {
+  display: flex;
+}
+.chosen {
+  box-shadow: inset 0 -2px #d1a34f;
+  background: #272a29;
+}
+.tab i,
+.draft {
+  color: #e6bc68;
+  font-style: normal;
+}
+.space {
+  flex: 1;
+}
+.draft {
+  align-self: center;
+  padding: 0 8px;
+  font-size: 10px;
+}
+.finder {
+  position: absolute;
+  z-index: 3;
+  top: 30px;
+  left: 4px;
+  right: 4px;
+  max-height: 65%;
+  border: 1px solid #62614c;
+  background: #222625;
+  box-shadow: 0 4px 12px #111a;
+}
+.finder.docked {
+  top: 3px;
+}
+.finder input {
+  flex: 1;
+}
+.finder .rows button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.code-editor {
+  position: relative;
+  inset: auto;
+  height: auto;
+  min-height: 0;
+  flex: 1;
+}
+</style>

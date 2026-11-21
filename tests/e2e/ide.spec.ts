@@ -1,0 +1,200 @@
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import { expect, test, type Page } from '@playwright/test'
+import { createCampaign, deployGameProject, serializeSave } from '../../packages/sim/src/index'
+
+const main = [
+  'import type { Factory } from "inherit"',
+  'import { feed } from "./lib/drive"',
+  'export function onTick(ctx: Factory) {',
+  '  feed(ctx)',
+  '  ctx.work("furnace-a")',
+  '}',
+].join('\n')
+const helper = [
+  'import type { Factory } from "inherit"',
+  'export function feed(ctx: Factory) {',
+  '  ctx.dig("mine")',
+  '  console.log("ore moving")',
+  '}',
+].join('\n')
+
+async function workshop(page: Page, unlock = true) {
+  if (unlock) {
+    const c = createCampaign()
+    c.economy.research.push('binder')
+    c.project.working = { 'main.ts': main, 'lib/drive.ts': helper }
+    deployGameProject(c)
+    await page.addInitScript((save) => {
+      if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
+    }, serializeSave(c))
+  }
+  await page.goto('/')
+  await expect(page.locator('.project-editor .view-lines').first()).toBeVisible()
+}
+const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
+const tab = (page: Page, name: string) =>
+  page.locator('.editor-dock .file-tabs').getByRole('button', { name, exact: true })
+async function photo(page: Page, name: string) {
+  const directory = process.env.INHERIT_SHOTS
+  if (!directory) return
+  await mkdir(directory, { recursive: true })
+  await page.screenshot({ path: join(directory, name + '.png'), animations: 'disabled' })
+}
+async function replaceCode(page: Page, text: string) {
+  await page.locator('.project-editor .view-lines').first().click()
+  await page.keyboard.press('Control+a')
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.evaluate((source) => navigator.clipboard.writeText(source), text)
+  await page.keyboard.press('Control+v')
+}
+
+test('first shift opens a single player file', async ({ page }) => {
+  await workshop(page, false)
+  await expect(tab(page, 'main.ts')).toBeVisible()
+  await expect(
+    page.locator('.editor-dock').getByRole('button', { name: 'main.ts', exact: true }),
+  ).toHaveCount(1)
+  await expect(page.getByRole('region', { name: 'Project files' })).toHaveCount(0)
+  await expect(button(page, 'Quick open')).toHaveCount(0)
+  const program = 'import type { Factory } from "inherit"\nexport function onTick(ctx: Factory) {\n  memory.room = ctx.stock("mine")\n  console.log(memory.room)\n}'
+  const markers = page.locator('.project-editor .squiggly-error')
+  await replaceCode(page, program)
+  await expect(markers.first()).toBeVisible()
+  await replaceCode(page, program.replace('ctx.stock', 'ctx.space'))
+  await expect(markers).toHaveCount(0)
+})
+
+test('follow definitions and references across files, search the draft and organize a folder', async ({
+  page,
+}) => {
+  await workshop(page)
+  const editor = page.getByRole('region', { name: 'Project editor' })
+  await editor
+    .locator('.view-line')
+    .filter({ hasText: 'feed(ctx)' })
+    .getByText('feed', { exact: true })
+    .click()
+  await page.keyboard.press('F12')
+  await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
+  await editor
+    .locator('.view-line')
+    .filter({ hasText: 'function feed' })
+    .getByText('feed', { exact: true })
+    .click()
+  await page.keyboard.press('Shift+F12')
+  await expect(editor.locator('.reference-zone-widget')).toContainText('main.ts')
+  await page.keyboard.press('Escape')
+  await tab(page, 'api.d.ts').click()
+  await page.keyboard.press('Control+p')
+  await page.getByRole('textbox', { name: 'Find file' }).fill('main')
+  await page.keyboard.press('Enter')
+  await expect(tab(page, 'main.ts')).toHaveAttribute('aria-pressed', 'true')
+  await page.keyboard.press('Control+Shift+f')
+  await page.getByRole('textbox', { name: 'Search project' }).fill('ore moving')
+  await photo(page, 'ide-project-search')
+  await editor.getByRole('button', { name: /lib\/drive.ts:4/ }).click()
+  await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
+  await replaceCode(page, helper.replace('ctx.dig', 'ctx.unknownCommand'))
+  await expect(editor.locator('.squiggly-error').first()).toBeVisible()
+  await expect(page.getByText('Working copy', { exact: true })).toBeVisible()
+
+  const tree = page.getByRole('region', { name: 'Project files' })
+  await tree.getByRole('button', { name: 'New folder' }).click()
+  await tree.getByLabel('Project path').fill('parts')
+  await tree.getByRole('button', { name: 'Create' }).click()
+  await page.reload()
+  await expect(tree.getByRole('button', { name: 'parts/index.ts' })).toBeVisible()
+  await tree.getByRole('button', { name: 'New file' }).click()
+  await tree.getByLabel('Project path').fill('parts/press.ts')
+  await tree.getByRole('button', { name: 'Create' }).click()
+  await expect(tab(page, 'parts/press.ts')).toHaveAttribute('aria-pressed', 'true')
+  await tree.getByRole('button', { name: 'parts', exact: true }).click()
+  await tree.getByRole('button', { name: 'Rename selected' }).click()
+  await tree.getByLabel('Project path').fill('presses')
+  await tree.getByRole('button', { name: 'Rename', exact: true }).click()
+  await expect(tree.getByRole('button', { name: 'presses/press.ts' })).toBeVisible()
+  await tree.getByRole('button', { name: 'presses/press.ts' }).click()
+  await tree.getByRole('button', { name: 'Delete selected' }).click()
+  await tree.getByRole('button', { name: 'Cancel' }).click()
+  await expect(tab(page, 'presses/press.ts')).toBeVisible()
+  await tree.getByRole('button', { name: 'Delete selected' }).click()
+  await tree.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(tab(page, 'presses/press.ts')).toHaveCount(0)
+})
+
+test('test and stage a working copy, restore a snapshot and inspect the live shift', async ({ page }) => {
+  await workshop(page)
+  const output = page.getByRole('region', { name: 'Program console' })
+  await expect(output).toContainText('ore moving')
+  await output.getByRole('searchbox').fill('absent')
+  await expect(output).toContainText('No matching lines.')
+  await button(page, 'Drivers').click()
+  const drivers = page.getByRole('region', { name: 'Machine drivers' })
+  await drivers.getByRole('button', { name: 'feed · lib/drive.ts:3' }).click()
+  await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
+  const mine = drivers.getByRole('button', { name: 'mine', exact: true })
+  await mine.click()
+  await expect(mine).toHaveAttribute('aria-pressed', 'true')
+  await photo(page, 'ide-drivers')
+
+  await button(page, 'Tests').click()
+  await button(page, 'Create tests.ts').click()
+  await expect(tab(page, 'tests.ts')).toBeVisible()
+  await button(page, 'Run tests').click()
+  await expect(page.getByText('Pass', { exact: true })).toBeVisible()
+  await replaceCode(page, 'test("bin count", () => { equal(1, 2) })')
+  await button(page, 'Run tests').click()
+  await expect(page.getByText('Fail', { exact: true })).toBeVisible()
+  await tab(page, 'main.ts').click()
+  await replaceCode(page, 'export function onTick() {}')
+  await button(page, 'Snapshots').click()
+  await page.getByLabel('Snapshot name').fill('Quiet shift')
+  await button(page, 'Save draft').click()
+  await expect(page.getByRole('region', { name: 'Project revisions' })).toContainText('Quiet shift')
+  await button(page, 'Tests').click()
+  await page.getByRole('combobox', { name: 'Preview ticks' }).selectOption('2000')
+  await button(page, 'Run preview').click()
+  const table = page.getByRole('table', { name: 'Preview comparison' })
+  const deployed = await table
+    .getByRole('row', { name: /^Deployed/ })
+    .getByRole('cell')
+    .first()
+    .innerText()
+  const draft = await table
+    .getByRole('row', { name: /^Draft/ })
+    .getByRole('cell')
+    .first()
+    .innerText()
+  expect(Number(draft)).toBeLessThan(Number(deployed))
+  await photo(page, 'ide-preview')
+  await button(page, 'Snapshots').click()
+  await button(page, 'Roll back').first().click()
+  await expect(page.locator('.project-editor .view-lines').first()).toContainText('ctx.work')
+  await button(page, 'Restore draft').click()
+  await expect(page.locator('.project-editor .view-lines').first()).toContainText('onTick() {}')
+  await button(page, 'Metrics').click()
+  await expect(page.getByRole('region', { name: 'Factory metrics' }).locator('figure')).toHaveCount(7)
+  await photo(page, 'ide-metrics')
+})
+
+test('jump from a controller error to its module and clear the log ring', async ({ page }) => {
+  await workshop(page)
+  await page
+    .getByRole('region', { name: 'Project files' })
+    .getByRole('button', { name: 'lib/drive.ts' })
+    .click()
+  await replaceCode(page, 'export function feed() {\n  throw new Error("stuck valve")\n}')
+  await expect(page.getByText('Working copy', { exact: true })).toBeVisible()
+  await page.keyboard.press('Control+s')
+  const output = page.getByRole('region', { name: 'Program console' })
+  const location = output.getByRole('button', { name: 'lib/drive.ts:2' })
+  await expect(location).toBeVisible()
+  await tab(page, 'main.ts').click()
+  await location.click()
+  await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('.project-editor .squiggly-error').first()).toBeVisible()
+  await photo(page, 'ide-console-error')
+  await output.getByRole('button', { name: 'Clear' }).click()
+  await expect(output.getByRole('listitem')).toHaveCount(0)
+})
