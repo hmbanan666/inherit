@@ -13,6 +13,7 @@ import {
 
 test('research licenses equipment and the shop charges the actual belt path once', () => {
   const c = createCampaign()
+  c.economy.money = 100
   expect(getSurface(c).machines).not.toContain('assembler')
   expect(purchaseMachine(c, 'sorter', 'shed', 0, 1)).toBeUndefined()
   expect(research(c, 'quality')).toBe(false)
@@ -28,6 +29,7 @@ test('research licenses equipment and the shop charges the actual belt path once
 
 test('land, mineral claims and the road have separate licenses and cash prices', () => {
   const c = createCampaign()
+  c.economy.money = 100
   c.economy.researchPoints = 80
   expect(purchasePlot(c, 'shed', 'east-lot')).toBe(false)
   expect(research(c, 'survey')).toBe(true)

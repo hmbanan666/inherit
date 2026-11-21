@@ -7,18 +7,16 @@ test('the workshop opens as Code and grows when the player changes the factory a
   expect(surface()).toMatchObject({ sections: ['code'], showMoney: false })
   c.progress.signals.printedTick = true
   expect(surface().sections).toEqual(['code'])
-  advanceGame(c, ctx => ctx.dig('mine'))
+  advanceGame(c, ctx => ctx.take('mine'))
   expect(surface()).toMatchObject({ sections: ['code', 'factory'], showMoney: false })
+  c.town.wired = true
   for (let i = 0; i < 100 && c.town.beat === 1; i++) advanceGame(c, ctx => {
-    ctx.connect('mine', 'furnace')
-    ctx.connect('furnace', 'cart')
-    ctx.dig('mine')
-    ctx.work('furnace')
+    ctx.put('furnace',ctx.take('mine'))
+    ctx.put('cart',ctx.take('furnace'))
   })
   expect(c.town.beat).toBe(2)
   expect(surface()).toMatchObject({ sections: ['code', 'factory', 'town', 'inbox', 'orders'], showMoney: true })
   c.economy.orders = []
-  c.town.nextOrders.bram = c.world.tick + 400
   const old = JSON.parse(serializeSave(c))
   delete old.seenSections
   const restored = loadSave(old)

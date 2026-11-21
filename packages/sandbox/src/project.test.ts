@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest'
-import { createProgram, runProjectTests } from './index'
+import { createLegacyProgram as createProgram, runProjectTests } from './index'
 import type { Factory } from '@inherit/sim'
 
 const ctx: Factory = {

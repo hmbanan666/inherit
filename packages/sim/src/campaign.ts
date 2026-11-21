@@ -58,16 +58,16 @@ export const initialSignals = () => ({
   confirmed: false,
 })
 const uncleNote =
-  '// The shed is yours. So is my tab at the bank.\n// The factory runs this file every tick. Start below. — Uncle\n'
+  '// The shed is yours. So is my tab at the bank.\n// Bring your verbs here. The factory calls onTick every tick. — Uncle\n'
 
 export function isStarterProject(files: ProjectFiles): boolean {
-  return files['main.ts'] === uncleNote && Object.keys(files).length === 1
+  return files['main.ts'] === uncleNote
 }
 
 export function createCampaign(seed = 1): Campaign {
   const files = { 'main.ts': uncleNote }
   const campaign: Campaign = {
-    version: 4,
+    version: 5,
     seenSections: ['code'],
     town: newTown(),
     world: {
@@ -91,7 +91,7 @@ export function createCampaign(seed = 1): Campaign {
       incidents: [],
     },
     economy: {
-      money: 100,
+      money: 0,
       reputation: 0,
       research: [],
       orders: [],

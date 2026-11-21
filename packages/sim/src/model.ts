@@ -72,6 +72,7 @@ export interface CampaignWorld {
   nextIncidentId: number
   sites: Site[]
   machines: CampaignMachine[]
+  hops?: { from: string; to: string; item: MaterialId }[]
   belts: CampaignBelt[]
   lost: number
   delivered: Partial<Record<MaterialId, number>>
@@ -154,7 +155,7 @@ export type WorkshopSection = typeof workshopSections[number]
 
 export interface Campaign {
   seenSections: WorkshopSection[]
-  version: 4
+  version: 5
   town: TownState
   world: CampaignWorld
   economy: Economy

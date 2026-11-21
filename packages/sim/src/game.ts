@@ -1,8 +1,5 @@
-import { blueprintCommands } from './blueprints'
-import { stepCampaign } from './engine'
 import type { Campaign, Incident, OrderState, StoryMessage, JsonObject } from './model'
-import type { BlueprintAPI, Factory, FactoryEvent } from './campaign-api'
-import { getSurface, type GameEventName } from './research'
+import { primitiveTick, type ChapterFactory } from './primitives'
 import { letter, settleTown } from './town'
 
 export interface GameTick {
@@ -12,51 +9,29 @@ export interface GameTick {
   moneyDelta: number
   incidents: Incident[]
 }
-export type GameFactory = Omit<Factory, 'recipe' | 'dispatch'> & BlueprintAPI
+export type GameFactory = ChapterFactory
 export interface GameProgram {
-  onTick(ctx: GameFactory): void
-  deliverEvent(name: GameEventName, event: FactoryEvent, ctx: GameFactory): void
-  exportMemory(): JsonObject
+  onTick(api: GameFactory): void
 }
-export type GameController = ((ctx: GameFactory, events: FactoryEvent[]) => void) | GameProgram
-const handlers: Partial<Record<FactoryEvent['type'], GameEventName>> = {
-  itemArrived: 'onItemArrived',
-  machineIdle: 'onMachineIdle',
-  truckReturned: 'onTruckReturned',
-}
+export type GameController = ((api: GameFactory) => void) | GameProgram
 /** Settle shipments even when a controller stops partway through a tick. */
 export function advanceGame(c: Campaign, controller: GameController): GameTick {
   const money = c.economy.money,
     messages = c.progress.messages.length,
     changes = c.town.changes.length
-  const surface = getSurface(c)
+  const tick = primitiveTick(c)
   try {
-    stepCampaign(
-      c.world,
-      (floor, previous) => {
-        const ctx = { ...floor, ...blueprintCommands(c) }
-        const { dispatch: _dispatch, recipe: _recipe, ...player } = ctx
-        const events = previous.filter((e) => surface.events.includes(handlers[e.type]!))
-        if (typeof controller === 'function') controller(player, events)
-        else {
-          try {
-            for (const e of events) controller.deliverEvent(handlers[e.type]!, e, player)
-            controller.onTick(player)
-          } finally {
-            c.memory = controller.exportMemory()
-          }
-        }
-      },
-      c.town.beat,
-    )
+    if (typeof controller === 'function') controller(tick.api)
+    else controller.onTick(tick.api)
   } finally {
+    tick.finish()
     if (c.world.machines.some((m) => m.fault === 'jammed'))
       letter(
         c,
         'jam',
         'Bram',
         'A furnace jammed',
-        'Dump the jammed bin with ctx.clear(id), then route copper to a copper furnace.',
+        'Take the stray rock out of the furnace and put it in the matching furnace.',
       )
     settleTown(c)
   }

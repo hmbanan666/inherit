@@ -1,20 +1,20 @@
-import { bramActivity, onboardingStep } from './onboarding'
 import type { BlueprintAPI, Factory, MachineKind } from './campaign-api'
-import type { Campaign, ProjectFiles, WorkshopSection } from './model'
+import type { Campaign, WorkshopSection } from './model'
+import { currentLesson } from './onboarding'
 import { deployProject, rollbackProject } from './campaign'
 
 export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'> | keyof BlueprintAPI
 export type GameEventName = 'onItemArrived' | 'onMachineIdle' | 'onTruckReturned'
-export interface HandleSurface {
-  name: 'mine' | 'furnace' | 'cart'
-  type: 'Miner' | 'Furnace' | 'Dock'
-  members: ('name' | 'dig' | 'connect' | 'smelt')[]
+export type ChapterExport = 'take' | 'put' | 'look' | 'buy' | 'repair'
+const licenses = { press: 3, furnace: 4, cutter: 5, assembler: 9 } as const
+export type ChapterMachine = keyof typeof licenses
+export function availableMachines(c: Campaign): ChapterMachine[] {
+  return (Object.keys(licenses) as ChapterMachine[]).filter(kind => licenses[kind] <= c.town.beat)
 }
 export interface UnlockedSurface {
   sections: WorkshopSection[]
   showMoney: boolean
-  handles: HandleSurface[]
-  methods: FactoryMethod[]
+  exports: ChapterExport[]
   events: GameEventName[]
   budget: number
   multiFile: boolean
@@ -198,55 +198,30 @@ export function research(c: Campaign, id: string): boolean {
 export function getSurface(c: Campaign): UnlockedSurface {
   const { beat } = c.town
   const sections: WorkshopSection[] = ['code']
-  if (beat > 1 || bramActivity(c).dug) sections.push('factory')
+  if (beat > 1 || !!c.world.extracted['iron-ore'] || !!c.world.extracted['copper-ore']) sections.push('factory')
   if (c.town.changes.length) sections.push('town')
   if (beat > 1 && c.progress.messages.some(m => m.kind === 'email' && m.id !== 'uncle')) sections.push('inbox')
-  if (Object.keys(c.town.nextOrders).length || c.economy.orders.some(o => o.id.startsWith('order-')))
+  if (c.town.offered.length || c.economy.orders.some(o => o.id.startsWith('order-')))
     sections.push('orders')
-  const step = onboardingStep(c)
-  const handles: HandleSurface[] = []
-  if (step >= 3) handles.push({
-    name: 'mine', type: 'Miner', members: step >= 4 ? ['name', 'dig', 'connect'] : ['name', 'dig'],
-  })
-  if (step >= 4) {
-    const members: HandleSurface['members'] = ['name']
-    if (step >= 5) members.push('smelt')
-    if (step >= 6) members.push('connect')
-    handles.push({ name: 'furnace', type: 'Furnace', members })
-  }
-  if (step >= 6) handles.push({ name: 'cart', type: 'Dock', members: ['name'] })
+  const exports: ChapterExport[] = ['take']
+  if (beat > 1 || c.town.solved.includes('dig')) exports.push('put')
+  if (beat >= 3) exports.push('buy')
+  if (beat >= 4) exports.push('look')
+  if (beat >= 6) exports.push('repair')
   const machines: MachineKind[] = ['miner', 'dock', 'furnace']
   if (beat >= 3) machines.push('press')
-  if (beat >= 4) machines.push('splitter')
   if (beat >= 5) machines.push('cutter')
   if (beat >= 9) machines.push('assembler')
-  const methods: FactoryMethod[] = ['dig', 'work', 'connect', 'space', 'build']
-  if (beat >= 3) methods.push('stock', 'recipes', 'lastError', 'dismantle')
-  if (beat >= 4) methods.push('peek', 'route', 'clear')
-  if (beat >= 6) methods.push('inspect', 'machines', 'repair')
-  if (beat >= 8) methods.push('orders')
   return {
-    sections,
-    showMoney: beat > 1,
-    handles,
-    methods,
-    events: beat >= 6 ? ['onItemArrived', 'onMachineIdle'] : [],
+    sections, showMoney: beat > 1, exports, events: [],
     budget: 1024,
     machines,
-    multiFile: beat >= 9,
+    multiFile: true,
   }
 }
-function checkFiles(c: Campaign, files: ProjectFiles) {
-  if (!getSurface(c).multiFile && Object.keys(files).some((path) => path !== 'main.ts'))
-    throw new Error('The mayor brings a filing cabinet with the bridge request.')
-}
 export function deployGameProject(c: Campaign) {
-  checkFiles(c, c.project.working)
-  return deployProject(c)
+  const revision = deployProject(c)
+  if (currentLesson(c)?.cases.length === 0) c.town.wired = true
+  return revision
 }
-export function rollbackGameProject(c: Campaign, id: number): boolean {
-  const entry = [...c.project.history, ...c.project.snapshots].find((r) => r.id === id)
-  if (!entry) return false
-  checkFiles(c, entry.files)
-  return rollbackProject(c, id)
-}
+export const rollbackGameProject = rollbackProject

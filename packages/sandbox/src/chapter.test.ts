@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { createWorld, evaluate, levels, step, type Layout } from '@inherit/sim'
-import { solutions } from '../../../tests/chapter-controllers'
-import { createProgram } from './index'
+import { solutions } from '../../../tests/legacy-level-controllers'
+import { createLegacyProgram as createProgram } from './index'
 
 async function replay(index: number, source: string, build = true, ticks = 240) {
   const level = levels[index]
