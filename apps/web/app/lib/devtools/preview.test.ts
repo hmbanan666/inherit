@@ -4,13 +4,13 @@ import { previewProject } from './preview'
 
 test('compare the draft with deployed code from the same live floor and memory', async () => {
   const live = createCampaign()
-  live.memory.start = 7
-  live.project.working['main.ts'] = `export function onTick(ctx) {
-    if (memory.start !== 7) throw new Error("missing ledger")
-    ctx.connect("mine","furnace")
-    ctx.connect("furnace","cart")
-    ctx.dig("mine")
-    ctx.work("furnace")
+  live.town.solved.push('dig','smelt','ship')
+  live.town.wired = true
+  live.progress.signals.printedTick = true
+  live.project.working['main.ts'] = `import { take, put } from "inherit"
+  export function onTick() {
+    put("furnace",take("mine"))
+    put("cart",take("furnace"))
   }`
   const before = serializeSave(live)
   const result = await previewProject(live, 100)
@@ -25,7 +25,7 @@ test('compare the draft with deployed code from the same live floor and memory',
 test('a stopped draft leaves its machines running idle for the remaining ticks', async () => {
   const live = createCampaign()
   live.project.working['main.ts'] =
-    'export function onTick(ctx) { ctx.dig("mine"); throw new Error("valve stuck") }'
+    'import { take } from "inherit"; export function onTick() { take("mine"); throw new Error("valve stuck") }'
   const result = await previewProject(live, 500)
   expect(result.draft.errors).toBe(1)
   expect(result.draft.firstError).toMatch(/main.ts:1.*valve stuck/)

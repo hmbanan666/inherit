@@ -1,6 +1,9 @@
-import { createProgram, type Program } from '@inherit/sandbox'
+import { createProgram, runVerb, type Program } from '@inherit/sandbox'
 import {
   advanceGame,
+  currentLesson,
+  runBench,
+  benchChecks,
   isStarterProject,
   deployGameProject,
   rollbackGameProject,
@@ -28,13 +31,12 @@ let cpu = { calls: 0, interrupts: 0, used: 0, budget: 96 }
 async function compile(files: ProjectFiles, allowStarter = false) {
   const { budget } = getSurface(campaign)
   const sites = commandSites(files)
-  if (allowStarter && isStarterProject(files))
-    return { program: undefined, sites }
+  if (allowStarter && isStarterProject(files)) return { program: undefined, sites }
   const program = await createProgram({
     files: sites.compiledFiles,
     memory: campaign.memory,
     budget,
-    unlockedEvents: ['onItemArrived', 'onMachineIdle'],
+    chapterExports: getSurface(campaign).exports,
   })
   return { program, sites }
 }
@@ -57,9 +59,6 @@ function step(): GameTick | undefined {
   const machines = new Set(campaign.world.machines.map((m) => m.id))
   const traced: GameProgram = {
     onTick: (ctx) => live.onTick(sites.wrap(ctx, live.drainLogs, machines)),
-    deliverEvent: (name, event, ctx) =>
-      live.deliverEvent(name, event, sites.wrap(ctx, live.drainLogs, machines)),
-    exportMemory: () => live.exportMemory(),
   }
   try {
     return advanceGame(campaign, traced)
@@ -74,6 +73,8 @@ function step(): GameTick | undefined {
   live.dispose()
   program = undefined
 }
+let checked: { id: string; files: ProjectFiles } | undefined
+let bench: Frame['bench']
 async function apply(a: Action) {
   switch (a.kind) {
     case 'init':
@@ -97,6 +98,39 @@ async function apply(a: Action) {
       install(next)
       return true
     }
+    case 'bench': {
+      const task = currentLesson(campaign)
+      checked = undefined
+      if (!task?.cases.length || task.id !== a.id) return true
+      try {
+        const checks = await runBench(task, a.files, (api, args, files) =>
+          runVerb(
+            {
+              files,
+              entry: task.file,
+              chapterExports: getSurface(campaign).exports,
+            },
+            task.name,
+            api,
+            args,
+          ),
+        )
+        bench = { checks }
+        if (checks.every((row) => row.state === 'done')) checked = a
+      } catch (e) {
+        bench = { checks: benchChecks(task), error: message(e) }
+      }
+      return true
+    }
+    case 'solve':
+      if (
+        currentLesson(campaign)?.id === a.id &&
+        checked?.id === a.id &&
+        JSON.stringify(checked.files) === JSON.stringify(a.files)
+      )
+        campaign.town.solved.push(a.id)
+      checked = undefined
+      return true
     case 'pay':
       return payInstallment(campaign, a.inFull)
     case 'snapshot':
@@ -108,6 +142,7 @@ async function apply(a: Action) {
 }
 // The host waits for each reply before sending another mutation or tick.
 self.onmessage ??= async ({ data }: MessageEvent<Action>) => {
+  bench = undefined
   let feedback: GameTick | undefined, notice: string | undefined
   try {
     if (data.kind === 'step') feedback = step()
@@ -120,6 +155,7 @@ self.onmessage ??= async ({ data }: MessageEvent<Action>) => {
   const changed = ['init', 'deploy', 'rollback', 'snapshot'].includes(data.kind)
   self.postMessage({
     campaign: live,
+    bench,
     town: townSnapshot(campaign),
     project: changed ? project : undefined,
     active: !!program,

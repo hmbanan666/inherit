@@ -322,6 +322,18 @@ export class FloorScene {
           fromY: art.y,
         })
       }
+    for (const [i, hop] of (world.hops ?? []).entries()) {
+      const from = world.machines.find(m => m.id === hop.from)
+      const to = world.machines.find(m => m.id === hop.to)
+      if (!from || !to) continue
+      const start = center(from.siteId, from), end = center(to.siteId, to)
+      const art = this.cargo.addChild(materialArt(hop.item))
+      const id = 'hop-' + world.tick + '-' + i
+      art.position.set(start.x, start.y)
+      art.scale.set(1.34)
+      seen.add(id)
+      this.items.set(id, {art, ...end, fromX:start.x, fromY:start.y})
+    }
     for (const [id, item] of this.items)
       if (!seen.has(id)) {
         item.art.destroy()
@@ -341,7 +353,7 @@ export class FloorScene {
   animate(now: number, interval: number, paused: boolean) {
     const t = Math.min(1, (now - this.arrivals) / interval)
     for (const item of this.items.values())
-      item.art.position.set(item.fromX + (item.x - item.fromX) * t, item.fromY + (item.y - item.fromY) * t)
+      item.art.position.set(item.fromX + (item.x - item.fromX) * t, item.fromY + (item.y - item.fromY) * t - 12 * Math.sin(Math.PI * t))
     for (const view of this.belts.values()) {
       const build = Math.min(1, Math.max(0, (now - view.built) / 420))
       view.art.alpha = 0.12 + build * 0.88

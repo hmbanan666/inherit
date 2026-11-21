@@ -1,12 +1,14 @@
 import {
   apiDeclarations,
   apiReference,
-  bramLessons,
+  benchChecks,
+  currentLesson,
+  libraryVerbs,
+  type RequestCheck,
   type ApiEntry,
   createCampaign,
   getSurface,
   loadSave,
-  onboardingStep,
   requestChecks,
   serializeSave,
   TICK_MS,
@@ -14,7 +16,6 @@ import {
   type ProjectFiles,
   type WorkshopSection,
 } from '@inherit/sim'
-import { sandboxDeclarations } from '@inherit/sandbox/declarations'
 import type { CpuStats } from '@inherit/sandbox'
 import { appendConsoleLines, type ConsoleRow } from './console-log'
 import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
@@ -55,19 +56,26 @@ function createGameStore() {
     metrics = shallowRef<MetricSample[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
-  const draftExportsOnTick = ref(false)
-  const lessonStep = computed(() => onboardingStep(state.value, draftExportsOnTick.value))
-  const checks = computed(() => requestChecks(state.value, draftExportsOnTick.value))
-  const lessonCheck = computed(() => state.value.town.beat === 1
-    ? checks.value.find(check => check.id === bramLessons[lessonStep.value].check)
-    : undefined)
+  const lesson = computed(() => currentLesson(state.value))
+  const library = computed(() => libraryVerbs(state.value))
+  const benchResult = shallowRef<Frame['bench']>()
+  const checks = computed<RequestCheck[]>(() =>
+    lesson.value?.cases.length
+      ? (benchResult.value?.checks ?? benchChecks(lesson.value))
+      : requestChecks(state.value),
+  )
+  const lessonCheck = computed(() => checks.value[0])
   const surface = computed(() => getSurface(state.value))
   const reference = shallowRef<ApiEntry[]>([])
   const api = ref('')
-  watch([() => state.value.town.beat, lessonStep], () => {
-    reference.value = apiReference(state.value)
-    api.value = apiDeclarations(state.value) + '\n' + sandboxDeclarations
-  }, { immediate: true })
+  watch(
+    [() => state.value.town.beat, () => lesson.value?.id],
+    () => {
+      reference.value = apiReference(state.value)
+      api.value = apiDeclarations(state.value)
+    },
+    { immediate: true },
+  )
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
   let worker: Worker | undefined, current: Action | undefined, rollbackDraft: ProjectFiles | undefined
@@ -76,6 +84,23 @@ function createGameStore() {
     autosave: ReturnType<typeof setInterval>
   let buildCheck: AbortController | undefined,
     errors = 0
+  let nextLesson: ReturnType<typeof setTimeout>
+  let benchTimer: ReturnType<typeof setTimeout>
+  function focusLesson() {
+    const task = lesson.value
+    if (!task) return
+    if (!(task.file in files.value)) createFile(task.file, task.stub)
+    openFile(task.file)
+  }
+  watch(() => lesson.value?.id, focusLesson)
+  watch([files, () => lesson.value?.id, ready], () => {
+    clearTimeout(benchTimer)
+    clearTimeout(nextLesson)
+    benchResult.value = undefined
+    const task = lesson.value
+    if (!task?.cases.length || !ready.value || !(task.file in files.value)) return
+    benchTimer = setTimeout(() => act({ kind: 'bench', id: task.id, files: files.value }), 250)
+  })
   function persist() {
     if (blockedSave.value) return
     try {
@@ -90,6 +115,8 @@ function createGameStore() {
     }
   }
   function stop() {
+    clearTimeout(benchTimer)
+    clearTimeout(nextLesson)
     buildCheck?.abort()
     clearTimeout(timer)
     clearTimeout(watchdog)
@@ -161,7 +188,11 @@ function createGameStore() {
     clearTimeout(watchdog)
     const action = current!
     current = undefined
-    const c = { ...frame.campaign, project: frame.project ?? state.value.project, seenSections: state.value.seenSections }
+    const c = {
+      ...frame.campaign,
+      project: frame.project ?? state.value.project,
+      seenSections: state.value.seenSections,
+    }
     active.value = frame.active
     if (action.kind === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
       files.value = c.project.working
@@ -170,6 +201,17 @@ function createGameStore() {
     c.project.working = files.value
     state.value = c
     town.value = frame.town
+    if (
+      action.kind === 'bench' &&
+      action.files === files.value &&
+      action.id === lesson.value?.id &&
+      frame.bench
+    ) {
+      benchResult.value = frame.bench
+      if (frame.bench.checks.every((check) => check.state === 'done')) {
+        nextLesson = setTimeout(() => act({ kind: 'solve', id: action.id, files: action.files }), 1200)
+      }
+    }
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
     if (frame.error && error.value !== frame.error) {
@@ -311,7 +353,7 @@ function createGameStore() {
     error.value = ''
     selected.value = ''
     notice.value = ''
-    openFile('main.ts')
+    focusLesson()
     persist()
     start()
   }
@@ -325,6 +367,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
+    focusLesson()
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)
@@ -352,8 +395,9 @@ function createGameStore() {
     rollback: (id: number) => act({ kind: 'rollback', id }),
     snapshot: (name: string) => act({ kind: 'snapshot', name, files: files.value }),
     restoreSnapshot,
-    draftExportsOnTick,
-    lessonStep,
+    lesson,
+    library,
+    benchResult,
     lessonCheck,
     checks,
     surface,

@@ -20,7 +20,7 @@ async function simulate(campaign: Campaign, ticks: PreviewTicks, compile?: Compi
         files: campaign.project.deployed,
         memory: campaign.memory,
         budget: surface.budget,
-        unlockedEvents: surface.events,
+        chapterExports: surface.exports,
       })
     } catch (error) {
       errors++

@@ -39,11 +39,13 @@ const drawer = computed(() => section.value === 'inbox' || section.value === 'or
 const floorPane = ref<HTMLElement>()
 const drawerPane = ref<HTMLElement>()
 const editorStatus = computed(() => {
+  if (g.lesson.value?.cases.length) return 'Working copy · checks run as you type'
   if (dirty.value) return 'Working copy · deploy to run your edits'
   if (error.value) return 'Check the error above'
   return g.active.value ? 'Deployed · your code now runs every tick' : 'Waiting for your first deploy'
 })
 const tab = ref<'controller' | 'api'>('controller')
+const showFiles = ref(false)
 const menu = ref<'' | 'history' | 'settings' | 'bank'>('')
 const confirmNew = ref(false)
 const swapped = ref(false)
@@ -78,7 +80,7 @@ const story = ref('')
 const letters = ref<StoryMessage[]>([])
 const letter = computed(() => letters.value[0])
 const archives = computed(() =>
-  campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ')),
+  campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ') || r.name.startsWith('Previous')),
 )
 const coinPop = ref<{ tick: number; amount: number }>()
 watch(
@@ -200,6 +202,7 @@ function resize(e: PointerEvent) {
 }
 function reset() {
   confirmNew.value = false
+  showFiles.value = false
   menu.value = ''
   section.value = 'code'
   letters.value = []
@@ -268,6 +271,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         <button aria-label="Settings" @click="toggleMenu('settings')"><Settings2 /></button>
         <aside v-if="menu === 'settings'" class="hud-menu">
           <button :aria-pressed="swapped" @click="swap">Swap sides</button>
+          <button @click="showFiles = !showFiles; menu = ''">Project files</button>
           <button @click="askNewGame">
             New game
           </button>
@@ -319,7 +323,10 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
               </article>
             </div>
             <div v-else class="drawer-body">
-              <p v-if="!campaign.economy.orders.length">Your regulars will write again soon.</p>
+              <p v-if="!campaign.economy.orders.length">All current orders are filled.</p>
+              <p v-if="Object.keys(campaign.town.waiting).length">Nobody ordered these yet:
+                <span v-for="(n, item) in campaign.town.waiting" :key="item">{{ n }} {{ item }} </span>
+              </p>
               <article v-for="o in campaign.economy.orders" :key="o.id" class="ticket">
                 <h3>{{ town.people.find((p) => p.id === o.customer)?.name }}</h3>
                 <p v-for="(n, item) in o.items" :key="item">{{ o.filled[item] ?? 0 }} / {{ n }} {{ item }}</p>
@@ -344,8 +351,12 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         <header class="dock-header">
           <span class="eyebrow"><Code2 />Code workshop</span>
         </header>
-        <RequestCard :person="requester" @checks="focusPanel('Checks')" />
-        <FileTree v-if="surface.multiFile" />
+        <RequestCard :person="requester" />
+        <FileTree v-if="showFiles" />
+        <details v-if="g.library.value.length" class="my-library">
+          <summary>My library</summary>
+          <button v-for="verb in g.library.value" :key="verb.file" @click="g.openFile(verb.file)">{{ verb.signature }}</button>
+        </details>
         <div class="file-tabs">
           <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
             <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
@@ -392,7 +403,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
       <div v-else-if="story" class="toast" role="status">
         <Mail />{{ story }}<button aria-label="Dismiss notification" @click="story = ''"><X /></button>
       </div>
-      <span v-if="hasFloor">{{ campaign.world.machines.length }} machines · {{ campaign.world.belts.length }} belts</span>
+      <span v-if="hasFloor">{{ campaign.world.machines.length }} machines</span>
       <div class="deploy-group">
         <button class="deploy" :disabled="!ready && !error" @click="g.deploy">
           <Play />{{ error ? 'Run' : 'Deploy' }}
@@ -430,6 +441,9 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
   </div>
 </template>
 <style scoped>
+.my-library { padding: 5px 14px; font: 12px var(--mono); color: var(--soft); max-height: 95px; overflow: auto; }
+.my-library summary { cursor: pointer; }
+.my-library button { margin: 4px 6px 0 0; }
 .wallet {
   position: relative;
 }

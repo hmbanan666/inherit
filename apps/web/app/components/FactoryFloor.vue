@@ -227,6 +227,10 @@ onBeforeUnmount(() => {
           <dd>{{ bins.map(([k, n]) => n + ' ' + k).join(', ') || 'Empty' }}</dd>
           <dt v-if="machine.recipe">Recipe</dt>
           <dd v-if="machine.recipe">{{ machine.recipe }}</dd>
+          <template v-if="machine.kind === 'dock' && Object.keys(campaign.town.waiting).length">
+            <dt>Nobody ordered these yet</dt>
+            <dd>{{ Object.entries(campaign.town.waiting).map(([item,n]) => n + ' ' + item).join(', ') }}</dd>
+          </template>
           <dt>Processed</dt>
           <dd>{{ machine.stats.processed }} · {{ machine.stats.rate }}/min</dd>
         </dl>

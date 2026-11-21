@@ -1,4 +1,4 @@
-import type { Campaign, GameTick, ProjectFiles, TownSnapshot } from '@inherit/sim'
+import type { Campaign, GameTick, RequestCheck, ProjectFiles, TownSnapshot } from '@inherit/sim'
 import type { CpuStats } from '@inherit/sandbox'
 
 export interface CallSite {
@@ -24,12 +24,15 @@ export interface MetricSample {
 export type Action =
   | { kind: 'init'; campaign: Campaign }
   | { kind: 'step' }
+  | { kind: 'bench'; id: string; files: ProjectFiles }
+  | { kind: 'solve'; id: string; files: ProjectFiles }
   | { kind: 'pay'; inFull?: boolean }
   | { kind: 'deploy'; files: ProjectFiles }
   | { kind: 'rollback'; id: number }
   | { kind: 'snapshot'; name: string; files: ProjectFiles }
   | { kind: 'read'; id: string }
 export interface Frame {
+  bench?: { checks: RequestCheck[]; error?: string }
   town: TownSnapshot
   campaign: Omit<Campaign, 'project' | 'seenSections'>
   project?: Campaign['project']
