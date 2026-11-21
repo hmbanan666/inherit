@@ -10,14 +10,18 @@ test('the mixed rock can be rescued, even after reloading a jam', () => {
   c.world.machines[0].output = { kind: 'copper-ore' }
   advanceGame(c, (api) => {
     expect(api.buy('furnace', 'copper')).toBe(true)
-    expect(api.put('furnace', api.take('mine'))).toBe(true)
+    api.take('mine')
+    expect(api.put('furnace')).toBe(true)
   })
   c = loadSave(serializeSave(c))
   advanceGame(c, (api) => {
     expect(api.look('furnace').status).toBe('jammed')
     expect(api.take('furnace')).toBe('copper-ore')
   })
-  advanceGame(c, (api) => expect(api.put('copper', api.take('furnace'))).toBe(true))
+  advanceGame(c, (api) => {
+    api.take('furnace')
+    expect(api.put('copper')).toBe(true)
+  })
   expect(c.world.lost).toBe(0)
   expect(c.world.machines[1].fault).toBeUndefined()
 })
@@ -33,13 +37,12 @@ test('buy charges once per name and machine kinds unlock with the story', () => 
   })
   expect(c.economy.money).toBe(72)
 })
-test('Uncle leaves a comment and an unlocked multi-file project', () => {
+test('Uncle supplies the import and the only player file is main.ts', () => {
   const c = createCampaign()
-  expect(
-    c.project.working['main.ts']
-      .trim()
-      .split('\n')
-      .every((line) => line.startsWith('//')),
-  ).toBe(true)
-  expect(getSurface(c).multiFile).toBe(true)
+  expect(Object.keys(c.project.working)).toEqual(['main.ts'])
+  expect(c.project.working['main.ts'].trim().split('\n')).toEqual([
+    "// Uncle's workshop. His arm can take from a place and put into a place.",
+    'import { take, put } from "inherit"',
+  ])
+  expect(getSurface(c).multiFile).toBe(false)
 })

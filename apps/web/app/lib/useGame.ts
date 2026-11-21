@@ -1,15 +1,14 @@
 import {
   apiDeclarations,
   apiReference,
-  benchChecks,
-  currentLesson,
-  libraryVerbs,
+  currentStep,
+  primaryButton,
+  placeNames,
   type RequestCheck,
   type ApiEntry,
   createCampaign,
   getSurface,
   loadSave,
-  requestChecks,
   serializeSave,
   TICK_MS,
   townSnapshot,
@@ -56,20 +55,19 @@ function createGameStore() {
     metrics = shallowRef<MetricSample[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
-  const lesson = computed(() => currentLesson(state.value))
-  const library = computed(() => libraryVerbs(state.value))
-  const benchResult = shallowRef<Frame['bench']>()
-  const checks = computed<RequestCheck[]>(() =>
-    lesson.value?.cases.length
-      ? (benchResult.value?.checks ?? benchChecks(lesson.value))
-      : requestChecks(state.value),
-  )
+  const view = computed(() => currentStep(state.value))
+  const lesson = computed(() => view.value?.step)
+  const library = computed(() => Object.entries(files.value).flatMap(([file, code]) =>
+    [...code.matchAll(/function (\w+\([^)]*\))/g)].map(match => ({ file, signature: match[1] }))))
+  const checks = computed<RequestCheck[]>(() => view.value?.checks.map(row => ({
+    id: row.id, text: row.text, state: row.status === 'green' ? 'done' : row.status === 'red' ? 'todo' : 'close',
+  })) ?? [])
   const lessonCheck = computed(() => checks.value[0])
   const surface = computed(() => getSurface(state.value))
   const reference = shallowRef<ApiEntry[]>([])
   const api = ref('')
   watch(
-    [() => state.value.town.beat, () => lesson.value?.id],
+    [() => state.value.town.beat, () => lesson.value?.id, () => JSON.stringify(placeNames(state.value))],
     () => {
       reference.value = apiReference(state.value)
       api.value = apiDeclarations(state.value)
@@ -84,23 +82,6 @@ function createGameStore() {
     autosave: ReturnType<typeof setInterval>
   let buildCheck: AbortController | undefined,
     errors = 0
-  let nextLesson: ReturnType<typeof setTimeout>
-  let benchTimer: ReturnType<typeof setTimeout>
-  function focusLesson() {
-    const task = lesson.value
-    if (!task) return
-    if (!(task.file in files.value)) createFile(task.file, task.stub)
-    openFile(task.file)
-  }
-  watch(() => lesson.value?.id, focusLesson)
-  watch([files, () => lesson.value?.id, ready], () => {
-    clearTimeout(benchTimer)
-    clearTimeout(nextLesson)
-    benchResult.value = undefined
-    const task = lesson.value
-    if (!task?.cases.length || !ready.value || !(task.file in files.value)) return
-    benchTimer = setTimeout(() => act({ kind: 'bench', id: task.id, files: files.value }), 250)
-  })
   function persist() {
     if (blockedSave.value) return
     try {
@@ -115,8 +96,6 @@ function createGameStore() {
     }
   }
   function stop() {
-    clearTimeout(benchTimer)
-    clearTimeout(nextLesson)
     buildCheck?.abort()
     clearTimeout(timer)
     clearTimeout(watchdog)
@@ -201,17 +180,6 @@ function createGameStore() {
     c.project.working = files.value
     state.value = c
     town.value = frame.town
-    if (
-      action.kind === 'bench' &&
-      action.files === files.value &&
-      action.id === lesson.value?.id &&
-      frame.bench
-    ) {
-      benchResult.value = frame.bench
-      if (frame.bench.checks.every((check) => check.state === 'done')) {
-        nextLesson = setTimeout(() => act({ kind: 'solve', id: action.id, files: action.files }), 1200)
-      }
-    }
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
     if (frame.error && error.value !== frame.error) {
@@ -272,7 +240,7 @@ function createGameStore() {
   }
   function deploy() {
     if (!worker) start()
-    act({ kind: 'deploy', files: files.value })
+    act({ kind: primaryButton(state.value), files: files.value })
     persist()
   }
   function openFile(file: string, line = 1) {
@@ -353,7 +321,7 @@ function createGameStore() {
     error.value = ''
     selected.value = ''
     notice.value = ''
-    focusLesson()
+    openFile('main.ts')
     persist()
     start()
   }
@@ -367,7 +335,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
-    focusLesson()
+    openFile('main.ts')
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)
@@ -397,7 +365,7 @@ function createGameStore() {
     restoreSnapshot,
     lesson,
     library,
-    benchResult,
+    view,
     lessonCheck,
     checks,
     surface,

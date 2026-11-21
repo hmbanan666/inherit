@@ -1,8 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { advanceGame, createCampaign, DAY, lessons, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
+import { advanceGame, createCampaign, DAY, lessons, jumpToStep, deployGameProject, serializeSave, type Campaign } from '../../packages/sim/src/index'
 import { chapterFiles } from '../chapter-controllers'
+import { applyChapterHint } from '../../packages/sim/src/reference/chapter-one'
 import oldWorkshop from './fixtures/v2-workshop.json'
 
 test.use({ viewport: { width: 1440, height: 900 } })
@@ -30,94 +31,72 @@ async function edit(page: Page, text: string) {
   await page.keyboard.press('Control+v')
   await expect(page.locator('.editor-foot')).toContainText('Working copy')
 }
-async function typeHint(page: Page) {
-  const card = page.getByRole('region', { name:'Current request' })
-  await card.getByRole('button', {name:'Hint',exact:true}).click()
-  await card.getByRole('button', {name:'Show exact step'}).click()
-  const source = (await card.locator('code.exact').textContent())!
-  await card.getByRole('button', {name:'Hide hint'}).click()
-  await page.getByRole('textbox', {name:'Factory controller TypeScript'}).focus()
-  await page.keyboard.press('Control+a')
-  for (const [i, line] of source.trimEnd().split('\n').entries()) {
-    if (i) {
-      await page.keyboard.press('Enter')
-      await page.keyboard.press('Shift+Home')
-    }
-    if (line) await page.keyboard.insertText(line)
-    // Discard any closing brace Monaco supplied after the caret. The hint includes its own.
-    await page.keyboard.press('Control+Shift+End')
-    await page.keyboard.press('Delete')
-  }
-}
-test('type the growing library from the hints and rebuild Riverside', async ({page}) => {
-  test.setTimeout(240000)
+test('run the growing project and rebuild Riverside', async ({page}) => {
+  test.setTimeout(300000)
   const errors = browserErrors(page)
-  const nav = page.getByRole('navigation', {name:'Workshop sections'})
-  const card = page.getByRole('region',{name:'Current request'})
-  const checks = page.getByRole('tabpanel',{name:'Checks'})
+  const button = (name: string) => page.getByRole('button', {name, exact:true})
+  const card = page.getByRole('region', {name:'Current request'})
+  const next = card.getByRole('button', {name:'Continue'})
   await page.goto('/')
-  await expect(page.locator('.view-lines')).toContainText('export function dig')
-  await expect(nav.getByRole('button')).toHaveText(['Code'])
-  await expect(page.locator('.world-shell, .wallet, .bank-chip, .speeds')).toHaveCount(0)
-  await expect(page.getByRole('button',{name:'Deploy',exact:true})).toBeEnabled()
-  await expect(page.locator('.view-line').getByText('export',{exact:true})).toHaveCSS('color','rgb(222, 169, 237)')
+  await expect(page.locator('.view-lines')).toContainText('from "inherit"')
+  await expect(page.locator('.pixi-mount canvas')).toBeVisible()
+  await expect(page.locator('.wallet')).toHaveCount(0)
   await photo(page,'first-launch')
-  for (const task of lessons) {
-    await expect(card).toContainText(task.title,{timeout:30000})
-    await expect(page.locator('.file-tabs')).toContainText(task.file)
-    if (task.id === 'smelt') {
-      await expect(page.locator('.my-library')).not.toHaveAttribute('open','')
-      await photo(page,'smelt-kata')
-    }
-    await typeHint(page)
-    if (task.cases.length) {
-      await expect(checks.locator('.done-count')).toContainText(task.cases.length + ' done')
-      if (task.id === 'dig') {
-        await checks.locator('.done-count').click()
-        await expect(checks.locator('[data-state="done"]')).toBeVisible()
-        await photo(page,'dig-green')
+  let files = createCampaign().project.working
+  for (const step of lessons) {
+    await expect(card.locator('.lesson strong')).toHaveText(step.title)
+    const updated = applyChapterHint(files, step)
+    if (step.id === 'harrow-tab') await button('Pay later').click()
+    else if (step.id === 'harrow-deed') {
+      await button('Pay debt').click()
+      await button('Pay balance (600 coins)').click()
+    } else {
+      if (step.id === 'mayor-tools') {
+        await button('Settings').click()
+        await button('Project files').click()
+        const tree = page.getByRole('region', {name:'Project files'})
+        await tree.getByRole('button', {name:'New file'}).click()
+        await tree.getByLabel('Project path').fill('tools.ts')
+        await tree.getByRole('button', {name:'Create', exact:true}).click()
+        await edit(page, updated['tools.ts']!)
+        await tree.getByRole('button', {name:'main.ts', exact:true}).click()
       }
-      continue
+      const target = step.id === 'bridge-fit' || step.id === 'bridge-span' ? 'tools.ts' : 'main.ts'
+      if (target === 'tools.ts') await page.getByRole('region', {name:'Project files'}).getByRole('button', {name:target, exact:true}).click()
+      await edit(page, updated[target]!)
+      if (step.button === 'run') {
+        await expect(async () => {
+          if (!(await next.isVisible())) await button('Run').click()
+          await expect(next).toBeVisible({timeout:1200})
+        }).toPass({timeout:12000})
+      } else await button('Deploy').click()
     }
-    await page.keyboard.press('Control+Enter')
-    if (task.beat === 1) {
-      await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
-      await expect(nav.getByRole('button',{name:'Factory'})).toContainText('new')
-      await expect(page.locator('.pixi-mount canvas')).toBeVisible()
-      await photo(page,'wire-up-deploy')
-      await expect(checks.locator('.done-count')).toContainText('3 done')
-      await expect(card).toContainText('The family tab',{timeout:15000})
-      await expect(nav.getByRole('button',{name:'Town'})).toContainText('new')
-      await expect(nav.getByRole('button',{name:'Inbox'})).toBeVisible()
-      await expect(nav.getByRole('button',{name:'Orders'})).toBeVisible()
-      await expect(page.locator('.wallet')).toContainText('coins')
-      await page.getByRole('button',{name:'See it'}).click()
-      await expect(page.getByRole('img',{name:/Bram’s forge working/})).toBeVisible()
-      await nav.getByRole('button',{name:'Factory'}).click()
-      await page.getByRole('button',{name:'Pay later'}).click()
-    }
+    await expect(next).toBeVisible({timeout:60000})
+    await expect(card).toContainText(step.solved.did)
+    const position = () => page.evaluate(() => {
+      const c = JSON.parse(localStorage.getItem('inherit.workshop.v1')!)
+      return c.lesson.index + c.lesson.released.length
+    })
+    do {
+      const before = await position()
+      await next.click()
+      await expect.poll(position).toBeGreaterThan(before)
+    } while ((await card.locator('.lesson strong').allTextContents()).includes(step.title))
+    files = updated
   }
-  await expect(card).toContainText('The family tab',{timeout:30000})
-  await page.getByRole('button',{name:'Pay debt'}).click()
-  await page.getByRole('button',{name:'Pay balance (600 coins)'}).click()
   await expect(card).toContainText('The shed is yours.')
   expect(errors).toEqual([])
 })
 
-async function seedWireUp(page: Page) {
-  const c = createCampaign()
-  c.town.solved = ['dig','smelt','ship']
-  c.project.working = chapterFiles(1,'ship')
+async function seedLoop(page: Page) {
+  const c = jumpToStep(createCampaign(), 'bram-loop')
   await page.addInitScript(save => {
     if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1',save)
   },serializeSave(c))
 }
 test('the town clock changes the light without printing a day or phase', async ({ page }) => {
-  const campaign = createCampaign()
-  campaign.town.changes.push({ buildingId: 'forge', text: 'The forge lights up.', tick: 10 })
-  campaign.progress.messages.push({ ...campaign.progress.messages[0]!, id: 'tab', from: 'Mrs Harrow' })
+  const campaign = jumpToStep(createCampaign(), 'elsie-press')
   campaign.world.tick = 2 * DAY
-  campaign.town.beat = 3
   await page.addInitScript((save) => localStorage.setItem('inherit.workshop.v1', save), serializeSave(campaign))
   await page.goto('/')
   const calendar = /\b(day|morning|evening|night)\b/i
@@ -152,9 +131,9 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
     if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
   }, JSON.stringify(oldWorkshop))
   await page.goto('/')
-  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled()
   await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
-  await expect(page.locator('.world-shell')).toHaveCount(0)
+  await expect(page.locator('.world-shell')).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
@@ -164,24 +143,24 @@ test('a saved v2 workshop starts with Bram and keeps the original controller fil
   )
   expect(archive.project.working).toEqual(oldWorkshop.project.working)
   expect(archive.project.deployed).not.toEqual(oldWorkshop.project.deployed)
-  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled()
   expect(errors).toEqual([])
 })
 test('a controller fault leaves the world ticking and a previous revision can resume digging', async ({
   page,
 }) => {
-  await seedWireUp(page)
+  await seedLoop(page)
   await page.goto('/')
   const button = (name: string) => page.getByRole('button', { name, exact: true })
   await expect(button('Deploy')).toBeEnabled()
   await edit(page, chapterFiles(1)['main.ts']!)
   await button('Deploy').click()
-  await expect(page.getByRole('heading', { name: 'The family tab' })).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
   await edit(page, 'export function onTick() {\n  throw new Error("Valve closed")\n}')
   await page.keyboard.press('Control+Enter')
   await expect(page.locator('.runtime')).toContainText('main.ts:2 · Valve closed')
   await expect(page.locator('.live')).toHaveText('Offline')
-  await expect(button('Run')).toBeVisible()
+  await expect(button('Deploy')).toBeVisible()
   await button('Deploy history').click()
   await page.getByRole('button', { name: /Restore #1 / }).click()
   await expect(page.locator('.runtime')).toHaveCount(0)
@@ -189,7 +168,7 @@ test('a controller fault leaves the world ticking and a previous revision can re
   await button('Settings').click()
   await button('New game').click()
   await button('Keep playing').click()
-  await expect(page.getByRole('heading', { name: 'The family tab' })).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
 })
 
 test('a missing worker refreshes once and preserves the notebook draft', async ({ page }) => {
@@ -219,7 +198,7 @@ test('a missing worker refreshes once and preserves the notebook draft', async (
   )
   await page.goto('/')
   await expect.poll(() => navigations, { timeout: 20000 }).toBe(2)
-  await expect(page.getByRole('button', { name: 'Deploy', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: 'Deploy history' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()
   await expect(page.locator('.view-lines')).toContainText('inherited draft')
@@ -244,7 +223,7 @@ test.describe('a high-density mobile display', () => {
 test('a machine remembers the actual helper lines that commanded it', async ({ page }) => {
   const campaign = createCampaign()
   campaign.town.beat = 9
-  campaign.town.changes.push({ buildingId: 'forge', text: 'The forge lights up.', tick: 0 })
+  campaign.lesson.released.push({kind:'section', id:'town'})
   campaign.project.working = {
     'main.ts':
       'import { morning, evening } from "./lib/crew"\nlet tick = 0; export function onTick() { if (++tick < 5) (tick % 2 ? morning : evening)() }',
@@ -297,7 +276,7 @@ test('a machine remembers the actual helper lines that commanded it', async ({ p
     JSON.parse(localStorage.getItem('inherit.workshop.v1')!).world.tick as number,
   )).toBeGreaterThan(5)
   await page.getByRole('button', { name: 'Town', exact: true }).click()
-  await page.getByRole('button', { name: 'Factory', exact: true }).click()
+  await page.getByRole('button', { name: 'Shed', exact: true }).click()
   await expect(floor).toBeVisible()
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   const rest = await pixels()
@@ -323,11 +302,11 @@ test('Run retries an unavailable worker without refreshing the same page', async
     failed = true
     return route.abort()
   })
-  await seedWireUp(page)
+  await seedLoop(page)
   await page.goto('/')
   await expect(page.locator('.runtime')).toContainText('Could not start the controller worker')
   await edit(page, chapterFiles(1)['main.ts']!)
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'The family tab' })).toBeVisible({ timeout: 15000 })
+  await page.getByRole('button', { name: 'Deploy', exact: true }).click()
+  await expect(page.locator('.editor-foot')).toContainText('Deployed · your code now runs every tick')
   await expect(page.locator('.runtime')).toHaveCount(0)
 })

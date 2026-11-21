@@ -1,3 +1,4 @@
+import { lessons } from './lessons'
 import { createCampaign, snapshotProject } from './campaign'
 import { COMPETITION_LETTER, INSTALLMENTS, TAB_LETTER } from './town'
 import { MACHINES, MATERIALS, RECIPES } from './catalog'
@@ -116,6 +117,7 @@ const world = shape({
   nextMachineId: count,
   sites: list(site),
   machines: list(machine),
+  hand: opt(shape({ origin: str, item: material, jam: bool })),
   hops: opt(list(shape({from:str,to:str,item:material}))),
   belts: list(
     shape({
@@ -151,8 +153,18 @@ const world = shape({
   delivered: totals,
   extracted: totals,
 })
+const reveal: Check = v => record(v) && (
+  v.kind === 'coins' || v.kind === 'debt' ||
+  (v.kind === 'section' && one('town', 'inbox', 'orders')(v.id)) ||
+  (v.kind === 'letter' && str(v.id))
+)
 const save = shape({
-  version: one(5),
+  version: one(6),
+  lesson: shape({
+    index: v => count(v) && Number(v) <= lessons.length,
+    phase: one('brief', 'working', 'solved'), passed: list(str),
+    released: list(reveal), queue: list(reveal),
+  }),
   seenSections: opt(list(one(...workshopSections))),
   town: shape({
     beat: one(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -235,6 +247,7 @@ const gameFields = shape({
 function validate(campaign: Campaign) {
   const world = campaign.world
   const machines = new Map(world.machines.map((machine) => [machine.id, machine]))
+  if (world.hand && !machines.has(world.hand.origin)) throw new Error('Invalid hand origin.')
   const sites = new Set(world.sites.map((s) => s.id))
   if (
     machines.size !== world.machines.length ||
@@ -244,7 +257,6 @@ function validate(campaign: Campaign) {
       (machine) =>
         !sites.has(machine.siteId) ||
         machine.builtAt > world.tick ||
-        (machine.fault === 'broken' && machine.coolAt === undefined) ||
         (machine.recipe && RECIPES[machine.recipe].machine !== machine.kind),
     )
   ) {
@@ -277,7 +289,7 @@ function validate(campaign: Campaign) {
 }
 
 function restoreTown(c: Campaign) {
-  c.seenSections ??= ['code']
+  c.seenSections ??= ['factory']
   const town = c.town as Campaign['town'] & { due?: number; interest?: boolean[]; installments?: number[] }
   if ('interest' in town || 'installments' in town || 'due' in town) {
     const principalPaid = INSTALLMENTS.slice(0, town.payments).reduce((sum, amount) => sum + amount, 0)
@@ -310,12 +322,12 @@ function archiveLegacy(data: Record<string, unknown>) {
   }
   if (record(data.project)) {
     const { working, deployed, snapshots, history } = data.project
-    archive(data.version === 4 ? 'Previous chapter code' : 'v2 code', record(working) && Object.keys(working).length ? working : deployed)
-    if (JSON.stringify(working) !== JSON.stringify(deployed)) archive(data.version === 4 ? 'Previous deployment' : 'v2 deployed', deployed)
+    archive(Number(data.version) >= 4 ? 'Previous chapter code' : 'v2 code', record(working) && Object.keys(working).length ? working : deployed)
+    if (JSON.stringify(working) !== JSON.stringify(deployed)) archive(Number(data.version) >= 4 ? 'Previous deployment' : 'v2 deployed', deployed)
     for (const group of [snapshots, history]) {
       if (Array.isArray(group))
         for (const rev of group) {
-          if (record(rev) && typeof rev.name === 'string') archive((data.version === 4 ? 'Previous · ' : 'v2 · ') + rev.name, rev.files)
+          if (record(rev) && typeof rev.name === 'string') archive((Number(data.version) >= 4 ? 'Previous · ' : 'v2 · ') + rev.name, rev.files)
         }
     }
   } else if (record(data.entries)) {
@@ -333,7 +345,7 @@ export function loadSave(input: unknown): Campaign {
   try {
     const data: unknown = typeof input === 'string' ? JSON.parse(input) : structuredClone(input)
     if (!record(data)) return createCampaign()
-    if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3 || data.version === 4)
+    if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3 || data.version === 4 || data.version === 5)
       return archiveLegacy(data)
     if (save(data) && gameFields(data)) return restoreTown(validate(data as unknown as Campaign))
   } catch {

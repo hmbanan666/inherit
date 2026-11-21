@@ -1,19 +1,19 @@
 import { expect, test } from 'vitest'
-import { createCampaign, serializeSave } from '@inherit/sim'
+import { createCampaign, jumpToStep, serializeSave } from '@inherit/sim'
 import { previewProject } from './preview'
 
 test('compare the draft with deployed code from the same live floor and memory', async () => {
-  const live = createCampaign()
-  live.town.solved.push('dig','smelt','ship')
+  const live = jumpToStep(createCampaign(), 'bram-loop')
   live.town.wired = true
-  live.progress.signals.printedTick = true
   live.project.working['main.ts'] = `import { take, put } from "inherit"
   export function onTick() {
-    put("furnace",take("mine"))
-    put("cart",take("furnace"))
+    take("mine")
+    put("furnace")
+    take("furnace")
+    put("cart")
   }`
   const before = serializeSave(live)
-  const result = await previewProject(live, 100)
+  const result = await previewProject(live, 500)
   expect(result.baseline.shipped).toBe(0)
   expect(result.draft.shipped).toBeGreaterThan(0)
   expect(result.draft.money).toBeGreaterThan(result.baseline.money)

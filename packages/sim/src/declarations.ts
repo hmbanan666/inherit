@@ -1,19 +1,20 @@
+import { placeNames } from './lesson-flow'
 import type { Campaign } from './model'
 import { getSurface, availableMachines, type ChapterExport } from './research'
 
 const docs: Record<ChapterExport, [string, string, string]> = {
   take: [
-    'take(place: string): string | undefined',
-    'Pick up the front ready item. Unused items return at the end of the tick.',
-    'const rock = take("mine")',
+    'take(place: Place): string | undefined',
+    'Pick up the front ready item. The hand holds one item.',
+    'take("mine")',
   ],
   put: [
-    'put(place: string, item: string | undefined): boolean',
-    'Give a place an item you took. An empty hand or a full bin returns false.',
-    'const rock = take("mine")\nput("furnace", rock)',
+    'put(place: Place): boolean',
+    'Put the item in the hand down here. An empty hand or a full bin returns false.',
+    'take("mine")\nput("furnace")',
   ],
   look: [
-    'look(place: string): { status: string; inside: string[]; ready: string | undefined; wanted?: string[]; waiting?: Record<string, number> }',
+    'look(place: Place): { status: string; inside: string[]; ready: string | undefined; wanted?: string[]; waiting?: Record<string, number> }',
     'See the ready item and inputs. The cart also lists wanted items and unsold quantities.',
     'const next = look("mine").ready',
   ],
@@ -22,7 +23,7 @@ const docs: Record<ChapterExport, [string, string, string]> = {
     'Buy a machine for the shed. Reusing its name costs nothing.',
     'buy("press")',
   ],
-  repair: ['repair(machine: string): boolean', 'Get a broken furnace working again.', 'repair("furnace")'],
+  repair: ['repair(machine: Place): boolean', 'Get a broken furnace working again.', 'repair("furnace")'],
 }
 export interface ApiEntry {
   name: ChapterExport
@@ -45,7 +46,9 @@ export function apiReference(c: Campaign): ApiEntry[] {
 }
 export function apiDeclarations(c: Campaign): string {
   return (
+    'type Place = ' + placeNames(c).map(p => JSON.stringify(p)).join(' | ') + '\n' +
     'declare module "inherit" {\n' +
+    (getSurface(c).exports.includes('look') ? '  export function look(place: "cart"): { status: string; inside: string[]; ready?: string; wanted: string[]; waiting: Record<string, number> }\n' : '') +
     apiReference(c)
       .map((doc) => '  /** ' + doc.description + ' */\n  export function ' + doc.signature)
       .join('\n') +

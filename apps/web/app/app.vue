@@ -23,10 +23,10 @@ const townPerson = ref<Townsperson['id']>()
 const replay = shallowRef<TownSnapshot['changes']>([])
 const highlighted = shallowRef<string[]>([])
 const requester = computed(() => town.value.people.find((p) => p.ask))
-const section = ref<WorkshopSection>('code')
+const section = ref<WorkshopSection>('factory')
 const unread = computed(() => campaign.value.progress.messages.filter(m => m.unread).length)
 const sectionNames: Record<WorkshopSection, string> = {
-  code: 'Code', factory: 'Factory', town: 'Town', inbox: 'Inbox', orders: 'Orders',
+  code: 'Code', factory: 'Shed', town: 'Town', inbox: 'Inbox', orders: 'Orders',
 }
 function sectionDescription(item: WorkshopSection) {
   const details = []
@@ -39,7 +39,7 @@ const drawer = computed(() => section.value === 'inbox' || section.value === 'or
 const floorPane = ref<HTMLElement>()
 const drawerPane = ref<HTMLElement>()
 const editorStatus = computed(() => {
-  if (g.lesson.value?.cases.length) return 'Working copy · checks run as you type'
+  if (g.lesson.value?.button === 'run') return 'Working copy · Run to watch your edits'
   if (dirty.value) return 'Working copy · deploy to run your edits'
   if (error.value) return 'Check the error above'
   return g.active.value ? 'Deployed · your code now runs every tick' : 'Waiting for your first deploy'
@@ -185,7 +185,7 @@ function hotkey(e: KeyboardEvent) {
   }
   if (e.key === 'Escape') {
     menu.value = ''
-    if (drawer.value) openSection('code')
+    if (drawer.value) openSection('factory')
     confirmNew.value = false
   }
 }
@@ -205,7 +205,7 @@ function reset() {
   confirmNew.value = false
   showFiles.value = false
   menu.value = ''
-  section.value = 'code'
+  section.value = 'factory'
   letters.value = []
   celebration.value = []
   replay.value = []
@@ -244,7 +244,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           >+{{ coinPop.amount }}</small
         >
       </div>
-      <div v-if="surface.showMoney" class="settings bank-chip">
+      <div v-if="campaign.lesson.released.some(item => item.kind === 'debt')" class="settings bank-chip">
         <button aria-label="Pay debt" @click="toggleMenu('bank')">
           Debt {{ town.debt.owed }} <b v-if="town.debt.next">Pay</b>
         </button>
@@ -313,7 +313,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
           <aside v-if="drawer" ref="drawerPane" tabindex="-1" class="drawer" :aria-label="drawer">
             <header>
               <h2>{{ drawer }}</h2>
-              <button aria-label="Close drawer" @click="openSection('code')"><X /></button>
+              <button aria-label="Close drawer" @click="openSection('factory')"><X /></button>
             </header>
             <div v-if="drawer === 'Inbox'" class="drawer-body">
               <article v-for="m in [...campaign.progress.messages].reverse()" :key="m.id" class="ticket">
@@ -356,7 +356,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
         <FileTree v-if="showFiles" />
         <details v-if="g.library.value.length" class="my-library">
           <summary>My library</summary>
-          <button v-for="verb in g.library.value" :key="verb.file" @click="g.openFile(verb.file)">{{ verb.signature }}</button>
+          <button v-for="verb in g.library.value" :key="verb.file + verb.signature" @click="g.openFile(verb.file)">{{ verb.signature }}</button>
         </details>
         <div class="file-tabs">
           <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
@@ -407,7 +407,7 @@ useHead({ title: () => (requester.value?.ask?.title ?? 'Kettlewick') + ' · inhe
       <span v-if="hasFloor">{{ campaign.world.machines.length }} machines</span>
       <div class="deploy-group">
         <button class="deploy" :disabled="!ready && !error" @click="g.deploy">
-          <Play />{{ error ? 'Run' : 'Deploy' }}
+          <Play />{{ g.lesson.value?.button === 'run' ? 'Run' : 'Deploy' }}
         </button>
         <button class="revisions" aria-label="Deploy history" @click="toggleMenu('history')">
           <ChevronDown />

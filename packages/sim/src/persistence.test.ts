@@ -135,3 +135,12 @@ test.each(['import { mine } from "inherit"; mine.dig()', 'export function onTick
     expect(fresh.project.working).toEqual(createCampaign().project.working)
     expect(fresh.project.snapshots.find(s => s.name === 'Previous chapter code')?.files).toEqual(old.project.working)
   })
+
+test('a version five workshop restarts with both revisions in snapshots', () => {
+  const old = createCampaign()
+  old.project.working = { 'main.ts': '// unfinished', 'tools.ts': '// spare' }
+  old.project.deployed = { 'main.ts': '// previous deployment' }
+  const fresh = loadSave({ ...old, version: 5 })
+  expect(fresh.lesson).toEqual(createCampaign().lesson)
+  expect(fresh.project.snapshots.slice(0,2).map(s => s.files)).toEqual([old.project.working,old.project.deployed])
+})

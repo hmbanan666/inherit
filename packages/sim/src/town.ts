@@ -1,3 +1,4 @@
+import { updateBankStep } from './lesson-flow'
 import type { MaterialId } from './campaign-api'
 import type { Campaign } from './model'
 import type { BuildingId, TownSnapshot } from './town-view'
@@ -126,7 +127,7 @@ export function letter(c: Campaign, id: string, from: string, title: string, bod
 function change(c: Campaign, buildingId: BuildingId, text: string) {
   c.town.changes.push({ buildingId, text, tick: c.world.tick })
 }
-function enter(c: Campaign, beat: number) {
+export function enterBeat(c: Campaign, beat: number) {
   const t = c.town
   t.beat = beat
   t.wired = false
@@ -134,8 +135,8 @@ function enter(c: Campaign, beat: number) {
   t.filled = 0
   switch (beat) {
     case 2:
+      c.world.machines.find(m => m.id === 'furnace')!.batchTicks = 4
       change(c, 'bank', 'Mrs Harrow hangs the family tab in the bank window.')
-      letter(c, 'tab', 'Mrs Harrow', 'Your uncle’s tab', TAB_LETTER)
       break
     case 4:
       letter(
@@ -173,10 +174,6 @@ function enter(c: Campaign, beat: number) {
       break
   }
 }
-// The bank introduction can be acknowledged before making a payment.
-export function acknowledgeTab(c: Campaign) {
-  if (c.town.beat === 2) enter(c, 3)
-}
 export function debtRemaining(c: Campaign) {
   return INSTALLMENTS.slice(c.town.payments).reduce((sum, amount) => sum + amount, 0)
 }
@@ -193,8 +190,7 @@ export function payInstallment(c: Campaign, inFull = false) {
   c.economy.money -= amount
   c.town.paid += amount
   c.town.payments = inFull ? INSTALLMENTS.length : c.town.payments + 1
-  acknowledgeTab(c)
-  if (c.town.beat === 10 && c.town.payments === INSTALLMENTS.length) enter(c, 11)
+  c.lesson = updateBankStep(c)
   return true
 }
 const jobs: [number, PersonId, MaterialId, number, number][] = [
@@ -227,7 +223,7 @@ export function wanted(c: Campaign): MaterialId[] {
   const request = activeRequest(c)
   return [
     ...new Set([
-      ...(request ? [request.item] : []),
+      ...(request && c.town.filled < request.quantity ? [request.item] : []),
       ...c.economy.orders.flatMap((o) => Object.keys(o.items) as MaterialId[]),
     ]),
   ]
@@ -245,13 +241,10 @@ export function settleTown(c: Campaign) {
   }
   const request = activeRequest(c)
   if (request && t.wired) {
-    const previouslyFull = t.filled === request.quantity
     t.filled += allocate(request.item, request.quantity - t.filled)
-    if (previouslyFull && (t.beat !== 1 || c.progress.signals.printedTick)) {
+    if (t.filled === request.quantity && !t.changes.some(row => row.buildingId === request.building)) {
       change(c, request.building, request.change)
       c.economy.money += request.pay
-      enter(c, request.beat + 1)
-      offerOrders(c)
     }
   }
   for (const o of [...c.economy.orders]) {
@@ -264,20 +257,4 @@ export function settleTown(c: Campaign) {
     c.economy.orders.splice(c.economy.orders.indexOf(o), 1)
     if (o.id.startsWith('order-8-')) t.competition.push(o.customer)
   }
-  if (
-    t.beat === 4 &&
-    t.wired &&
-    t.solved.includes('unjam') &&
-    c.world.machines.some((m) => m.id === 'copper' && m.stats.processed)
-  )
-    enter(c, 5)
-  if (t.beat === 6 && t.wired && c.progress.signals.recovered && t.solved.includes('fixBroken')) enter(c, 7)
-  if (
-    t.beat === 8 &&
-    t.wired &&
-    t.solved.includes('choose') &&
-    ['elsie', 'wen'].every((who) => t.competition.includes(who))
-  )
-    enter(c, 9)
-  if (t.beat === 10 && t.payments === INSTALLMENTS.length) enter(c, 11)
 }

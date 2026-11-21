@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-import { createCampaign, deployGameProject, serializeSave } from '../../packages/sim/src/index'
+import { createCampaign, jumpToStep, deployGameProject, serializeSave } from '../../packages/sim/src/index'
 
 const main = 'import { feed } from "./lib/drive"\nexport function onTick() {\n  feed()\n}'
 const helper = 'import {take} from "inherit"\nexport function feed() {\n  take("mine")\n  console.log("ore moving")\n}'
@@ -16,8 +16,7 @@ async function projectFiles(page: Page) {
 
 async function workshop(page: Page, unlock = true) {
   if (unlock) {
-    const c = createCampaign()
-    c.town.beat = 10
+    const c = jumpToStep(createCampaign(), 'harrow-deed')
     c.project.working = { 'main.ts': main, 'lib/drive.ts': helper }
     deployGameProject(c)
     await page.addInitScript((save) => {
@@ -46,9 +45,9 @@ async function replaceCode(page: Page, text: string) {
 
 test('first shift opens a single player file', async ({ page }) => {
   await workshop(page, false)
-  await expect(tab(page, 'verbs/dig.ts')).toBeVisible()
+  await expect(tab(page, 'main.ts')).toBeVisible()
   await expect(
-    page.locator('.editor-dock').getByRole('button', { name: 'verbs/dig.ts', exact: true }),
+    page.locator('.editor-dock').getByRole('button', { name: 'main.ts', exact: true }),
   ).toHaveCount(1)
   await expect(page.getByRole('region', { name: 'Project files' })).toHaveCount(0)
   await expect(page.locator('.my-library')).toHaveCount(0)
@@ -72,7 +71,7 @@ test('first shift distinguishes TypeScript tokens and explains the available cal
   const panel = page.getByRole('region', { name: 'API reference' })
   await expect(panel).toContainText('What inherit exports')
   await expect(panel.getByRole('heading', {name:/^take/})).toBeVisible()
-  await expect(panel.locator('article')).toHaveCount(1)
+  await expect(panel.locator('article')).toHaveCount(2)
   expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   await photo(page, 'api-reference')
 })
@@ -117,7 +116,7 @@ test('import completion inside braces lists the unlocked workshop exports', asyn
   await page.keyboard.press('Control+Space')
   const list = page.locator('.suggest-widget.visible')
   await expect(list).toContainText('take')
-  await expect(list).not.toContainText(/repair|buy|put/)
+  await expect(list).not.toContainText(/repair|buy/)
 })
 
 test('invalid or missing palette values preserve distinct syntax colors', async ({ page }) => {

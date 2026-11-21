@@ -1,6 +1,6 @@
 import type { BlueprintAPI, Factory, MachineKind } from './campaign-api'
 import type { Campaign, WorkshopSection } from './model'
-import { currentLesson } from './onboarding'
+import { lessons } from './lessons'
 import { deployProject, rollbackProject } from './campaign'
 
 export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'> | keyof BlueprintAPI
@@ -197,31 +197,31 @@ export function research(c: Campaign, id: string): boolean {
 }
 export function getSurface(c: Campaign): UnlockedSurface {
   const { beat } = c.town
-  const sections: WorkshopSection[] = ['code']
-  if (beat > 1 || !!c.world.extracted['iron-ore'] || !!c.world.extracted['copper-ore']) sections.push('factory')
-  if (c.town.changes.length) sections.push('town')
-  if (beat > 1 && c.progress.messages.some(m => m.kind === 'email' && m.id !== 'uncle')) sections.push('inbox')
-  if (c.town.offered.length || c.economy.orders.some(o => o.id.startsWith('order-')))
-    sections.push('orders')
-  const exports: ChapterExport[] = ['take']
-  if (beat > 1 || c.town.solved.includes('dig')) exports.push('put')
+  const sections: WorkshopSection[] = ['factory']
+  for (const reveal of c.lesson.released) if (reveal.kind === 'section') sections.push(reveal.id)
+  const exports: ChapterExport[] = ['take', 'put']
   if (beat >= 3) exports.push('buy')
-  if (beat >= 4) exports.push('look')
-  if (beat >= 6) exports.push('repair')
+  if (beat >= 6) exports.push('look')
+  if (beat > 6 || beat === 6 && lessons[c.lesson.index]?.id !== 'heat-inspect') exports.push('repair')
   const machines: MachineKind[] = ['miner', 'dock', 'furnace']
   if (beat >= 3) machines.push('press')
   if (beat >= 5) machines.push('cutter')
   if (beat >= 9) machines.push('assembler')
   return {
-    sections, showMoney: beat > 1, exports, events: [],
+    sections, showMoney: c.lesson.released.some(r => r.kind === 'coins'), exports, events: [],
     budget: 1024,
     machines,
-    multiFile: true,
+    multiFile: beat >= 9,
   }
 }
 export function deployGameProject(c: Campaign) {
   const revision = deployProject(c)
-  if (currentLesson(c)?.cases.length === 0) c.town.wired = true
+  const id = lessons[c.lesson.index]?.id
+  if (id === 'bram-loop' && !c.town.wired) {
+    c.town.entered = c.world.tick
+    delete c.town.waiting['iron-ingot']
+  }
+  if (id && ['bram-loop', 'elsie-grate', 'tomas-lamps', 'wen-wheel', 'bridge-span'].includes(id)) c.town.wired = true
   return revision
 }
 export const rollbackGameProject = rollbackProject

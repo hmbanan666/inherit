@@ -18,6 +18,7 @@ export interface CpuStats {
   budget: number
 }
 export interface FactoryContext {
+  traceSite?(site: { file: string; line: number; within?: string }): void
   readonly tick: number
 }
 
@@ -75,6 +76,7 @@ export async function openRuntime(
   budget: number,
   testing: boolean,
   chapterExports?: readonly string[],
+  initialFactory?: FactoryContext,
 ) {
   if (!Number.isInteger(budget) || budget < 1 || budget > 4096)
     throw new Error('Budget must be an integer from 1 to 4096.')
@@ -178,6 +180,7 @@ export async function openRuntime(
           const [name, x, y, recipe, deposit] = params.splice(1)
           params.push({ name, x, y, recipe, deposit })
         }
+        if (chapterExports && current.traceSite) current.traceSite(project.callSite(vm.getString(args[4])))
         const result = Reflect.apply(method, current, params)
         return result === undefined ? vm.undefined : vm.newString(hostJson(result))
       }),
@@ -217,9 +220,11 @@ export async function openRuntime(
     begin(fresh())
     unwrap(vm.evalCode(inheritModule(names), 'inherit', { type: 'module' })).dispose()
     runtime.setModuleLoader(project.load, project.resolve)
+    current = initialFactory
     const namespace = keep(
       unwrap(vm.evalCode(project.load(project.entry), project.entry, { type: 'module' })),
     )
+    current = undefined
     assertSynchronous(namespace)
     runtime.removeModuleLoader()
     return {
@@ -229,20 +234,6 @@ export async function openRuntime(
       handler(name: string) {
         const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
         if (vm.typeof(fn) === 'function') return fn
-      },
-      callVerb(fn: QuickJSHandle, ctx: FactoryContext, args: readonly string[]) {
-        begin(fresh())
-        const values = args.map(arg => vm.newString(arg))
-        current = ctx
-        try {
-          return usingHandle(invoke(fn, ...values), value => {
-            assertSynchronous(value)
-            return vm.typeof(value) === 'string' ? vm.getString(value) : undefined
-          })
-        } finally {
-          current = undefined
-          for (const value of values) value.dispose()
-        }
       },
       dispatch(fn: QuickJSHandle, ctx: FactoryContext, event?: object) {
         if (lastTick !== ctx.tick) {

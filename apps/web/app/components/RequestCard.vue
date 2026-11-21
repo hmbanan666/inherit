@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { bankLesson, storyLetter, type TownSnapshot } from '@inherit/sim'
+import type { TownSnapshot } from '@inherit/sim'
 import TownPortrait from './town/TownPortrait.vue'
 import { useGame } from '../lib/useGame'
 const props = defineProps<{ person?: TownSnapshot['people'][number] }>()
@@ -19,8 +19,6 @@ const units: Record<string, string> = {
   bracket: 'brackets',
   coins: 'coins',
 }
-const interlude = computed(() => storyLetter(c.value))
-const bank = computed(() => bankLesson(c.value))
 </script>
 <template>
   <section class="objective request" aria-label="Current request">
@@ -28,9 +26,9 @@ const bank = computed(() => bankLesson(c.value))
       <TownPortrait v-if="person" class="objective-icon" :person="person" />
       <span v-else class="objective-icon portrait" aria-hidden="true">✉</span>
       <div class="goal-body">
-        <small class="eyebrow">{{ person ? person.name + ' · ' + person.role : interlude?.from }}</small>
-        <h2>{{ ask?.title ?? (c.town.beat === 11 ? 'The shed is yours.' : interlude?.title) }}</h2>
-        <p>{{ ask?.text ?? interlude?.body }}</p>
+        <small class="eyebrow">{{ person ? person.name + ' · ' + person.role : lesson?.who }}</small>
+        <h2>{{ ask?.title ?? (c.town.beat === 11 ? 'The shed is yours.' : lesson?.title) }}</h2>
+        <p>{{ ask?.text ?? lesson?.story }}</p>
       </div>
     </div>
     <div v-if="ask" class="request-count">
@@ -40,22 +38,18 @@ const bank = computed(() => bankLesson(c.value))
     </div>
     <div v-if="lesson" class="lesson">
       <strong>{{ lesson.title }}</strong>
-      <button v-if="g.activeFile.value !== lesson.file" @click="g.openFile(lesson.file)">Open {{ lesson.file }}</button>
-      <button class="hint" :aria-expanded="hint > 0" @click="hint = (hint + 1) % 3">
-        {{ ['Hint', 'Show exact step', 'Hide hint'][hint] }}
-      </button>
-      <p v-if="lesson.cases.length"><b>{{ lesson.name }}</b> is your name for this job. {{ lesson.instruction }}</p>
-      <p v-else>{{ lesson.instruction }}</p>
-      <code v-if="hint < 2">{{ lesson.bricks.join('   ·   ') }}</code>
-      <p v-if="hint === 1">{{ lesson.idea }}</p>
-      <code v-if="hint === 2" class="exact">{{ lesson.exact }}</code>
-    </div>
-    <div v-if="bank" class="lesson">
-      <strong>{{ bank.title }}</strong>
-      <button class="hint" :aria-expanded="hint > 0" @click="hint = (hint + 1) % 3">
-        {{ ['Hint', 'Show exact step', 'Hide hint'][hint] }}
-      </button>
-      <p v-if="hint">{{ hint === 1 ? bank.idea : bank.exact }}</p>
+      <template v-if="g.view.value?.phase === 'solved'">
+        <p>{{ lesson.solved.did }} {{ lesson.solved.idea }} {{ lesson.solved.reward }}</p>
+        <button @click="g.act({ kind: 'continue' })">Continue</button>
+      </template>
+      <template v-else>
+        <p>{{ lesson.task }}</p>
+        <p>{{ lesson.idea?.explain }}</p>
+        <button class="hint" @click="hint = (hint + 1) % 4">
+          {{ ['Hint', 'Places and functions', 'Show me the lines', 'Hide hint'][hint] }}
+        </button>
+        <code v-if="hint" class="exact">{{ lesson.hints[hint - 1] }}</code>
+      </template>
     </div>
     <button v-if="c.town.beat === 2" class="hint" @click="g.act({ kind: 'read', id: 'tab' })">Pay later</button>
   </section>
