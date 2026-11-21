@@ -83,7 +83,7 @@ export function placeMachine(
 const same = (a: Tile, b: Tile) => a.x === b.x && a.y === b.y
 const distance = (a: Tile, b: Tile) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 // Breadth-first search gives the same shortest owned route for every replay.
-function autoPath(site: Site, start: Tile, end: Tile): Tile[] | undefined {
+export function autoPath(site: Site, start: Tile, end: Tile): Tile[] | undefined {
   const open = [{ x: start.x, y: start.y, parent: -1 }]
   const seen = new Set([start.x + ',' + start.y])
   for (let i = 0; i < open.length; i++) {
