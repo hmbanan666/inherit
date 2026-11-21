@@ -21,3 +21,17 @@ The browser test serves the generated site on loopback port 4173. Set `INHERIT_S
 ## Commits and merging
 
 Omit `Co-authored-by` trailers and AI tool or model names from commit messages, PR titles and PR bodies. When squash-merging on GitHub, pass an explicit subject and body, for example `gh pr merge --squash --subject "..." --body "..."`. GitHub's default squash message appends `Co-authored-by` trailers for commit authors.
+
+## Agent skills
+
+### Issue tracker
+
+Track issues and specs in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+When triaging an issue, use the labels in `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+All packages share one glossary and one set of architecture decisions. See `docs/agents/domain.md`.
