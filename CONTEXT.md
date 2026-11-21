@@ -28,7 +28,10 @@ _Avoid_: reward, unlock
 A part of the town that is closed until a town change opens it, bringing new townspeople.
 
 **Onboarding**:
-The first handful of guided steps, wrapped inside the first request. The only place with step-by-step hints.
+The guided steps inside Bram's request. The player starts from an empty main.ts and writes every line himself, one new thing per step. The only place with step-by-step hints.
+
+**Onboarding step**:
+One onboarding step: a short card naming one new thing (for example the `smelt` verb), an example with a blank, and a two-rung hint (the idea, then the exact line).
 _Avoid_: tutorial levels
 
 **Debt**:
@@ -51,8 +54,22 @@ A machine stopped by an item it cannot process, for example copper ore in an iro
 A machine that stopped from wear. It recovers by repair (costs coins) or by cooling down (costs time).
 
 **Controller**:
-The player's TypeScript project that runs every tick. One codebase for the whole game.
+The player's TypeScript project. It exports `onTick`, which the factory runs every tick. It starts as a comment from Uncle and the player writes all of it. One codebase for the whole game.
 _Avoid_: script, solution
+
+**Handle**:
+A machine as an object the controller can use, imported from the `"inherit"` module (`mine`, `furnace`, `cart`) or returned by `build` and `machine`.
+_Avoid_: machine id, ctx (the low-level API, kept only for old controllers)
+
+**Verb**:
+A method on a handle, such as `dig`, `connect`, `smelt`, `stamp`, `cut`, `send`, `repair`. A word for an action in a request, hint or check is always the verb's exact name.
+
+**Check**:
+A live plain sentence about what the current request needs ("Ore reaches the furnace"), coloured red (not yet), amber (getting closer) or green (done). Checks guide, they never block.
+_Avoid_: test, assertion
+
+**Section**:
+A part of the screen in the top navigation (Code, Factory, Town, Inbox, Orders). Each appears when the story reaches it and carries a "new" mark until opened.
 
 **Floor view**:
 The animated canvas that shows the factory. It visualizes what the controller does. You inspect it, you do not build on it.
