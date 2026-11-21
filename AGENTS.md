@@ -17,3 +17,7 @@ pnpm test:browser
 ```
 
 The browser test serves the generated site on loopback port 4173. Set `INHERIT_SHOTS` to a directory outside the checkout when capturing chapter screenshots.
+
+## Commits and merging
+
+Omit `Co-authored-by` trailers and AI tool or model names from commit messages, PR titles and PR bodies. When squash-merging on GitHub, pass an explicit subject and body, for example `gh pr merge --squash --subject "..." --body "..."`. GitHub's default squash message appends `Co-authored-by` trailers for commit authors.
