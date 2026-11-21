@@ -153,8 +153,10 @@ function planGrid() {
 const suggested = computed(() => {
   const a = props.guide
   if (a?.[0] !== 'machine' || props.placing !== a[1]) return
+  const deposits = world.value.sites.find((s) => s.id === a[2])?.deposits
+  const seam = (x: number, y: number) => deposits?.find((d) => d.x === x && d.y === y)?.kind
   return cells.value
-    .filter((c) => c.valid && c.site === a[2])
+    .filter((c) => c.valid && c.site === a[2] && (a[1] !== 'miner' || seam(c.x, c.y) === seam(a[3], a[4])))
     .sort(
       (l, r) => Math.abs(l.x - a[3]) + Math.abs(l.y - a[4]) - Math.abs(r.x - a[3]) - Math.abs(r.y - a[4]),
     )[0]
@@ -169,19 +171,26 @@ function reveal(x: number, y: number) {
   if (px < 48 || px > size.value.w - 48 || py < 48 || py > size.value.h - 48)
     pan.value = { x: pan.value.x + size.value.w / 2 - px, y: pan.value.y + size.value.h / 2 - py }
 }
-function revealGuide() {
+function revealGuide(switchSites = true) {
+  function focus(id: string, x: number, y: number) {
+    if (site.value !== id) {
+      if (!switchSites) return
+      goSite(id)
+    }
+    reveal(x, y)
+  }
   const a = props.guide
   if (a?.[0] === 'plot') {
     const p = plots.value.find((p) => p.id === a[2] && p.site === a[1])
-    if (p) reveal((siteX(p.site) + p.x + 1.05) * tile, (p.y + 0.68) * tile)
+    if (p) focus(p.site, (siteX(p.site) + p.x + 1.05) * tile, (p.y + 0.68) * tile)
   } else if (a?.[0] === 'machine' && suggested.value) {
     const p = center(suggested.value.site, suggested.value)
-    reveal(p.x, p.y)
+    focus(suggested.value.site, p.x, p.y)
   } else if (a?.[0] === 'belt' || a?.[0] === 'unbelt') {
     const m = world.value.machines.find((m) => m.id === a[source.value ? 2 : 1])
     if (m) {
       const p = center(m.siteId, m)
-      reveal(p.x, p.y)
+      focus(m.siteId, p.x, p.y)
     }
   }
 }
@@ -228,10 +237,10 @@ watch(
 watch([() => JSON.stringify(props.guide), () => props.tool], async () => {
   source.value = ''
   await nextTick()
-  if (props.guide?.[0] === 'plot' || props.tool) revealGuide()
+  if (props.guide?.[0] === 'plot' || props.tool) revealGuide(false)
 })
 watch(source, () => {
-  if (props.tool === 'belt') revealGuide()
+  if (props.tool === 'belt') revealGuide(false)
 })
 function sync() {
   if (!app) return
