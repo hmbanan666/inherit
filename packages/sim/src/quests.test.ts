@@ -7,9 +7,11 @@ import {
   questStatus,
   removeBelt,
   restartQuest,
+  loadSave,
+  serializeSave,
 } from './index'
 
-test('the five customer quests use the same growing shed, with relative deadlines and allowances', () => {
+test('the five customer quests use the same growing shed, with a single count per request', () => {
   const c = createCampaign()
   const { world } = c
   // The inherited program fills the first furnace and leaves shipment to the player.
@@ -20,19 +22,13 @@ test('the five customer quests use the same growing shed, with relative deadline
   expect(questStatus(c)?.state).toBe('active')
   const run = (quest: string) => {
     const start = world.tick
-    const coal = world.extracted.coal ?? 0
     while (c.progress.activeQuest?.id === quest && world.tick < start + 500) {
       advanceCampaign(c, (ctx) => {
         if (ctx.space('mine')) ctx.dig('mine')
-        ctx.route('splitter', ctx.stock('furnace-a') <= ctx.stock('furnace-b') ? 'furnace-a' : 'furnace-b')
+        ctx.route('splitter', ctx.tick % 2 ? 'furnace-a' : 'furnace-b')
         ctx.work('furnace-a')
         ctx.work('furnace-b')
-        if (
-          (quest === 'parts' || quest === 'gate') &&
-          ctx.space('coal-mine') &&
-          (quest !== 'gate' || (world.extracted.coal ?? 0) - coal < 12)
-        )
-          ctx.dig('coal-mine')
+        if ((quest === 'parts' || quest === 'gate') && ctx.space('coal-mine')) ctx.dig('coal-mine')
         ctx.work('press', 'part')
       })
     }
@@ -69,16 +65,49 @@ test('the five customer quests use the same growing shed, with relative deadline
   expect(c.progress.activeQuest).toBeUndefined()
   expect(world.machines).toHaveLength(7)
 })
-test('a missed deadline can be retried on the same tick without replacing memory or equipment', () => {
-  const c = createCampaign()
-  c.progress.completedQuests = ['shed', 'balance', 'parts', 'loading']
-  c.memory = { coal: 4 }
-  restartQuest(c)
-  for (let i = 0; i < 128; i++) advanceCampaign(c, () => {})
-  expect(questStatus(c)?.state).toBe('failed')
-  expect(restartQuest(c)).toBe(true)
-  expect(questStatus(c)).toMatchObject({ state: 'active', elapsed: 0 })
-  expect(c.world.tick).toBe(128)
-  expect(c.world.machines).toHaveLength(3)
-  expect(c.memory).toEqual({ coal: 4 })
+test.each(['balance', 'gate'])(
+  '%s counts finished batches even with a blocked dock, spills and long pauses',
+  (id) => {
+    const c = createCampaign()
+    const gate = id === 'gate'
+    const machine = gate ? placeMachine(c, 'press', 'shed', 3, 3, 'press')! : c.world.machines[1]
+    restartQuest(c, id)
+    for (let t = 0; t < 150; t++) advanceCampaign(c, (ctx) => ctx.dig('mine'))
+    c.world.extracted.coal = 30
+    expect(questStatus(c)?.state).toBe('active')
+    if (!gate) removeBelt(c, 'furnace-a', 'dock')
+    const target = gate ? 5 : 10
+    for (let batch = 1; batch <= target; batch++) {
+      machine.queue.push({ kind: gate ? 'iron-ingot' : 'iron-ore' })
+      if (gate) machine.queue.push({ kind: 'coal' })
+      for (let t = 0; t < (gate ? 5 : 4); t++) advanceCampaign(c, (ctx) => ctx.work(machine.id))
+      if (batch < target) expect(questStatus(c)?.current).toBe(batch)
+      // Take the output off this test bench without shipping it.
+      delete machine.output
+    }
+    expect(c.progress.completedQuests).toContain(id)
+    expect(c.world.delivered).toEqual({})
+  },
+)
+
+test('the gate card remembers only finished part batches across reloads', () => {
+  let c = createCampaign()
+  placeMachine(c, 'press', 'shed', 3, 1, 'press')
+  connectBelt(c, 'press', 'dock')
+  restartQuest(c, 'gate')
+  function batch(recipe: 'plate' | 'part', ticks: number) {
+    const press = c.world.machines.find((m) => m.id === 'press')!
+    press.queue.push({ kind: 'iron-ingot' })
+    if (recipe === 'part') press.queue.push({ kind: 'coal' })
+    for (let i = 0; i < ticks; i++) advanceCampaign(c, (ctx) => ctx.work('press', recipe))
+  }
+  batch('plate', 2)
+  expect(questStatus(c)?.current).toBe(0)
+  batch('part', 5)
+  expect(questStatus(c)?.current).toBe(1)
+  c = loadSave(serializeSave(c))
+  for (let i = 0; i < 250; i++) advanceCampaign(c, () => {})
+  expect(questStatus(c)?.current).toBe(1)
+  batch('part', 5)
+  expect(questStatus(c)?.current).toBe(2)
 })

@@ -17,7 +17,7 @@ import { center, FloorScene, tile, siteX } from '../lib/floor'
 import type { BuildTool, BuildGuide } from '../lib/buildGuide'
 import { machineArt } from '../lib/machineArt'
 
-const props = defineProps<{ placing?: MachineKind; tool?: BuildTool; guide?: BuildGuide; focusId?: string }>()
+const props = defineProps<{ placing?: MachineKind; tool?: BuildTool; guide?: BuildGuide }>()
 const emit = defineEmits<{ placed: [] }>()
 const g = useGame(),
   { campaign, selected, paused, speed } = g
@@ -152,6 +152,8 @@ function planGrid() {
 }
 const suggested = computed(() => {
   const a = props.guide
+  if (a?.[0] === 'tile' && a[4] && props.placing === a[4])
+    return cells.value.find((c) => c.valid && c.site === a[1] && c.x === a[2] && c.y === a[3])
   if (a?.[0] !== 'machine' || props.placing !== a[1]) return
   const deposits = world.value.sites.find((s) => s.id === a[2])?.deposits
   const seam = (x: number, y: number) => deposits?.find((d) => d.x === x && d.y === y)?.kind
@@ -180,7 +182,16 @@ function revealGuide(switchSites = true) {
     reveal(x, y)
   }
   const a = props.guide
-  if (a?.[0] === 'plot') {
+  if (a?.[0] === 'focus') {
+    const m = world.value.machines.find((m) => m.id === a[1])
+    if (m) {
+      const p = center(m.siteId, m)
+      focus(m.siteId, p.x, p.y)
+    }
+  } else if (a?.[0] === 'tile') {
+    const p = center(a[1], { x: a[2], y: a[3] })
+    focus(a[1], p.x, p.y)
+  } else if (a?.[0] === 'plot') {
     const p = plots.value.find((p) => p.id === a[2] && p.site === a[1])
     if (p) focus(p.site, (siteX(p.site) + p.x + 1.05) * tile, (p.y + 0.68) * tile)
   } else if (a?.[0] === 'machine' && suggested.value) {
@@ -194,12 +205,17 @@ function revealGuide(switchSites = true) {
     }
   }
 }
-defineExpose({ revealGuide })
+defineExpose({
+  revealGuide: () => {
+    revealGuide()
+    host.value?.scrollIntoView({ block: 'nearest' })
+  },
+})
 const guidedId = computed(() =>
   props.guide?.[0] === 'belt' && props.tool === 'belt'
     ? props.guide[source.value ? 2 : 1]
-    : !props.guide
-      ? props.focusId
+    : props.guide?.[0] === 'focus'
+      ? props.guide[1]
       : undefined,
 )
 function preview() {
@@ -237,7 +253,7 @@ watch(
 watch([() => JSON.stringify(props.guide), () => props.tool], async () => {
   source.value = ''
   await nextTick()
-  if (props.guide?.[0] === 'plot' || props.tool) revealGuide(false)
+  revealGuide(false)
 })
 watch(source, () => {
   if (props.tool === 'belt') revealGuide(false)
@@ -435,6 +451,7 @@ onMounted(async () => {
       sync()
     }
     resize()
+    revealGuide()
     observer = new ResizeObserver(resize)
     observer.observe(host.value!)
     renderer.ticker.maxFPS = 40
@@ -472,6 +489,18 @@ function buyPlot() {
       class="map-overlay"
       :style="{ transform: 'translate(' + camera.x + 'px,' + camera.y + 'px) scale(' + scale + ')' }"
     >
+      <span
+        v-if="guide?.[0] === 'tile' && !suggested"
+        class="objective-tile guide-pulse"
+        role="img"
+        :aria-label="'Guide tile at ' + guide[1] + ' ' + guide[2] + ', ' + guide[3]"
+        :style="{
+          ...pos((siteX(guide[1]) + guide[2]) * tile, guide[3] * tile),
+          width: tile + 'px',
+          height: tile + 'px',
+        }"
+        >↓</span
+      >
       <button
         v-for="cell in cells"
         :key="cell.site + cell.x + ',' + cell.y"
@@ -488,7 +517,7 @@ function buyPlot() {
         <button
           v-if="p.status === 'sale'"
           class="deed"
-          :class="{ 'guide-pulse': guide?.[0] === 'plot' && guide[2] === p.id }"
+          :class="{ 'guide-pulse': guide?.[0] === 'plot' && guide[1] === p.site && guide[2] === p.id }"
           :aria-label="'Buy ' + p.id"
           :style="pos((siteX(p.site) + p.x + 1.05) * tile, (p.y + 0.68) * tile)"
           @click="offer(p, p.site)"

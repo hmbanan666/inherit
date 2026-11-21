@@ -142,6 +142,7 @@ function accept(id: string) {
           v-for="kind in surface.machines"
           :key="kind"
           class="shop-item"
+          :class="{ 'guide-pulse': (guide?.[0] === 'machine' || guide?.[0] === 'shop') && guide[1] === kind }"
           :aria-label="'Build ' + MACHINES[kind].name"
           :disabled="economy.money < PRICES.machines[kind]"
           @pointerdown="startDrag($event, kind)"

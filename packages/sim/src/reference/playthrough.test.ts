@@ -7,6 +7,7 @@ import {
   deployGameProject,
   advanceGame,
   objectiveTrack,
+  objectiveProgress,
   OBJECTIVES,
   serializeSave,
   loadSave,
@@ -61,7 +62,18 @@ test.each([1, 9721])('every ticket on one persistent factory, seed %s', (seed) =
   const durations: Record<string, number> = {}
   for (const stage of OBJECTIVES) {
     const start = world.tick
-    expect(objectiveTrack(c).active?.id).toBe(stage.id)
+    const { active, progress } = objectiveTrack(c)
+    expect(active?.id).toBe(stage.id)
+    expect(progress.target).toBeGreaterThan(0)
+    expect(progress.current).toBeLessThanOrEqual(progress.target)
+    expect(active?.progressUnit).toBeTruthy()
+    if (active?.highlight.type === 'machine' && active.highlight.id) {
+      const id = active.highlight.id
+      expect(
+        world.machines.some((m) => m.id === id),
+        stage.id,
+      ).toBe(true)
+    }
     for (const action of referenceActions(stage.id))
       expect(applyReferenceAction(c, action), JSON.stringify(action)).toBeTruthy()
     const files = referenceFiles(stage.id)
@@ -83,6 +95,11 @@ test.each([1, 9721])('every ticket on one persistent factory, seed %s', (seed) =
         signals: c.progress.signals,
       }),
     ).toBe(stage.id)
+    expect(objectiveProgress(c, stage.id)).toEqual({
+      state: 'complete',
+      current: progress.target,
+      target: progress.target,
+    })
     durations[stage.id] = world.tick - start
     expect(c.world).toBe(world)
     expect(c.world.machines.find((m) => m.id === 'mine')?.builtAt).toBe(0)
@@ -93,7 +110,7 @@ test.each([1, 9721])('every ticket on one persistent factory, seed %s', (seed) =
   expect(c.world.receipts.filter((r) => r.key === 'island-1')).toHaveLength(1)
   expect(c.world.receipts.find((r) => r.key === 'island-1')?.acknowledged).toBe(true)
   expect(c.world.machines.find((m) => m.id === 'remote')?.queue).toHaveLength(1)
-  expect(c.world.delivered.motor).toBeGreaterThanOrEqual(4)
+  expect(c.world.delivered.motor).toBeGreaterThanOrEqual(3)
   if (process.env.INHERIT_TIMINGS)
     console.log({
       seed,
@@ -101,6 +118,8 @@ test.each([1, 9721])('every ticket on one persistent factory, seed %s', (seed) =
       longest: Object.entries(durations).sort((a, b) => b[1] - a[1])[0],
     })
   expect(world.tick).toBeLessThan(4000)
+  expect(Number(c.memory.coal)).toBeGreaterThan(0)
+  expect(c.economy.orders.some((o) => o.status === 'accepted' || o.status === 'done')).toBe(false)
   expect(Number(c.memory.rocks)).toBeGreaterThan(100)
   expect(objectiveTrack(c).active).toBeUndefined()
   expect(loadSave(serializeSave(c))).toEqual(c)

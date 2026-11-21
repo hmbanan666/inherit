@@ -1,6 +1,6 @@
 import type { Factory, FactoryEvent, MaterialId } from './campaign-api'
 import { stepCampaign } from './engine'
-import type { Campaign } from './model'
+import type { Campaign, QuestRun } from './model'
 
 export interface Quest {
   id: string
@@ -10,72 +10,79 @@ export interface Quest {
   product: MaterialId
   quantity: number
   dockInterval: number
-  minRate?: number
-  maxIdle?: number
-  lossless?: boolean
-  coalBudget?: number
-  deadline?: number
+  count: 'made' | 'shipped'
 }
 export const QUESTS: readonly Quest[] = [
   {
     id: 'shed',
-    title: 'The shed',
+    title: 'Ship 10 iron ingots',
     customer: 'Hale Hardware',
-    brief: 'Give the cold furnace a job and ship ten ingots.',
+    brief: 'Let the dock collect the bars.',
     product: 'iron-ingot',
     quantity: 10,
     dockInterval: 1,
+    count: 'shipped',
   },
   {
     id: 'balance',
-    title: 'Second furnace',
+    title: 'Make 10 iron ingots',
     customer: 'West End Rail',
-    brief:
-      'Add a second furnace. Balance both bins to ship 185 ingots per minute with each furnace at most half idle.',
+    brief: 'Each finished furnace batch counts.',
     product: 'iron-ingot',
-    quantity: 48,
+    quantity: 10,
     dockInterval: 1,
-    minRate: 185,
-    maxIdle: 50,
+    count: 'made',
   },
   {
     id: 'parts',
-    title: 'Parts department',
+    title: 'Ship 3 pressed parts',
     customer: 'Miller Tool Co.',
-    brief: 'Feed coal and iron into a press for ten parts.',
+    brief: 'Leave the press running.',
     product: 'part',
-    quantity: 10,
+    quantity: 3,
     dockInterval: 1,
+    count: 'shipped',
   },
   {
     id: 'loading',
-    title: 'Loading bay',
+    title: 'Ship 3 more iron ingots',
     customer: 'County Freight',
-    brief: 'The dock loads every twelve ticks. Ship seven ingots without spilling anything.',
+    brief: 'The next three pickups open the order board.',
     product: 'iron-ingot',
-    quantity: 7,
-    dockInterval: 12,
-    lossless: true,
+    quantity: 3,
+    dockInterval: 1,
+    count: 'shipped',
   },
   {
     id: 'gate',
-    title: 'First real order',
+    title: 'Make 5 gate parts',
     customer: 'Canal Lock Works',
-    brief: 'Ship twelve parts within 128 ticks. Draw at most twelve coal and avoid spills.',
+    brief: 'Each part off the press fits one hinge.',
     product: 'part',
-    quantity: 12,
-    dockInterval: 8,
-    deadline: 128,
-    coalBudget: 12,
-    lossless: true,
+    quantity: 5,
+    dockInterval: 1,
+    count: 'made',
   },
 ]
+
+// Older runs contain only a shipment baseline. Carry their earned units into the new counter.
+type ProductionRun = QuestRun & { made?: number; sampledTick?: number }
+function recordProduction(c: Campaign) {
+  const run: ProductionRun | undefined = c.progress.activeQuest
+  const q = QUESTS.find((q) => q.id === run?.id)
+  if (!run || q?.count !== 'made' || run.sampledTick === c.world.tick) return
+  const made = c.world.machines.filter(
+    (m) => m.recipe === q.product && m.recentProduction.at(-1) === c.world.tick,
+  ).length
+  run.made = (run.made ?? Math.max(0, (c.world.delivered[q.product] ?? 0) - run.shipped)) + made
+  run.sampledTick = c.world.tick
+}
 /** Take fresh order counters on the existing floor, including work already in flight. */
 export function restartQuest(campaign: Campaign, id?: string): boolean {
   const q = QUESTS.find((q) => (id ? q.id === id : !campaign.progress.completedQuests.includes(q.id)))
   if (!q) return false
   const world = campaign.world
-  campaign.progress.activeQuest = {
+  const run: ProductionRun = {
     id: q.id,
     startTick: world.tick,
     shipped: world.delivered[q.product] ?? 0,
@@ -87,12 +94,14 @@ export function restartQuest(campaign: Campaign, id?: string): boolean {
         .map((machine) => [machine.id, machine.stats.activeTicks]),
     ),
   }
+  if (q.count === 'made') Object.assign(run, { made: 0, sampledTick: world.tick })
+  campaign.progress.activeQuest = run
   world.dockInterval = q.dockInterval
   return true
 }
 export function questStatus(campaign: Campaign) {
-  const world = campaign.world,
-    run = campaign.progress.activeQuest
+  const world = campaign.world
+  const run: ProductionRun | undefined = campaign.progress.activeQuest
   const q = QUESTS.find((q) => q.id === run?.id)
   if (!run || !q) return
   const elapsed = world.tick - run.startTick
@@ -113,22 +122,13 @@ export function questStatus(campaign: Campaign) {
     : 100
   const lost = world.lost - run.lost,
     coal = (world.extracted.coal ?? 0) - run.coal
-  const withinBudget = (!q.lossless || lost === 0) && (q.coalBudget === undefined || coal <= q.coalBudget)
-  const complete =
-    withinBudget &&
-    shipped >= q.quantity &&
-    (!q.deadline || elapsed <= q.deadline) &&
-    (!q.minRate || rate >= q.minRate) &&
-    (q.maxIdle === undefined || (furnaces.length >= 2 && idle <= q.maxIdle))
-  const state = complete
-    ? 'complete'
-    : !withinBudget || (q.deadline !== undefined && elapsed >= q.deadline)
-      ? 'failed'
-      : 'active'
-  return { id: q.id, state, elapsed, shipped, rate, idle, lost, coal } as const
+  const current = q.count === 'made' ? (run.made ?? shipped) : shipped
+  const state = current >= q.quantity ? 'complete' : 'active'
+  return { id: q.id, state, current, elapsed, shipped, rate, idle, lost, coal } as const
 }
 /** Call once after a raw step, or use advanceCampaign. Returns the newly completed quest ID. */
 export function updateQuests(campaign: Campaign): string | undefined {
+  recordProduction(campaign)
   const status = questStatus(campaign)
   if (status?.state !== 'complete') return
   campaign.progress.completedQuests.push(status.id)
@@ -145,5 +145,6 @@ export function advanceCampaign(
     stepCampaign(campaign.world, onTick)
   } finally {
     if (legacyQuests) updateQuests(campaign)
+    else recordProduction(campaign)
   }
 }
