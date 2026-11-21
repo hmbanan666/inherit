@@ -1,4 +1,4 @@
-import type { Townsperson } from '../townTypes'
+import type { Townsperson } from '@inherit/sim'
 import { Paint, grain } from './townPaint'
 
 // Cameos use the same three-quarter pose as a printed town directory.

@@ -5,6 +5,7 @@ import { MACHINES, TICK_MS } from '@inherit/sim'
 import { useGame } from '../lib/useGame'
 import { center, FloorScene, tile } from '../lib/floor'
 
+const props = defineProps<{ highlighted: string[] }>()
 const g = useGame(),
   { campaign, selected, paused, speed } = g
 const world = computed(() => campaign.value.world)
@@ -63,6 +64,14 @@ function sync() {
   scene.update(world.value)
 }
 watch([world, camera, scale], sync)
+function highlightLines() {
+  for (const id of props.highlighted) scene?.highlightMachine(id)
+}
+watch(() => props.highlighted, highlightLines)
+function inspect(id: string) {
+  scene?.highlightMachine(id)
+  g.selectMachine(id)
+}
 function down(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('button,aside') || e.button !== 0) return
   host.value!.focus({ preventScroll: true })
@@ -143,6 +152,7 @@ onMounted(async () => {
       sync()
     }
     resize()
+    highlightLines()
     observer = new ResizeObserver(resize)
     observer.observe(host.value!)
     renderer.ticker.maxFPS = 40
@@ -182,7 +192,7 @@ onBeforeUnmount(() => {
         :class="{ chosen: selected === m.id }"
         :style="pos(center(m.siteId, m).x, center(m.siteId, m).y)"
       >
-        <button class="machine-hit" :aria-label="'Inspect ' + m.id" @click="g.selectMachine(m.id)">
+        <button class="machine-hit" :aria-label="'Inspect ' + m.id" @click="inspect(m.id)">
           <span class="machine-label"
             >{{ m.id }}<b v-if="m.fault"> · {{ m.fault }}</b></span
           >

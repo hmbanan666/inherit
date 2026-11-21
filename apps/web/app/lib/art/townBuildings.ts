@@ -1,4 +1,4 @@
-import type { BuildingId, BuildingState, TownSnapshot } from '../townTypes'
+import type { BuildingId, BuildingState, TownSnapshot } from '@inherit/sim'
 import { Paint } from './townPaint'
 import { fir } from './townLandscape'
 
@@ -222,7 +222,7 @@ function bakery(p: Paint, live: boolean, lit: boolean) {
   plaque(p, 'BAKERY', -7, -57, 46, '#875244')
   barrel(p, 45, -1)
 }
-function civic(p: Paint, bank: boolean, lit: boolean, owed: number) {
+function civic(p: Paint, bank: boolean, lit: boolean, owed: number | undefined) {
   const wall = bank ? '#c7b697' : '#d4be99'
   if (!bank) {
     p.box(wood, -14, -118, 3, 28)
@@ -245,7 +245,7 @@ function civic(p: Paint, bank: boolean, lit: boolean, owed: number) {
     }
     p.line('#a89a84', 1, -60, -7, 49, -7)
     plaque(p, 'BANK', 0, -30, 34)
-    plaque(p, owed ? owed + ' DUE' : 'PAID', 0, -12, 52, '#513d32')
+    if (owed !== undefined) plaque(p, owed ? owed + ' DUE' : 'PAID', 0, -12, 52, '#513d32')
     p.box('#9e927d', -24, -3, 48, 3)
   } else {
     p.box('#dac19f', -26, -83, 26, 58)
@@ -405,7 +405,7 @@ export function drawBuilding(
   id: BuildingId,
   state: BuildingState,
   phase: TownSnapshot['phase'],
-  owed: number,
+  owed: number | undefined,
 ) {
   const live = state === 'working',
     lit = phase === 'night' || phase === 'evening'

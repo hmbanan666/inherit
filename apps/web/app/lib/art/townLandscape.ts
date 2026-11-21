@@ -1,4 +1,4 @@
-import type { TownSnapshot } from '../townTypes'
+import type { TownSnapshot } from '@inherit/sim'
 import { Paint, grain } from './townPaint'
 
 const skies = {

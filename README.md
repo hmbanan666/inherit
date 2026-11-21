@@ -1,14 +1,12 @@
 # Inherit
 
-Your uncle left you a shed, three idle machines and a tab at Kettlewick Bank. Write one TypeScript controller to get the mail horse shod, bring bread and light back to town, and rebuild the bridge to Riverside.
+Your uncle left you a factory and a 600-coin debt. In Kettlewick, the mail horse needs shoes, the baker needs an oven grate, and the bridge to Riverside is down. Write one TypeScript controller that gets the town working again.
 
 ## Your first shift
 
-Bram needs three iron ingots by evening. Open **Hint** on his request, add a line inside `onTick` in `main.ts`, and press **Deploy**. Connect the mine to the furnace, smelt the ore, and connect the furnace to the cart. Click a machine to inspect its bins or jump to the line that drives it. **See it** opens the Town view when a delivery changes Kettlewick.
+Open Bram’s request and click **Hint**. Add `ctx.dig("mine")` inside `onTick` in `main.ts`, then click **Deploy**. Follow the next hints to connect the mine, furnace and cart. When the third ingot ships, click **See it** to watch the mail horse trot past the forge.
 
-Each request brings another regular who pays for deliveries. Use **Pay** to settle the three installments. Late deliveries still count and missed installments collect interest once. After the bridge stands and the debt is paid, regular orders continue.
-
-The floor, working copy and deployed controller save locally. **Ctrl/Cmd+S** deploys, and the arrow beside **Deploy** opens revisions. Earlier saves start a fresh shed with the old project filed under **v2 code**. The mayor brings a filing cabinet for multi-file controllers.
+Build machines with `ctx.build` and lay belts with `ctx.connect`. Click a machine to inspect its bins and the line that drives it. Each delivery changes the town, and regular orders help pay the bank. A late delivery still counts. Your floor and controller save in this browser. Returning from v2? Open **Deploy history → Open v2 code** to find your old project.
 
 ## Run locally
 

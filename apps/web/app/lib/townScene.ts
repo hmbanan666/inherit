@@ -2,7 +2,7 @@ import { Application, CanvasSource, Container, Graphics, Sprite, Texture } from 
 import { illustration, Paint } from './art/townPaint'
 import { landscape } from './art/townLandscape'
 import { drawBuilding, horse, lamps, sites, wheel } from './art/townBuildings'
-import type { BuildingId, TownSnapshot } from './townTypes'
+import type { BuildingId, TownSnapshot } from '@inherit/sim'
 
 const W = 1000,
   H = 420
@@ -40,10 +40,12 @@ export class TownScene {
     private host: HTMLElement,
     snapshot: TownSnapshot,
     private announce: (text: string) => void,
+    replay: Change[] = [],
   ) {
     host.appendChild(app.canvas)
     app.stage.addChild(this.stage)
     this.stage.addChild(this.terrain, this.celestial, this.buildings, this.moving, this.sparks)
+    this.pending = [...replay]
     this.update(snapshot)
     this.resize()
     this.observer = new ResizeObserver(() => this.resize())
@@ -94,7 +96,7 @@ export class TownScene {
       this.terrain.addChild(print(W, H, (p) => landscape(p, s.phase), 1.5))
       this.phase = s.phase
     }
-    const key = JSON.stringify([s.phase, s.debt.owed, s.buildings.map((b) => [b.id, b.state])])
+    const key = JSON.stringify([s.phase, s.debt.owed, s.buildings.map((b) => [b.id, b.state, b.label])])
     if (key !== this.artKey) {
       this.artKey = key
       clear(this.buildings)
@@ -106,7 +108,7 @@ export class TownScene {
         if (!b) continue
         const site = sites[id]
         const sprite = print(210, 176, (p) =>
-          p.at(105, 138, 1, () => drawBuilding(p, id, b.state, s.phase, s.debt.owed)),
+          p.at(105, 138, 1, () => drawBuilding(p, id, b.state, s.phase, b.label ? s.debt.owed : undefined)),
         )
         sprite.tint = tint
         sprite.scale.set(site.scale)

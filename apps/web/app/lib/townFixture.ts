@@ -1,4 +1,4 @@
-import type { BuildingId, TownAsk, TownSnapshot, Townsperson } from './townTypes'
+import type { BuildingId, TownAsk, TownSnapshot, Townsperson } from '@inherit/sim'
 
 const names: Record<BuildingId, string> = {
   forge: 'Forge',
@@ -165,5 +165,7 @@ export const townFrames = milestones.map(([name, day, phase, clock], step) => {
             late: false,
           },
   }
+  const bank = buildings.find(b => b.id === 'bank')!
+  if (step > 0) bank.label = debt.owed ? debt.owed + ' coins owed' : 'Paid in full'
   return { name, snapshot: { day, clock, phase, buildings, people, changes, debt } satisfies TownSnapshot }
 })

@@ -15,12 +15,12 @@ import {
   Footprints,
 } from '@lucide/vue'
 import { TownScene } from '../../lib/townScene'
-import type { TownSnapshot, Townsperson } from '../../lib/townTypes'
+import type { TownSnapshot, Townsperson } from '@inherit/sim'
 import TownPortrait from './TownPortrait.vue'
 
-const props = defineProps<{ snapshot: TownSnapshot }>()
+const props = defineProps<{ snapshot: TownSnapshot; replay?: TownSnapshot['changes'] }>()
 const host = ref<HTMLElement>()
-const selection = ref<Townsperson['id']>()
+const selection = defineModel<Townsperson['id']>('selection')
 const notice = ref('')
 const unavailable = ref(false)
 const person = computed(
@@ -45,6 +45,7 @@ onMounted(async () => {
   const app = new Application()
   try {
     await app.init({
+      preference: 'canvas',
       width: 1000,
       height: 420,
       antialias: true,
@@ -56,9 +57,15 @@ onMounted(async () => {
       app.destroy(true)
       return
     }
-    scene = new TownScene(app, host.value!, props.snapshot, (text) => {
-      notice.value = text
-    })
+    scene = new TownScene(
+      app,
+      host.value!,
+      props.snapshot,
+      (text) => {
+        notice.value = text
+      },
+      props.replay,
+    )
   } catch {
     if (app.renderer) app.destroy(true, { children: true })
     unavailable.value = true
@@ -67,7 +74,6 @@ onMounted(async () => {
 watch(
   () => props.snapshot,
   (snapshot) => scene?.update(snapshot),
-  { deep: true },
 )
 onBeforeUnmount(() => {
   disposed = true
@@ -90,13 +96,13 @@ onBeforeUnmount(() => {
         class="town-print"
         role="img"
         :aria-label="
-          snapshot.buildings.map((b) => b.name + ' ' + b.state + (b.label ? ', ' + b.label : '')).join('. ') +
-          '. Bank debt ' +
-          snapshot.debt.owed
+          snapshot.buildings.map((b) => b.name + ' ' + b.state + (b.label ? ', ' + b.label : '')).join('. ')
         "
       />
-      <p v-if="unavailable" class="town-unavailable">The town illustration needs WebGL.</p>
-      <Transition name="town-pop"
+      <p v-if="unavailable" class="town-unavailable">
+        Could not open the town illustration. Reload to retry.
+      </p>
+      <Transition name="town-pop" mode="out-in"
         ><p v-if="notice" :key="notice" class="town-notice" role="status">✦ {{ notice }}</p></Transition
       >
     </div>
@@ -123,7 +129,7 @@ onBeforeUnmount(() => {
               >
             </div>
           </template>
-          <template v-else-if="person.id === 'harrow'">
+          <template v-else-if="person.id === 'harrow' && readyBuilding?.label">
             <strong
               ><Coins /> {{ snapshot.debt.owed ? snapshot.debt.owed + ' coins owed' : 'Debt paid' }}</strong
             >
@@ -164,8 +170,22 @@ onBeforeUnmount(() => {
   color: var(--text);
   border: 1px solid var(--line);
   background: var(--base);
-  overflow: hidden;
+  max-height: 100%;
+  overflow: auto;
   border-radius: 8px;
+}
+.map-frame .town-view {
+  display: grid;
+  grid-template-rows: minmax(150px, 1fr) auto;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.map-frame .town-heading {
+  display: none;
+}
+.map-frame .town-picture {
+  aspect-ratio: auto;
 }
 .town-heading {
   display: flex;

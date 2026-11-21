@@ -237,6 +237,15 @@ onMounted(() => {
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: 'Factory controller TypeScript editor',
   })
+  editor.onMouseDown(({ target }) => {
+    if (!target.position || target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return
+    const file = current.value
+    if (files.value[file] !== campaign.value.project.deployed[file]) return
+    const line = target.position.lineNumber
+    emit('focusIds', Object.keys(game.traces.value).filter(id =>
+      game.traces.value[id]?.some(site => site.file === file && site.line === line),
+    ))
+  })
   syncFiles()
   runtimeMarker()
   opener = monaco.editor.registerEditorOpener({

@@ -149,7 +149,7 @@ const statusColor = {
   jammed: 0xf48360,
   broken: 0xe79355,
 }
-type FloorStatus = CampaignMachine['status'] | 'jammed' | 'broken'
+type FloorStatus = CampaignMachine['status'] | NonNullable<CampaignMachine['fault']>
 type MachineArt = {
   art: Graphics
   ring: Graphics
@@ -263,8 +263,8 @@ export class FloorScene {
     this.syncEquipment(world, now)
     for (const m of world.machines) {
       const view = this.machines.get(m.id)!
-      if (view.fire) view.fire.visible = m.status === 'working'
-      const status = m.status as FloorStatus
+      const status = m.fault ?? m.status
+      if (view.fire) view.fire.visible = status === 'working'
       if (view.status !== status) {
         const color = statusColor[status]
         view.ring
@@ -351,7 +351,7 @@ export class FloorScene {
       const view = this.machines.get(m.id)!
       const { art: a, fire, halo, hiccup } = view
       const p = center(m.siteId, m)
-      const status = m.status as FloorStatus
+      const status = m.fault ?? m.status
       const pulse = Math.max(0, (now - view.pulse) / 750)
       if (pulse < 1) {
         halo
@@ -370,7 +370,7 @@ export class FloorScene {
       if (fire?.visible) fire.alpha = paused ? 0.85 : 0.8 + Math.sin(now / 100) * 0.18
       a.position.set(
         p.x,
-        p.y - 15 * lift + (m.status === 'working' && !paused ? Math.sin(now / 58) * 1.6 : 0),
+        p.y - 15 * lift + (status === 'working' && !paused ? Math.sin(now / 58) * 1.6 : 0),
       )
       const trip = m.kind === 'truck' && this.world.trips.find((trip) => trip.truckId === m.id)
       if (trip) {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { type TownSnapshot } from '@inherit/sim'
+import TownPortrait from './town/TownPortrait.vue'
 import { useGame } from '../lib/useGame'
 const props = defineProps<{ person?: TownSnapshot['people'][number] }>()
 const g = useGame()
@@ -12,7 +13,7 @@ const lessons = [
   ['Add the mine’s belt above your dig call and deploy.', 'ctx.connect("mine", "furnace")'],
   ['Tell the furnace to smelt what arrives, then deploy.', 'ctx.work("furnace")'],
   ['Connect the furnace to the cart and deploy.', 'ctx.connect("furnace", "cart")'],
-  ['Leave the controller running. The cart delivers each ingot.', 'ctx.stock("cart", "iron-ingot")'],
+  ['Leave the controller running. The cart delivers each ingot.', 'Watch the ingot count on this card.'],
 ] as const
 const step = computed(() => {
   if (c.value.town.beat !== 1) return 0
@@ -23,7 +24,18 @@ const step = computed(() => {
   if (!w.belts.some((b) => b.from === 'furnace' && b.to === 'cart')) return 4
   return 5
 })
-watch(step, () => {
+const clues: Record<number, string> = {
+  2: 'Keep shipping ingots for Bram. When you have enough coins, open Pay debt at the top of the workshop.',
+  3: 'Build a press with ctx.build("press"). Connect furnace → press → cart and call ctx.work("press", "plate").',
+  4: 'Connect the mine to a splitter. Use ctx.peek("splitter")?.kind to send copper ore to a second furnace.',
+  5: 'Route copper ore from the splitter to a named furnace on the copper-ingot recipe. Feed its ingots to a cutter on wire, then connect the cutter to the cart.',
+  6: 'Loop over ctx.machines("furnace"). If ctx.inspect(id)?.status is "broken", call ctx.repair(id).',
+  7: 'Feed plates to a second cutter named "gears" and send its gears to the cart. If a furnace stops, check its status and repair it or wait for it to cool.',
+  8: 'Connect a splitter after the press. Send plates to the cart for Elsie or the gear cutter for Wen. Check the due tick in ctx.orders().',
+  9: 'Feed plates and wire into the assembler and call ctx.work("assembler", "bracket"). Connect the assembler to the cart.',
+  10: 'Regular orders keep paying. Open Orders to see what the town still needs, then use Pay debt for the remaining installments.',
+}
+watch([step, () => c.value.town.beat], () => {
   hint.value = false
 })
 const units: Record<string, string> = {
@@ -45,7 +57,7 @@ const interlude = computed(() => {
 <template>
   <section class="objective request" aria-label="Current request">
     <div class="request-main">
-      <RequestPortrait v-if="person" :person="person.id" />
+      <TownPortrait v-if="person" class="objective-icon" :person="person" />
       <span v-else class="objective-icon portrait" aria-hidden="true">✉</span>
       <div class="goal-body">
         <small class="eyebrow">{{ person ? person.name + ' · ' + person.role : interlude?.from }}</small>
@@ -63,6 +75,10 @@ const interlude = computed(() => {
       <span>{{ step + 1 }}/6 · {{ lessons[step]![0] }}</span>
       <button class="hint" :aria-expanded="hint" @click="hint = !hint">Hint</button>
       <code v-if="hint">{{ lessons[step]![1] }}</code>
+    </div>
+    <div v-else-if="clues[c.town.beat]" class="request-hint">
+      <button class="hint" :aria-expanded="hint" @click="hint = !hint">Hint</button>
+      <p v-if="hint">{{ clues[c.town.beat] }}</p>
     </div>
   </section>
 </template>
@@ -92,6 +108,13 @@ const interlude = computed(() => {
 }
 .request-count small {
   color: var(--sub);
+}
+.request-hint {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
 }
 .lesson {
   grid-column: 1/-1;

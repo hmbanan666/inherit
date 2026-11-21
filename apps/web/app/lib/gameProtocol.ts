@@ -1,4 +1,4 @@
-import type { Campaign, GameTick, ProjectFiles } from '@inherit/sim'
+import type { Campaign, GameTick, ProjectFiles, TownSnapshot } from '@inherit/sim'
 import type { CpuStats } from '@inherit/sandbox'
 
 export interface CallSite {
@@ -29,6 +29,7 @@ export type Action =
   | { kind: 'snapshot'; name: string; files: ProjectFiles }
   | { kind: 'read'; id: string }
 export interface Frame {
+  town: TownSnapshot
   campaign: Omit<Campaign, 'project'>
   project?: Campaign['project']
   active: boolean
