@@ -17,7 +17,7 @@ const reloadKey = 'inherit.workshop.reloadedBuild'
 const key: InjectionKey<GameStore> = Symbol('campaign')
 export type GameStore = ReturnType<typeof createGameStore>
 /** Shared IDE and floor interface. Refs expose detached campaign frames, the editable
- * project, telemetry and research. Submit mutations with the store methods so the
+ * project, telemetry and story unlocks. Submit mutations with the store methods so the
  * worker applies them in order between simulation ticks. */
 export function useGame() {
   const game = inject(key)
@@ -41,7 +41,6 @@ function createGameStore() {
     ready = ref(false),
     error = ref(''),
     notice = ref('')
-  const buildTutorialSeen = ref(false)
   const active = ref(false)
   const saved = ref(true),
     blockedSave = ref(false)
@@ -65,7 +64,6 @@ function createGameStore() {
       const save = {
         ...state.value,
         project: { ...state.value.project, working: files.value },
-        workshop: { buildTutorialSeen: buildTutorialSeen.value },
       }
       localStorage.setItem(saveKey, serializeSave(save))
       saved.value = true
@@ -277,7 +275,6 @@ function createGameStore() {
   }
   function newGame() {
     stop()
-    buildTutorialSeen.value = false
     state.value = createCampaign()
     files.value = state.value.project.working
     blockedSave.value = false
@@ -296,12 +293,7 @@ function createGameStore() {
   }
   onMounted(() => {
     try {
-      const restored = loadSave(localStorage.getItem(saveKey)) as ReturnType<typeof loadSave> & {
-        workshop?: { buildTutorialSeen?: boolean }
-      }
-      const { workshop, ...campaign } = restored
-      buildTutorialSeen.value = workshop?.buildTutorialSeen === true
-      state.value = campaign
+      state.value = loadSave(localStorage.getItem(saveKey))
       files.value = state.value.project.working
     } catch {
       blockedSave.value = true
@@ -354,10 +346,5 @@ function createGameStore() {
     saved,
     act,
     newGame,
-    buildTutorialSeen,
-    markBuildTutorialSeen: () => {
-      buildTutorialSeen.value = true
-      persist()
-    },
   }
 }

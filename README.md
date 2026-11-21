@@ -1,16 +1,14 @@
 # Inherit
 
-Your uncle left you a shed, an idle iron mine, and a furnace waiting for its first rock. Inherit is a browser game about growing one persistent factory with TypeScript. The first of 75 objectives takes one line.
+Your uncle left you a shed, three idle machines and a tab at Kettlewick Bank. Write one TypeScript controller to get the mail horse shod, bring bread and light back to town, and rebuild the bridge to Riverside.
 
 ## Your first shift
 
-Open the workshop and click **Hint** on the objective card. Add `ctx.dig("mine")` inside `onTick` in `main.ts`, then click **Deploy**. Watch the rock travel down the belt. The next card shows how to turn it into an ingot.
+Bram needs three iron ingots by evening. Open **Hint** on his request, add a line inside `onTick` in `main.ts`, and press **Deploy**. Connect the mine to the furnace, smelt the ore, and connect the furnace to the cart. Click a machine to inspect its bins or jump to the line that drives it. **See it** opens the Town view when a delivery changes Kettlewick.
 
-Spend coins on land, machines, and belts. Take customer orders for extra pay and reputation. Research unlocks equipment and new controller commands. The floor, code, and `memory` carry over between objectives and save locally in your browser.
+Each request brings another regular who pays for deliveries. Use **Pay** to settle the three installments. Late deliveries still count and missed installments collect interest once. After the bridge stands and the debt is paid, regular orders continue.
 
-Edits stay in your working copy while the deployed controller runs. **Ctrl/Cmd+S** deploys a change. Open the arrow beside **Deploy** to roll back to an earlier revision. Research the **Workshop binder** to split your controller into files and import helpers.
-
-Click a machine to inspect its bins. **Drivers** shows which lines in your project command each machine. Use the console and metrics to investigate a slow line, preview changes on a copy of the factory, or save a named draft in **Snapshots**.
+The floor, working copy and deployed controller save locally. **Ctrl/Cmd+S** deploys, and the arrow beside **Deploy** opens revisions. Earlier saves start a fresh shed with the old project filed under **v2 code**. The mayor brings a filing cabinet for multi-file controllers.
 
 ## Run locally
 
@@ -40,9 +38,9 @@ Open `http://localhost:8080`. The image builds the workspace with Node 24 and se
 
 ## Project structure
 
-- `packages/sim` runs the factory simulation, objectives, orders, and research.
+- `packages/sim` runs the factory simulation, town requests, orders, hiccups, and debt.
 - `packages/sandbox` compiles the player’s TypeScript and runs it in QuickJS.
 - `apps/web` contains the workshop, floor renderer, editor, and simulation worker.
-- `tests/e2e` exercises the generated site through the editor and floor controls. Set `INHERIT_SHOTS` to a directory outside the checkout to capture workshop screenshots.
+- `tests/e2e` exercises the generated site through the editor and town views. Set `INHERIT_SHOTS` to a directory outside the checkout to capture workshop screenshots.
 
 Released under the [MIT license](LICENSE).

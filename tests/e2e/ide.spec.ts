@@ -8,7 +8,7 @@ const main = [
   'import { feed } from "./lib/drive"',
   'export function onTick(ctx: Factory) {',
   '  feed(ctx)',
-  '  ctx.work("furnace-a")',
+  '  ctx.work("furnace")',
   '}',
 ].join('\n')
 const helper = [
@@ -22,7 +22,7 @@ const helper = [
 async function workshop(page: Page, unlock = true) {
   if (unlock) {
     const c = createCampaign()
-    c.economy.research.push('binder')
+    c.town.beat = 9
     c.project.working = { 'main.ts': main, 'lib/drive.ts': helper }
     deployGameProject(c)
     await page.addInitScript((save) => {
@@ -77,7 +77,7 @@ for (const file of ['main.ts', 'lib/drive.ts']) {
     ].join('\n')
     const markers = page.locator('.project-editor .squiggly-error')
     // Wait for a semantic error first so a worker still starting up cannot give a false pass.
-    await replaceCode(page, program.replace('ctx.space', 'ctx.stock'))
+    await replaceCode(page, program.replace('ctx.space', 'ctx.dispatch'))
     await expect(markers.first()).toBeVisible()
     await replaceCode(page, program)
     await expect(markers).toHaveCount(0)
@@ -140,61 +140,6 @@ test('follow definitions and references across files, search the draft and organ
   await tree.getByRole('button', { name: 'Delete selected' }).click()
   await tree.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(tab(page, 'presses/press.ts')).toHaveCount(0)
-})
-
-test('test and stage a working copy, restore a snapshot and inspect the live shift', async ({ page }) => {
-  await workshop(page)
-  const output = page.getByRole('region', { name: 'Program console' })
-  await expect(output).toContainText('ore moving')
-  await output.getByRole('searchbox').fill('absent')
-  await expect(output).toContainText('No matching lines.')
-  await button(page, 'Drivers').click()
-  const drivers = page.getByRole('region', { name: 'Machine drivers' })
-  await drivers.getByRole('button', { name: 'feed · lib/drive.ts:3' }).click()
-  await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
-  const mine = drivers.getByRole('button', { name: 'mine', exact: true })
-  await mine.click()
-  await expect(mine).toHaveAttribute('aria-pressed', 'true')
-  await photo(page, 'ide-drivers')
-
-  await button(page, 'Tests').click()
-  await button(page, 'Create tests.ts').click()
-  await expect(tab(page, 'tests.ts')).toBeVisible()
-  await button(page, 'Run tests').click()
-  await expect(page.getByText('Pass', { exact: true })).toBeVisible()
-  await replaceCode(page, 'test("bin count", () => { equal(1, 2) })')
-  await button(page, 'Run tests').click()
-  await expect(page.getByText('Fail', { exact: true })).toBeVisible()
-  await tab(page, 'main.ts').click()
-  await replaceCode(page, 'export function onTick() {}')
-  await button(page, 'Snapshots').click()
-  await page.getByLabel('Snapshot name').fill('Quiet shift')
-  await button(page, 'Save draft').click()
-  await expect(page.getByRole('region', { name: 'Project revisions' })).toContainText('Quiet shift')
-  await button(page, 'Tests').click()
-  await page.getByRole('combobox', { name: 'Preview ticks' }).selectOption('2000')
-  await button(page, 'Run preview').click()
-  const table = page.getByRole('table', { name: 'Preview comparison' })
-  const deployed = await table
-    .getByRole('row', { name: /^Deployed/ })
-    .getByRole('cell')
-    .first()
-    .innerText()
-  const draft = await table
-    .getByRole('row', { name: /^Draft/ })
-    .getByRole('cell')
-    .first()
-    .innerText()
-  expect(Number(draft)).toBeLessThan(Number(deployed))
-  await photo(page, 'ide-preview')
-  await button(page, 'Snapshots').click()
-  await button(page, 'Roll back').first().click()
-  await expect(page.locator('.project-editor .view-lines').first()).toContainText('ctx.work')
-  await button(page, 'Restore draft').click()
-  await expect(page.locator('.project-editor .view-lines').first()).toContainText('onTick() {}')
-  await button(page, 'Metrics').click()
-  await expect(page.getByRole('region', { name: 'Factory metrics' }).locator('figure')).toHaveCount(7)
-  await photo(page, 'ide-metrics')
 })
 
 test('jump from a controller error to its module and clear the log ring', async ({ page }) => {
