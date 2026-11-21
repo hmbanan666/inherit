@@ -49,3 +49,11 @@ test('story opens the filing cabinet and the event handlers', () => {
   c.town.beat = 9
   expect(getSurface(c)).toMatchObject({ multiFile: true, events: ['onItemArrived', 'onMachineIdle'] })
 })
+
+test('Uncle leaves only a comment for the first shift', () => {
+  const c = createCampaign()
+  const lines = c.project.working['main.ts'].trim().split('\n')
+  expect(lines.every(line => line.startsWith('//'))).toBe(true)
+  expect(lines.join(' ')).toContain('Uncle')
+  expect(c.project.deployed).toEqual(c.project.working)
+})

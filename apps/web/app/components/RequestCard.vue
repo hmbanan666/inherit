@@ -1,29 +1,14 @@
 <script setup lang="ts">
-import { type TownSnapshot } from '@inherit/sim'
+import { bramLessons, type TownSnapshot } from '@inherit/sim'
 import TownPortrait from './town/TownPortrait.vue'
 import { useGame } from '../lib/useGame'
 const props = defineProps<{ person?: TownSnapshot['people'][number] }>()
 const g = useGame()
 const ask = computed(() => props.person?.ask)
 const c = computed(() => g.campaign.value)
-const hint = ref(false)
-const lessons = [
-  ['Inside onTick, tell the mine to dig one rock.', 'ctx.dig("mine")'],
-  ['Deploy your edit to run it every tick.', 'ctx.dig("mine")'],
-  ['Add the mine’s belt above your dig call and deploy.', 'ctx.connect("mine", "furnace")'],
-  ['Tell the furnace to smelt what arrives, then deploy.', 'ctx.work("furnace")'],
-  ['Connect the furnace to the cart and deploy.', 'ctx.connect("furnace", "cart")'],
-  ['Leave the controller running. The cart delivers each ingot.', 'Watch the ingot count on this card.'],
-] as const
-const step = computed(() => {
-  if (c.value.town.beat !== 1) return 0
-  const w = c.value.world
-  if (!w.lost && !w.extracted['iron-ore']) return g.dirty.value ? 1 : 0
-  if (!w.belts.some((b) => b.from === 'mine' && b.to === 'furnace')) return 2
-  if (!w.machines.find((m) => m.id === 'furnace')?.stats.activeTicks) return 3
-  if (!w.belts.some((b) => b.from === 'furnace' && b.to === 'cart')) return 4
-  return 5
-})
+const hint = ref(0)
+const step = g.lessonStep
+const lesson = computed(() => bramLessons[step.value])
 const clues: Record<number, string> = {
   2: 'Keep shipping ingots for Bram. When you have enough coins, open Pay debt at the top of the workshop.',
   3: 'Build a press with ctx.build("press"). Connect furnace → press → cart and call ctx.work("press", "plate").',
@@ -36,7 +21,7 @@ const clues: Record<number, string> = {
   10: 'Regular orders keep paying. Open Orders to see what the town still needs, then use Pay debt for the remaining installments.',
 }
 watch([step, () => c.value.town.beat], () => {
-  hint.value = false
+  hint.value = 0
 })
 const units: Record<string, string> = {
   'iron-ingot': 'iron ingots',
@@ -71,12 +56,21 @@ const interlude = computed(() => {
       >
     </div>
     <div v-if="c.town.beat === 1" class="lesson">
-      <span>{{ step + 1 }}/6 · {{ lessons[step]![0] }}</span>
-      <button class="hint" :aria-expanded="hint" @click="hint = !hint">Hint</button>
-      <code v-if="hint">{{ lessons[step]![1] }}</code>
+      <strong>{{ step }}/7 · {{ lesson.title }}</strong>
+      <button class="hint" :aria-expanded="hint > 0" @click="hint = (hint + 1) % 3">
+        {{ ['Hint', 'Show exact step', 'Hide hint'][hint] }}
+      </button>
+      <p>{{ lesson.text }}</p>
+      <code v-if="hint < 2">{{ lesson.blank }}</code>
+      <p v-if="hint >= 1">{{ lesson.idea }}</p>
+      <template v-if="hint === 2">
+        <code v-if="lesson.importLine">{{ lesson.importLine }}</code>
+        <code v-if="lesson.code">{{ lesson.code }}</code>
+        <p v-if="lesson.action">{{ lesson.action }}</p>
+      </template>
     </div>
     <div v-else-if="clues[c.town.beat]" class="request-hint">
-      <button class="hint" :aria-expanded="hint" @click="hint = !hint">Hint</button>
+      <button class="hint" :aria-expanded="hint > 0" @click="hint = hint ? 0 : 1">Hint</button>
       <button v-if="c.town.beat === 2" class="hint" @click="g.act({ kind: 'read', id: 'tab' })">
         Pay later
       </button>
@@ -125,11 +119,15 @@ const interlude = computed(() => {
   gap: 8px;
   font-size: 13px;
 }
-.lesson span {
+.lesson strong {
   flex: 1;
 }
-.lesson code {
+.lesson p, .lesson code {
   flex-basis: 100%;
+  margin: 0;
+}
+.lesson code {
+  white-space: pre-wrap;
   color: var(--gold);
 }
 </style>

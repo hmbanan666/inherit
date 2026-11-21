@@ -5,7 +5,7 @@ import {
   type QuickJSContext,
   type QuickJSHandle,
 } from 'quickjs-emscripten'
-import { guestSetup } from './guest'
+import { guestSetup, inheritModule } from './guest'
 import type { compileProject } from './project'
 
 const engine = () => newQuickJSWASMModuleFromVariant(variant)
@@ -210,6 +210,7 @@ export async function openRuntime(
       return exceeded(true)
     })
     begin(fresh())
+    unwrap(vm.evalCode(inheritModule, 'inherit', { type: 'module' })).dispose()
     runtime.setModuleLoader(project.load, project.resolve)
     const namespace = keep(
       unwrap(vm.evalCode(project.load(project.entry), project.entry, { type: 'module' })),

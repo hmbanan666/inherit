@@ -24,9 +24,10 @@ function projectPath(path: string) {
 }
 
 function resolveImport(files: Map<string, string>, from: string, request: string) {
+  if (request === 'inherit') return request
   const parts = from.split('/').slice(0, -1)
   if (request.length > 128 || !/^\.\.?\//.test(request)) {
-    throw new Error(`${from} · Only relative project imports are supported.`)
+    throw new Error(`${from} · Import from "inherit" or use a relative project path.`)
   }
   for (const part of request.split('/')) {
     if (part === '.') continue
@@ -62,7 +63,7 @@ export function compileProject(options: ProjectOptions, testing: boolean) {
   const compiled = new Map<string, { js: string; map: TraceMap }>()
   const resolve = (from: string, request: string) => resolveImport(files, from, request)
   function compile(path: string) {
-    if (compiled.has(path)) return
+    if (path === 'inherit' || compiled.has(path)) return
     const source = files.get(path)
     if (source === undefined) throw new Error(`Missing project entry ${path}.`)
     const output = ts.transpileModule(source, {

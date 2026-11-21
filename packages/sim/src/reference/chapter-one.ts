@@ -1,7 +1,27 @@
 import type { ProjectFiles } from '../model'
+import type { OnboardingStep } from '../onboarding'
 
 /** Successive edits to the same player project, used by the chapter and browser playthroughs. */
-export function chapterFiles(beat: number): ProjectFiles {
+export function chapterFiles(beat: number, step: OnboardingStep = 7): ProjectFiles {
+  if (beat <= 2) {
+    const machines: string[] = []
+    const body = ['  console.log("tick")']
+    if (step >= 3) {
+      machines.push('mine')
+      body.push('  mine.dig()')
+    }
+    if (step >= 4) {
+      machines.push('furnace')
+      body.push('  mine.connect(furnace)')
+    }
+    if (step >= 5) body.push('  furnace.smelt()')
+    if (step >= 6) {
+      machines.push('cart')
+      body.push('  furnace.connect(cart)')
+    }
+    const header = machines.length ? `import { ${machines.join(', ')} } from "inherit"\n\n` : ''
+    return { 'main.ts': header + 'export function onTick() {\n' + body.join('\n') + '\n}\n' }
+  }
   const lines: string[] = []
   const files: ProjectFiles = {}
   if (beat >= 3) lines.push('ctx.build("press")')

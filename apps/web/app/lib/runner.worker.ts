@@ -1,6 +1,7 @@
 import { createProgram, type Program } from '@inherit/sandbox'
 import {
   advanceGame,
+  isStarterProject,
   deployGameProject,
   rollbackGameProject,
   getSurface,
@@ -24,9 +25,11 @@ let error = ''
 let logs: string[] = []
 let cpu = { calls: 0, interrupts: 0, used: 0, budget: 96 }
 
-async function compile(files: ProjectFiles) {
+async function compile(files: ProjectFiles, allowStarter = false) {
   const { budget } = getSurface(campaign)
   const sites = commandSites(files)
+  if (allowStarter && isStarterProject(files))
+    return { program: undefined, sites }
   const program = await createProgram({
     files: sites.compiledFiles,
     memory: campaign.memory,
@@ -39,6 +42,8 @@ function install(next: Awaited<ReturnType<typeof compile>>) {
   program?.dispose()
   program = next.program
   error = ''
+  // Module-level logs belong to deployment. Only a running tick advances Bram's lesson.
+  if (program) logs.push(...program.drainLogs())
   sites = next.sites
   cpu = { calls: 0, interrupts: 0, used: 0, budget: getSurface(campaign).budget }
 }
@@ -62,7 +67,9 @@ function step(): GameTick | undefined {
     error = message(e)
   } finally {
     cpu = live.stats
-    logs.push(...sites.drainLogs(live.drainLogs()))
+    const printed = sites.drainLogs(live.drainLogs())
+    if (printed.length && campaign.town.beat === 1) campaign.progress.signals.printedTick = true
+    logs.push(...printed)
   }
   live.dispose()
   program = undefined
@@ -71,20 +78,20 @@ async function apply(a: Action) {
   switch (a.kind) {
     case 'init':
       campaign = loadSave(a.campaign)
-      install(await compile(campaign.project.deployed))
+      install(await compile(campaign.project.deployed, true))
       return true
     case 'deploy':
     case 'rollback': {
       const files = a.kind === 'deploy' ? a.files : campaign.project.history.find((r) => r.id === a.id)?.files
       if (!files) return false
-      const next = await compile(files)
+      const next = await compile(files, a.kind === 'rollback')
       try {
         if (a.kind === 'deploy') {
           campaign.project.working = files
           deployGameProject(campaign)
         } else if (!rollbackGameProject(campaign, a.id)) throw new Error('Unknown revision.')
       } catch (e) {
-        next.program.dispose()
+        next.program?.dispose()
         throw e
       }
       install(next)

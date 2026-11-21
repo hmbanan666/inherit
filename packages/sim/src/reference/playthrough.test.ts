@@ -1,9 +1,12 @@
-import { expect, test } from 'vitest'
+import { expect, onTestFinished, test } from 'vitest'
 import ts from 'typescript'
+import { createProgram, type Program } from '../../../sandbox/src/index'
 import { runInNewContext } from 'node:vm'
 import { posix } from 'node:path'
 import {
   createCampaign,
+  onboardingStep,
+  type OnboardingStep,
   deployGameProject,
   advanceGame,
   townSnapshot,
@@ -55,17 +58,22 @@ function referenceController(files: ProjectFiles, campaign: Campaign): GameProgr
 
 test.each(['immediate edits', 'beginner pace', 'long breaks'])(
   'every chapter request on one growing controller with %s',
-  (pace) => {
+  async (pace) => {
     const slow = pace === 'long breaks'
     // At beginner pace the current deployment keeps running while the player edits the next one.
     const editAtMinute: Record<number, number> = { 1: 2.5, 3: 18, 5: 29, 7: 40, 8: 44, 9: 56 }
     let c = createCampaign(831)
-    const deployed = (beat: number) => {
-      c.project.working = chapterFiles(beat)
+    let guest: Program | undefined
+    onTestFinished(() => guest?.dispose())
+    const deployed = async (beat: number, step?: OnboardingStep) => {
+      guest?.dispose()
+      guest = undefined
+      c.project.working = chapterFiles(beat, step)
       deployGameProject(c)
+      if (beat <= 2) return guest = await createProgram({ files: c.project.deployed })
       return referenceController(c.project.deployed, c)
     }
-    let run = referenceController(c.project.deployed, c)
+    let run: GameProgram | (() => void) = () => {}
     const requests: string[] = []
     const beats: number[] = []
     const advance = () => advanceGame(c, run)
@@ -97,12 +105,26 @@ test.each(['immediate edits', 'beginner pace', 'long breaks'])(
           ask: { requestId: person.ask.requestId },
         })
       }
-      if (slow && beat === 2) {
+      if (beat === 1) {
+        expect(onboardingStep(c)).toBe(1)
+        c.project.working = chapterFiles(1, 1)
+        expect(onboardingStep(c, true)).toBe(2)
+        run = await deployed(1, 2)
+        advance()
+        expect(guest!.drainLogs()).toEqual(['tick'])
+        c.progress.signals.printedTick = true
+        for (const step of [3, 4, 5, 6] as const) {
+          expect(onboardingStep(c)).toBe(step)
+          run = await deployed(1, step)
+          until(() => onboardingStep(c) === step + 1, 30)
+        }
+        until(() => c.town.beat === 2, 1920)
+      } else if (slow && beat === 2) {
         markMessageRead(c, 'tab')
         expect(c.town.beat).toBe(3)
         expect(c.town.paid).toBe(0)
       } else if (beat === 2 || beat === 10) {
-        run = deployed(beat === 2 ? 1 : 9)
+        run = await deployed(beat === 2 ? 1 : 9)
         while (c.town.beat === beat) {
           const debt = townSnapshot(c).debt
           const amount = slow ? debt.owed : debt.next!.amount
@@ -110,8 +132,8 @@ test.each(['immediate edits', 'beginner pace', 'long breaks'])(
           expect(payInstallment(c, slow)).toBe(true)
         }
       } else {
-        run = deployed(beat)
-        until(() => c.town.beat !== beat, beat === 1 ? 1920 : 2000)
+        run = await deployed(beat)
+        until(() => c.town.beat !== beat, 2000)
       }
       if (beat === 5) c = loadSave(serializeSave(c))
     }

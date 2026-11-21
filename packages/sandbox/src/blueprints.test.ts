@@ -30,3 +30,44 @@ test('QuickJS can declare and inspect the same named floor every tick', async ()
     program.dispose()
   }
 })
+
+test('the mine drops its first rock, waits on a full belt, then supplies Bram', async () => {
+  const c = createCampaign()
+  const program = await createProgram(`
+    import { mine, furnace, cart } from "inherit"
+    export function onTick(ctx) {
+      if (ctx.tick > 1) mine.connect(furnace)
+      mine.dig()
+      if (ctx.tick > 60) {
+        furnace.smelt()
+        furnace.connect(cart.name)
+      }
+    }`)
+  try {
+    advanceGame(c, program)
+    expect(c.world.extracted['iron-ore']).toBe(1)
+    expect(c.world.lost).toBe(1)
+    for (let i = 0; i < 90; i++) advanceGame(c, program)
+    expect(c.world.lost).toBe(1)
+    expect(c.town.beat).toBe(2)
+    expect(c.world.belts).toHaveLength(2)
+  } finally {
+    program.dispose()
+  }
+})
+
+test('a deployed ctx-style controller still receives the factory', async () => {
+  const c = createCampaign()
+  const program = await createProgram(`
+    import type { Factory } from "inherit"
+    export function onTick(ctx: Factory) {
+      ctx.connect("mine", "furnace")
+      ctx.dig("mine")
+    }`)
+  try {
+    advanceGame(c, program)
+    expect(c.world.extracted['iron-ore']).toBe(1)
+  } finally {
+    program.dispose()
+  }
+})

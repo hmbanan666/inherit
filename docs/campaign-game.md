@@ -1,12 +1,13 @@
 # Workshop game API
 
-The game host imports from `@inherit/sim`. One Campaign owns the floor, player project, ledger, research, board and mail. Shop and research between ticks. Licensed controllers can also build during a tick. Call `advanceGame` once per simulation tick. The first program waits for the player to put `ctx.dig("mine")` inside `onTick`. A dock shipment and every objective stamp pay coins.
+The game host imports from `@inherit/sim`. One Campaign owns the floor, player project, ledger, research, board and mail. Shop and research between ticks. Licensed controllers can also build during a tick. Call `advanceGame` once per simulation tick. The factory starts idle with Uncle’s note in `main.ts`. The player writes and deploys `onTick()`, then imports machine handles from `"inherit"`. A dock shipment and every objective stamp pay coins.
 
 ## Worker loop
 
 ```ts
 const c = loadSave(savedText)
 const surface = getSurface(c)
+// After the player deploys a controller:
 const program = await createProgram({
   files: c.project.deployed,
   memory: c.memory,
@@ -17,7 +18,7 @@ const feedback = advanceGame(c, program)
 const { active, next, progress } = objectiveTrack(c)
 ```
 
-`createProgram` belongs to the sandbox package. The game accepts its structural interface without a runtime dependency. It delivers the previous tick’s unlocked events in order, calls onTick, exports memory, then settles the current physical tick. Recreate the program on deployment, rollback, or an event/budget unlock. Refresh Monaco’s ambient library after research. Register the sandbox declarations alongside the game declarations for globals such as `memory`.
+`createProgram` belongs to the sandbox package. The game accepts its structural interface without a runtime dependency. It delivers the previous tick’s unlocked events in order, calls onTick, exports memory, then settles the current physical tick. Recreate the program on deployment, rollback, or an event/budget unlock. Refresh Monaco’s ambient library when the onboarding step or story beat changes. Register the sandbox declarations alongside the game declarations for globals such as `memory`.
 
 ```ts
 createCampaign(seed?: number): Campaign

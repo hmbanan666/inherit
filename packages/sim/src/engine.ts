@@ -76,9 +76,11 @@ export function stepCampaign(
       const item = findMachine(id)?.queue[0]
       return item && { ...item }
     },
-    dig(id) {
+    dig(id, mode) {
       const machine = findMachine(id)
       if (!machine || machine.kind !== 'miner' || !machine.deposit || dug.has(id)) return false
+      const output = belt(id)
+      if (mode === 'wait-for-space' && output?.items.some((item) => item.position === 0)) return false
       dug.add(id)
       const item: MaterialItem = {
         kind: machine.deposit === 'coal' ? 'coal' : machine.deposit === 'iron' ? 'iron-ore' : 'copper-ore',
@@ -87,7 +89,9 @@ export function stepCampaign(
         world.seed = (Math.imul(1664525, world.seed) + 1013904223) >>> 0
         if (world.seed % 3 === 0) item.kind = 'copper-ore'
       }
-      if (!feed(belt(id), markDefect(world, item))) {
+      if (!feed(output, markDefect(world, item))) {
+        if (!output && mode === 'wait-for-space')
+          world.extracted[item.kind] = (world.extracted[item.kind] ?? 0) + 1
         machine.status = 'blocked'
         world.lost++
         return false

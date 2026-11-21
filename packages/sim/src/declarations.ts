@@ -1,6 +1,6 @@
 import { MATERIALS, RECIPES } from './catalog'
 import type { Campaign } from './model'
-import { getSurface, type FactoryMethod } from './research'
+import { getSurface, type FactoryMethod, type HandleSurface } from './research'
 
 type Group = 'Machines' | 'Belts' | 'Floor' | 'Orders' | 'Memory' | 'Events'
 type Doc = [group: Group, description: string, example: string, signature: string]
@@ -115,7 +115,8 @@ export interface ApiEntry {
   description: string
   example: string
   signature: string
-  kind: 'method' | 'property' | 'handler'
+  receiver?: string
+  kind: 'method' | 'property' | 'handler' | 'machine'
 }
 const eventDescriptions = {
   onItemArrived: 'Run when an item reaches a machine.',
@@ -125,7 +126,7 @@ const eventDescriptions = {
 function entry(name: string, kind: ApiEntry['kind'], [group, description, example, signature]: Doc): ApiEntry {
   return { name, kind, group, description, example, signature }
 }
-export function apiReference(c: Campaign): ApiEntry[] {
+function factoryEntries(c: Campaign): ApiEntry[] {
   const surface = getSurface(c)
   const entries = surface.methods.map(name => entry(name, 'method', docs[name]))
   entries.push(
@@ -158,6 +159,48 @@ export function apiReference(c: Campaign): ApiEntry[] {
   }
   return entries
 }
+const tickHandler = entry('onTick', 'handler', [
+  'Floor', 'The factory runs this function every tick.',
+  'export function onTick() { console.log("tick") }', 'onTick(): void',
+])
+
+function handleEntries({ name, type, members }: HandleSurface) {
+  const machine = entry(name, 'machine', [
+    'Machines', 'Import Uncle’s ' + name + ' to use it in your controller.',
+    `import { ${name} } from "inherit"`, `${name}: ${type}`,
+  ])
+  const memberDocs: Record<HandleSurface['members'][number], Doc> = {
+    name: ['Machines', 'Read the machine’s name.', `console.log(${name}.name)`, 'name: string'],
+    dig: ['Machines', 'Dig one rock. Wait when the belt is full.', 'mine.dig()', 'dig(): boolean'],
+    connect: ['Belts', 'Connect these machines with a belt. Repeating this keeps the same belt.',
+      name === 'mine' ? 'mine.connect(furnace)' : 'furnace.connect(cart)', 'connect(to: Handle | string): boolean'],
+    smelt: ['Machines', 'Smelt ore into an ingot. The default recipe makes iron.',
+      'furnace.smelt()', 'smelt(recipe?: "iron-ingot" | "copper-ingot"): boolean'],
+  }
+  const methods = members.map(member => ({
+    ...entry(member, member === 'name' ? 'property' : 'method', memberDocs[member]),
+    receiver: name,
+  }))
+  return { machine, methods }
+}
+
+export function apiReference(c: Campaign): ApiEntry[] {
+  const entries = [tickHandler]
+  for (const handle of getSurface(c).handles) {
+    const { machine, methods } = handleEntries(handle)
+    entries.push(machine, ...methods)
+  }
+  // Later requests still teach the original calls until their handle lessons land.
+  if (c.town.beat > 1) {
+    for (const doc of factoryEntries(c)) {
+      if (doc.name === 'onTick') continue
+      entries.push(doc.kind === 'handler'
+        ? { ...doc, signature: doc.signature.replace(', ctx: Factory', '') }
+        : { ...doc, receiver: 'ctx' })
+    }
+  }
+  return entries
+}
 function declaration(doc: ApiEntry) {
   let signature = doc.signature
   if (doc.kind === 'property') signature = 'readonly ' + signature
@@ -166,7 +209,7 @@ function declaration(doc: ApiEntry) {
 }
 export function apiDeclarations(c: Campaign): string {
   const surface = getSurface(c)
-  const entries = apiReference(c)
+  const entries = factoryEntries(c)
   return [
     'declare module "inherit" {',
     '  export type MaterialId = ' + literals(Object.keys(MATERIALS)),
@@ -177,6 +220,17 @@ export function apiDeclarations(c: Campaign): string {
     '  export interface MaterialItem { kind: MaterialId; defect?: true }',
     '  export interface MachineView { id: string; kind: MachineKind; siteId: string; x: number; y: number; status: "idle" | "working" | "ready" | "blocked" | "starved" | "jammed" | "broken"; deposit?: "iron" | "coal" | "copper"; recipe?: RecipeId; remaining: number; queue: MaterialItem[]; output?: MaterialItem; stats: { processed: number; activeTicks: number; idleTicks: number; blockedTicks: number; rate: number } }',
     '  export type MemoryValue = null | boolean | number | string | MemoryValue[] | { [key: string]: MemoryValue }',
+    ...(surface.handles.length ? ['  export interface Handle { readonly name: string }'] : []),
+    ...surface.handles.flatMap(handle => {
+      const { machine, methods } = handleEntries(handle)
+      return [
+        `  export interface ${handle.type} extends Handle {`,
+        ...methods.map(declaration),
+        '  }',
+        `  /** ${machine.description} @example ${machine.example} */`,
+        '  export const ' + machine.signature,
+      ]
+    }),
     '  export interface Factory {',
     ...entries.filter(doc => doc.kind !== 'handler').map(declaration),
     '  }',

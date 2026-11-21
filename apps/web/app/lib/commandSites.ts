@@ -29,18 +29,22 @@ function collect(files: ProjectFiles) {
           : ts.isElementAccessExpression(member) && ts.isStringLiteralLike(member.argumentExpression)
             ? member.argumentExpression
             : undefined
-        const op = key?.text as Command
+        const op = (key?.text === 'smelt' ? 'work' : key?.text) as Command
         const first = node.arguments[0],
           last = node.arguments.at(-1)
-        if (key && first && last && commands.includes(op) && !ts.isSpreadElement(last)) {
+        const handleCall = key?.text === 'smelt' || (op === 'dig' && !first) ||
+          (op === 'connect' && node.arguments.length === 1)
+        // Zero-argument handle verbs can tag their receiver instead of an argument.
+        const tag = last ?? (handleCall && ts.isPropertyAccessExpression(member) ? member.expression : undefined)
+        if (key && tag && commands.includes(op) && !ts.isSpreadElement(tag)) {
           candidates.push({
             op,
             file,
             fn,
             line: tree.getLineAndCharacterOfPosition(key.getStart(tree)).line + 1,
-            target: ts.isStringLiteralLike(first) ? first.text : undefined,
-            start: last.getStart(tree),
-            end: last.end,
+            target: !handleCall && first && ts.isStringLiteralLike(first) ? first.text : undefined,
+            start: tag.getStart(tree),
+            end: tag.end,
           })
         }
       }

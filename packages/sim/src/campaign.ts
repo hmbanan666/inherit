@@ -1,7 +1,7 @@
 import { PRICES } from './prices'
 import { letter, newTown } from './town'
 import { placeMachine } from './construction'
-import type { Campaign, ProjectRevision, Site } from './model'
+import type { Campaign, ProjectFiles, ProjectRevision, Site } from './model'
 
 function sites(): Site[] {
   return [
@@ -48,6 +48,7 @@ function sites(): Site[] {
   ]
 }
 export const initialSignals = () => ({
+  printedTick: false,
   choseRecipe: false,
   inspectedParcel: false,
   arrival: false,
@@ -56,11 +57,15 @@ export const initialSignals = () => ({
   recovered: false,
   confirmed: false,
 })
+const uncleNote =
+  '// The shed is yours. So is my tab at the bank.\n// The factory runs this file every tick. Start below. — Uncle\n'
+
+export function isStarterProject(files: ProjectFiles): boolean {
+  return files['main.ts'] === uncleNote && Object.keys(files).length === 1
+}
+
 export function createCampaign(seed = 1): Campaign {
-  const files = {
-    'main.ts':
-      'import type { Factory } from "inherit"\n\nexport function onTick(ctx: Factory) {\n  // The shed is yours. So is my tab. — Uncle\n}\n',
-  }
+  const files = { 'main.ts': uncleNote }
   const campaign: Campaign = {
     version: 4,
     town: newTown(),

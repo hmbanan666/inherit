@@ -195,6 +195,7 @@ const gameFields = shape({
       }),
     ),
     signals: shape({
+      printedTick: opt(bool),
       choseRecipe: bool,
       inspectedParcel: bool,
       arrival: bool,

@@ -1,10 +1,17 @@
+import { onboardingStep } from './onboarding'
 import type { BlueprintAPI, Factory, MachineKind } from './campaign-api'
 import type { Campaign, ProjectFiles } from './model'
 import { deployProject, rollbackProject } from './campaign'
 
 export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'> | keyof BlueprintAPI
 export type GameEventName = 'onItemArrived' | 'onMachineIdle' | 'onTruckReturned'
+export interface HandleSurface {
+  name: 'mine' | 'furnace' | 'cart'
+  type: 'Miner' | 'Furnace' | 'Dock'
+  members: ('name' | 'dig' | 'connect' | 'smelt')[]
+}
 export interface UnlockedSurface {
+  handles: HandleSurface[]
   methods: FactoryMethod[]
   events: GameEventName[]
   budget: number
@@ -188,6 +195,18 @@ export function research(c: Campaign, id: string): boolean {
 }
 export function getSurface(c: Campaign): UnlockedSurface {
   const { beat } = c.town
+  const step = onboardingStep(c)
+  const handles: HandleSurface[] = []
+  if (step >= 3) handles.push({
+    name: 'mine', type: 'Miner', members: step >= 4 ? ['name', 'dig', 'connect'] : ['name', 'dig'],
+  })
+  if (step >= 4) {
+    const members: HandleSurface['members'] = ['name']
+    if (step >= 5) members.push('smelt')
+    if (step >= 6) members.push('connect')
+    handles.push({ name: 'furnace', type: 'Furnace', members })
+  }
+  if (step >= 6) handles.push({ name: 'cart', type: 'Dock', members: ['name'] })
   const machines: MachineKind[] = ['miner', 'dock', 'furnace']
   if (beat >= 3) machines.push('press')
   if (beat >= 4) machines.push('splitter')
@@ -199,6 +218,7 @@ export function getSurface(c: Campaign): UnlockedSurface {
   if (beat >= 6) methods.push('inspect', 'machines', 'repair')
   if (beat >= 8) methods.push('orders')
   return {
+    handles,
     methods,
     events: beat >= 6 ? ['onItemArrived', 'onMachineIdle'] : [],
     budget: 1024,

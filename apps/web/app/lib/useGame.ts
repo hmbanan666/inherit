@@ -5,6 +5,7 @@ import {
   createCampaign,
   getSurface,
   loadSave,
+  onboardingStep,
   serializeSave,
   TICK_MS,
   townSnapshot,
@@ -52,10 +53,12 @@ function createGameStore() {
     metrics = shallowRef<MetricSample[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
+  const draftExportsOnTick = ref(false)
+  const lessonStep = computed(() => onboardingStep(state.value, draftExportsOnTick.value))
   const surface = computed(() => getSurface(state.value))
   const reference = shallowRef<ApiEntry[]>([])
   const api = ref('')
-  watch(() => state.value.town.beat, () => {
+  watch([() => state.value.town.beat, lessonStep], () => {
     reference.value = apiReference(state.value)
     api.value = apiDeclarations(state.value) + '\n' + sandboxDeclarations
   }, { immediate: true })
@@ -340,6 +343,8 @@ function createGameStore() {
     rollback: (id: number) => act({ kind: 'rollback', id }),
     snapshot: (name: string) => act({ kind: 'snapshot', name, files: files.value }),
     restoreSnapshot,
+    draftExportsOnTick,
+    lessonStep,
     surface,
     reference,
     api,

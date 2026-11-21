@@ -226,6 +226,39 @@ onMounted(() => {
     ))
   })
   syncFiles()
+  // Ask the same compiler that checks the player's editor whether main.ts exports a callable onTick.
+  const probe = monaco.Uri.file('/.onboarding/check.ts')
+  const main = monaco.Uri.file('/main.ts')
+  watch([files, () => campaign.value.town.beat === 1 && game.lessonStep.value <= 2], ([, needed], _, onCleanup) => {
+    if (!needed) {
+      game.draftExportsOnTick.value = false
+      return
+    }
+    const check = ts.typescriptDefaults.addExtraLib(
+      'import { onTick } from "../main"; const handler: (...args: never[]) => unknown = onTick', probe.toString(),
+    )
+    let stale = false
+    const timer = setTimeout(async () => {
+      try {
+        const getWorker = await ts.getTypeScriptWorker()
+        const worker = await getWorker(main, probe)
+        const diagnostics = await Promise.all([
+          worker.getSyntacticDiagnostics(main.toString()),
+          worker.getSemanticDiagnostics(main.toString()),
+          worker.getSemanticDiagnostics(probe.toString()),
+        ])
+        if (!stale) game.draftExportsOnTick.value = diagnostics.every(list => list.length === 0)
+      } catch {
+        // The language worker may be restarting as the editor closes.
+        if (!stale) game.draftExportsOnTick.value = false
+      }
+    }, 150)
+    onCleanup(() => {
+      stale = true
+      clearTimeout(timer)
+      check.dispose()
+    })
+  }, { immediate: true })
   runtimeMarker()
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {

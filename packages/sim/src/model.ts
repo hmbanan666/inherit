@@ -162,6 +162,7 @@ export interface Campaign {
     messages: StoryMessage[]
     objectiveRun?: ObjectiveRun
     signals: {
+      printedTick?: boolean
       choseRecipe: boolean
       inspectedParcel: boolean
       arrival: boolean
