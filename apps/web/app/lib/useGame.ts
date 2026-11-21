@@ -332,6 +332,11 @@ function createGameStore() {
     state.value = { ...state.value, seenSections: [...state.value.seenSections, section] }
     persist()
   }
+  function openDraft() {
+    const source = files.value['main.ts'] ?? ''
+    const line = source === step.value?.step.starter ? source.split('\n').length : 1
+    openFile('main.ts', line)
+  }
   function newGame() {
     stop()
     state.value = loadChapter()
@@ -345,7 +350,7 @@ function createGameStore() {
     error.value = ''
     selected.value = ''
     notice.value = ''
-    openFile('main.ts')
+    openDraft()
     persist()
     start()
   }
@@ -365,7 +370,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
-    openFile('main.ts')
+    openDraft()
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)

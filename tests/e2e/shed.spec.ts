@@ -23,6 +23,7 @@ test('Run shows the rock and its source line before Continue becomes available',
   await openShed(page)
   await page.getByRole('textbox', {name:'Factory controller TypeScript'}).focus()
   await page.keyboard.insertText('take("mine")')
+  await expect(page.locator('.view-line').nth(3)).toHaveText('take("mine")')
   await page.getByTestId('primary-button').click()
   await expect(page.locator('.machine-line')).toBeVisible()
   await expect(page.getByTestId('hand')).toHaveText('iron ore')

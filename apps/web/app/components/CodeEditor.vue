@@ -262,11 +262,9 @@ onMounted(() => {
   })
   syncFiles()
   runtimeMarker()
-  const initial = editor.getModel()
-  if (initial && game.step.value?.step.starter === initial.getValue()) {
-    editor.setPosition({ lineNumber: initial.getLineCount(), column: 1 })
-    editor.focus()
-  }
+  // Navigation can arrive before the lazy editor mounts.
+  const initial = game.navigation.value
+  revealLine(initial.file, initial.line)
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
