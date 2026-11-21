@@ -89,11 +89,13 @@ export const guestSetup = String.raw`
   function result(reply) { return reply === undefined ? undefined : parse(reply); }
   for (const name of parse(operations)) {
     if (name === "build") {
-      blueprintApi.build = (kind, x, y, opts) => {
+      blueprintApi.build = (kind, opts) => {
         if (opts !== undefined && (!opts || typeof opts !== "object" || isArray(opts)))
           throw new Fault("Expected build options.");
-        return result(call(name, 6, arg(kind), coordinate(x), coordinate(y),
-          arg(opts?.siteId), arg(opts?.recipe), arg(opts?.deposit)));
+        return result(call(name, 6, arg(kind), arg(opts?.name),
+          opts?.x === undefined ? undefined : coordinate(opts.x),
+          opts?.y === undefined ? undefined : coordinate(opts.y),
+          arg(opts?.recipe), arg(opts?.deposit)));
       };
       continue;
     }
@@ -105,7 +107,9 @@ export const guestSetup = String.raw`
     };
   }
   freeze(api);
-  Object.defineProperties(blueprintApi, Object.getOwnPropertyDescriptors(api));
+  const descriptors = Object.getOwnPropertyDescriptors(api);
+  delete descriptors.dispatch;
+  Object.defineProperties(blueprintApi, descriptors);
   freeze(blueprintApi);
 
   const cases = create(null);
