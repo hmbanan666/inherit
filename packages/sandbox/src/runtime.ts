@@ -113,13 +113,9 @@ export async function openRuntime(
       stopped = 'Controller interrupted by 25 ms time budget.'
     return !!stopped
   }
-  runtime.setInterruptHandler(() => {
-    meter.interrupts++
-    meter.used++
-    return exceeded(true)
-  })
   function unwrap(result: ReturnType<QuickJSContext['callFunction']>) {
     if (result.error) {
+      current = undefined
       const error = result.error
       let detail = ''
       try {
@@ -151,8 +147,6 @@ export async function openRuntime(
   }
 
   try {
-    // Bootstrap with trusted code, then start a fresh meter for player module initialization.
-    begin(fresh())
     const install = keep(unwrap(vm.evalCode(guestSetup, 'sandbox.js', { type: 'global' })))
     const call = keep(
       vm.newFunction('factory', (name, length, ...args) => {
@@ -194,6 +188,13 @@ export async function openRuntime(
     const exported = helper('exported')
     formatError = helper('errorText')
 
+    // Charge player module initialization from its first instruction. The fixed
+    // bootstrap above runs before any player code can enter this context.
+    runtime.setInterruptHandler(() => {
+      meter.interrupts++
+      meter.used++
+      return exceeded(true)
+    })
     begin(fresh())
     runtime.setModuleLoader(project.load, project.resolve)
     const namespace = keep(
