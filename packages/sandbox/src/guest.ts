@@ -1,0 +1,123 @@
+// Evaluated inside QuickJS before loading any player modules. The returned helpers
+// stay in host-owned handles. Guest values only cross the boundary as primitives.
+export const guestSetup = String.raw`
+(function install(initial, operations, call, tick, log, testing) {
+  "use strict";
+  delete Math.random;
+  delete globalThis.Date;
+  const parse = JSON.parse, stringify = JSON.stringify, finite = Number.isFinite;
+  const own = Object.getOwnPropertyDescriptor, keys = Object.keys, isArray = Array.isArray;
+  const prototypeOf = Object.getPrototypeOf, objectPrototype = Object.prototype;
+  const has = Function.prototype.call.bind(Object.prototype.hasOwnProperty);
+  const cut = Function.prototype.call.bind(String.prototype.slice);
+  const define = Object.defineProperty, freeze = Object.freeze, create = Object.create;
+  const Fault = Error, same = Object.is, string = String;
+  const memory = parse(initial);
+  const global = (key, value) => define(globalThis, key, { value, configurable: false, writable: false });
+  global("memory", memory);
+
+  // Walk data properties only. Cap work before expanding arrays or constructing
+  // the output string. Proxy traps, if present, execute under the VM interrupt.
+  function snapshot() {
+    let text = "", nodes = 0;
+    const parents = create(null);
+    function append(part) {
+      if (part.length + text.length > 64000) throw new Fault("Memory exceeds 64,000 JSON characters.");
+      text += part;
+    }
+    function quoted(s) {
+      if (s.length > 64000) throw new Fault("Memory string is too large.");
+      append(stringify(s));
+    }
+    function visit(value, depth) {
+      if (++nodes > 8192 || depth > 32) throw new Fault("Memory exceeds JSON complexity limit.");
+      if (value === null || typeof value === "boolean" || finite(value)) return append(string(value));
+      if (typeof value === "string") return quoted(value);
+      if (typeof value !== "object") throw new Fault("Memory requires JSON values.");
+      for (let i = 0; i < depth; i++) if (parents[i] === value) throw new Fault("Cyclic memory.");
+      parents[depth] = value;
+      const array = isArray(value);
+      if (!array) {
+        const proto = prototypeOf(value);
+        if (proto !== null && proto !== objectPrototype) throw new Fault("Memory requires plain JSON objects.");
+      }
+      const names = array ? null : keys(value);
+      const count = array ? own(value, "length").value : names.length;
+      if (count > 8192) throw new Fault("Memory exceeds JSON complexity limit.");
+      append(array ? "[" : "{");
+      for (let i = 0; i < count; i++) {
+        if (i) append(",");
+        const key = array ? i : names[i];
+        if (!array) { quoted(key); append(":"); }
+        const prop = own(value, key);
+        if (!prop || !has(prop, "value")) throw new Fault("Memory requires JSON data properties.");
+        visit(prop.value, depth + 1);
+      }
+      append(array ? "]" : "}");
+    }
+    visit(memory, 0);
+    return text;
+  }
+
+  function label(value) {
+    if (typeof value === "string") return cut(value, 0, 512);
+    if (value === null || typeof value === "boolean" || typeof value === "number" || value === undefined)
+      return string(value);
+    return "[" + typeof value + "]";
+  }
+  global("console", freeze({ log(...values) {
+    let line = "";
+    for (let i = 0; i < values.length && i < 8 && line.length < 512; i++)
+      line += (i ? " " : "") + label(values[i]);
+    log(stringify(cut(line, 0, 512)));
+  } }));
+
+  const api = create(null);
+  define(api, "tick", { get: tick });
+  define(api, "memory", { value: memory });
+  for (const name of parse(operations)) {
+    api[name] = (...args) => {
+      if (args.length > 4) throw new Fault("Too many factory arguments.");
+      for (let i = 0; i < args.length; i++) {
+        const value = args[i];
+        if (value !== undefined && (typeof value !== "string" || value.length > 256))
+          throw new Fault("Expected a short string factory argument.");
+      }
+      const arg = i => i < args.length && args[i] !== undefined ? stringify(args[i]) : undefined;
+      const reply = call(name, args.length, arg(0), arg(1), arg(2), arg(3));
+      return reply === undefined ? undefined : parse(reply);
+    };
+  }
+  freeze(api);
+
+  const cases = create(null);
+  let count = 0, collecting = testing;
+  global("test", (name, fn) => {
+    if (!collecting) return;
+    if (count >= 32) throw new Fault("Maximum 32 player tests.");
+    if (typeof name !== "string" || typeof fn !== "function") throw new Fault("Expected test(name, fn).");
+    cases[count++] = { name: cut(name, 0, 128), fn };
+  });
+  global("assert", (ok, message) => { if (!ok) throw new Fault(label(message ?? "Assertion failed.")); });
+  global("equal", (actual, expected, message) => {
+    if (!same(actual, expected))
+      throw new Fault(message === undefined ? "Expected " + label(expected) + ", received " + label(actual) : label(message));
+  });
+
+  function errorText(e) {
+    if (typeof e === "string") return "[" + stringify(cut(e, 0, 1024)) + ',""]';
+    if (!e || (typeof e !== "object" && typeof e !== "function")) return '["",""]';
+    const data = key => {
+      const prop = own(e, key);
+      return prop && has(prop, "value") && typeof prop.value === "string" ? cut(prop.value, 0, 2048) : "";
+    };
+    return "[" + stringify(data("message")) + "," + stringify(data("stack")) + "]";
+  }
+  function exported(namespace, name) {
+    const property = own(namespace, name);
+    return property && has(property, "value") ? property.value : undefined;
+  }
+  return { api, snapshot, parse, errorText, exported, finishTests() { collecting = false; return count; },
+    testName(i) { return stringify(cases[i].name); }, runTest(i) { return cases[i].fn(api); } };
+})
+`

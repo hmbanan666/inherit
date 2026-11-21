@@ -1,118 +1,84 @@
-import ts from 'typescript'
-import variant from '@jitl/quickjs-singlefile-browser-release-sync'
-import { DefaultIntrinsics, newQuickJSWASMModuleFromVariant, type QuickJSHandle } from 'quickjs-emscripten'
-import { TraceMap, originalPositionFor } from '@jridgewell/trace-mapping'
-import type { Factory, Item } from '@inherit/sim'
+import { compileProject, projectOptions, type JsonObject, type ProjectOptions } from './project'
+import { openRuntime, type CpuStats, type FactoryContext } from './runtime'
 
-const engine = () => newQuickJSWASMModuleFromVariant(variant)
-let engineReady: ReturnType<typeof engine> | undefined
+export type { JsonObject, JsonValue, ProjectOptions } from './project'
+export type { CpuStats, FactoryContext } from './runtime'
+
+const events = ['onItemArrived', 'onMachineIdle', 'onTruckReturned'] as const
+export type EventName = (typeof events)[number]
 export interface Program {
-  onTick(ctx: Factory): void
+  onTick<C extends FactoryContext>(ctx: C): void
+  deliverEvent<C extends FactoryContext>(name: EventName, event: object, ctx: C): void
+  exportMemory(): JsonObject
+  drainLogs(): string[]
+  readonly stats: CpuStats
   dispose(): void
 }
+export interface PlayerTestResult {
+  name: string
+  passed: boolean
+  error?: string
+}
 
-export async function createProgram(source: string): Promise<Program> {
-  if (source.length > 64_000) throw new Error('Controller exceeds 64,000 characters.')
-  const compiled = ts.transpileModule(source, {
-    fileName: 'controller.ts',
-    reportDiagnostics: true,
-    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, sourceMap: true },
-  })
-  const diagnostic = compiled.diagnostics?.find((d) => d.category === ts.DiagnosticCategory.Error)
-  if (diagnostic) {
-    const line = diagnostic.file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0).line ?? 0
-    throw new Error(
-      `controller.ts:${line + 1} · ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`,
-    )
-  }
-  const map = new TraceMap(compiled.sourceMapText!)
-  const module = await (engineReady ??= engine())
-  const runtime = module.newRuntime()
-  runtime.setMemoryLimit(8 * 1024 * 1024)
-  runtime.setMaxStackSize(256 * 1024)
-  let deadline = performance.now() + 100
-  runtime.setInterruptHandler(() => performance.now() >= deadline)
-  const vm = runtime.newContext({ intrinsics: { ...DefaultIntrinsics, Date: false } })
-  const api = vm.newObject()
-  let handler: QuickJSHandle | undefined
-  let current: Factory | undefined
-  let calls = 0
-  const dispose = () => {
-    handler?.dispose()
-    api.dispose()
-    vm.dispose()
-    runtime.dispose()
-  }
-  function failure(error: QuickJSHandle): Error {
-    try {
-      // Only bounded strings cross the error bridge. Never serialize player objects.
-      const read = (key: string) =>
-        vm
-          .getProp(error, key)
-          .consume((h) => (vm.typeof(h) === 'string' ? vm.getString(h).slice(0, 4096) : ''))
-      const message = vm.typeof(error) === 'string' ? vm.getString(error).slice(0, 4096) : read('message')
-      const frame = read('stack').match(/controller\.js:(\d+)(?::(\d+))?/)
-      const pos =
-        frame &&
-        originalPositionFor(map, {
-          line: Math.max(1, Number(frame[1]) - 1),
-          column: Math.max(0, Number(frame[2] ?? 1) - 1),
-        })
-      return new Error(
-        `controller.ts${pos?.line ? ':' + pos.line : ''} · ${message || 'Controller stopped.'}`,
-      )
-    } finally {
-      error.dispose()
-    }
-  }
+export const sandboxDeclarations = `
+type MemoryValue = null | boolean | number | string | MemoryValue[] | { [key: string]: MemoryValue }
+declare const memory: { [key: string]: MemoryValue }
+interface Console { log(...values: unknown[]): void }
+declare var console: Console
+declare function test(name: string, fn: (ctx: import('inherit').Factory) => void): void
+declare function assert(condition: unknown, message?: string): asserts condition
+declare function equal(actual: unknown, expected: unknown, message?: string): void
+`
+
+export async function createProgram(source: string | ProjectOptions): Promise<Program> {
+  const options = projectOptions(source)
+  const project = compileProject(options, false)
+  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false)
   try {
-    const setup = vm.evalCode('delete Math.random; delete globalThis.Date')
-    if (setup.error) throw failure(setup.error)
-    setup.value.dispose()
-    vm.defineProp(api, 'tick', { get: () => vm.newNumber(current?.tick ?? 0) })
-    for (const key of ['dig', 'work', 'route', 'space', 'stock'] as const) {
-      const fn = vm.newFunction(key, (first, second) => {
-        if (!current || ++calls > 128) throw new Error('Maximum 128 factory calls per tick.')
-        const string = (h?: QuickJSHandle) => (h && vm.typeof(h) === 'string' ? vm.getString(h) : undefined)
-        const id = string(first) ?? ''
-        const arg = string(second)
-        if (key === 'stock') return vm.newNumber(current.stock(id, arg as Item | undefined))
-        const ok =
-          key === 'route'
-            ? current.route(id, arg ?? '')
-            : key === 'space'
-              ? current.space(id, arg)
-              : current[key](id)
-        return ok ? vm.true : vm.false
-      })
-      vm.setProp(api, key, fn)
-      fn.dispose()
-    }
-    const run = vm.evalCode(
-      `(function () { const exports = {};\n${compiled.outputText}\nreturn exports.onTick; })()`,
-      'controller.js',
-      { type: 'global' },
+    const tick = session.handler('onTick')
+    if (!tick) throw new Error(`${project.entry} · Export a function named onTick.`)
+    const handlers = new Map(
+      events
+        .filter((name) => options.unlockedEvents?.includes(name))
+        .map((name) => [name, session.handler(name)]),
     )
-    if (run.error) throw failure(run.error)
-    handler = run.value
-    if (vm.typeof(handler) !== 'function') throw new Error('Export a function named onTick.')
     return {
-      onTick(ctx) {
-        current = ctx
-        calls = 0
-        deadline = performance.now() + 25
-        try {
-          const result = vm.callFunction(handler!, vm.undefined, api)
-          if (result.error) throw failure(result.error)
-          result.value.dispose()
-        } finally {
-          current = undefined
-        }
+      onTick: (ctx) => session.dispatch(tick, ctx),
+      deliverEvent(name, event, ctx) {
+        const fn = handlers.get(name)
+        if (fn) session.dispatch(fn, ctx, event)
       },
-      dispose,
+      exportMemory: session.exportMemory,
+      drainLogs: session.drainLogs,
+      get stats() {
+        return session.stats()
+      },
+      dispose: session.dispose,
     }
   } catch (error) {
-    dispose()
+    session.dispose()
     throw error
+  }
+}
+
+export async function runProjectTests(source: string | ProjectOptions): Promise<PlayerTestResult[]> {
+  const options = projectOptions(source)
+  if (!Object.hasOwn(options.files, 'tests.ts')) return []
+  try {
+    const project = compileProject(options, true)
+    const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, true)
+    try {
+      return session.tests()
+    } finally {
+      session.dispose()
+    }
+  } catch (error) {
+    return [
+      {
+        name: 'tests.ts',
+        passed: false,
+        error: error instanceof Error ? error.message : 'Test setup failed.',
+      },
+    ]
   }
 }
