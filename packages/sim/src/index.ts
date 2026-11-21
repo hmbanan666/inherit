@@ -4,7 +4,7 @@ import type { Factory as CampaignFactory, FactoryEvent } from './campaign-api'
 export * from './model'
 export * from './catalog'
 export * from './campaign'
-export * from './onboarding'
+export { lessons } from './lessons'
 export * from './request-checks'
 export * from './construction'
 export * from './persistence'
@@ -265,5 +265,6 @@ export { referenceFiles, referenceActions, applyReferenceAction, type ReferenceA
 
 export * from './town-view'
 export { payInstallment, activeRequest, DAY } from './town'
-export * from './bench'
-export type { ChapterFactory } from './primitives'
+export { primitiveTick, type ChapterFactory } from './primitives'
+
+export * from './lesson-flow'

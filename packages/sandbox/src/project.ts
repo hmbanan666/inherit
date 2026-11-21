@@ -96,6 +96,20 @@ export function compileProject(options: ProjectOptions, testing: boolean) {
       if (!file) throw new Error('Unknown project module.')
       return file.js
     },
+    callSite(stack: string) {
+      for (const frame of stack.split('\n')) {
+        const match = /at (?:(.*?) \()?([\w./-]+\.ts):(\d+)(?::(\d+))?/.exec(frame)
+        if (!match) continue
+        const [, name, file, line, column] = match
+        const source = compiled.get(file)
+        if (!source) continue
+        const pos = originalPositionFor(source.map, {
+          line: Number(line), column: Math.max(0, Number(column ?? 1) - 1),
+        })
+        return { file, line: pos.line ?? Number(line), within: name && !name.startsWith('<') ? name : undefined }
+      }
+      return { file: entry, line: 1 }
+    },
     location(stack: string) {
       for (const match of stack.matchAll(/([\w./-]+\.ts):(\d+)(?::(\d+))?/g)) {
         const file = compiled.get(match[1])

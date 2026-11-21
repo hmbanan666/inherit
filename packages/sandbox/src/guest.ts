@@ -103,7 +103,7 @@ export const guestSetup = String.raw`
     target[name] = (...args) => {
       if (args.length > 4) throw new Fault("Too many factory arguments.");
       const at = i => i < args.length ? arg(args[i]) : undefined;
-      return result(call(name, args.length, at(0), at(1), at(2), at(3)));
+      return result(call(name, args.length, at(0), at(1), at(2), at(3), chapter ? cut(new Fault().stack, 0, 4096) : undefined));
     };
   }
   freeze(api);

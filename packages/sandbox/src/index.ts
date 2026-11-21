@@ -22,9 +22,11 @@ export interface PlayerTestResult {
 
 export { sandboxDeclarations } from './declarations'
 
-export async function createProgram(source: string | ProjectOptions): Promise<Program> {
+const chapterExports = ['take', 'put', 'look', 'buy', 'repair'] as const
+
+export async function createProgram(source: string | ProjectOptions, initialFactory?: FactoryContext): Promise<Program> {
   const options = projectOptions(source)
-  return loadProgram(options, options.chapterExports ?? ['take'])
+  return loadProgram(options, options.chapterExports ?? chapterExports, initialFactory)
 }
 
 /** Historical levels run against the original engine's callback surface. */
@@ -32,9 +34,9 @@ export function createLegacyProgram(source: string | ProjectOptions) {
   return loadProgram(projectOptions(source))
 }
 
-async function loadProgram(options: ProjectOptions, exports?: readonly string[]): Promise<Program> {
+async function loadProgram(options: ProjectOptions, exports?: readonly string[], initialFactory?: FactoryContext): Promise<Program> {
   const project = compileProject(options, false)
-  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false, exports)
+  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false, exports, initialFactory)
   try {
     const tick = session.handler('onTick')
     if (!tick) throw new Error(`${project.entry} · Export a function named onTick.`)
@@ -84,15 +86,16 @@ export async function runProjectTests(source: string | ProjectOptions): Promise<
   }
 }
 
-/** Load only the active verb and its imports. Each case gets fresh module state. */
-export async function runVerb(options: ProjectOptions, name: string, api: FactoryContext, args: readonly string[]) {
+/** Evaluate the entry module once on the floor without requiring a clock handler. */
+export async function runOnce(options: ProjectOptions, api: FactoryContext, runClock = false) {
   const project = compileProject(options, false)
-  const session = await openRuntime(project, {}, 1024, false, options.chapterExports ?? ['take'])
+  const session = await openRuntime(project, {}, options.budget ?? 1024, false, options.chapterExports ?? chapterExports, api)
   try {
-    const verb = session.handler(name)
-    if (!verb) throw new Error(project.entry + ' · Export a function named ' + name + '.')
-    return session.callVerb(verb, api, args)
+    const tick = runClock && session.handler('onTick')
+    if (tick) session.dispatch(tick, api)
+    return session.drainLogs()
   } finally {
     session.dispose()
   }
 }
+export { startChapter } from './chapter'
