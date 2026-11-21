@@ -112,7 +112,6 @@ watch(g.notice, (message) => {
     g.notice.value = ''
   }
 })
-watch(error, message => { if (message) openPanel('Checks') })
 watch(g.navigation, async ({ file, line }) => {
   tab.value = 'controller'
   await nextTick()
