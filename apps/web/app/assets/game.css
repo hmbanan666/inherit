@@ -293,7 +293,9 @@ button.revisions:hover {
   gap: 12px;
   padding: 22px 3px 16px;
 }
-.world-title > div:first-child {
+.floor-heading {
+  position: relative;
+  min-width: 0;
   flex: 1;
 }
 .eyebrow {
@@ -308,6 +310,9 @@ button.revisions:hover {
 .eyebrow svg {
   width: 14px;
   height: 14px;
+}
+.floor-heading.celebrating > :is(.eyebrow, h1) {
+  visibility: hidden;
 }
 .world-title h1 {
   font-size: clamp(26px, 2.8vw, 42px);
@@ -436,13 +441,16 @@ button.revisions:hover {
   background: var(--gold);
   transition: width 0.2s;
 }
+.objective:has(.hint-note) {
+  flex-wrap: wrap;
+}
 .hint-note {
-  position: absolute;
-  top: calc(100% + 5px);
-  right: 0;
-  z-index: 6;
-  max-width: min(440px, 100%);
-  padding: 16px;
+  flex: 1 0 100%;
+  min-width: 0;
+  max-height: 20vh;
+  overflow: auto;
+  background: #30342b;
+  box-shadow: none;
   line-height: 1.5;
 }
 .hint-note p {
@@ -803,11 +811,17 @@ button.revisions:hover {
   z-index: 4;
 }
 .inspect {
-  width: min(265px, 95%);
+  width: min(265px, calc(100% - 24px));
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
   top: 48px;
   left: 12px;
   padding: 14px;
   user-select: text;
+}
+.inspect.opposite {
+  left: auto;
+  right: 12px;
 }
 .inspect header,
 .drawer header,
@@ -1028,26 +1042,20 @@ button.revisions:hover {
   word-break: break-word;
 }
 .toast {
-  position: fixed;
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 92vw;
-  padding: 8px 12px;
-  z-index: 10;
-  background: #373e32;
-  color: #e6ebd9;
-  border: 1px solid #77826a;
-  box-shadow: 0 6px 24px #12181099;
-  border-radius: 6px;
-  font-size: 13px;
+  min-width: 0;
+  color: #e2d3a6;
+  gap: 6px;
+  font: 11px var(--mono);
+}
+.toast button {
+  padding: 2px;
 }
 .receipt {
   position: absolute;
-  z-index: 3;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  top: 50%;
+  max-width: 100%;
+  transform: translateY(-50%);
   background: #e0c48c;
   border: 2px solid #514e37;
   color: #282e23;
@@ -1059,7 +1067,7 @@ button.revisions:hover {
 .receipt > div {
   display: grid;
   gap: 1px;
-  white-space: nowrap;
+  min-width: 0;
 }
 .receipt small {
   text-transform: uppercase;
@@ -1068,6 +1076,9 @@ button.revisions:hover {
 }
 .receipt b {
   font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .receipt span:last-child {
   font: 10px var(--mono);
@@ -1112,11 +1123,11 @@ button.revisions:hover {
 }
 @keyframes stamp {
   from {
-    transform: translateX(-50%) scale(1.28) rotate(-3deg);
+    transform: translateY(-50%) scale(1.12) rotate(-3deg);
     opacity: 0;
   }
   to {
-    transform: translateX(-50%);
+    transform: translateY(-50%);
   }
 }
 .scrim {
@@ -1267,8 +1278,19 @@ button.revisions:hover {
   .floor-help {
     max-width: 65%;
   }
-  .toast {
-    bottom: 10px;
+  .statusbar:has(.toast) > span:first-child,
+  .receipt .stamp-mark {
+    display: none;
+  }
+  .receipt {
+    padding: 4px 6px;
+  }
+  .receipt small {
+    font-size: 8px;
+    letter-spacing: 0;
+  }
+  .receipt b {
+    font-size: 12px;
   }
   .desk.collapsed .world-shell {
     height: calc(100dvh - 107px);

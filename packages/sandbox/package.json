@@ -2,7 +2,10 @@
   "name": "@inherit/sandbox",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./declarations": "./src/declarations.ts"
+  },
   "dependencies": {
     "@inherit/sim": "workspace:*",
     "@jitl/quickjs-singlefile-browser-release-sync": "0.32.0",

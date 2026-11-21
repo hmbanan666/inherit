@@ -419,9 +419,18 @@ function askNewGame() {
     <main class="desk" :class="{ collapsed: !dock }">
       <section class="world-shell">
         <header class="world-title">
-          <div>
+          <div class="floor-heading" :class="{ celebrating: stamp }">
             <span class="eyebrow"><Factory /> Factory floor</span>
             <h1>Uncle’s shed</h1>
+            <Transition name="stamp"
+              ><div v-if="stamp" :key="stamp.id" class="receipt" role="status">
+                <span class="stamp-mark"><Check /></span>
+                <div>
+                  <small>Objective complete</small><b>{{ stamp.title }}</b
+                  ><span>+{{ stamp.reward.money }} coins · +{{ stamp.reward.researchPoints }} RP</span>
+                </div>
+                <i v-for="i in 12" :key="i" :style="{ '--i': i }"></i></div
+            ></Transition>
           </div>
           <nav class="world-actions" aria-label="Workshop">
             <button
@@ -527,15 +536,6 @@ function askNewGame() {
             </div>
             <button aria-label="Dismiss build tutorial" @click="tutorial = false"><X /></button>
           </aside>
-          <Transition name="stamp"
-            ><div v-if="stamp" :key="stamp.id" class="receipt" role="status">
-              <span class="stamp-mark"><Check /></span>
-              <div>
-                <small>Objective complete</small><b>{{ stamp.title }}</b
-                ><span>+{{ stamp.reward.money }} coins · +{{ stamp.reward.researchPoints }} RP</span>
-              </div>
-              <i v-for="i in 12" :key="i" :style="{ '--i': i }"></i></div
-          ></Transition>
           <WorkshopDrawer
             v-if="drawer"
             :name="drawer"
@@ -613,14 +613,14 @@ function askNewGame() {
       </section>
     </main>
     <footer class="statusbar">
-      <span><Radio /> {{ saved ? 'Saved locally' : 'Save unavailable' }}</span
-      ><span
+      <span><Radio /> {{ saved ? 'Saved locally' : 'Save unavailable' }}</span>
+      <div v-if="toast" class="toast" role="status">
+        <Mail />{{ toast }}<button aria-label="Dismiss notification" @click="toast = ''"><X /></button>
+      </div>
+      <span
         >{{ campaign.world.machines.length }} machines <i>/</i> {{ campaign.world.belts.length }} belts</span
       >
     </footer>
-    <div v-if="toast" class="toast" role="status">
-      <Mail />{{ toast }}<button aria-label="Dismiss notification" @click="toast = ''"><X /></button>
-    </div>
     <div v-if="confirmNew" class="scrim">
       <section class="confirm" role="dialog" aria-label="New game">
         <h2>Start a new factory?</h2>

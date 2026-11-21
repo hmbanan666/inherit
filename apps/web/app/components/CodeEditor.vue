@@ -6,8 +6,6 @@ import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.
 import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
-import { createBenchWorker } from '../lib/devtools/worker'
-import type { BenchReply } from '../lib/preview.worker'
 import { useGame } from '../lib/useGame'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
@@ -37,9 +35,6 @@ const views = new Map<string, monaco.editor.ICodeEditorViewState | null>()
 let editor: monaco.editor.IStandaloneCodeEditor | undefined
 let opener: monaco.IDisposable
 let library: monaco.editor.ITextModel
-let globals = ''
-const typesUnavailable = ref(false)
-let declarationsWorker: Worker | undefined
 let settingSource = false
 
 function syncFiles() {
@@ -175,28 +170,6 @@ function runtimeMarker() {
     )
   }
 }
-function loadSandboxTypes() {
-  // Keep the sandbox compiler off the UI thread.
-  typesUnavailable.value = false
-  try {
-    declarationsWorker = createBenchWorker()
-    declarationsWorker.onmessage = ({ data }: MessageEvent<BenchReply>) => {
-      if (data.kind === 'declarations') {
-        globals = data.text
-        library.setValue(api.value + '\n' + globals)
-      } else typesUnavailable.value = true
-      declarationsWorker?.terminate()
-    }
-    declarationsWorker.onerror = () => {
-      typesUnavailable.value = true
-      declarationsWorker?.terminate()
-    }
-    declarationsWorker.postMessage({ kind: 'declarations' })
-  } catch {
-    typesUnavailable.value = true
-    declarationsWorker?.terminate()
-  }
-}
 onMounted(() => {
   // The shell already shows the active file and API. Add the other open files to that strip.
   shellTabs.value = host.value?.closest('.editor-dock')?.querySelector<HTMLElement>('.file-tabs') ?? undefined
@@ -278,7 +251,6 @@ onMounted(() => {
     },
   })
   window.addEventListener('keydown', keys, true)
-  loadSandboxTypes()
   emit('ready')
 })
 watch(files, syncFiles)
@@ -286,7 +258,7 @@ watch(activeFile, () => {
   showApi.value = false
   display()
 })
-watch(api, (text) => library?.setValue(text + '\n' + globals))
+watch(api, (text) => library?.setValue(text))
 watch(
   () => props.tab,
   (tab) => {
@@ -298,7 +270,6 @@ watch(
 watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
-  declarationsWorker?.terminate()
   opener?.dispose()
   editor?.dispose()
   for (const model of models.values()) model.dispose()
@@ -377,7 +348,6 @@ onBeforeUnmount(() => {
       <p v-else-if="query" class="quiet">No matches.</p>
       <small v-if="results.length > 80">First 80 of {{ results.length }} matches</small>
     </div>
-    <button v-if="typesUnavailable" @click="loadSandboxTypes">Retry sandbox type hints</button>
     <div ref="host" class="code-editor" />
   </section>
 </template>
