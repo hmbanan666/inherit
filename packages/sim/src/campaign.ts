@@ -1,3 +1,4 @@
+import { PRICES } from './prices'
 import { restartQuest } from './quests'
 import { connectBelt, placeMachine } from './construction'
 import type { Campaign, ProjectRevision, Site } from './model'
@@ -9,9 +10,25 @@ function sites(): Site[] {
       name: 'Uncle’s shed',
       plots: [
         { id: 'shed-floor', x: 0, y: 0, width: 8, height: 5, status: 'owned', price: 0 },
-        { id: 'east-lot', x: 8, y: 0, width: 6, height: 5, status: 'sale', price: 80 },
-        { id: 'south-lot', x: 0, y: 5, width: 8, height: 5, status: 'sale', price: 60 },
-        { id: 'rail-spur', x: 8, y: 5, width: 6, height: 5, status: 'locked', price: 180 },
+        { id: 'east-lot', x: 8, y: 0, width: 6, height: 5, status: 'sale', price: PRICES.plots['east-lot'] },
+        {
+          id: 'south-lot',
+          x: 0,
+          y: 5,
+          width: 8,
+          height: 5,
+          status: 'sale',
+          price: PRICES.plots['south-lot'],
+        },
+        {
+          id: 'rail-spur',
+          x: 8,
+          y: 5,
+          width: 6,
+          height: 5,
+          status: 'locked',
+          price: PRICES.plots['rail-spur'],
+        },
       ],
       deposits: [
         { x: 1, y: 2, kind: 'iron' },
@@ -30,13 +47,22 @@ function sites(): Site[] {
     },
   ]
 }
+export const initialSignals = () => ({
+  choseRecipe: false,
+  inspectedParcel: false,
+  arrival: false,
+  idle: false,
+  breakdown: false,
+  recovered: false,
+  confirmed: false,
+})
 export function createCampaign(seed = 1): Campaign {
   const files = {
     'main.ts':
-      'import type { Factory } from "inherit"\n\nexport function onTick(ctx: Factory) {\n  if (ctx.space("mine")) ctx.dig("mine")\n  // Give furnace-a a job.\n}\n',
+      'import type { Factory } from "inherit"\n\nexport function onTick(ctx: Factory) {\n  // Try ctx.dig("mine") here.\n}\n',
   }
   const campaign: Campaign = {
-    version: 2,
+    version: 3,
     world: {
       tick: 0,
       seed: seed >>> 0,
@@ -57,8 +83,17 @@ export function createCampaign(seed = 1): Campaign {
       lastEvents: [],
       incidents: [],
     },
-    economy: { money: 100, reputation: 0, research: [], orders: [] },
-    progress: { completedQuests: [] },
+    economy: {
+      money: 100,
+      reputation: 0,
+      research: [],
+      orders: [],
+      researchPoints: 1,
+      orderSeed: seed >>> 0,
+      nextOrder: 1,
+      road: false,
+    },
+    progress: { completedQuests: [], completedObjectives: [], messages: [], signals: initialSignals() },
     project: {
       working: { ...files },
       deployed: { ...files },

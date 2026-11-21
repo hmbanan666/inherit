@@ -99,7 +99,10 @@ export interface OrderState {
   customer: string
   items: Partial<Record<MaterialId, number>>
   quality?: 'good'
-  status: 'open' | 'accepted' | 'done' | 'failed'
+  line: string
+  filled: Partial<Record<MaterialId, number>>
+  duration: number
+  status: 'open' | 'accepted' | 'done' | 'failed' | 'declined'
   deadline?: number
   pay: number
   reputation: number
@@ -109,6 +112,10 @@ export interface Economy {
   reputation: number
   research: string[]
   orders: OrderState[]
+  researchPoints: number
+  orderSeed: number
+  nextOrder: number
+  road: boolean
 }
 export interface QuestRun {
   id: string
@@ -118,11 +125,44 @@ export interface QuestRun {
   coal: number
   furnaceActive: Record<string, number>
 }
+export interface StoryMessage {
+  id: string
+  kind: 'notebook' | 'email'
+  from: string
+  title: string
+  body: string
+  tick: number
+  unread: boolean
+}
+export interface ObjectiveRun {
+  startTick: number
+  revision: number
+  memoryKey?: string
+  memoryValue?: number
+}
 export interface Campaign {
-  version: 2
+  version: 3
   world: CampaignWorld
   economy: Economy
-  progress: { completedQuests: string[]; activeQuest?: QuestRun }
+  progress: {
+    completedQuests: string[]
+    activeQuest?: QuestRun
+    pausedQuest?: Omit<QuestRun, 'startTick'> & { elapsed: number }
+    completedObjectives: string[]
+    messages: StoryMessage[]
+    objectiveRun?: ObjectiveRun
+    signals: {
+      choseRecipe: boolean
+      inspectedParcel: boolean
+      arrival: boolean
+      idle: boolean
+      breakdown: boolean
+      recovered: boolean
+      confirmed: boolean
+      brokenKey?: string
+      missingKey?: string
+    }
+  }
   project: PlayerProject
   memory: JsonObject
 }

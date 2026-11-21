@@ -252,3 +252,6 @@ export function evaluate(world: World): Check[] {
   )
   return checks
 }
+export * from './research'
+export * from './shop'
+export { apiDeclarations } from './declarations'
