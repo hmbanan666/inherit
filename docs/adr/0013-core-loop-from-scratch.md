@@ -4,7 +4,7 @@
 
 The frame works and stays: the IDE, the navigation, the game area, the overall layout, the checks panel and the palette (ADR 0006, 0009, 0011, 0012). What did not work is the coding gameplay itself. v3 first taught a low-level `ctx` API, then ready-made machine handles with verbs (ADR 0010, PR #38). In both cases the player used a library he did not write, kept asking "what is this and where does it come from?", and never saw what the factory really does underneath. Separately, a running furnace and cart earned coins forever, so with no timers (ADR 0008) the debt paid itself while the player waited.
 
-This ADR redesigns only what the player writes. The implementation must fit the existing frame. A throwaway prototype of this loop lives in `prototypes/from-scratch/index.html`.
+This ADR redesigns only what the player writes. The implementation must fit the existing frame.
 
 ## Decision
 
@@ -18,7 +18,7 @@ The story adds two non-physical actions when it introduces them: `buy(kind, name
 
 **Machines work by themselves.** A machine processes as soon as it holds its inputs, and the recipe follows from the input: iron ore in a furnace makes an iron ingot, copper ore a copper ingot, an ingot in the press a plate, two plates in the cutter a gear, copper ingots in the cutter wire, a plate and wire in the assembler a bracket. A finished item waits until it is taken. Mixing ores in one furnace jams it; taking from a jammed machine pulls the wrong item out. Belts are not taught in chapter 1. A belt is the player's own function, and the floor view animates every take and put so the player sees what his code did.
 
-**The player writes the verbs, in this order.** Each request asks for one new function in plain words, and the word in the task is the function's name:
+**The player writes the verbs, in this order.** Each request asks for one new function in plain words, and the word in the task is the function's name. Verbs stay casual: each is one or two lines built from the primitives (for example `function smelt() { put("furnace", take("mine")) }`), and the step shows the exact line when the player asks for it.
 
 1. Bram: `onTick` with a `console.log`, Deploy, `take("mine")`, then his first functions `dig()`, `smelt()` (put a dug rock into the furnace) and `ship()` (furnace to cart).
 2. Mrs Harrow: the debt and what coins are for.
