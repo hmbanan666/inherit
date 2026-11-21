@@ -80,7 +80,7 @@ const docs: Record<FactoryMethod, Doc> = {
   ],
   orders: [
     'Orders',
-    'List regular orders with their remaining demand and deadlines.',
+    'List regular orders with their remaining demand.',
     'ctx.orders().find(o => o.who === "elsie")',
     'orders(): OrderView[]',
   ],
@@ -173,7 +173,7 @@ export function apiDeclarations(c: Campaign): string {
     '  export type RecipeId = ' + literals(Object.keys(RECIPES)),
     '  export type MachineKind = ' + literals(surface.machines),
     '  export interface BuildOptions { name?: string; x?: number; y?: number; recipe?: RecipeId; deposit?: "iron" | "coal" | "copper" }',
-    '  export interface OrderView { readonly id: string; readonly who: string; readonly items: Readonly<Partial<Record<MaterialId,number>>>; readonly filled: Readonly<Partial<Record<MaterialId,number>>>; readonly due: number; readonly late: boolean }',
+    '  export interface OrderView { readonly id: string; readonly who: string; readonly items: Readonly<Partial<Record<MaterialId,number>>>; readonly filled: Readonly<Partial<Record<MaterialId,number>>> }',
     '  export interface MaterialItem { kind: MaterialId; defect?: true }',
     '  export interface MachineView { id: string; kind: MachineKind; siteId: string; x: number; y: number; status: "idle" | "working" | "ready" | "blocked" | "starved" | "jammed" | "broken"; deposit?: "iron" | "coal" | "copper"; recipe?: RecipeId; remaining: number; queue: MaterialItem[]; output?: MaterialItem; stats: { processed: number; activeTicks: number; idleTicks: number; blockedTicks: number; rate: number } }',
     '  export type MemoryValue = null | boolean | number | string | MemoryValue[] | { [key: string]: MemoryValue }',
