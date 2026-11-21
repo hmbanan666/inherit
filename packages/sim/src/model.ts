@@ -1,4 +1,5 @@
 import type { FactoryEvent, MachineView, MaterialId, MaterialItem, TruckOutcome } from './campaign-api'
+import type { TownState } from './town'
 export interface Tile {
   x: number
   y: number
@@ -18,6 +19,12 @@ export interface Site {
   roads: string[]
 }
 export interface CampaignMachine extends MachineView {
+  status: Exclude<MachineView['status'], 'broken' | 'jammed'>
+  fault?: 'broken' | 'jammed'
+  heatLimit?: number
+  heat?: number
+  coolAt?: number
+  repairing?: true
   lastInput?: string
   builtByCode?: true
   paid: number
@@ -143,7 +150,8 @@ export interface ObjectiveRun {
   memoryValue?: number
 }
 export interface Campaign {
-  version: 3
+  version: 4
+  town: TownState
   world: CampaignWorld
   economy: Economy
   progress: {

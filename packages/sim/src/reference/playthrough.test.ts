@@ -6,16 +6,15 @@ import {
   createCampaign,
   deployGameProject,
   advanceGame,
-  objectiveTrack,
-  objectiveProgress,
-  OBJECTIVES,
-  serializeSave,
+  townSnapshot,
+  payInstallment,
   loadSave,
+  serializeSave,
   type Campaign,
-  type GameProgram,
   type ProjectFiles,
+  type GameProgram,
 } from '../index'
-import { referenceFiles, referenceActions, applyReferenceAction } from './index'
+import { chapterFiles } from './chapter-one'
 
 // Only the fixtures authored in this directory enter this test evaluator.
 // The application executes player projects in QuickJS.
@@ -52,76 +51,103 @@ function referenceController(files: ProjectFiles, campaign: Campaign): GameProgr
   }
 }
 
-test.each([1, 9721])('every ticket on one persistent factory, seed %s', (seed) => {
-  const c = createCampaign(seed)
-  const world = c.world
-  let current = referenceController(c.project.deployed, c)
-  advanceGame(c, current)
-  expect(c.progress.completedObjectives).toEqual([])
-  const reached: string[] = []
-  const durations: Record<string, number> = {}
-  for (const stage of OBJECTIVES) {
-    const start = world.tick
-    const { active, progress } = objectiveTrack(c)
-    expect(active?.id).toBe(stage.id)
-    expect(progress.target).toBeGreaterThan(0)
-    expect(progress.current).toBeLessThanOrEqual(progress.target)
-    expect(active?.progressUnit).toBeTruthy()
-    if (active?.highlight.type === 'machine' && active.highlight.id) {
-      const id = active.highlight.id
-      expect(
-        world.machines.some((m) => m.id === id),
-        stage.id,
-      ).toBe(true)
-    }
-    for (const action of referenceActions(stage.id))
-      expect(applyReferenceAction(c, action), JSON.stringify(action)).toBeTruthy()
-    const files = referenceFiles(stage.id)
-    if (JSON.stringify(files) !== JSON.stringify(c.project.deployed)) {
-      c.project.working = files
+test.each(['immediate edits', 'beginner pace', 'missed deadlines'])(
+  'every chapter request on one growing controller with %s',
+  (pace) => {
+    const lazy = pace === 'missed deadlines'
+    // At beginner pace the current deployment keeps running while the player edits the next one.
+    const editAtMinute: Record<number, number> = { 1: 2.5, 3: 18, 5: 29, 7: 40, 8: 44, 9: 56 }
+    let c = createCampaign(831)
+    const deployed = (beat: number) => {
+      c.project.working = chapterFiles(beat)
       deployGameProject(c)
-      current = referenceController(files, c)
+      return referenceController(c.project.deployed, c)
     }
-    while (world.tick - start < 720 && reached.at(-1) !== stage.id) {
-      const result = advanceGame(c, current)
-      reached.push(...result.completed)
+    let run = referenceController(c.project.deployed, c)
+    const requests: string[] = []
+    const beats: number[] = []
+    const advance = () => advanceGame(c, run)
+    const until = (condition: () => boolean, budget: number) => {
+      const end = c.world.tick + budget
+      while (!condition() && c.world.tick < end) advance()
+      expect(condition(), 'beat ' + c.town.beat + ' tick ' + c.world.tick + ' cash ' + c.economy.money).toBe(
+        true,
+      )
     }
-    expect(
-      reached.at(-1),
-      JSON.stringify({
-        stage: stage.id,
-        track: objectiveTrack(c).progress,
-        deliveries: world.delivered,
-        signals: c.progress.signals,
-      }),
-    ).toBe(stage.id)
-    expect(objectiveProgress(c, stage.id)).toEqual({
-      state: 'complete',
-      current: progress.target,
-      target: progress.target,
-    })
-    durations[stage.id] = world.tick - start
-    expect(c.world).toBe(world)
-    expect(c.world.machines.find((m) => m.id === 'mine')?.builtAt).toBe(0)
-    expect(c.project.history[0].id).toBe(0)
-  }
-  expect(reached).toEqual(OBJECTIVES.map((o) => o.id))
-  expect(c.progress.completedQuests.sort()).toEqual(['balance', 'gate', 'loading', 'parts', 'shed'])
-  expect(c.world.receipts.filter((r) => r.key === 'island-1')).toHaveLength(1)
-  expect(c.world.receipts.find((r) => r.key === 'island-1')?.acknowledged).toBe(true)
-  expect(c.world.machines.find((m) => m.id === 'remote')?.queue).toHaveLength(1)
-  expect(c.world.delivered.motor).toBeGreaterThanOrEqual(3)
-  if (process.env.INHERIT_TIMINGS)
-    console.log({
-      seed,
-      ticks: world.tick,
-      longest: Object.entries(durations).sort((a, b) => b[1] - a[1])[0],
-    })
-  expect(world.tick).toBeLessThan(4000)
-  expect(Number(c.memory.coal)).toBeGreaterThan(0)
-  expect(c.economy.orders.some((o) => o.status === 'accepted' || o.status === 'done')).toBe(false)
-  expect(Number(c.memory.rocks)).toBeGreaterThan(100)
-  expect(objectiveTrack(c).active).toBeUndefined()
-  expect(loadSave(serializeSave(c))).toEqual(c)
-  expect(advanceGame(c, current).completed).toEqual([])
-})
+    for (let beat = 1; beat <= 10; beat++) {
+      expect(c.town.beat).toBe(beat)
+      beats.push(beat)
+      const person = townSnapshot(c).people.find((p) => p.ask)
+      if (person?.ask) requests.push(person.ask.requestId)
+      if (pace === 'beginner pace' && editAtMinute[beat]) {
+        const editTick = editAtMinute[beat] * 240
+        while (c.world.tick < editTick) {
+          advance()
+          if (c.town.payments === 1 && c.world.tick >= 5 * 1200 && c.economy.money >= 250) payInstallment(c)
+        }
+      }
+      if (lazy && person?.ask) {
+        // Leave the controller off through every deadline, then finish the same request.
+        run = referenceController({ 'main.ts': 'export function onTick(){}' }, c)
+        const due = person.id === 'harrow' ? townSnapshot(c).debt.next!.dueDay * 1200 : c.town.due
+        until(() => c.world.tick > due, 15000)
+        expect(townSnapshot(c).people.find((p) => p.id === person.id)).toMatchObject({
+          mood: 'worried',
+          ask: { late: true },
+        })
+      }
+      if (beat === 2 || beat === 10) {
+        run = deployed(beat === 2 ? 1 : 9)
+        while (c.town.beat === beat) {
+          const payment = townSnapshot(c).debt.next!
+          if (lazy) until(() => c.world.tick > payment.dueDay * 1200, 15000)
+          until(() => c.economy.money >= townSnapshot(c).debt.next!.amount, 10000)
+          expect(payInstallment(c)).toBe(true)
+        }
+      } else {
+        run = deployed(beat)
+        until(() => c.town.beat !== beat, beat === 1 ? 1920 : 2000)
+      }
+      if (beat === 5) c = loadSave(serializeSave(c))
+    }
+    expect(beats).toHaveLength(10)
+    expect(requests).toEqual([
+      'horseshoes',
+      'installment-0',
+      'oven-grate',
+      'lamp-wire',
+      'wheel-teeth',
+      'bridge-brackets',
+      pace === 'beginner pace' ? 'installment-2' : 'installment-1',
+    ])
+    expect(c.town.changes.map((change) => change.buildingId)).toEqual([
+      'forge',
+      'bank',
+      'bakery',
+      'lamp-street',
+      'mill',
+      'bridge',
+      'riverside',
+      'bank',
+    ])
+    expect(c.town.beat).toBe(11)
+    expect(c.town.paid).toBe(lazy ? 660 : c.town.installments.reduce((a, b) => a + b))
+    expect(townSnapshot(c).debt.owed).toBe(0)
+    expect(townSnapshot(c).people.map((p) => p.name)).toEqual(expect.arrayContaining(['Ines', 'Pell']))
+    expect(c.progress.messages.map((m) => m.id)).toEqual(
+      expect.arrayContaining(['vein', 'heat', 'competition', 'slow']),
+    )
+    if (process.env.INHERIT_TIMINGS)
+      console.log({
+        pace,
+        tick: c.world.tick,
+        changes: c.town.changes.map((change) => [change.buildingId, change.tick]),
+      })
+    if (!lazy) expect(c.world.tick).toBeLessThanOrEqual(14400)
+    const deliveries = c.world.delivered.bracket!
+    for (let i = 0; i < 100; i++) advance()
+    expect(c.world.delivered.bracket).toBeGreaterThan(deliveries)
+    expect(c.economy.orders.some((o) => o.customer === 'bram')).toBe(true)
+  },
+  30000,
+)

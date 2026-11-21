@@ -1,24 +1,27 @@
 import { expect, test } from 'vitest'
 import { connectBelt, placeMachine, removeBelt, createCampaign, step, type CampaignFactory } from './index'
 
-test('the inherited belts fill the cold furnace, and a controller can ship the waiting ore', () => {
-  const { world } = createCampaign(7)
+test('belts connected by the controller fill the cold furnace, and a controller can ship the waiting ore', () => {
+  const c = createCampaign(7)
+  connectBelt(c, 'mine', 'furnace')
+  connectBelt(c, 'furnace', 'cart')
+  const { world } = c
   const dig = (ctx: CampaignFactory) => {
     if (ctx.space('mine')) ctx.dig('mine')
   }
   for (let i = 0; i < 30; i++) step(world, dig)
-  const furnace = world.machines.find((m) => m.id === 'furnace-a')!
+  const furnace = world.machines.find((m) => m.id === 'furnace')!
   expect(furnace.queue[0]).toEqual({ kind: 'iron-ore' })
   expect(furnace.status).toBe('ready')
   expect(world.delivered).toEqual({})
-  for (let i = 0; i < 24; i++) step(world, (ctx) => ctx.work('furnace-a'))
+  for (let i = 0; i < 24; i++) step(world, (ctx) => ctx.work('furnace'))
   expect(world.delivered['iron-ingot']).toBeGreaterThan(0)
   expect(furnace.stats.activeTicks).toBeGreaterThan(0)
 })
 
 test('a retry after breakdown and lost acknowledgement consumes and delivers exactly one parcel', () => {
   const c = createCampaign()
-  removeBelt(c, 'mine', 'furnace-a')
+  removeBelt(c, 'mine', 'furnace')
   placeMachine(c, 'depot', 'shed', 2, 2, 'local')
   placeMachine(c, 'truck', 'shed', 2, 3, 'lorry')
   placeMachine(c, 'depot', 'yard', 0, 1, 'remote')
@@ -54,7 +57,7 @@ test('backpressure keeps bounded incident history during long production runs', 
   for (let i = 0; i < 1000; i++)
     step(world, (ctx) => {
       ctx.dig('mine')
-      ctx.work('furnace-a')
+      ctx.work('furnace')
     })
   expect(world.lost).toBeGreaterThan(128)
   expect(world.incidents.length).toBeLessThanOrEqual(129)

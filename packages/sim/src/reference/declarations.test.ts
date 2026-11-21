@@ -1,30 +1,24 @@
 import { expect, test } from 'vitest'
 import ts from 'typescript'
 import { posix } from 'node:path'
-import { apiDeclarations, createCampaign, OBJECTIVES, referenceActions, referenceFiles } from '../index'
+import { apiDeclarations, createCampaign, getSurface } from '../index'
 
-test('each pasteable stage typechecks against its own editor surface, including recipe typos', () => {
+import { chapterFiles } from './chapter-one'
+
+test('each chapter controller typechecks against the declarations available at that beat', () => {
   const c = createCampaign()
   const files = new Map<string, string>()
   files.set(
     '/workshop/globals.d.ts',
     'type Json = string | number | boolean | null | Json[] | { [key: string]: Json }; declare const memory: { [key: string]: Json }',
   )
-  for (const stage of OBJECTIVES) {
-    // Each folder has its own "inherit" module just as each research milestone does in Monaco.
-    for (const a of referenceActions(stage.id)) if (a[0] === 'research') c.economy.research.push(a[1])
-    const dir = '/workshop/' + stage.id
-    const scope = (source: string) => source.replaceAll('"inherit"', JSON.stringify('inherit-' + stage.id))
+  for (const beat of [1, 3, 4, 5, 6, 7, 8, 9]) {
+    c.town.beat = beat
+    const dir = '/workshop/' + beat
+    const scope = (source: string) => source.replaceAll('"inherit"', JSON.stringify('inherit-' + beat))
     files.set(dir + '/api.d.ts', scope(apiDeclarations(c)))
-    for (const [name, text] of Object.entries(referenceFiles(stage.id)))
-      files.set(dir + '/' + name, scope(text))
-    if (stage.id === 'contract')
-      files.set(
-        dir + '/typo.ts',
-        scope(
-          'import { runJob } from "./lib/jobs"; import type { Factory } from "inherit"; declare const ctx: Factory; runJob(ctx, "draw", "wirre")',
-        ),
-      )
+    for (const [name, text] of Object.entries(chapterFiles(beat))) files.set(dir + '/' + name, scope(text))
+    expect(getSurface(c).methods).toContain('build')
   }
   const options: ts.CompilerOptions = {
     strict: true,
@@ -48,7 +42,5 @@ test('each pasteable stage typechecks against its own editor surface, including 
     code: d.code,
     message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
   }))
-  expect(errors).toEqual([
-    { file: '/workshop/contract/typo.ts', code: 2345, message: expect.stringContaining('wirre') },
-  ])
+  expect(errors).toEqual([])
 })

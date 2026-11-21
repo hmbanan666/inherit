@@ -34,20 +34,27 @@ test('save, load and preview preserve independent live and working projects and 
   expect(serializeSave(restored)).toBe(saved)
   expect(serializeSave(c)).toBe(saved)
 })
-test('imports the selected MVP script into the working copy and archives earlier scripts', () => {
-  const c = loadSave({ current: 2, entries: { 0: { code: 'first' }, 2: { code: 'more' } }, complete: [0, 1] })
-  expect(c.project.working['main.ts']).toBe('more')
-  expect(c.project.deployed['main.ts']).toContain('ctx.dig')
-  expect(c.project.snapshots.map((s) => s.files['main.ts'])).toEqual(['first', 'more'])
-  expect(c.world.machines.map((m) => m.kind)).toEqual(['miner', 'furnace', 'dock'])
+test.each([1, 2, 3])('old save version %i starts a fresh shed and keeps the working files', (version) => {
+  const files = { 'main.ts': 'old controller', 'lib/belts.ts': 'unfinished helper' }
+  const c = loadSave({ version, project: { working: files } })
+  expect(c.world.tick).toBe(0)
+  expect(c.world.belts).toHaveLength(0)
+  expect(c.project.working).toEqual(createCampaign().project.working)
+  expect(c.project.snapshots).toContainEqual(expect.objectContaining({ name: 'v2 code', files }))
 })
-test('recognizes fresh and corrupt legacy notebooks and protects unsupported versioned saves', () => {
-  expect(loadSave(null)).toEqual(createCampaign())
-  expect(loadSave({ current: 8, entries: { 0: null } })).toEqual(createCampaign())
-  expect(() => loadSave({ version: 3 })).toThrow(/version/i)
+test('the selected notebook entry and earlier chapters survive as snapshots', () => {
+  const c = loadSave({ current: 2, entries: { 0: { code: 'first' }, 2: { code: 'more' } } })
+  expect(c.project.snapshots.map((s) => [s.name, s.files['main.ts']])).toEqual([
+    ['Chapter 1', 'first'],
+    ['v2 code', 'more'],
+  ])
+  expect(c.project.working).toEqual(createCampaign().project.deployed)
+})
+test('garbage, unknown versions and broken belt references start fresh', () => {
   const broken = createCampaign()
-  broken.world.belts[0].to = 'missing'
-  expect(() => loadSave(broken)).toThrow(/belt/i)
+  connectBelt(broken, 'mine', 'furnace')!.to = 'missing'
+  for (const data of ['{bad', null, false, [], { version: 65 }, broken])
+    expect(loadSave(data)).toEqual(createCampaign())
 })
 test('reloading a loaded truck and an unacknowledged delivery keeps its original manifest', () => {
   let c = createCampaign(44)

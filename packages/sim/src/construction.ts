@@ -121,6 +121,7 @@ export function connectBelt(
   path?: Tile[],
   cost = 0,
   fail?: ReportFailure,
+  rewire = false,
 ): CampaignBelt | undefined {
   const { world } = campaign
   const a = world.machines.find((machine) => machine.id === from),
@@ -135,7 +136,11 @@ export function connectBelt(
   )
     return fail?.('Choose compatible belt endpoints on the same site.')
   if (!affordable(campaign, cost)) return fail?.('Insufficient coins for this belt.')
-  if (world.belts.some((link) => link.from === from && (link.to === to || !MACHINES[a.kind].routes)))
+  if (
+    world.belts.some(
+      (link) => link.from === from && (link.to === to || (!rewire && !MACHINES[a.kind].routes)),
+    )
+  )
     return fail?.('This belt or machine output is already in use.')
   const site = world.sites.find((s) => s.id === a.siteId)!
   const tiles = path ?? autoPath(site, a, b)
@@ -155,6 +160,10 @@ export function connectBelt(
     items: [],
     sequence: 0,
     paid: cost,
+  }
+  if (rewire && !MACHINES[a.kind].routes) {
+    const previous = world.belts.find((link) => link.from === from)
+    if (previous) removeBelt(campaign, from, previous.to)
   }
   world.belts.push(belt)
   campaign.economy.money -= cost
