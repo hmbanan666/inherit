@@ -1,5 +1,7 @@
 import {
   apiDeclarations,
+  apiReference,
+  type ApiEntry,
   createCampaign,
   getSurface,
   loadSave,
@@ -50,8 +52,13 @@ function createGameStore() {
     metrics = shallowRef<MetricSample[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
-  const surface = computed(() => getSurface(state.value)),
-    api = computed(() => apiDeclarations(state.value) + '\n' + sandboxDeclarations)
+  const surface = computed(() => getSurface(state.value))
+  const reference = shallowRef<ApiEntry[]>([])
+  const api = ref('')
+  watch(() => state.value.town.beat, () => {
+    reference.value = apiReference(state.value)
+    api.value = apiDeclarations(state.value) + '\n' + sandboxDeclarations
+  }, { immediate: true })
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
   let worker: Worker | undefined, current: Action | undefined, rollbackDraft: ProjectFiles | undefined
@@ -334,6 +341,7 @@ function createGameStore() {
     snapshot: (name: string) => act({ kind: 'snapshot', name, files: files.value }),
     restoreSnapshot,
     surface,
+    reference,
     api,
     dirty,
     cpu,

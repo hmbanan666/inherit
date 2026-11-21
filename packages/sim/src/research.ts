@@ -193,25 +193,13 @@ export function getSurface(c: Campaign): UnlockedSurface {
   if (beat >= 4) machines.push('splitter')
   if (beat >= 5) machines.push('cutter')
   if (beat >= 9) machines.push('assembler')
+  const methods: FactoryMethod[] = ['dig', 'work', 'connect', 'space', 'build']
+  if (beat >= 3) methods.push('stock', 'recipes', 'lastError', 'dismantle')
+  if (beat >= 4) methods.push('peek', 'route', 'clear')
+  if (beat >= 6) methods.push('inspect', 'machines', 'repair')
+  if (beat >= 8) methods.push('orders')
   return {
-    methods: [
-      'dig',
-      'work',
-      'space',
-      'stock',
-      'inspect',
-      'machines',
-      'route',
-      'peek',
-      'recipes',
-      'build',
-      'connect',
-      'clear',
-      'repair',
-      'orders',
-      'lastError',
-      'dismantle',
-    ],
+    methods,
     events: beat >= 6 ? ['onItemArrived', 'onMachineIdle'] : [],
     budget: 1024,
     machines,

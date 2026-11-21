@@ -255,7 +255,7 @@ export function evaluate(world: World): Check[] {
 export * from './research'
 export * from './shop'
 export { acceptOrder, declineOrder, openBoard, orderMaterials } from './orders'
-export { apiDeclarations } from './declarations'
+export { apiDeclarations, apiReference, type ApiEntry } from './declarations'
 export { OBJECTIVES, objectiveTrack, objectiveProgress, retryObjective, type Objective } from './objectives'
 export { markMessageRead } from './story'
 export * from './game'

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import ts from 'typescript'
 import { posix } from 'node:path'
-import { apiDeclarations, createCampaign, getSurface } from '../index'
+import { apiDeclarations, apiReference, createCampaign, getSurface } from '../index'
 
 import { chapterFiles } from './chapter-one'
 
@@ -43,4 +43,18 @@ test('each chapter controller typechecks against the declarations available at t
     message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
   }))
   expect(errors).toEqual([])
+})
+
+test('the reference and controller typings introduce calls at the same story beat', () => {
+  const c = createCampaign()
+  for (const [name, beat] of [
+    ['dig', 0], ['build', 0], ['connect', 0], ['stock', 3], ['peek', 4], ['route', 4],
+    ['repair', 6], ['onMachineIdle', 6], ['onItemArrived', 6], ['orders', 8],
+  ] as const) {
+    for (const current of beat ? [beat - 1, beat] : [0]) {
+      c.town.beat = current
+      expect(apiReference(c).some(entry => entry.name === name)).toBe(current >= beat)
+      expect(new RegExp('\\b' + name + '\\??\\(').test(apiDeclarations(c))).toBe(current >= beat)
+    }
+  }
 })

@@ -59,6 +59,47 @@ test('first shift opens a single player file', async ({ page }) => {
   await expect(button(page, 'Quick open')).toHaveCount(0)
 })
 
+test('first shift distinguishes TypeScript tokens and explains the available calls', async ({ page }) => {
+  await workshop(page, false)
+  const tokens = page.locator('.project-editor .view-line span[class*="mtk"]')
+  const samples = ['import', '"inherit"', 'Factory', 'onTick', 'ctx', '// The shed']
+  await expect.poll(() => tokens.evaluateAll((spans, samples) => {
+    const colors = new Set<string>()
+    for (const sample of samples) {
+      const token = spans.find(span => span.textContent?.replaceAll('\u00a0', ' ').includes(sample))
+      if (token) colors.add(getComputedStyle(token).color)
+    }
+    return colors.size
+  }, samples)).toBe(samples.length)
+  await photo(page, 'main-ts')
+  await tab(page, 'API reference').click()
+  const panel = page.getByRole('region', { name: 'API reference' })
+  await expect(panel.getByRole('heading', { name: 'Machines', exact: true })).toBeVisible()
+  const dig = panel.getByRole('article').filter({ has: page.getByRole('heading', { name: /^ctx\.dig\(/ }) })
+  await expect(dig).toContainText('Send one rock onto the belt.')
+  await expect(dig).toContainText('ctx.dig("mine")')
+  await expect(panel).toContainText('ctx.connect("mine", "furnace")')
+  await expect(panel).not.toContainText(/declare module|dispatch|onItemArrived|repair|orders\(/)
+  expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await photo(page, 'api-reference')
+})
+
+test('invalid or missing palette values preserve distinct syntax colors', async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.documentElement.style.setProperty('--syntax-keyword', 'initial')
+      document.documentElement.style.setProperty('--syntax-number', 'invalid')
+    })
+  })
+  await workshop(page, false)
+  await replaceCode(page, 'export function onTick() { return 42 }')
+  const tokens = page.locator('.project-editor .view-line span[class*="mtk"]')
+  const keyword = tokens.filter({ hasText: 'return' })
+  const number = tokens.filter({ hasText: '42' })
+  await expect(keyword).toHaveCSS('color', 'rgb(222, 169, 237)')
+  await expect(number).toHaveCSS('color', 'rgb(246, 173, 143)')
+})
+
 for (const file of ['main.ts', 'lib/drive.ts']) {
   test(`sandbox globals have zero error markers in ${file}`, async ({ page }) => {
     // Editing works even while optional preview assets are unavailable.
@@ -88,7 +129,7 @@ test('follow definitions and references across files, search the draft and organ
   page,
 }) => {
   await workshop(page)
-  const editor = page.getByRole('region', { name: 'Project editor' })
+  const editor = page.getByRole('region', { name: 'Controller files' })
   await editor
     .locator('.view-line')
     .filter({ hasText: 'feed(ctx)' })
@@ -104,7 +145,7 @@ test('follow definitions and references across files, search the draft and organ
   await page.keyboard.press('Shift+F12')
   await expect(editor.locator('.reference-zone-widget')).toContainText('main.ts')
   await page.keyboard.press('Escape')
-  await tab(page, 'api.d.ts').click()
+  await tab(page, 'API reference').click()
   await page.keyboard.press('Control+p')
   await page.getByRole('textbox', { name: 'Find file' }).fill('main')
   await page.keyboard.press('Enter')

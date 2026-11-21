@@ -28,10 +28,11 @@
   --floor-light: #303136;
   --floor-base: #222327;
   --floor-stripe: #252629;
-  --syntax-comment: #898b92;
-  --syntax-keyword: #cca9d1;
-  --syntax-type: #a6bace;
-  --syntax-number: #dfac86;
+  --syntax-comment: #969aa4;
+  --syntax-keyword: #dea9ed;
+  --syntax-type: #8bc9f2;
+  --syntax-string: #a4d8b4;
+  --syntax-number: #f6ad8f;
   --editor-muted: #84858e;
   --mono: 'IBM Plex Mono', monospace;
   font-family: 'Space Grotesk', sans-serif;
@@ -749,14 +750,11 @@ button.revisions:hover {
   height: 14px;
   color: var(--accent-soft);
 }
-.editor-host,
-.api-source {
+.editor-host {
+  position: relative;
   flex: 1;
   min-height: 80px;
   min-width: 0;
-}
-.editor-host {
-  position: relative;
 }
 .code-editor {
   height: 100%;
@@ -767,13 +765,6 @@ button.revisions:hover {
 .machine-line {
   background: color-mix(in srgb, var(--gold) 13%, transparent);
   border-left: 2px solid var(--gold);
-}
-.api-source {
-  overflow: auto;
-  color: var(--soft);
-  padding: 15px;
-  font: 12px/1.7 var(--mono);
-  margin: 0;
 }
 .editor-foot,
 .statusbar {
