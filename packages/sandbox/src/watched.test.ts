@@ -105,3 +105,31 @@ test('a stopped watched run shows completed moves and a failed deployment leaves
   expect(shed.economy.money).toBe(money)
   expect(shed.world.machines.some((m) => m.id === 'press')).toBe(false)
 })
+
+test('an empty clock cannot automate Bram by repeating module setup', async () => {
+  const c = jumpToStep(createCampaign(), 'bram-loop')
+  const files = { 'main.ts': c.project.working['main.ts'] + '\nexport function onTick() {}' }
+  for (let i = 0; i < 200; i++) {
+    const { program } = await startChapter(c, files, 'deploy')
+    advanceGame(c, program)
+    program!.dispose()
+  }
+  expect(currentStep(c)?.phase).toBe('working')
+  expect(c.economy.money).toBe(0)
+})
+
+test('Run once continues the deployed clock and keeps draft setup off the floor', async () => {
+  const c = jumpToStep(createCampaign(), 'elsie-press')
+  const files = { 'main.ts': 'let n = 0; console.log("setup"); export function onTick() { console.log(++n) }' }
+  const { program } = await startChapter(c, files, 'deploy')
+  try {
+    expect(advanceGame(c, program, program!.drainLogs).logs).toEqual(['1'])
+    expect((await startChapter(c, files, 'run', program)).logs).toEqual(['2'])
+    const draft = { 'main.ts': 'import { buy } from "inherit"; buy("press"); ' + files['main.ts'] }
+    expect((await startChapter(c, draft, 'run', program)).logs).toEqual(['1'])
+    expect(c.world.machines.map(m => m.id)).not.toContain('press')
+    expect(advanceGame(c, program, program!.drainLogs).logs).toEqual(['3'])
+  } finally {
+    program?.dispose()
+  }
+})

@@ -87,12 +87,10 @@ export async function runProjectTests(source: string | ProjectOptions): Promise<
 }
 
 /** Evaluate the entry module once on the floor without requiring a clock handler. */
-export async function runOnce(options: ProjectOptions, api: FactoryContext, runClock = false) {
+export async function runOnce(options: ProjectOptions, api: FactoryContext) {
   const project = compileProject(options, false)
   const session = await openRuntime(project, {}, options.budget ?? 1024, false, options.chapterExports ?? chapterExports, api)
   try {
-    const tick = runClock && session.handler('onTick')
-    if (tick) session.dispatch(tick, api)
     return session.drainLogs()
   } finally {
     session.dispose()

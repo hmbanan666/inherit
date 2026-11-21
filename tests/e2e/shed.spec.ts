@@ -153,3 +153,14 @@ test('the clock lesson keeps Deploy on error and releases one reveal per Continu
   await page.getByRole('button', {name:'Deploy history'}).click()
   await expect(page.getByRole('button', {name:'Run once'})).toBeVisible()
 })
+
+test('opening the same step link again starts at the requested brief', async ({ page }) => {
+  const link = '?step=bram-take&speed=8'
+  await openShed(page, link)
+  await edit(page, 'take("mine")', true)
+  await page.getByTestId('primary-button').click()
+  await page.getByTestId('continue').click()
+  await expect(page.getByTestId('task-card')).toContainText('Wake the furnace')
+  await openShed(page, link)
+  await expect(page.getByTestId('task-card')).toContainText('A rock for the forge')
+})

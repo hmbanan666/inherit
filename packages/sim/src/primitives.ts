@@ -8,7 +8,7 @@ import { RECIPES } from './catalog'
 import type { Campaign, CampaignMachine } from './model'
 import { finishProduction, work } from './production'
 import { availableMachines, type ChapterMachine } from './research'
-import { wanted } from './town'
+import { purchaseProblem, wanted } from './town'
 
 function recipeFor(machine: CampaignMachine, item?: MaterialId): RecipeId | undefined {
   switch (machine.kind) {
@@ -132,12 +132,14 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
     },
     buy(kind: ChapterMachine, name?: string) {
       const commands = blueprintCommands(c)
-      const ok = availableMachines(c).includes(kind) && !!commands.build(kind, { name })
+      const allowed = availableMachines(c).includes(kind)
+      const problem = allowed ? purchaseProblem(c, kind, name ?? kind) : 'That machine is not for sale yet.'
+      const ok = !problem && !!commands.build(kind, { name })
       return record(
         'buy',
         name === undefined ? [kind] : [kind, name],
         ok,
-        ok ? undefined : (commands.lastError() ?? 'That machine is not for sale yet.'),
+        ok ? undefined : (problem ?? commands.lastError()),
       )
     },
     repair(place: string) {

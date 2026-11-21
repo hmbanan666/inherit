@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { advanceGame, createCampaign, getSurface, loadSave, serializeSave } from './index'
+import { advanceGame, createCampaign, jumpToStep, primitiveTick, getSurface, loadSave, serializeSave } from './index'
 
 test('the mixed rock can be rescued, even after reloading a jam', () => {
   let c = createCampaign()
@@ -45,4 +45,14 @@ test('Uncle supplies the import and the only player file is main.ts', () => {
     'import { take, put } from "inherit"',
   ])
   expect(getSurface(c).multiFile).toBe(false)
+})
+
+test('optional machines leave enough money and free names for the chapter', () => {
+  const c = jumpToStep(createCampaign(), 'elsie-press')
+  const run = primitiveTick(c, 'deploy')
+  expect(run.api.buy('press', 'copper')).toBe(false)
+  expect(run.api.buy('press', 'extra')).toBe(true)
+  expect(run.api.buy('press', 'another')).toBe(false)
+  expect(run.api.buy('press')).toBe(true)
+  expect(c.economy.money).toBe(8)
 })

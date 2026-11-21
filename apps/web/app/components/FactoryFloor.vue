@@ -50,7 +50,9 @@ const travelRail = computed(() => {
   return { left: (Math.min(...xs) - 24) + 'px', width: (Math.max(...xs) - Math.min(...xs) + 48) + 'px', top: (stops[0]!.y + tile * .94) + 'px' }
 })
 const armPoint = computed(() => {
-  const target = world.value.machines.find(m => m.id === g.playback.last.value?.args[0])
+  const call = g.playback.last.value
+  const place = call?.fn === 'buy' ? call.args[1] ?? call.args[0] : call?.args[0]
+  const target = world.value.machines.find(m => m.id === place)
   const point = target ? center(target.siteId, target) : bounds.value
   return { x: point.x + (target ? 0 : -tile), y: point.y + tile * .94 }
 })
@@ -224,7 +226,7 @@ onBeforeUnmount(() => {
             >"{{ m.id }}"<b v-if="m.fault"> · {{ m.fault }}</b></span
           >
         </button>
-        <span v-if="m.id === 'cart' && story?.id === 'bram-loop'" class="cart-load">{{ campaign.town.filled }} / 3 ingots</span>
+        <span v-if="m.id === 'cart' && g.step.value?.checks[0]?.progress" class="cart-load">{{ g.step.value?.checks[0]?.progress }} delivered</span>
       </div>
       <div v-if="travelRail" class="travel-rail" :style="travelRail" aria-hidden="true"></div>
       <FloorArm :x="armPoint.x" :y="armPoint.y" :call="g.playback.call.value" :hand="g.hand.value" />

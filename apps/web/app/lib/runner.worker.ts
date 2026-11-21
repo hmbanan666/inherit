@@ -58,7 +58,7 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
           error = ''
           break
         }
-        const next = await startChapter(campaign, files, action.type === 'run' ? 'run' : 'deploy')
+        const next = await startChapter(campaign, files, action.type === 'run' ? 'run' : 'deploy', program)
         if (action.type !== 'run') {
           program?.dispose()
           program = next.program

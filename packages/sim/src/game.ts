@@ -41,7 +41,7 @@ export function advanceGame(c: Campaign, controller?: GameController, drainLogs?
     throw new ChapterRunError(cause, tick.calls, drainLogs?.() ?? [])
   } finally {
     tick.finish()
-    settleTown(c)
+    settleTown(c, !!controller)
   }
   const logs = drainLogs?.() ?? []
   if (controller) c.lesson = observeLesson(c, tick.calls, logs)

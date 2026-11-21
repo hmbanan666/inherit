@@ -33,6 +33,7 @@ function sectionDescription(item: WorkshopSection) {
   return details.join('. ') || undefined
 }
 const showMoney = computed(() => reveals.value.some(r => r.kind === 'coins'))
+const bankFunds = computed(() => campaign.value.economy.money - (town.value.debt.reserve ?? 0))
 const showDebt = computed(() => reveals.value.some(r => r.kind === 'debt'))
 const drawer = computed(() => section.value === 'inbox' || section.value === 'orders' ? sectionNames[section.value] : '')
 const floorPane = ref<HTMLElement>()
@@ -234,16 +235,17 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
         <aside v-if="menu === 'bank'" class="hud-menu">
           <h3>Kettlewick Bank</h3>
           <p>{{ town.debt.paid }} paid · {{ town.debt.owed }} owed</p>
+          <p v-if="town.debt.reserve">Keep {{ town.debt.reserve }} coins for the machines the town needs.</p>
           <template v-if="town.debt.next">
             <button
               class="gold"
-              :disabled="campaign.economy.money < town.debt.next.amount"
+              :disabled="bankFunds < town.debt.next.amount"
               @click="payBank()"
             >
               Pay {{ town.debt.next.amount }} coins
             </button>
             <button
-              v-if="town.debt.owed > town.debt.next.amount && campaign.economy.money >= town.debt.owed"
+              v-if="town.debt.owed > town.debt.next.amount && bankFunds >= town.debt.owed"
               @click="payBank(true)"
             >
               Pay balance ({{ town.debt.owed }} coins)

@@ -361,7 +361,9 @@ function createGameStore() {
       if (id) storageKey = saveKey + '.preview.' + id
       speed = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
       const stored = localStorage.getItem(storageKey)
-      state.value = id && !stored ? jumpToStep(createCampaign(), id) : loadSave(stored)
+      state.value = id && (!stored || history.state?.chapterPreview !== id)
+        ? jumpToStep(createCampaign(), id) : loadSave(stored)
+      if (id) history.replaceState({ ...history.state, chapterPreview: id }, '')
       town.value = townSnapshot(state.value)
       files.value = state.value.project.working
     } catch {

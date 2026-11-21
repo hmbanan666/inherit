@@ -1,3 +1,5 @@
+import { PRICES } from './prices'
+import type { ChapterMachine } from './research'
 import { updateBankStep } from './lesson-flow'
 import type { MaterialId } from './campaign-api'
 import type { Campaign } from './model'
@@ -186,7 +188,7 @@ export function payInstallment(c: Campaign, inFull = false) {
   const next = nextInstallment(c)
   if (!next) return false
   const amount = inFull ? debtRemaining(c) : next.amount
-  if (c.economy.money < amount) return false
+  if (c.economy.money - amount < machineReserve(c)) return false
   c.economy.money -= amount
   c.town.paid += amount
   c.town.payments = inFull ? INSTALLMENTS.length : c.town.payments + 1
@@ -200,6 +202,44 @@ const jobs: [number, PersonId, MaterialId, number, number][] = [
   [8, 'elsie', 'plate', 4, 24],
   [8, 'wen', 'gear', 3, 24],
 ]
+
+// The story pays for these purchases in stages. Extra machines are affordable
+// only when each remaining request can still be supplied and the tab can be paid.
+const purchases: { beat: number; kind: ChapterMachine; name: string }[] = [
+  { beat: 3, kind: 'press', name: 'press' },
+  { beat: 4, kind: 'furnace', name: 'copper' },
+  { beat: 5, kind: 'cutter', name: 'cutter' },
+  { beat: 7, kind: 'cutter', name: 'gears' },
+  { beat: 9, kind: 'assembler', name: 'assembler' },
+]
+function chapterReserve(c: Campaign, includeDebt = true, newPlace?: string) {
+  let needed = includeDebt ? debtRemaining(c) : 0
+  for (let beat = 9; beat >= c.town.beat; beat--) {
+    const request = REQUESTS.find(r => r.beat === beat)
+    let income = request && !c.town.changes.some(row => row.buildingId === request.building) ? request.pay : 0
+    // Both regulars must be supplied to finish the competing-orders lesson.
+    if (beat === 8) {
+      for (const [chapterBeat, who, , , pay] of jobs)
+        if (chapterBeat === beat && !c.town.competition.includes(who)) income += pay
+    }
+    needed = Math.max(0, needed - income)
+    for (const purchase of purchases)
+      if (purchase.beat === beat && purchase.name !== newPlace && !c.world.machines.some(m => m.id === purchase.name))
+        needed += PRICES.machines[purchase.kind]
+  }
+  return needed
+}
+export const machineReserve = (c: Campaign) => chapterReserve(c, false)
+
+export function purchaseProblem(c: Campaign, kind: ChapterMachine, name: string) {
+  if (c.town.beat > 10 || c.world.machines.some(m => m.id === name)) return
+  const stock = purchases.find(m => m.name === name)
+  if (stock && stock.kind !== kind) return 'The label "' + name + '" belongs to a ' + stock.kind + '. Choose another name.'
+  if (stock && stock.beat <= c.town.beat) return
+  const reserve = chapterReserve(c, true, name)
+  if (c.economy.money - PRICES.machines[kind] < reserve)
+    return 'Keep ' + reserve + ' coins for the town’s remaining work and the family tab.'
+}
 
 function offerOrders(c: Campaign) {
   for (const [beat, customer, item, qty, pay] of jobs) {
@@ -229,7 +269,7 @@ export function wanted(c: Campaign): MaterialId[] {
   ]
 }
 
-export function settleTown(c: Campaign) {
+export function settleTown(c: Campaign, clockRan: boolean) {
   const t = c.town
   if (c.lesson.released.some(r => r.kind === 'section' && r.id === 'orders')) offerOrders(c)
   function allocate(item: MaterialId, needed: number) {
@@ -241,7 +281,10 @@ export function settleTown(c: Campaign) {
   }
   const request = activeRequest(c)
   if (request && t.wired) {
-    t.filled += allocate(request.item, request.quantity - t.filled)
+    const remaining = request.quantity - t.filled
+    const clockLoad = (c.world.hops ?? []).filter(h => h.to === 'cart' && h.item === request.item).length
+    const needed = request.beat === 1 ? Math.min(remaining, clockRan ? clockLoad : 0) : remaining
+    t.filled += allocate(request.item, needed)
     if (t.filled === request.quantity && !t.changes.some(row => row.buildingId === request.building)) {
       change(c, request.building, request.change)
       c.economy.money += request.pay

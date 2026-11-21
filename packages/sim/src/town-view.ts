@@ -1,5 +1,5 @@
 import type { Campaign } from './model'
-import { activeRequest, DAY, debtRemaining, nextInstallment, REQUESTS, TAB_LETTER } from './town'
+import { activeRequest, DAY, debtRemaining, machineReserve, nextInstallment, REQUESTS, TAB_LETTER } from './town'
 
 export type BuildingId =
   | 'forge'
@@ -31,7 +31,7 @@ export interface TownSnapshot {
     mood: 'happy' | 'waiting' | 'gone'
     ask?: TownAsk
   }[]
-  debt: { owed: number; paid: number; next?: { amount: number } }
+  debt: { owed: number; paid: number; reserve?: number; next?: { amount: number } }
   changes: { tick: number; buildingId: BuildingId; text: string }[]
 }
 const buildings: Record<BuildingId, string> = {
@@ -62,6 +62,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
   } = c
   const clock = (tick % DAY) / DAY
   const next = nextInstallment(c)
+  const reserve = next ? machineReserve(c) : 0
   const owed = debtRemaining(c)
   const request = activeRequest(c)
   return {
@@ -116,7 +117,7 @@ export function townSnapshot(c: Campaign): TownSnapshot {
             : ask,
         }
       }),
-    debt: { owed, paid: town.paid, next },
+    debt: { owed, paid: town.paid, ...(reserve ? { reserve } : {}), next },
     changes: town.changes.map((change) => ({ ...change })),
   }
 }

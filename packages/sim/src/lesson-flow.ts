@@ -90,7 +90,7 @@ export function currentStep(c: Campaign): StepView | undefined {
       progress,
       status: passed.includes(check.id)
         ? 'green'
-        : phase === 'working' && (c.town.filled > 0 || c.world.hops?.some((h) => h.from !== h.to))
+        : phase === 'working' && progress && c.town.filled > 0
           ? 'amber'
           : 'red',
     })),
@@ -192,7 +192,7 @@ export function observeLesson(c: Campaign, calls: CallRecord[], logs: string[] =
       case 'elsie-load':
         return carried('press', 'cart', undefined, 'plate')
       case 'vein-sample':
-        return logs.includes('copper-ore') && calls.some((r) => r.fn === 'take' && r.result === 'copper-ore')
+        return logs.some(line => /\bcopper-ore\b/.test(line)) && calls.some((r) => r.fn === 'take' && r.result === 'copper-ore')
       case 'vein-furnace':
         return machine('copper')?.kind === 'furnace'
       case 'vein-clear':
@@ -204,7 +204,8 @@ export function observeLesson(c: Campaign, calls: CallRecord[], logs: string[] =
       case 'tomas-collect':
         return carried('cutter', 'cart', undefined, 'wire')
       case 'heat-inspect':
-        return logs.includes('broken') && ran('look', 'furnace')
+        return logs.some(line => /\bbroken\b/.test(line)) && calls.some(r =>
+          r.fn === 'look' && r.args[0] === 'furnace' && (r.result as {status?: string})?.status === 'broken')
       case 'heat-restart':
         return ran('repair', 'furnace')
       case 'heat-rounds':
@@ -303,7 +304,7 @@ export function jumpToStep(c: Campaign, id: string): Campaign {
             else if (fn === 'take' || fn === 'put' || fn === 'repair') frame.api[fn](place)
           }
           frame.finish()
-          if (mode === 'tick') settleTown(checkpoint)
+          if (mode === 'tick') settleTown(checkpoint, true)
           if (mode === 'deploy') mode = 'tick'
         }
       }

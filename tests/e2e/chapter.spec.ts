@@ -1,14 +1,19 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { chapterCapture } from './chapter-capture'
 import { lessons } from '../../packages/sim/src/lessons'
 import { applyChapterHint } from '../../packages/sim/src/reference/chapter-one'
 import { edit, openShed } from './workshop'
 
-test('play every request from the visible hints, build the bridge and pay the tab', async ({ page }) => {
-  test.setTimeout(300000)
+function browserErrors(page: Page) {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()) })
+  return errors
+}
+
+test('play every request from the visible hints, build the bridge and pay the tab', async ({ page }) => {
+  test.setTimeout(300000)
+  const errors = browserErrors(page)
   const capture = await chapterCapture(page)
   const button = (name: string) => page.getByRole('button', { name, exact: true })
   const card = page.getByTestId('task-card')
@@ -63,7 +68,7 @@ test('play every request from the visible hints, build the bridge and pay the ta
           }).toPass({ timeout: 15000 })
         }
         if (step.id === 'bram-loop') {
-          await expect(page.locator('.cart-load')).toHaveText(/[12] \/ 3 ingots/)
+          await expect(page.locator('.cart-load')).toHaveText(/[12] \/ 3 delivered/)
           await capture('bram-deploy-filling')
         }
       }
@@ -100,6 +105,7 @@ test('play every request from the visible hints, build the bridge and pay the ta
 })
 
 test('late jumps open the expected machines, files and town changes', async ({ page }) => {
+  const errors = browserErrors(page)
   await openShed(page, '?step=bridge-fit&speed=8')
   await expect(page.getByTestId('task-card')).toContainText('Fit a plate to a coil')
   await expect(page.getByTestId('place-assembler')).toBeVisible()
@@ -111,4 +117,5 @@ test('late jumps open the expected machines, files and town changes', async ({ p
   await page.getByTestId('nav-town').click()
   await expect(page.locator('.town-print')).toHaveAccessibleName(/Riverside bridge working/)
   await expect(page.getByRole('button', { name: 'Pay debt' })).toContainText('600')
+  expect(errors).toEqual([])
 })
