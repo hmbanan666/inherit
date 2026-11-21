@@ -14,7 +14,7 @@ const letters: Record<string, [string, string, string]> = {
   board: [
     'County Freight',
     'Room on the noticeboard',
-    'Seven clean pickups! Neighbors can leave little orders on the board now. Take whichever looks fun.',
+    'Three more bars on the truck! Neighbors can leave little orders on the board now. Take whichever looks fun.',
   ],
   ledger: [
     'Uncle',
@@ -29,12 +29,12 @@ const letters: Record<string, [string, string, string]> = {
   miller: [
     'Miller Tool Co.',
     'Parts received',
-    'All ten fit. Even the one my apprentice measured in thumbs.',
+    'All three fit. Even the one my apprentice measured in thumbs.',
   ],
   canal: [
     'Canal Lock Works',
     'The gate swings',
-    'Twelve sacks on the invoice, twelve parts in the crate. Our accountant has gone outside to celebrate.',
+    'Five parts for five hinges. The gate finally swings without the whole crew leaning on it.',
   ],
   binder: [
     'Uncle',

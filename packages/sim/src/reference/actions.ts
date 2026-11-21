@@ -14,40 +14,34 @@ export type ReferenceAction =
   | ['machine', MachineKind, string, number, number, string]
 
 const plan: Record<string, ReferenceAction[]> = {
-  plot: [
-    ['research', 'survey'],
-    ['plot', 'shed', 'east-lot'],
-  ],
+  survey: [['research', 'survey']],
+  plot: [['plot', 'shed', 'east-lot']],
   oven: [['machine', 'furnace', 'shed', 4, 3, 'furnace-b']],
   belt: [['belt', 'furnace-b', 'dock']],
   gauges: [['research', 'bins']],
-  fork: [
-    ['research', 'fork'],
-    ['machine', 'splitter', 'shed', 2, 2, 'splitter'],
+  'fork-license': [['research', 'fork']],
+  fork: [['machine', 'splitter', 'shed', 2, 2, 'splitter']],
+  'fork-feed': [
     ['unbelt', 'mine', 'furnace-a'],
     ['belt', 'mine', 'splitter'],
+  ],
+  'fork-belts': [
     ['belt', 'splitter', 'furnace-a'],
     ['belt', 'splitter', 'furnace-b'],
   ],
-  coal: [
-    ['research', 'press'],
-    ['machine', 'miner', 'shed', 1, 4, 'coal-mine'],
-  ],
-  press: [
-    ['machine', 'press', 'shed', 6, 2, 'press'],
-    ['belt', 'coal-mine', 'press'],
+  dies: [['research', 'press']],
+  coal: [['machine', 'miner', 'shed', 1, 4, 'coal-mine']],
+  press: [['machine', 'press', 'shed', 6, 2, 'press']],
+  'press-coal': [['belt', 'coal-mine', 'press']],
+  'press-iron': [
     ['unbelt', 'furnace-a', 'dock'],
-    ['unbelt', 'furnace-b', 'dock'],
     ['belt', 'furnace-a', 'press'],
-    ['belt', 'furnace-b', 'press'],
-    ['belt', 'press', 'dock'],
   ],
+  part: [['belt', 'press', 'dock']],
   clock: [['research', 'clock']],
   binder: [['research', 'binder']],
-  copper: [
-    ['research', 'copper'],
-    ['machine', 'miner', 'shed', 9, 2, 'copper'],
-  ],
+  'copper-claim': [['research', 'copper']],
+  copper: [['machine', 'miner', 'shed', 9, 2, 'copper']],
   blueprints: [['research', 'blueprints']],
   cutter: [
     ['research', 'cutter'],
@@ -65,9 +59,11 @@ const plan: Record<string, ReferenceAction[]> = {
     ['belt', 'teeth', 'dock'],
   ],
   cards: [['research', 'recipes']],
-  jig: [
+  assembler: [
     ['research', 'assembly'],
     ['machine', 'assembler', 'shed', 8, 3, 'jig'],
+  ],
+  bracket: [
     ['unbelt', 'press', 'teeth'],
     ['belt', 'press', 'jig'],
     ['unbelt', 'draw', 'dock'],
@@ -85,13 +81,13 @@ const plan: Record<string, ReferenceAction[]> = {
     ['research', 'merge'],
     ['machine', 'merger', 'shed', 5, 2, 'merge'],
     ['unbelt', 'furnace-a', 'press'],
-    ['unbelt', 'furnace-b', 'press'],
+    ['unbelt', 'furnace-b', 'dock'],
     ['belt', 'furnace-a', 'merge'],
     ['belt', 'furnace-b', 'merge'],
-    ['belt', 'merge', 'press'],
   ],
+  'merge-out': [['belt', 'merge', 'press']],
   quality: [['research', 'quality']],
-  sorter: [
+  'sorter-built': [
     ['machine', 'sorter', 'shed', 2, 1, 'sorter'],
     ['unbelt', 'mine', 'splitter'],
     ['belt', 'mine', 'sorter'],
@@ -105,35 +101,38 @@ const plan: Record<string, ReferenceAction[]> = {
   doorbell: [['research', 'arrivals']],
   'idle-bell': [['research', 'idle']],
   road: [['research', 'road'], ['road']],
-  depots: [
+  'local-depot': [
     ['machine', 'depot', 'shed', 2, 4, 'local'],
-    ['machine', 'depot', 'yard', 1, 1, 'remote'],
     ['unbelt', 'coal-mine', 'press'],
     ['belt', 'coal-mine', 'local'],
   ],
+  depots: [['machine', 'depot', 'yard', 1, 1, 'remote']],
   truck: [
     ['research', 'freight'],
     ['machine', 'truck', 'shed', 0, 4, 'truck'],
   ],
-  motor: [
-    ['machine', 'assembler', 'shed', 9, 3, 'motor-jig'],
+  'motor-bench': [['machine', 'assembler', 'shed', 9, 3, 'motor-jig']],
+  'motor-gear': [
     ['machine', 'splitter', 'shed', 6, 3, 'plate-fork'],
-    ['machine', 'splitter', 'shed', 11, 3, 'wire-fork'],
     ['unbelt', 'press', 'jig'],
     ['belt', 'press', 'plate-fork'],
     ['belt', 'plate-fork', 'teeth'],
     ['belt', 'plate-fork', 'jig'],
+    ['unbelt', 'teeth', 'dock'],
+    ['belt', 'teeth', 'motor-jig'],
+  ],
+  'motor-wire': [
+    ['machine', 'splitter', 'shed', 11, 3, 'wire-fork'],
     ['unbelt', 'buffer', 'jig'],
     ['belt', 'buffer', 'wire-fork'],
     ['belt', 'wire-fork', 'jig'],
     ['belt', 'wire-fork', 'motor-jig'],
-    ['unbelt', 'teeth', 'dock'],
-    ['belt', 'teeth', 'motor-jig'],
+  ],
+  motor: [
     ['unbelt', 'jig', 'dock'],
     ['belt', 'jig', 'motor-jig'],
     ['belt', 'motor-jig', 'dock'],
   ],
-  tram: [['acceptTram']],
   network: [['read', 'tram']],
 }
 export function referenceActions(objectiveId: string): ReferenceAction[] {
