@@ -29,6 +29,8 @@ pnpm build
 pnpm --filter web preview --port 4173
 ```
 
+Open [The tally desk](http://127.0.0.1:4173/?chapter=tally-desk) on the local production build for a two-challenge React chapter. Edit a state slot, then compare your desk with React as parcels arrive and shifts change. Reload the chapter to play again from the starter.
+
 ## Self-host with Docker
 
 ```sh

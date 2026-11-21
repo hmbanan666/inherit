@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./api": "./src/api.ts",
-    "./campaign-api": "./src/campaign-api.ts"
+    "./campaign-api": "./src/campaign-api.ts",
+    "./tally-desk": "./src/tally-desk.ts"
   }
 }
