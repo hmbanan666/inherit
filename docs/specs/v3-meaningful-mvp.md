@@ -19,30 +19,35 @@ See CONTEXT.md for terms and docs/adr/ for the decisions.
 3. Requests and orders wait and pay in full. Debt stays at 600 coins until the player chooses to pay it down. The next request follows a completed story beat (ADR 0008).
 4. Old saves start fresh, and old code is kept as a snapshot (ADR 0004).
 5. Progressive disclosure: CPU, research tree, tests, metrics, drivers and the second site are hidden in chapter 1. Unlocks come from the story (ADR 0005).
-6. Layout: editor stays on the right, plus a cheap "swap sides" toggle in settings that is remembered.
-7. A Town view sits next to the factory floor as a tab ("Factory | Town"), with a slim town ribbon above the floor that shows open requests as speech bubbles. When a town change happens, the game shows it with a short celebration and a "See it" button that opens the Town tab.
+6. Layout: the frame (top navigation, thin footer with Deploy, context menus, palette) is fixed. Sections in the top navigation (Code, Factory, Town, Inbox, Orders) appear as the story reaches them, starting with Code alone; coins appear when Bram pays; speed controls stay hidden in chapter 1 (ADR 0011). The panel under the editor has Checks (default) and Console (ADR 0012).
+7. Town is a section in the top navigation next to Factory, with a slim town ribbon above the floor that shows open requests as speech bubbles. When a town change happens, the game shows it with a short celebration and a "See it" button that opens the Town tab.
 8. Palette: near-black neutral background, much less green, the warm v1 accent (ADR 0006). Compare with v1 at commit 26defa1.
 9. An internal town day lasts about five minutes at 1× speed. Chapter one shows the passing day only through the tint on the town and factory. A visible day counter or phase label requires a story reason and a new ADR (ADR 0008).
+10. Beginners write the controller from scratch: main.ts starts as Uncle's comment, machines are handles imported from "inherit", and the words in requests, hints and checks are the verbs' exact names (ADR 0010).
+11. Every request card goes from story to code: who asks and why, what the factory must do (its checks), and the code line.
 
 ## Chapter 1 script (about 60 minutes at 1x, a beginner pace)
 
 | # | Who | Request and reason | New thing | TS concept | Town change |
 |---|-----|--------------------|-----------|------------|-------------|
-| 0 | Uncle (letter) | "The shed is yours. So is my tab at the bank. Bram will come knocking." | the floor, main.ts | none | none |
-| 1 | Bram, blacksmith | 3 iron ingots, the mail horse threw a shoe. Onboarding: dig, deploy, belt, smelt, belt to cart, deliver | dig, work, deploy, `ctx.connect` | calling a function | Forge lights up, the mail horse trots by. Bram's orders (ingots) begin. |
+| 0 | Uncle (letter) | "The shed is yours. So is my tab at the bank. Bram will come knocking." | main.ts, the exported onTick, Deploy | a function and export | none |
+| 1 | Bram, blacksmith | 3 iron ingots, the mail horse threw a shoe. Onboarding: write onTick, deploy, dig, connect, smelt, connect to cart, deliver | `import { mine, furnace, cart } from "inherit"`, `mine.dig()`, `mine.connect(furnace)`, `furnace.smelt()` | calling a method | Forge lights up, the mail horse trots by. Bram's orders (ingots) begin. |
 | 2 | Mrs Harrow, banker (letter) | Acknowledge the 600-coin tab and carry on. Pay when ready, in full or in chunks of 100, 200 and 300. | Bank, Pay button | none | Bank sign shows the debt |
-| 3 | Elsie, baker | 4 plates for a new oven grate | press via `ctx.build("press")` (Bram sells you his old one) | choosing a recipe: `ctx.work("press", "plate")`, if with stock | Bakery chimney smokes, bread stall opens. Elsie's orders (plates) begin. |
-| 4 | Hiccup: mixed vein | The mine now gives iron and copper ore (seeded, about 1 in 3). Copper jams the iron furnace. | `ctx.build` a splitter and a second furnace, peek, route | if/else, comparing strings, the MaterialId union | none (it is a problem) |
-| 5 | Tomas, lamplighter | 5 wire for Lamp Street, dark since your uncle left. The copper is suddenly useful. | cutter (wire) | variables, small helper function | Lamp Street lights up at night. Tomas's orders (wire) begin. |
-| 6 | Hiccup: breakdowns | Old furnaces overheat after long runs (seeded). Repair costs 5 coins, cooling takes about 60 s. | `ctx.repair(id)`, status "broken" | for...of over `ctx.machines()`, `memory` counters | none |
-| 7 | Old Wen, miller | 3 gears, the water wheel lost its teeth | cutter on gears (2 plates each) | functions with parameters, a shared plate budget | Mill wheel turns. Elsie's orders grow. |
-| 8 | Hiccup: competing orders | Elsie wants plates, and Wen's gears need plates. One press. | `ctx.orders()` (read only) | arrays: find who still needs plates and route the press output | none |
-| 9 | Mayor Odile | 6 brackets to rebuild the Riverside bridge. The mayor gives you a filing cabinet. | assembler (plate + wire), multi-file controller | modules: export and import | The bridge is built and the Riverside district opens with two new townspeople (teaser). |
+| 3 | Elsie, baker | 4 plates for a new oven grate | press via `build("press")` (Bram sells you his old one), `press.stamp()` | a variable holding a handle, if with `has()` | Bakery chimney smokes, bread stall opens. Elsie's orders (plates) begin. |
+| 4 | Hiccup: mixed vein | The mine now gives iron and copper ore (seeded, about 1 in 3). Copper jams the iron furnace. | `build` a splitter and a copper furnace, `splitter.peek()`, `splitter.send()`, `clear()` | if/else, comparing strings, the MaterialId union | none (it is a problem) |
+| 5 | Tomas, lamplighter | 5 wire for Lamp Street, dark since your uncle left. The copper is suddenly useful. | cutter, `cut("wire")` | the player's first helper function | Lamp Street lights up at night. Tomas's orders (wire) begin. |
+| 6 | Hiccup: breakdowns | Old furnaces overheat after long runs (seeded). Repair costs 5 coins, cooling takes about 60 s. | `status`, `repair()` | for...of over `machines("furnace")` in the player's `fixBroken()` helper, `memory` counters | none |
+| 7 | Old Wen, miller | 3 gears, the water wheel lost its teeth | `cut("gear")` (2 plates each) | functions with parameters, a shared plate budget | Mill wheel turns. Elsie's orders grow. |
+| 8 | Hiccup: competing orders | Elsie wants plates, and Wen's gears need plates. One press. | `orders()` (read only) | arrays: find who still needs plates and route the press output | none |
+| 9 | Mayor Odile | 6 brackets to rebuild the Riverside bridge. The mayor gives you a filing cabinet. | `assemble()`, multi-file controller (the player's helpers move to their own file) | modules: export and import | The bridge is built and the Riverside district opens with two new townspeople (teaser). |
 | 10 | Mrs Harrow | The bridge stands and the debt is paid | none | none | Chapter card: "The shed is yours." Free play continues with orders from all regulars. A letter teases chapter 2: "your controller is getting slow" (CPU). |
 
 Budget roughly an hour of content at a beginner pace. Allow about eight minutes for the first delivery, half an hour to reach Lamp Street and the rest for the mill, competing orders and the bridge. Players can stop to read or experiment at any beat. Regular orders fund equipment and repayment whenever the player chooses.
 
 ## Player API changes (chapter 1)
+
+Taught API (ADR 0010): `import { mine, furnace, cart, build, machine, machines, orders, memory } from "inherit"`. Handles have `connect(to)`, `has(item?)`, `status`, `repair()`, `clear()`; the miner `dig()`, furnace `smelt()`, press `stamp()`, cutter `cut(recipe)`, assembler `assemble()`, splitter `peek()` and `send(to)`. `export function onTick()` takes no parameters. Autocomplete and the API reference show only unlocked verbs. The low-level `ctx` below is still passed to `onTick` for older controllers and is not taught in chapter 1.
+
 
 Keep: dig, work, space, route, peek, stock, machines, inspect, memory, console.log, onItemArrived/onMachineIdle (unlocked by the story when useful).
 Change: `ctx.build(kind, opts?)` with `opts.name` (the machine id) and optional x/y, auto-placed on a free owned tile when x/y are omitted, idempotent by name (an existing machine is returned, no second charge, coins are paid on first build). `ctx.connect(from, to)` is idempotent too and auto-routes the belt. Both are available from minute one. Unlocked machine kinds come from the story.
@@ -52,7 +57,7 @@ Hide in chapter 1: dispatch/trucks, CPU budget, research.
 ## What we keep and cut from v2
 
 Keep: the simulation engine, machines, belts, Blueprint API, sandbox, deploy, rollback, console, multi-file editor, floor renderer (as a visualization), save system.
-Cut from the UI: mouse building (build palette, belt drawing, remove tool), the objective list and card, the research panel, the CPU meter, the Tests/Metrics/Drivers/Snapshots tabs (only Console is visible in chapter 1), the second site.
+Cut from the UI: mouse building (build palette, belt drawing, remove tool), the objective list and card, the research panel, the CPU meter, the Tests/Metrics/Drivers/Snapshots tabs (only Checks and Console are visible in chapter 1), the second site.
 The code can stay where it is cheap to keep; the UI simply does not show it.
 
 ## Testing
@@ -60,7 +65,9 @@ The code can stay where it is cheap to keep; the UI simply does not show it.
 - A sim playthrough test runs chapter 1 with a reference controller, which grows step by step like a player's would, and asserts every request and town change happens in order, within about 60 minutes of game time at 1x.
 - A player who takes long breaks can still finish every story beat, collect full pay and settle the original 600 coins without interest.
 - Save tests: a v2 save loads as a fresh chapter 1 with a "v2 code" snapshot, and garbage loads fresh without throwing.
-- Browser test: a new player finishes request 1 by typing code only (no canvas clicks), and the Town tab shows the forge lit.
+- Browser test: a new player starts with only the editor, Deploy, the request card and Checks, finishes request 1 by typing code only (no canvas clicks), sees the Factory section appear after the first dig, and the Town tab shows the forge lit.
+- Every hint and clue code line type-checks against the declarations unlocked at its step.
+- An old `ctx`-style controller still runs.
 
 ## Out of scope
 
