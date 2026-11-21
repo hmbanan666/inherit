@@ -1,9 +1,9 @@
-import { createProgram, type Program, type ProjectOptions } from '@inherit/sandbox'
-import { advanceGame, cloneCampaign, deployProject, getSurface, isStarterProject, type Campaign } from '@inherit/sim'
+import { createProgram, type Program, type FactoryContext, type ProjectOptions } from '@inherit/sandbox'
+import { advanceGame, cloneCampaign, primitiveTick, deployProject, getSurface, isStarterProject, type Campaign } from '@inherit/sim'
 
 export type PreviewTicks = 100 | 500 | 2000
 
-type Compile = (options: ProjectOptions) => Promise<Program>
+type Compile = (options: ProjectOptions, api: FactoryContext) => Promise<Program>
 
 async function simulate(campaign: Campaign, ticks: PreviewTicks, compile?: Compile) {
   const surface = getSurface(campaign)
@@ -16,12 +16,14 @@ async function simulate(campaign: Campaign, ticks: PreviewTicks, compile?: Compi
   const startMoney = campaign.economy.money
   try {
     try {
+      const setup = primitiveTick(campaign, 'deploy')
       program = await compile?.({
         files: campaign.project.deployed,
         memory: campaign.memory,
         budget: surface.budget,
         chapterExports: surface.exports,
-      })
+      }, setup.api)
+      setup.finish()
     } catch (error) {
       errors++
       firstError = String(error)
