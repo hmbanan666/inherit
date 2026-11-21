@@ -7,6 +7,7 @@ import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
+import { standaloneJobCalls } from '../lib/standalone-calls'
 import { useGame } from '../lib/useGame'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
@@ -37,6 +38,28 @@ let library: monaco.IDisposable
 let settingSource = false
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
+const movingJobs = computed(() => game.step.value?.step.id === 'bram-loop' && game.step.value.phase !== 'solved')
+let jobLines: monaco.editor.IEditorDecorationsCollection | undefined
+
+function markJobCalls() {
+  const model = editor?.getModel()
+  if (!jobLines || !model || model !== models.get('main.ts') || !movingJobs.value) {
+    jobLines?.clear()
+    return
+  }
+  jobLines.set(standaloneJobCalls(model.getValue()).map(({ from, to }) => ({
+    range: monaco.Range.fromPositions(model.getPositionAt(from), model.getPositionAt(to)),
+    options: { inlineClassName: 'call-to-move' },
+  })))
+}
+
+function showJobCalls() {
+  const ranges = jobLines?.getRanges()
+  if (ranges?.length && !editor?.hasTextFocus()) {
+    editor?.revealRangeInCenterIfOutsideViewport(ranges[0].plusRange(ranges[ranges.length - 1]))
+  }
+}
+
 function lightCall() {
   const call = game.playback.call.value
   lineLight?.clear()
@@ -229,6 +252,10 @@ onMounted(() => {
     ariaLabel: 'Factory controller TypeScript',
   })
   lineLight = editor.createDecorationsCollection()
+  jobLines = editor.createDecorationsCollection()
+  editor.onDidChangeModel(markJobCalls)
+  editor.onDidChangeModelContent(markJobCalls)
+  editor.onDidLayoutChange(showJobCalls)
   suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, pos) {
@@ -284,6 +311,10 @@ onMounted(() => {
   })
   window.addEventListener('keydown', keys, true)
   emit('ready')
+})
+watch(movingJobs, () => {
+  markJobCalls()
+  showJobCalls()
 })
 watch(game.playback.call, lightCall)
 watch(files, syncFiles)

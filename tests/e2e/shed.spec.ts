@@ -105,6 +105,17 @@ test('the furnace can be empty and a named shipping trip plays above the arm', a
   await expect(page.getByTestId('primary-button')).toContainText('Deploy')
 })
 
+test('the loop marks only the calls left outside the clock after Deploy', async ({ page }) => {
+  await openShed(page, '?step=bram-loop')
+  const primary = page.getByTestId('primary-button')
+  const calls = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
+  await expect(calls).toHaveText(['smelt()', 'ship()'])
+  await edit(page, '\nexport function onTick() {\n  ship()\n}\n/*\nsmelt()\n*/', true)
+  await primary.click()
+  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(calls).toHaveText(['smelt()', 'ship()'])
+})
+
 test('the clock lesson keeps Deploy on error and releases one reveal per Continue', async ({ page }) => {
   await openShed(page, '?step=bram-loop&speed=24')
   const primary = page.getByTestId('primary-button')

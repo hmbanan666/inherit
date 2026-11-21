@@ -769,6 +769,10 @@ button.revisions:hover {
   position: absolute;
   inset: 0;
 }
+.call-to-move {
+  background: color-mix(in srgb, var(--gold) 24%, transparent);
+  border-bottom: 2px solid var(--gold);
+}
 .machine-line {
   background: color-mix(in srgb, var(--gold) 13%, transparent);
   border-left: 2px solid var(--gold);

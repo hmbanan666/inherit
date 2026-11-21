@@ -29,10 +29,19 @@ test('play every request from the visible hints, build the bridge and pay the ta
       const prefix = String(index + 1).padStart(2, '0') + '-' + step.id
       await expect(card.getByRole('heading')).toHaveText(step.title)
       await expect(page.getByTestId('speech')).toContainText(step.story)
+      if (step.id === 'bram-smelt') {
+        await expect(card.locator('pre')).toContainText('function smelt() {')
+        await expect(card.locator('pre')).not.toContainText('take("mine")')
+      }
       if (index < 8) await capture(prefix + '-brief')
       for (const label of ['Hint', 'Show places and functions', 'Show exact lines']) await button(label).click()
-      const lines = await card.locator('pre').innerText()
-      await expect(card.locator('pre')).toHaveText(step.hints[2])
+      const lines = await card.locator('pre.hint').innerText()
+      await expect(card.locator('pre.hint')).toHaveText(step.hints[2])
+      if (step.id === 'bram-loop') {
+        const calls = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
+        await expect(calls).toHaveText(['smelt()', 'ship()'])
+        for (const call of await calls.all()) await expect(call.locator('.call-to-move').first()).toBeInViewport({ ratio: 1 })
+      }
       if (index < 8) await capture(prefix + '-hint')
       await button('Hide hint').click()
       if (step.id === 'harrow-tab') {
@@ -69,11 +78,17 @@ test('play every request from the visible hints, build the bridge and pay the ta
         }
         if (step.id === 'bram-loop') {
           await expect(page.locator('.cart-load')).toHaveText(/[12] \/ 3 delivered/)
+          await expect(page.locator('.call-to-move')).toHaveCount(0)
           await capture('bram-deploy-filling')
         }
       }
       await expect(solved).toContainText(step.solved.did, { timeout: 45000 })
       await expect(page.getByTestId('speech')).toContainText(step.solved.reaction)
+      if (step.id === 'harrow-tab') {
+        await expect(solved).toContainText('12 coins for three more ingots')
+        await expect(page.getByTitle('Workshop money')).toContainText('64 coins')
+        await expect(page.getByTestId('nav-orders')).toBeHidden()
+      }
       if (index < 8) await capture(prefix + '-solved')
       if (step.id === 'bram-loop') {
         await next.click()
