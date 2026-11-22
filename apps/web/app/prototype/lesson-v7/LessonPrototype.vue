@@ -50,6 +50,8 @@ const solved = computed(() => frame.value?.solved)
 const typed = computed(() => !!v7.value?.ready(code.value) && code.value !== failedCode.value)
 const guessed = computed(() => !prediction.value || !!choice.value)
 const runReady = computed(() => !busy.value && !solved.value && !ended.value && typed.value && guessed.value)
+const theory = computed(() => frame.value?.theory && { ...frame.value.theory,
+  body: frame.value.theory.body.map(line => (v7.value.reword ?? []).reduce((text, [from, to]) => text.replace(from, to), line)) })
 const steps = computed(() => {
   const list = [{ label: v7.value?.write ?? '', done: typed.value || !!solved.value, run: false }]
   if (prediction.value) list.push({ label: 'Make a guess', done: guessed.value, run: false })
@@ -252,7 +254,7 @@ useHead({ title: 'Lesson screen v7 prototype · Inherit' })
       <section class="world" data-testid="world">
         <SceneFrame v-if="world" :world="world" :calls="calls" :covered="!!drawer"
           :confused="feedback?.tone === 'error' && code === failedCode" />
-        <HelpDrawer v-if="drawer && frame && lessonId" :tab="drawer" :theory="frame.theory" :condition="frame.task?.condition"
+        <HelpDrawer v-if="drawer && frame && lessonId" :tab="drawer" :theory="theory" :condition="frame.task?.condition"
           :hints="frame.hints" :rung="frame.save.hints[lessonId] ?? 0" :entries="frame.reference" :busy="busy"
           @tab="drawer = $event" @close="closeDrawer" @hint="send({ kind: 'hint' })" />
         <SolvedCard v-if="celebrating && solved && v7 && lessonId" :solved="solved" :code="runCode" :learned="v7.learned"

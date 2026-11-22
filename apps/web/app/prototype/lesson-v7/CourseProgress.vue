@@ -83,7 +83,7 @@ onBeforeUnmount(() => { document.removeEventListener('pointerdown', outside); wi
 .chip:hover:not(:disabled), .chip[aria-expanded='true'] { border-color: var(--line); background: var(--surface-raised) }
 .chip i { color: var(--editor-muted); font-style: normal }
 .chip svg { width: 14px; height: 14px; color: var(--sub) }
-.map { position: absolute; top: calc(100% + 14px); left: 0; z-index: 12; width: min(390px, calc(100vw - 24px)); max-height: min(560px, calc(100dvh - 110px)); overflow: auto; padding: 8px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); box-shadow: 0 14px 40px var(--shadow); animation: drop .16s ease-out }
+.map { position: absolute; top: calc(100% + 14px); right: 0; z-index: 12; width: min(390px, calc(100vw - 24px)); max-height: min(560px, calc(100dvh - 110px)); overflow: auto; padding: 8px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); box-shadow: 0 14px 40px var(--shadow); animation: drop .16s ease-out }
 header { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 6px 10px; padding: 8px 8px 12px }
 header strong { font-size: 15px }
 header small { color: var(--sub) }
@@ -107,7 +107,7 @@ ol button:disabled { opacity: .55 }
 @keyframes drop { from { opacity: 0; transform: translateY(-6px) } }
 @media (max-width: 800px) {
   .chip .label, .chip svg { display: none }
-  .map { position: fixed; top: 58px; left: 8px }
+  .map { position: fixed; top: 58px; left: 8px; right: auto }
 }
 @media (prefers-reduced-motion: reduce) { .map { animation: none } }
 </style>

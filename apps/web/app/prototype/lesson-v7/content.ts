@@ -30,6 +30,8 @@ export interface LessonV7 {
   needsWords: string
   /** Predict lessons: the question asked before Run. The choices and answer are the shipped ones. */
   guess?: string
+  /** Shipped theory sentences that describe the old starter, with the wording that fits the prefill. */
+  reword?: readonly [from: string, to: string][]
 }
 
 /** Code without comment lines. */
@@ -66,6 +68,7 @@ export const lessonsV7: readonly LessonV7[] = [
       { find: /(["']).*\1/, tone: 'mint', label: 'string: words in quotes' },
     ],
     needsWords: 'Mila needs some words.',
+    reword: [['Write your instruction below the TODO comment.', 'The line below a comment is your instruction.']],
   },
   {
     id: 'sign-spaces',
