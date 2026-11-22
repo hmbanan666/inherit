@@ -2,11 +2,11 @@ import type { Campaign } from './model'
 import { isStarterProject } from './campaign'
 import { lessons } from './chapter'
 import { loadChapterSave } from './persistence'
+import { revealId } from './lesson-flow'
 import { validProject } from '../../framework/save'
 
 export function workshopSave(c: Campaign, activeFile = 'main.ts', active = !isStarterProject(c.project.deployed)) {
   const { project, ...world } = c
-  const revealId = (r: Campaign['lesson']['queue'][number]) => 'id' in r ? r.kind + '.' + r.id : r.kind
   return { formatVersion: 2, packVersion: 2, packId: 'workshop', lessonId:lessons[c.lesson.index]?.id ?? null,
     phase:c.lesson.phase, completed:c.town.solved, passed:c.lesson.passed, pendingReveals:c.lesson.queue.map(revealId),
     released:c.lesson.released.map(revealId), seenSections:c.seenSections, world, entryWorld:world,

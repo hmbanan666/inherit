@@ -1,3 +1,4 @@
+import { revealId } from './lesson-flow'
 import type { Campaign } from './model'
 import type { Panel } from '../../framework/pack'
 import { debtRemaining } from './town'
@@ -9,4 +10,4 @@ export const panels: (Panel<Campaign> & { reveal?: string })[] = [
   {id:'coins',label:'Coins',placement:'panel',reveal:'coins',rows:c=>[{id:'balance',label:'Coins',value:String(c.economy.money)}]},
   {id:'debt',label:'Debt',placement:'panel',reveal:'debt',rows:c=>[{id:'debt',label:'Debt',value:String(debtRemaining(c))}]},
 ]
-export const releasedIds = (c: Campaign) => c.lesson.released.map(r=>'id' in r ? r.kind+'.'+r.id : r.kind)
+export const releasedIds = (c: Campaign) => c.lesson.released.map(revealId)

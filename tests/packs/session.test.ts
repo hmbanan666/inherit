@@ -91,6 +91,10 @@ test('migration credits surviving ids across gaps, keeps the draft, and rechecks
       formatVersion: 2, phase: 'brief', lessonId: 'flowers', completed: ['hello', 'house-sign'],
       world: {bubble: 'Hello!', gateFlowers: 0}, project: {working: {'main.ts': '// saved draft'}},
     })
+    await runner.play(save, beginner.lessons[1].referenceSolution)
+    await runner.advance(save)
+    expect(save.lessonId).toBe('flag')
+    expect(save.world).toMatchObject({gateFlowers: 3, sign: 'Mira'})
     await expect(migrateBeginner(beginner, raw.replace('"gateFlowers":0', '"gateFlowers":null'), async () => {})).rejects.toThrow()
   } finally {
     runner.dispose()

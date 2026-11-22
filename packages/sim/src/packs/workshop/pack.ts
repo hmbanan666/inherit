@@ -17,7 +17,10 @@ function chapterCall(call: Call): CallRecord {
 }
 export const workshopLessons: Lesson<Campaign>[] = chapter.map(step=>{
   const files = workshopReference(step)
-  const hints = [step.hints[0], edits[step.id].goal + '. Watch the result on the floor.']
+  const approach = step.id === 'harrow-tab' ? 'Use the reply action in Learn or call the reply function from your program.'
+    : step.id === 'harrow-deed' ? 'Settle the balance in Learn or call the bank function from your program.'
+    : step.hints[1]
+  const hints = [step.hints[0], approach]
   return { id:step.id, goal:edits[step.id].goal, idea:step.solved.idea, mode:step.button,
     scene: 'shed', unit: 'chapter', kind: 'fill',
     theory: {

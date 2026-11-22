@@ -47,7 +47,7 @@ function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 function projectFiles(value: unknown): value is Files {
-  return record(value) && typeof value['main.ts'] === 'string' &&
+  return record(value) &&
     Object.entries(value).every(([name, source]) => name.endsWith('.ts') && typeof source === 'string')
 }
 function revisions(value: unknown): value is Revision[] {
@@ -55,7 +55,7 @@ function revisions(value: unknown): value is Revision[] {
     typeof r.name === 'string' && projectFiles(r.files))
 }
 export function validProject(p: PackSave<unknown>['project']) {
-  return p && projectFiles(p.working) && Object.hasOwn(p.working, p.activeFile) &&
+  return p && projectFiles(p.working) && typeof p.working['main.ts'] === 'string' && Object.hasOwn(p.working, p.activeFile) &&
     (p.deployed === null || projectFiles(p.deployed)) && Number.isInteger(p.nextRevision) &&
     revisions(p.history) && revisions(p.snapshots)
 }
@@ -97,7 +97,7 @@ function keepDraft<W>(save: PackSave<W>) {
   }
 }
 
-function enter<W, A extends object>(pack: Pack<W, A>, save: PackSave<W>, lesson?: Lesson<W>) {
+function enter<W, A extends object>(pack: Pack<W, A>, save: PackSave<W>, lesson?: Lesson<W>, restoreEntry = true) {
   save.lessonId = lesson?.id ?? null
   save.clockActive = false
   save.project.deployed = null
@@ -110,7 +110,7 @@ function enter<W, A extends object>(pack: Pack<W, A>, save: PackSave<W>, lesson?
     return
   }
   const draft = save.drafts[lesson.id]
-  if (draft) save.world = structuredClone(draft.entryWorld)
+  if (draft && restoreEntry) save.world = structuredClone(draft.entryWorld)
   else {
     if (pack.manifest.track === 'challenges') save.world = pack.initialWorld(1)
     lesson.enter?.(save.world)
@@ -136,7 +136,8 @@ export function continueLesson<W, A extends object>(pack: Pack<W, A>, save: Pack
   const id = save.lessonId
   if (save.phase !== 'solved' || !id) return
   keepDraft(save)
-  if (!save.completed.includes(id)) {
+  const review = save.completed.includes(id)
+  if (!review) {
     save.completed.push(id)
     save.firstTryStreak = save.attempts[id] === 1 ? save.firstTryStreak + 1 : 0
   }
@@ -145,5 +146,5 @@ export function continueLesson<W, A extends object>(pack: Pack<W, A>, save: Pack
     ? [...pack.lessons.slice(index + 1), ...pack.lessons.slice(0, index)]
     : pack.lessons
   const next = ordered.find(l => !save.completed.includes(l.id))
-  enter(pack, save, next)
+  enter(pack, save, next, review || pack.manifest.track === 'challenges')
 }

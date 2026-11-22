@@ -123,8 +123,13 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     }
     if (m.level === 'Game' || m.level === 'Advanced') {
       expect(comments.some(line => /\bTODO\b/.test(line)), label).toBe(true)
-      for (const hint of lesson.hints ?? []) for (const line of hint.split('\n'))
-        expect(answers, label + ' hint gives the answer').not.toContain(normalize(line))
+      for (const hint of lesson.hints ?? []) {
+        for (const line of hint.split('\n')) {
+          const words = normalize(line)
+          expect(answers.some(answer => words === answer || (answer.includes('(') && words.includes(answer))),
+            label + ' hint gives the answer').toBe(false)
+        }
+      }
     }
     if (m.track === 'challenges') {
       expect(lesson.unit, label).toBeUndefined()

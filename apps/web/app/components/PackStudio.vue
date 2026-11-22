@@ -145,7 +145,7 @@ async function receive(data: PackFrame | {loadError:string}) {
     drawer.value = data.showLearn ? 'learn' : undefined
     files.value = data.save.project.working
     activeFile.value = data.save.project.activeFile
-    navigation.value = data.edit
+    navigation.value = data.edit.file === activeFile.value ? data.edit : {file: activeFile.value, line: 1}
   }
   if (!frame.value && data.save.clockActive) paused.value = true
   if (!data.save.clockActive) paused.value = false

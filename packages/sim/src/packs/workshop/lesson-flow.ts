@@ -22,6 +22,8 @@ export type Reveal =
   | { kind: 'coins' }
   | { kind: 'debt' }
   | { kind: 'letter'; id: string }
+export const revealId = (reveal: Reveal) => 'id' in reveal ? reveal.kind + '.' + reveal.id : reveal.kind
+
 export interface LessonStep {
   id: string
   beat: number
@@ -257,7 +259,10 @@ export function continueStep(c: Campaign): Campaign {
   if (c.lesson.phase !== 'solved') return c
   const next = structuredClone(c)
   const flow = next.lesson
+  const released = new Set(flow.released.map(revealId))
   for (const reveal of flow.queue) {
+    if (released.has(revealId(reveal))) continue
+    released.add(revealId(reveal))
     flow.released.push(reveal)
     if (reveal.kind === 'letter' && reveal.id === 'tab')
       letter(next, 'tab', 'Mrs Harrow', 'Your uncle’s tab', TAB_LETTER)

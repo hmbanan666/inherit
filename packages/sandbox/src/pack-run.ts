@@ -1,7 +1,7 @@
 import { readPlayerAPI, playerDeclarations } from '../../sim/src/framework/declarations'
 import { playerError } from './player-error'
 import type { Call, Colour, Files, Pack } from '../../sim/src/framework/pack'
-import type { PackSave } from '../../sim/src/framework/save'
+import { continueLesson, type PackSave } from '../../sim/src/framework/save'
 import { createProgram, runOnce, type Program } from './index'
 
 const parsed = new Map<string,ReturnType<typeof readPlayerAPI>>()
@@ -115,7 +115,33 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
     }
     return visible.play(save, files, mode)
   }
-  return { play, dispose: visible.dispose }
+  async function advance(save: PackSave<W>) {
+    if (!save.lessonId || save.phase !== 'solved') return
+    // Imported completions can follow a new lesson. Apply their scene effects to the
+    // player's actual world before opening the next missing lesson.
+    if (pack.manifest.track === 'course' && !save.completed.includes(save.lessonId)) {
+      const index = pack.lessons.findIndex(l => l.id === save.lessonId)
+      let world = save.world
+      for (const earned of pack.lessons.slice(index + 1)) {
+        if (!save.completed.includes(earned.id)) break
+        const trial = structuredClone(save)
+        trial.lessonId = earned.id
+        trial.world = structuredClone(world)
+        earned.enter?.(trial.world)
+        trial.entryWorld = structuredClone(trial.world)
+        trial.phase = 'brief'
+        const solved = () => trial.phase === 'solved'
+        await play(trial, earned.referenceSolution, earned.mode)
+        for (let tick = 0; earned.mode === 'deploy' && tick < 1200 && !solved(); tick++)
+          await play(trial, earned.referenceSolution, 'tick')
+        if (!solved()) throw new Error('Could not restore the earned scene for ' + earned.goal)
+        world = trial.world
+      }
+      save.world = world
+    }
+    continueLesson(pack, save)
+  }
+  return { play, advance, dispose: visible.dispose }
 }
 export async function runPack<W,A extends object>(pack: Pack<W,A>,save: PackSave<W>,files: Files) {
   const runner = createPackRunner(pack)

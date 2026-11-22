@@ -80,7 +80,7 @@ async function act(command: PackCommand) {
         break
       case 'continue':
         if (command.id === save.lessonId && save.phase === 'solved') {
-          continueLesson(pack, save)
+          await runner.advance(save)
           runner.dispose()
           logs = []
         }
