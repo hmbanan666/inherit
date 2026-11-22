@@ -101,8 +101,8 @@ li i { flex: none; width: 14px; height: 3px; border-radius: 2px; background: var
 li[data-tone='mint'] i { background: var(--mint) }
 .guess { margin: 12px 0 0; font-size: 13px; color: var(--sub) }
 .guess[data-right='true'] { color: var(--mint) }
-.progress { display: flex; align-items: center; gap: 9px; margin: 16px 0 14px; color: var(--soft); font: 12px var(--mono) }
-.progress span:last-child { color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.progress { display: flex; align-items: center; gap: 9px; margin: 16px 0 14px; color: var(--soft); font: 12px var(--mono); white-space: nowrap }
+.progress span:last-child { min-width: 0; color: var(--sub); overflow: hidden; text-overflow: ellipsis }
 button { width: 100%; height: 46px; font-size: 16px; border-radius: 7px }
 kbd { display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border: 1px solid currentColor; border-radius: 3px; font: 10px var(--mono); opacity: .75 }
 kbd svg { width: 10px; height: 10px }

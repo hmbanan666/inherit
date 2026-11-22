@@ -97,10 +97,10 @@ const board = computed(() => [0, 1].map(i => props.world.announcements[i] ?? '')
       <template v-if="world.lessonId === 'hello'">
         <p v-if="!said" class="bubble small" :style="at(468, 350)" data-testid="visitor-bubble">Hello?</p>
         <p class="bubble" :class="{ empty: !said, confused: confused && !said }" :style="at(407, 331)"
-          data-testid="speech" :aria-label="said ? 'Mila says: ' + said : 'Mila has nothing to say yet'">
+          data-testid="speech">
           <template v-if="said">{{ said }}</template>
           <template v-else-if="confused">?</template>
-          <span v-else class="dots" aria-hidden="true"><i /><i /><i /></span>
+          <template v-else><span class="dots" aria-hidden="true"><i /><i /><i /></span><span class="sr-only">Mila has nothing to say yet</span></template>
         </p>
       </template>
 
@@ -109,7 +109,7 @@ const board = computed(() => [0, 1].map(i => props.world.announcements[i] ?? '')
           <span v-if="confused">?</span>
         </div>
         <span class="sr-only" data-testid="signs">{{ world.sign || 'Blank sign' }}</span>
-        <div class="ticket" :style="at(176, 64)" aria-label="Boat ticket: Moon Ferry">
+        <div class="ticket" :style="at(176, 64)">
           <small>Boat ticket</small>
           <strong>Moon Ferry</strong>
         </div>

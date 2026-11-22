@@ -328,8 +328,9 @@ useHead({ title: 'Lesson screen v7 prototype · Inherit' })
 
     <footer class="statusbar">
       <span>Prototype<span class="wide"> · lesson screen v7</span> · nothing is saved</span>
-      <span class="jump">Jump to lesson
-        <button v-for="(lesson, index) in lessonsV7" :key="lesson.id" :aria-pressed="lesson.id === lessonId" @click="boot(lesson.id)">{{ index + 1 }}</button>
+      <span class="jump"><span aria-hidden="true">Jump to lesson</span>
+        <button v-for="(lesson, index) in lessonsV7" :key="lesson.id" :aria-pressed="lesson.id === lessonId"
+          :aria-label="'Jump to lesson ' + (index + 1)" @click="boot(lesson.id)">{{ index + 1 }}</button>
       </span>
     </footer>
   </div>
