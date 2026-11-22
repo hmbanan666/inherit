@@ -12,7 +12,9 @@ import { appendConsoleLines, type ConsoleRow } from './console-log'
 import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
 export type { CallSite, GameLog, MetricSample } from './gameProtocol'
 
-const saveKey = 'inherit.workshop.v1'
+import { packKey } from '@inherit/sim/save'
+import { importWorkshop, restoreWorkshop, workshopSave } from '../../../../packages/sim/src/packs/workshop/save'
+const saveKey = packKey('workshop')
 const reloadKey = 'inherit.workshop.reloadedBuild'
 const key: InjectionKey<GameStore> = Symbol('campaign')
 export type GameStore = ReturnType<typeof createGameStore>
@@ -64,6 +66,7 @@ function createGameStore() {
     : state.value.world.hand?.item ?? null)
   const busy = ref(false)
   let speed = 1
+  let resumeClock = true
   let storageKey = saveKey
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
@@ -81,7 +84,7 @@ function createGameStore() {
         ...state.value,
         project: { ...state.value.project, working: files.value },
       }
-      localStorage.setItem(storageKey, serializeSave(save))
+      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, active.value)))
       saved.value = true
     } catch {
       saved.value = false
@@ -246,7 +249,7 @@ function createGameStore() {
       instance.onmessage = ({ data }: MessageEvent<Frame>) => {
         if (worker === instance) receive(data)
       }
-      act({ type: 'init', campaign: state.value })
+      act({ type: 'init', campaign: state.value, resumeClock })
     } catch {
       void assetFailed(failed)
     }
@@ -273,6 +276,7 @@ function createGameStore() {
   function update(next: ProjectFiles) {
     files.value = next
     state.value = { ...state.value, project: { ...state.value.project, working: next } }
+    persist()
     return true
   }
   function valid(path: string) {
@@ -356,13 +360,25 @@ function createGameStore() {
     try {
       const local = import.meta.dev || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
       const query = new URLSearchParams(local ? location.search : '')
-      const id = query.get('step')
+      const id = query.get('lesson') ?? query.get('step')
       if (id) storageKey = saveKey + '.preview.' + id
       speed = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
-      const stored = localStorage.getItem(storageKey)
+      let stored = localStorage.getItem(storageKey)
+      const legacy = !id && !stored && localStorage.getItem('inherit.workshop.v1')
+      if (legacy) {
+        stored = JSON.stringify(importWorkshop(legacy))
+        restoreWorkshop(stored)
+        localStorage.setItem(storageKey, stored)
+      }
       const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
       const resumePreview = navigation?.type === 'reload' || navigation?.type === 'back_forward'
-      state.value = id && !(stored && resumePreview) ? jumpToStep(createCampaign(), id) : loadSave(stored)
+      if (id && !(stored && resumePreview)) state.value = jumpToStep(createCampaign(), id)
+      else if (stored) {
+        const restored = restoreWorkshop(stored)
+        state.value = restored.campaign
+        activeFile.value = restored.activeFile
+        resumeClock = restored.clockActive
+      }
       town.value = townSnapshot(state.value)
       files.value = state.value.project.working
     } catch {
@@ -370,7 +386,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
-    openDraft()
+    if (activeFile.value === 'main.ts') openDraft()
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)

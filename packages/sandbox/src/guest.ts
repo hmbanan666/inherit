@@ -1,7 +1,7 @@
 // Evaluated inside QuickJS before loading any player modules. The returned helpers
 // stay in host-owned handles. Guest values only cross the boundary as primitives.
 export const guestSetup = String.raw`
-(function install(initial, operations, call, tick, log, testing, chapter) {
+(function install(initial, operations, call, tick, log, testing, chapter, ambient) {
   "use strict";
   delete Math.random;
   delete globalThis.Date;
@@ -18,7 +18,7 @@ export const guestSetup = String.raw`
 
   // Walk data properties only. Cap work before expanding arrays or constructing
   // the output string. Proxy traps, if present, execute under the VM interrupt.
-  function snapshot() {
+  function snapshot(data = memory) {
     let text = "", nodes = 0;
     const parents = create(null);
     function append(part) {
@@ -55,7 +55,7 @@ export const guestSetup = String.raw`
       }
       append(array ? "]" : "}");
     }
-    visit(memory, 0);
+    visit(data, 0);
     return text;
   }
 
@@ -88,6 +88,16 @@ export const guestSetup = String.raw`
   }
   function result(reply) { return reply === undefined ? undefined : parse(reply); }
   for (const name of parse(operations)) {
+    if (chapter) {
+      const method = (...args) => {
+        if (args.length > 4) throw new Fault("Use at most four arguments.");
+        const at = i => args[i] === undefined ? undefined : snapshot(args[i]);
+        return result(call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096)));
+      };
+      api[name] = freeze(method);
+      if (ambient) global(name, method);
+      continue;
+    }
     if (name === "build") {
       blueprintApi.build = (kind, opts) => {
         if (opts !== undefined && (!opts || typeof opts !== "object" || isArray(opts)))

@@ -23,7 +23,7 @@ export async function edit(page: Page, source: string, append = false) {
   }
 }
 export async function openShed(page: Page, query = '') {
-  await page.goto('/' + query)
+  await page.goto('/?pack=workshop' + (query ? '&' + query.slice(1) : ''))
   await expect(page.getByTestId('primary-button')).toBeEnabled()
   await expect(page.locator('.pixi-mount canvas')).toBeVisible()
   await expect(page.locator('.project-editor .view-lines')).toBeVisible()

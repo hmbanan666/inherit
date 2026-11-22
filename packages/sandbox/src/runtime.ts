@@ -77,13 +77,14 @@ export async function openRuntime(
   testing: boolean,
   chapterExports?: readonly string[],
   initialFactory?: FactoryContext,
+  exposure: 'globals' | 'module' = 'module',
 ) {
   if (!Number.isInteger(budget) || budget < 1 || budget > 4096)
     throw new Error('Budget must be an integer from 1 to 4096.')
   if (!memory || typeof memory !== 'object' || Array.isArray(memory))
     throw new Error('Memory must be a JSON object.')
   const names = chapterExports ?? []
-  if (names.some(n => !['take', 'put', 'look', 'buy', 'repair'].includes(n))) throw new Error('Unknown chapter export.')
+  if (names.some(n => !/^[a-zA-Z_$][a-zA-Z_$0-9]*$/.test(n) || n in Object.prototype)) throw new Error('Invalid player function name.')
   const allowed = chapterExports ?? operations
   const initial = hostJson(memory)
   const module = await (engineReady ??= engine())
@@ -176,7 +177,7 @@ export async function openRuntime(
           if (type === 'number') return vm.getNumber(h)
           if (type === 'string') return JSON.parse(vm.getString(h))
         })
-        if (key === 'build') {
+        if (!chapterExports && key === 'build') {
           const [name, x, y, recipe, deposit] = params.splice(1)
           params.push({ name, x, y, recipe, deposit })
         }
@@ -195,7 +196,7 @@ export async function openRuntime(
     const helpers = keep(
       usingHandle(vm.newString(initial), (seed) =>
         usingHandle(vm.newString(JSON.stringify(allowed)), (names) =>
-          invoke(install, seed, names, call, tick, log, testing ? vm.true : vm.false, chapterExports ? vm.true : vm.false),
+          invoke(install, seed, names, call, tick, log, testing ? vm.true : vm.false, chapterExports ? vm.true : vm.false, exposure === 'globals' ? vm.true : vm.false),
         ),
       ),
     )

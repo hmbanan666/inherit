@@ -22,7 +22,7 @@ export interface MetricSample {
   machines: Record<string, { rate: number; idle: number; blocked: number; queue: number }>
 }
 export type Action =
-  | { type: 'init'; campaign: Campaign }
+  | { type: 'init'; campaign: Campaign; resumeClock?: boolean }
   | { type: 'step' }
   | { type: 'run'; files?: ProjectFiles }
   | { type: 'continue' }

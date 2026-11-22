@@ -1,0 +1,62 @@
+import ts from 'typescript'
+import type { Call, Colour, Files, Pack } from '../../sim/src/framework/pack'
+import type { PackSave } from '../../sim/src/framework/save'
+import { runOnce } from './index'
+
+export function declarations(source: string, names: readonly string[], exposure: 'globals' | 'module') {
+  const file = ts.createSourceFile('player.ts', source, ts.ScriptTarget.Latest, true)
+  const signatures: string[] = []
+  const types: string[] = []
+  for (const stmt of file.statements) {
+    if (ts.isInterfaceDeclaration(stmt) && stmt.name.text === 'PlayerAPI') {
+      for (const method of stmt.members) {
+        if (!ts.isMethodSignature(method) || !names.includes(method.name.getText(file))) continue
+        const doc = ts.getJSDocCommentsAndTags(method)[0]?.getText(file) ?? ''
+        signatures.push(doc + '\n' + (exposure === 'globals' ? 'declare' : 'export') + ' function ' + method.getText(file))
+      }
+    } else if (ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) {
+      types.push(stmt.getText(file).replace(/^export\s+/, ''))
+    }
+  }
+  return types.join('\n') + '\n' + (exposure === 'globals' ? signatures.join('\n') : 'declare module "inherit" {\n' + signatures.join('\n') + '\n}') +
+    '\ndeclare const console: {log(...words: unknown[]): void}'
+}
+export interface Moment<W> { call: Call; world: W; checks: Colour[] }
+export async function runPack<W,A extends object>(pack: Pack<W,A>, save: PackSave<W>, files: Files) {
+  const lesson = pack.lessons.find(l => l.id === save.lessonId)
+  if (!lesson) throw new Error('This pack is complete.')
+  const world = structuredClone(pack.retry === 'entry' ? save.entryWorld : save.world)
+  const start = structuredClone(world)
+  const { api, finish } = pack.beginAttempt(world, 'run')
+  const calls: Call[] = []
+  const moments: Moment<W>[] = []
+  const names = pack.available(world, lesson.id)
+  let site: Pick<Call,'file'|'line'|'within'> = { file: 'main.ts', line: 1 }
+  const host = { tick: 0, traceSite(next: typeof site) { site = next } }
+  const evidence = { before: save.entryWorld, world, calls, files, console: [] as string[] }
+  const checks = () => lesson.checks.map(check => check.evaluate(evidence))
+  for (const name of names) {
+    const method = api[name]
+    if (typeof method !== 'function') throw new Error('Missing player function: ' + name)
+    Object.defineProperty(host, name, { value(...args: unknown[]) {
+      const result: unknown = Reflect.apply(method, api, args)
+      const call = { ...site, name, args, result, ok: true }
+      calls.push(call)
+      moments.push({ call, world: structuredClone(world), checks: checks() })
+      return result
+    } })
+  }
+  save.project.working = files
+  save.phase = 'working'
+  save.passed = []
+  evidence.console = await runOnce({ files, exposure: pack.exposure, chapterExports: names, budget: 256 }, host)
+  finish()
+  const statuses = checks()
+  save.world = world
+  save.passed = lesson.checks.filter((_, i) => statuses[i] === 'green').map(c => c.id)
+  if (save.passed.length === lesson.checks.length) {
+    save.phase = 'solved'
+    save.pendingReveals = [...lesson.reveals ?? []].filter(id => !save.released.includes(id))
+  }
+  return { start, moments, logs: evidence.console, checks: statuses }
+}

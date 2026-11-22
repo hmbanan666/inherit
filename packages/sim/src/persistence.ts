@@ -341,15 +341,14 @@ function archiveLegacy(data: Record<string, unknown>) {
   c.project.working = { ...c.project.deployed }
   return c
 }
-export function loadSave(input: unknown): Campaign {
-  try {
+export function loadChapterSave(input: unknown): Campaign {
     const data: unknown = typeof input === 'string' ? JSON.parse(input) : structuredClone(input)
-    if (!record(data)) return createCampaign()
+    if (!record(data)) throw new Error('Unreadable chapter save.')
     if (data.version === undefined || data.version === 1 || data.version === 2 || data.version === 3 || data.version === 4 || data.version === 5)
       return archiveLegacy(data)
     if (save(data) && gameFields(data)) return restoreTown(validate(data as unknown as Campaign))
-  } catch {
-    /* An incomplete write starts a fresh shift. */
-  }
-  return createCampaign()
+  throw new Error('Unreadable chapter save.')
+}
+export function loadSave(input: unknown): Campaign {
+  try { return loadChapterSave(input) } catch { return createCampaign() }
 }

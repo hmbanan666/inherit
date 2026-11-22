@@ -5,6 +5,13 @@
   "exports": {
     ".": "./src/index.ts",
     "./api": "./src/api.ts",
-    "./campaign-api": "./src/campaign-api.ts"
+    "./campaign-api": "./src/campaign-api.ts",
+    "./pack": "./src/framework/pack.ts",
+    "./save": "./src/framework/save.ts",
+    "./registry": "./src/packs/registry.ts",
+    "./rules": "./src/packs/rules.ts"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
   }
 }

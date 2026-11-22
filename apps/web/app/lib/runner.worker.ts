@@ -33,7 +33,7 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
         campaign = loadSave(action.campaign)
         program?.dispose()
         program = undefined
-        if (!isStarterProject(campaign.project.deployed))
+        if (action.resumeClock !== false && !isStarterProject(campaign.project.deployed))
           program = (await startChapter(campaign, campaign.project.deployed, 'resume')).program
         error = ''
         break

@@ -81,7 +81,7 @@ test('Run retries an unavailable worker when the manifest is offline', async ({ 
     failed = true
     return route.abort()
   })
-  await page.goto('/')
+  await page.goto('/?pack=workshop')
   await expect(page.getByTestId('checks')).toContainText('Could not start the controller worker')
   await edit(page, 'take("mine")', true)
   await page.getByTestId('primary-button').click()

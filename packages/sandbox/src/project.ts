@@ -10,6 +10,7 @@ export interface ProjectOptions {
   entry?: string
   memory?: JsonObject
   budget?: number
+  exposure?: 'globals' | 'module'
   chapterExports?: readonly string[]
   unlockedEvents?: readonly string[]
 }

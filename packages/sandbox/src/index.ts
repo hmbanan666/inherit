@@ -36,7 +36,7 @@ export function createLegacyProgram(source: string | ProjectOptions) {
 
 async function loadProgram(options: ProjectOptions, exports?: readonly string[], initialFactory?: FactoryContext): Promise<Program> {
   const project = compileProject(options, false)
-  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false, exports, initialFactory)
+  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, false, exports, initialFactory, options.exposure)
   try {
     const tick = session.handler('onTick')
     if (!tick) throw new Error(`${project.entry} · Export a function named onTick.`)
@@ -89,7 +89,7 @@ export async function runProjectTests(source: string | ProjectOptions): Promise<
 /** Evaluate the entry module once on the floor without requiring a clock handler. */
 export async function runOnce(options: ProjectOptions, api: FactoryContext) {
   const project = compileProject(options, false)
-  const session = await openRuntime(project, {}, options.budget ?? 1024, false, options.chapterExports ?? chapterExports, api)
+  const session = await openRuntime(project, {}, options.budget ?? 1024, false, options.chapterExports ?? chapterExports, api, options.exposure)
   try {
     return session.drainLogs()
   } finally {
