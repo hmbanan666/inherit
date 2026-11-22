@@ -1,0 +1,35 @@
+name: Check game packs
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm exec playwright install-deps chromium
+      - run: pnpm exec playwright install chromium --only-shell
+      - run: pnpm test:browser
+        env:
+          INHERIT_SHOTS: ${{ runner.temp }}/inherit-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-playthroughs
+          path: ${{ runner.temp }}/inherit-shots

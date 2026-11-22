@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useContrast } from "../../../../../apps/web/app/lib/contrast"
 import {
   BookOpen,
   ChevronDown,
@@ -58,7 +59,7 @@ const tab = ref<'controller' | 'api'>('controller')
 const showFiles = ref(false)
 const menu = ref<'' | 'history' | 'settings' | 'bank'>('')
 const confirmNew = ref(false)
-const contrast = ref(false)
+const contrast = useContrast()
 const nextReveal = computed(() => {
   const reveal = step.value?.nextReveal
   if (!reveal) return ''
@@ -67,7 +68,6 @@ const nextReveal = computed(() => {
   if (reveal.kind === 'coins') return 'Continue to collect your coins.'
   return 'Continue to see the family tab.'
 })
-const swapped = ref(false)
 const dockWidth = ref(43)
 type Panel = 'Checks' | 'Console'
 const panels = computed<Panel[]>(() => g.logs.value.length || g.error.value || (step.value?.index ?? 0) >= 5 ? ['Checks','Console'] : ['Checks'])
@@ -177,10 +177,6 @@ function highlightMachines(ids: string[]) {
   highlighted.value = ids
   if (ids.length && section.value !== 'factory') openSection('factory')
 }
-function swap() {
-  swapped.value = !swapped.value
-  localStorage.setItem('inherit.workshop.editorLeft', String(swapped.value))
-}
 function hotkey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key === 'Enter')) {
     e.preventDefault()
@@ -198,7 +194,7 @@ function resize(e: PointerEvent) {
   el.setPointerCapture(e.pointerId)
   const change = (event: PointerEvent) => {
     const fraction = event.clientX / window.innerWidth
-    dockWidth.value = Math.max(25, Math.min(62, 100 * (swapped.value ? fraction : 1 - fraction)))
+    dockWidth.value = Math.max(25, Math.min(62, 100 * (1 - fraction)))
   }
   el.addEventListener('pointermove', change)
   el.addEventListener('lostpointercapture', () => el.removeEventListener('pointermove', change), {
@@ -310,7 +306,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
         </aside>
       </div>
     </header>
-    <main class="desk" :class="{ swapped }">
+    <main class="desk" >
       <section ref="floorPane" tabindex="-1" aria-label="Factory and town" class="world-shell pack-world" data-testid="world">
         <header class="world-title">
           <div class="floor-heading">

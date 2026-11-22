@@ -182,7 +182,7 @@ export async function openRuntime(
     })
     begin(fresh())
     unwrap(vm.evalCode(inheritModule(names), 'inherit', { type: 'module' })).dispose()
-    runtime.setModuleLoader(project.load, project.resolve)
+    runtime.setModuleLoader(project.load, (from, request) => project.resolve(from, request))
     current = initialFactory
     const namespace = keep(
       unwrap(vm.evalCode(project.load(project.entry), project.entry, { type: 'module' })),

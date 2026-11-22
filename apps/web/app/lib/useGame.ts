@@ -10,8 +10,8 @@ import {
 import { usePlayback } from './usePlayback'
 import type { CpuStats } from '@inherit/sandbox'
 import { appendConsoleLines, type ConsoleRow } from './console-log'
-import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
-export type { CallSite, GameLog, MetricSample } from './gameProtocol'
+import type { Action, CallSite, Frame, GameLog } from './gameProtocol'
+export type { CallSite, GameLog } from './gameProtocol'
 
 import { packKey } from '@inherit/sim/save'
 import { importWorkshop, restoreWorkshop, workshopSave } from '../../../../packages/sim/src/packs/workshop/save'
@@ -46,8 +46,7 @@ function createGameStore() {
   const active = ref(false)
   const saved = ref(true),
     blockedSave = ref(false)
-  const logs = shallowRef<ConsoleRow[]>([]),
-    metrics = shallowRef<MetricSample[]>([])
+  const logs = shallowRef<ConsoleRow[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
   const step = computed(() => currentStep(state.value))
@@ -76,16 +75,16 @@ function createGameStore() {
   let timer: ReturnType<typeof setTimeout>,
     watchdog: ReturnType<typeof setTimeout>,
     autosave: ReturnType<typeof setInterval>
-  let buildCheck: AbortController | undefined,
-    errors = 0
+  let buildCheck: AbortController | undefined
+  let acknowledged: Frame | undefined
   function persist() {
     if (blockedSave.value) return
     try {
       const save = {
-        ...state.value,
-        project: { ...state.value.project, working: files.value },
+        ...state.value, ...acknowledged?.campaign,
+        project: { ...(acknowledged?.project ?? state.value.project), working: files.value },
       }
-      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, active.value)))
+      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, acknowledged?.active ?? active.value)))
       saved.value = true
     } catch {
       saved.value = false
@@ -170,6 +169,7 @@ function createGameStore() {
     // A Run that fails before executing leaves the previous hand in place.
     const returned = mode === 'run' && frame.campaign.world.tick !== state.value.world.tick
       ? state.value.world.hand : undefined
+    acknowledged = frame
     await playback.play(frame.calls, mode, speed, returned)
     if (worker !== instance) return
     current = undefined
@@ -195,6 +195,7 @@ function createGameStore() {
     }
     c.project.working = files.value
     state.value = c
+    acknowledged = undefined
     town.value = frame.town
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
@@ -210,33 +211,13 @@ function createGameStore() {
         file: loc?.[1],
         line: loc ? Number(loc[2]) : undefined,
       })
-      errors++
     }
     logs.value = appendConsoleLines(logs.value, lines)
     error.value = frame.error
     if (frame.notice) notice.value = frame.notice
     cpu.value = frame.cpu
     traces.value = frame.traces
-    if (action.type === 'step') {
-      const machines = Object.fromEntries(
-        c.world.machines.map((m) => {
-          const elapsed = Math.max(1, tick - m.builtAt)
-          return [
-            m.id,
-            {
-              rate: m.stats.rate,
-              idle: m.stats.idleTicks / elapsed,
-              blocked: m.stats.blockedTicks / elapsed,
-              queue: m.queue.length,
-            },
-          ]
-        }),
-      )
-      metrics.value = [
-        ...metrics.value.slice(-239),
-        { tick, money: c.economy.money, cpu: frame.cpu.used, budget: frame.cpu.budget, errors, machines },
-      ]
-    } else persist()
+    if (action.type !== 'step') persist()
     ready.value = true
     if (['run', 'deploy', 'continue'].includes(action.type)) busy.value = false
     pump()
@@ -350,9 +331,7 @@ function createGameStore() {
     files.value = state.value.project.working
     blockedSave.value = false
     logs.value = []
-    metrics.value = []
     traces.value = {}
-    errors = 0
     error.value = ''
     selected.value = ''
     notice.value = ''
@@ -433,7 +412,6 @@ function createGameStore() {
       logs.value = []
     },
     traces,
-    metrics,
     ready,
     active,
     visitSection,

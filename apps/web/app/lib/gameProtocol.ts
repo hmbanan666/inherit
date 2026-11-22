@@ -13,14 +13,6 @@ export interface GameLog {
   file?: string
   line?: number
 }
-export interface MetricSample {
-  tick: number
-  money: number
-  cpu: number
-  budget: number
-  errors: number
-  machines: Record<string, { rate: number; idle: number; blocked: number; queue: number }>
-}
 export type Action =
   | { type: 'init'; campaign: Campaign; resumeClock?: boolean }
   | { type: 'step' }

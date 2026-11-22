@@ -1,12 +1,8 @@
 # Inherit
 
-Your uncle left you a factory and a 600-coin debt. In Kettlewick, the mail horse needs shoes, the baker needs an oven grate, and the bridge to Riverside is down. Write one TypeScript controller that gets the town working again.
+Learn TypeScript by changing a game world. Choose a pack, edit the code beside its world and press **Run**. Calls play back beside their source lines. **Continue** opens the next lesson when you are ready.
 
-## Your first shift
-
-Start in `verbs/dig.ts`. Bram’s card explains how to take a rock from the mine. Open Hint for the idea, then Show exact step for the lines. The bench runs as you edit. Use your dig in smelt, write ship, then import your verbs into `main.ts` and click **Deploy**. When the third ingot ships, click **See it** to visit the forge.
-
-Find solved functions under **My library**. Machines work automatically when supplied. Use the floor to inspect inputs and the lines that moved them. Requests and finite orders pay for machines and the debt. The cart keeps extra items until someone needs them. Your progress saves in this browser. Open **Deploy history** to find snapshots from earlier versions.
+Start with **Village at Dawn**. Help Mila wake a village and build a fair in thirteen lessons, from one greeting to functions, choices and loops. **Uncle’s Workshop** follows the basics. Automate Bram’s shed, supply Kettlewick and rebuild the bridge. The pack switcher keeps each game and its working files on this device.
 
 ## Run locally
 
@@ -34,11 +30,10 @@ docker run --rm -p 8080:80 inherit
 
 Open `http://localhost:8080`. The image builds the workspace with Node 24 and serves the static files with nginx on **port 80**. Fonts, editor workers, artwork and the WebAssembly engine are included in the build.
 
-## Project structure
+## Add a pack
 
-- `packages/sim` runs the factory simulation, town requests, orders, hiccups, and debt.
-- `packages/sandbox` compiles the player’s TypeScript and runs it in QuickJS.
-- `apps/web` contains the workshop, floor renderer, editor, and simulation worker.
-- `tests/e2e` exercises the generated site through the editor and town views. Set `INHERIT_SHOTS` to a directory outside the checkout to capture workshop screenshots.
+Run `pnpm new-pack <id>` to create a playable pack in `packages/sim/src/packs`. Its folder supplies its cover, world, player functions, lessons and view. The showcase and validation suite discover it automatically. Follow the [authoring guide](docs/packs/AUTHORING.md).
+
+`packages/sandbox` runs player projects inside QuickJS. `apps/web` contains the showcase, editor and worker sessions. Run `pnpm test` for lesson validation, then `pnpm build` and `pnpm test:browser` for the player playthroughs. Set `INHERIT_SHOTS` outside the checkout to keep screenshots and their visible text.
 
 Released under the [MIT license](LICENSE).

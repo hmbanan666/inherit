@@ -1,6 +1,6 @@
-const title = 'inherit — a factory you program'
+const title = 'Inherit · Game packs'
 const description =
-  'Your uncle left a factory and a debt. Build machines and belts with TypeScript to fill Kettlewick’s requests and rebuild its bridge.'
+  'Learn TypeScript by waking a village or running a workshop. Pick a game pack and watch your code change its world.'
 
 export default defineNuxtConfig({
   ssr: false,

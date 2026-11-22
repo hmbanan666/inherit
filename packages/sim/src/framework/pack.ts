@@ -48,7 +48,7 @@ export interface Lesson<W> {
   reveals?: readonly string[]
   enter?(world: W): void
 }
-export interface Row { id: string; label: string; value: string }
+export interface Row { id: string; label: string; value: string; action?: {name:string;args:unknown[]} }
 export interface Entity<W> { id: string; label: string; rows(world: W): Row[] }
 export interface Panel<W> extends Entity<W> { placement: 'nav' | 'panel'; reveal?: string }
 export interface Pack<W, A extends object> {
@@ -63,6 +63,11 @@ export interface Pack<W, A extends object> {
   retry: 'entry' | 'live'
   beginAttempt(world: W, mode: 'run' | 'setup' | 'tick' | 'idle'): { api: A; finish(): void }
   available(world: W, lessonId: string): readonly (keyof A & string)[]
+  guestModules?: Readonly<Record<string,{source:string;declarations:string}>>
+  typeAliases?(world: W): Record<string,string[]>
+  clock?: {intervalMs:number;handler:'onTick'}
+  actions?: Record<string,(world:W,args:readonly unknown[])=>void>
+  upgrade?(fromVersion:number,input:unknown):unknown
   release?(world: W, id: string): void
 }
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }

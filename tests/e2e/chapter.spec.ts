@@ -134,7 +134,7 @@ test('late jumps open the expected machines, files and town changes', async ({ p
   await expect(page.getByTestId('place-assembler')).toBeVisible()
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Project files' }).click()
-  await expect(page.getByRole('button', { name: 'tools.ts', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', {name:'Project files'}).getByRole('button', { name: 'tools.ts', exact: true })).toBeVisible()
   await openShed(page, '?step=harrow-deed&speed=8')
   await expect(page.getByTestId('task-card')).toContainText(edits['harrow-deed'].goal)
   await page.getByTestId('nav-town').click()

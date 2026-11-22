@@ -233,6 +233,7 @@ onMounted(() => {
     model: null,
     wordBasedSuggestions: 'off',
     autoClosingBrackets: 'never',
+    acceptSuggestionOnEnter: 'off',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,

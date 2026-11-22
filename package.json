@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
-    "test": "vitest run --maxWorkers=2 --exclude '**/e2e/**'",
+    "test": "vitest run --maxWorkers=1 --exclude '**/e2e/**'",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter web typecheck",
     "lint": "pnpm typecheck",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "new-pack": "node scripts/new-pack.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.65.1",

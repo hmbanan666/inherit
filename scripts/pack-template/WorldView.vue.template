@@ -1,0 +1,18 @@
+<script setup lang="ts">
+defineProps<{world:{ lit:boolean }}>()
+</script>
+<template>
+  <figure class="garden">
+    <svg viewBox="0 0 200 200" role="img" data-testid="lantern" :aria-label="world.lit ? 'Lantern lit' : 'Lantern dark'">
+      <path d="M82 59v-8a18 18 0 0 1 36 0v8" fill="none" stroke="#b89a73" stroke-width="5"/>
+      <path d="M60 80l15-22h50l15 22-9 68H69Z" fill="#594239" stroke="#d6b88c" stroke-width="4"/>
+      <path d="M74 84h52l-7 51H81Z" :fill="world.lit ? '#ffcc76' : '#403e47'"/>
+      <ellipse cx="100" cy="151" rx="36" ry="6" fill="#44342f"/>
+    </svg>
+    <figcaption>{{ world.lit ? 'Lantern lit' : 'Lantern dark' }}</figcaption>
+  </figure>
+</template>
+<style scoped>
+.garden { margin:auto; text-align:center; color:var(--ink); }
+svg { width:min(36vw,22rem); }
+</style>

@@ -4,6 +4,7 @@ import { Play, Settings2 } from '@lucide/vue'
 import { packKey } from '@inherit/sim/save'
 import type { PackManifest, Call, Files, Colour } from '@inherit/sim/pack'
 import type { PackFrame, PackCommand } from '../lib/packProtocol'
+import { useContrast } from '../lib/contrast'
 import { editorKey } from '../lib/editor'
 const props = defineProps<{manifest: PackManifest; view: Component}>()
 const frame = shallowRef<PackFrame>()
@@ -13,7 +14,7 @@ const statuses = ref<Colour[]>([])
 const files = shallowRef<Files>({})
 const activeFile = ref('main.ts')
 const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(false), saved = ref(true)
-const settings = ref(false), panel = ref(''), dark = ref(true), width = ref(45)
+const settings = ref(false), panel = ref(''), contrast = useContrast(), width = ref(45)
 const activeCall = shallowRef<Call>()
 const navigation = shallowRef({file:'main.ts',line:1})
 const editor = ref<{revealLine(file:string,line:number):void}>()
@@ -26,6 +27,7 @@ const local = import.meta.dev || ['localhost','127.0.0.1','[::1]'].includes(loca
 const lesson = local ? query.get('lesson') ?? undefined : undefined
 const speed = local ? Math.min(32, Math.max(1, Number(query.get('speed')) || 1)) : 1
 const key = packKey(props.manifest.id) + (lesson ? '.preview.' + lesson : '')
+let timer: ReturnType<typeof setTimeout>
 let worker: Worker | undefined, alive = true
 function persist() {
   if (!frame.value || blocked.value) return
@@ -35,7 +37,7 @@ function persist() {
     saved.value = true
   } catch { saved.value = false }
 }
-function send(command: PackCommand) { busy.value = true; worker?.postMessage(command) }
+function send(command: PackCommand) { clearTimeout(timer); busy.value = true; worker?.postMessage(command) }
 function run() {
   if (!busy.value && !blocked.value && !complete.value) send({kind:'run',files:files.value})
 }
@@ -86,6 +88,7 @@ async function receive(data: PackFrame | {loadError:string}) {
   displayWorld.value = data.save.world
   statuses.value = data.checks
   busy.value = false
+  if (data.clockMs && data.save.clockActive && !data.solved && !complete.value) timer = setTimeout(()=>send({kind:'tick'}),data.clockMs/speed)
   if (changed && !complete.value) {await nextTick();editor.value?.revealLine(data.edit.file,data.edit.line)}
 }
 function start(reset = false) {
@@ -99,24 +102,24 @@ function start(reset = false) {
   send({kind:'open',id:props.manifest.id,stored,lesson})
 }
 onMounted(()=>{start();window.addEventListener('keydown',shortcut,true);window.addEventListener('pagehide',persist)})
-onBeforeUnmount(()=>{alive = false;persist();worker?.terminate();window.removeEventListener('keydown',shortcut,true);window.removeEventListener('pagehide',persist)})
+onBeforeUnmount(()=>{alive = false;clearTimeout(timer);persist();worker?.terminate();window.removeEventListener('keydown',shortcut,true);window.removeEventListener('pagehide',persist)})
 </script>
 <template>
-  <div class="workshop pack-studio" :class="{'high-contrast':!dark}" :style="{'--dock-width': width+'%'}">
+  <div class="workshop pack-studio" :class="{'high-contrast':contrast}" :style="{'--dock-width': width+'%'}">
     <header class="hud"><PackNav :manifest="manifest"/><nav v-if="frame?.panels.some(p=>p.placement==='nav')"><button v-for="p in frame.panels.filter(p=>p.placement==='nav')" :key="p.id" @click="panel = panel === p.id ? '' : p.id">{{ p.label }}</button></nav>
-      <div class="settings pack-settings"><button aria-label="Settings" @click="settings=!settings"><Settings2/></button><aside v-if="settings" class="hud-menu"><button @click="dark=!dark">High contrast {{ dark ? 'off' : 'on' }}</button></aside></div>
-      <button v-if="!complete" class="deploy primary-run" data-testid="primary-button" :disabled="busy || blocked" @click="run"><Play/>{{ watching ? 'Playing your run' : 'Run' }} <kbd>Ctrl+Enter</kbd></button>
+      <div class="settings pack-settings"><button aria-label="Settings" @click="settings=!settings"><Settings2/></button><aside v-if="settings" class="hud-menu"><button @click="contrast=!contrast">High contrast {{ contrast ? 'on' : 'off' }}</button></aside></div>
+      <button v-if="!complete" class="deploy primary-run" data-testid="primary-button" :disabled="busy || blocked" @click="run"><Play/>{{ watching ? 'Playing your run' : frame?.mode==='deploy' ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd></button>
     </header>
     <main class="desk"><section class="world-shell pack-world" data-testid="world">
       <header class="world-title"><div><small class="eyebrow">{{ manifest.genre }}</small><h1>{{ manifest.title }}</h1></div></header>
       <component :is="view" v-if="displayWorld" :world="displayWorld" :calls="calls"/>
-      <aside v-for="p in frame?.panels.filter(p=>p.id===panel || p.placement==='panel')" :key="p.id" class="entity-panel"><h2>{{ p.label }}</h2><p v-for="row in p.rows" :key="row.id">{{ row.label }} · {{ row.value }}</p></aside>
+      <aside v-for="p in frame?.panels.filter(p=>p.id===panel || p.placement==='panel')" :key="p.id" class="entity-panel"><h2>{{ p.label }}</h2><p v-for="row in p.rows" :key="row.id"><button v-if="row.action" :disabled="busy" @click="send({kind:'action',panel:p.id,row:row.id})">{{ row.label }} · {{ row.value }}</button><template v-else>{{ row.label }} · {{ row.value }}</template></p></aside>
       <SolvedCard v-if="solved" class="solved-overlay" :solved="solved" :busy="busy" @advance="advance"/>
     </section><div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)"/>
     <section class="editor-dock"><template v-if="complete"><div class="pack-ending"><small>Pack complete</small><h2>{{ manifest.title }}</h2><p>You used {{ manifest.learningGoals.join(', ').toLowerCase() }}.</p><a href="/">Back to game packs</a></div></template>
       <template v-else-if="frame"><header class="dock-header"><small>Lesson {{ frame.index+1 }} of {{ frame.total }}</small></header>
       <GoalBar :key="frame.save.lessonId ?? ''" :goal="frame.goal" :hints="frame.hints"/>
-      <div class="file-tabs"><button aria-pressed="true">{{ activeFile }}</button></div>
+      <div class="file-tabs"><button v-for="(_,path) in files" :key="path" :aria-pressed="path===activeFile" @click="activeFile=path">{{ path }}</button></div>
       <div class="editor-pane"><div class="editor-host"><LazyCodeEditor ref="editor" :error="error"/></div></div>
       <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows"/>
       <section v-if="frame.logs.length" class="pack-checks"><small>Console</small><p v-for="(line,i) in frame.logs" :key="i">{{ line }}</p></section></template>

@@ -22,10 +22,13 @@ export function workshopSave(c: Campaign, activeFile = 'main.ts', active = !isSt
 export function restoreWorkshop(raw: string) {
   const data = JSON.parse(raw)
   if (data?.formatVersion !== 1 || data.packId !== 'workshop' || data.packVersion !== 1) throw new Error('Unknown Workshop save.')
+  if (data.world?.version !== 6 || data.entryWorld?.version !== 6 || typeof data.clockActive!=='boolean') throw new Error('Incomplete Workshop save.')
+  loadChapterSave({...data.entryWorld,project:data.project})
   const campaign = loadChapterSave({...data.world,project:data.project})
   const index = data.lessonId === null ? lessons.length : lessons.findIndex(l => l.id === data.lessonId)
-  if (index < 0) throw new Error('Unknown Workshop lesson.')
-  campaign.lesson.index = index
+  if (index < 0 || index !== campaign.lesson.index || data.phase !== campaign.lesson.phase) throw new Error('Unknown Workshop lesson.')
+  for (const field of [data.completed,data.passed,data.pendingReveals,data.released,data.seenSections])
+    if (!Array.isArray(field) || !field.every(id=>typeof id==='string')) throw new Error('Incomplete Workshop progress.')
   return {campaign, activeFile: typeof data.project.working[data.project.activeFile] === 'string' ? data.project.activeFile : 'main.ts', clockActive: data.clockActive === true}
 }
 export function importWorkshop(raw: string) {
@@ -35,5 +38,6 @@ export function importWorkshop(raw: string) {
     c.lesson.index = lessons.findIndex(l => l.id === v4Order[c.lesson.index])
     if (c.lesson.index < 0) throw new Error('Unknown chapter lesson.')
   }
+  c.lesson.queue = c.lesson.queue.filter(r=>!(r.kind==='section' && r.id==='inbox'))
   return workshopSave(c)
 }

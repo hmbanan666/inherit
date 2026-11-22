@@ -1,0 +1,16 @@
+import { definePack } from '../../framework/pack'
+import manifest from './manifest'
+import { lessons } from './lessons'
+import type { PlayerAPI } from './player'
+export default definePack<{lit:boolean},PlayerAPI>({
+  manifest, version:1, lessons, exposure:'globals', retry:'entry',
+  initialWorld: () => ({lit:false}),
+  decodeWorld(input) {
+    if (!input || typeof input !== 'object' || !('lit' in input) || typeof input.lit !== 'boolean')
+      throw new Error('The lantern save could not be opened.')
+    return {lit:input.lit}
+  },
+  entities:[{id:'lantern',label:'Lantern',rows:w=>[{id:'light',label:'Light',value:w.lit?'On':'Off'}]}],
+  panels:[], available:()=>['light'],
+  beginAttempt(world) { return {api:{light() {world.lit = true}},finish() {}} },
+})
