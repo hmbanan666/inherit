@@ -46,8 +46,14 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
   if (!mine.output && w.hand?.origin !== 'mine' && w.tick % interval === 1) {
     w.seed = (Math.imul(1664525, w.seed) + 1013904223) >>> 0
     const lesson = lessons[c.lesson.index]?.id
-    // This part of the vein supplies paired samples; the cutter for excess copper comes later.
-    const mixedOre = lesson === 'vein-sort' ? mine.stats.processed % 2 === 0 : w.seed % 3 === 0
+    let mixedOre = w.seed % 3 === 0
+    if (lesson === 'vein-sort') {
+      // A returned rock can be picked up several times. Once one route works,
+      // present the other sample regardless of those extra pickups.
+      mixedOre = c.lesson.passed.length === 1
+        ? c.lesson.passed[0] === 'iron'
+        : mine.stats.processed % 2 === 0
+    }
     const copper = c.town.beat >= 4 && (lesson === 'vein-sample' || mixedOre)
     mine.output = { kind: copper ? 'copper-ore' : 'iron-ore' }
   }
