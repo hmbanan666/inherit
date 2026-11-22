@@ -1,48 +1,61 @@
-export type Place = string
-export type MachineKind = 'press' | 'furnace' | 'cutter' | 'assembler'
-export interface Inspection { status: string; inside: string[]; ready?: string; wanted?: string[]; waiting?: Record<string,number> }
+export type Place = 'belt' | 'left' | 'right' | 'cart'
+export interface Parcel {
+  id: string
+  colour: 'red' | 'blue'
+  weight: number
+  to: 'north' | 'south' | 'dock'
+}
+export interface Inspection {
+  count: number
+  front: Parcel | undefined
+  jammed: boolean
+}
 export interface PlayerAPI {
-  /** Pick up the front ready item. The hand holds one item.
-   * @param place Station to pick up from.
-   * @returns Item name or undefined when nothing is ready.
-   * @example const item = take("furnace")
+  /**
+   * Lift the front parcel into the empty hand.
+   * @param place The belt or a bin to unload.
+   * @returns A label snapshot, or undefined for a full hand, an empty or jammed source, or the cart.
+   * @example const lifted = take("belt")
    */
-  take(place: Place): string | undefined
-  /** Put the item in the hand down at this place.
-   * @param place Station to receive the held item.
-   * @returns True when the station accepts the item.
-   * @example put("cart")
+  take(place: Place): Parcel | undefined
+  /**
+   * Drop the held parcel at the back of a queue.
+   * @param place A bin or the dispatch cart.
+   * @returns True on delivery. An empty hand, blocked bin or belt returns false and leaves the hand unchanged.
+   * @example const delivered = put("left")
    */
   put(place: Place): boolean
-  /** Read the state and contents of a place.
-   * @param place Station to inspect.
-   * @returns The status, contents and ready item.
-   * @example const report = look("cart")
+  /**
+   * Inspect a station without moving the arm.
+   * @param place The station whose label, count and jam flag you need.
+   * @returns A fresh snapshot including blocked parcels. An empty queue has count zero and an undefined front.
+   * @example const queued = look("right").count
    */
   look(place: Place): Inspection
-  /** Buy a machine once for its name.
-   * @param kind Machine to purchase.
-   * @param name Optional name for this machine.
-   * @returns True when the purchase succeeds.
-   * @example buy("furnace", "copper")
+  /**
+   * Write one reading to the scale. The most recent reading stays visible.
+   * @param value A finite number. Invalid readings produce a diagnostic and leave the scale unchanged.
+   * @returns No value.
+   * @example display(12)
    */
-  buy(kind: MachineKind, name?: string): boolean
-  /** Restart a broken machine.
-   * @param place Machine to restart.
-   * @returns True when the repair succeeds.
-   * @example repair("furnace")
+  display(value: number): void
+  /**
+   * Remove a blockage. The front parcel stays where it is.
+   * @param place The station to clear.
+   * @returns True if a jam was cleared, false if the station was already clear.
+   * @example const cleared = clearJam("left")
    */
-  repair(place: Place): boolean
-  /** Answer Mrs Harrow and leave the balance for later.
-   * @returns True when the reply is accepted.
-   * @example replyLater()
+  clearJam(place: Place): boolean
+}
+
+/** Functions supplied by the player, called by the floor clock after arrivals. */
+export interface Controller {
+  /**
+   * Export this function from main.ts to respond to each tick after Deploy.
+   * @returns No value.
+   * @example export function onTick() { console.log("Another tick") }
    */
-  replyLater(): boolean
-  /** Pay the remaining balance from the workshop earnings.
-   * @returns True when payment succeeds.
-   * @example payBalance()
-   */
-  payBalance(): boolean
+  onTick(): void
 }
 
 export interface PlayerConsole {

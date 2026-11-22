@@ -23,7 +23,6 @@ export const lessons = (Object.keys(briefs) as ChallengeId[]).map(id => {
     checks: brief.checks.map((label, index) => ({
       id: id + '-' + (index + 1),
       label,
-      input: brief.checkInputs[index],
       evaluate: evidence => passes(evidence, index),
     })),
     referenceSolution: { 'main.ts': solutions[id] },

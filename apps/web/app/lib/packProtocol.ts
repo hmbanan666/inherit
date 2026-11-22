@@ -6,12 +6,13 @@ import type { PackSave } from '@inherit/sim/save'
 export type DrawerTab = 'learn' | 'hints' | 'api' | 'console'
 export type PackCommand =
   | { kind: 'open'; id: string; stored: string | null; lesson?: string }
-  | { kind: 'run'; files: Files }
+  | { kind: 'run' | 'trySetup' | 'runOnce'; files: Files }
   | { kind: 'select'; id: string; files: Files; activeFile: string }
   | { kind: 'hint' }
   | { kind: 'predict'; choice: string }
   | { kind: 'continue'; id: string }
-  | { kind: 'tick' | 'stopLoop' }
+  | { kind: 'tick' }
+  | { kind: 'stopLoop'; completedTicks: number }
   | { kind: 'action'; panel: string; row: string }
 
 export interface PackFrame {
@@ -26,11 +27,6 @@ export interface PackFrame {
   types: string[]
   mode: 'run' | 'deploy'
   clockMs?: number
-  activities: { id: string; title: string }[]
-  theory?: { title: string; body: string[]; example: string }
-  task?: { condition: string; examples: string[] }
-  reference: APIEntry[]
-  types: string[]
   previewWorld?: unknown
   notice?: string
   tickCount: number

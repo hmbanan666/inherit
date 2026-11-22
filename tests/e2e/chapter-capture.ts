@@ -71,7 +71,6 @@ export async function chapterCapture(page: Page) {
       const { data } = await browser.send('Page.captureScreenshot', { format: 'png' })
       await mkdir(dirname(join(dir,name)),{recursive:true})
       await writeFile(join(dir, name + '.png'), Buffer.from(data, 'base64'))
-      if (workshop || town) text[1] += '\nMap signs: ' + signs
       await writeFile(join(dir, name + '.txt'), text.join('\n\n') + '\n')
       await appendFile(join(dir,'visible-text.md'),'\n## '+name+'.png\n\n````text\n'+text.join('\n\n')+'\n````\n')
     } finally {

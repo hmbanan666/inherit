@@ -36,8 +36,7 @@ if (!id) onMounted(async () => {
 useHead({title: (manifest?.title ?? 'Game packs') + ' · Inherit'})
 </script>
 <template>
-  <component :is="studio" v-if="studio"/>
-  <PackStudio v-else-if="manifest && world" :manifest="manifest" :view="world"/>
+  <PackStudio v-if="manifest && world" :manifest="manifest" :view="world"/>
   <main v-else-if="id || query.has('lesson')" class="showcase"><article><h1>Unknown pack</h1><a href="/">Choose a game pack</a></article></main>
   <main v-else class="showcase"><header class="hud"><a class="brand pack-brand" href="/"><img src="/mark.svg" alt=""/>Inherit<span>.</span></a></header>
     <article><header><h1>Game packs</h1><p>Learn TypeScript by making a world your own.</p></header>
