@@ -42,15 +42,15 @@ test('review returns to the frontier with its draft and checkpoint intact', asyn
   try {
     await runner.play(save, beginner.lessons[0].referenceSolution)
     continueLesson(beginner, save)
-    save.project.working = {'main.ts': '// still choosing flowers'}
+    save.project.working = {'main.ts': '// still lettering the ferry sign'}
     const frontier = structuredClone(save.entryWorld)
     selectLesson(beginner, save, 'hello')
     expect(save.phase).toBe('brief')
     await runner.play(save, beginner.lessons[0].referenceSolution)
     continueLesson(beginner, save)
-    expect(save.lessonId).toBe('flowers')
+    expect(save.lessonId).toBe('sign-spaces')
     expect(save.completed).toEqual(['hello'])
-    expect(save.project.working['main.ts']).toBe('// still choosing flowers')
+    expect(save.project.working['main.ts']).toBe('// still lettering the ferry sign')
     expect(save.entryWorld).toEqual(frontier)
   } finally {
     runner.dispose()
@@ -79,8 +79,13 @@ test('player reference retains parameter names, return guidance and multiline ex
 test('migration credits surviving ids across gaps, keeps the draft, and rechecks a solved boundary', async () => {
   const before = freshSave(beginner)
   const { migrateBeginner } = await import('../../packages/sim/src/framework/migrate')
+  const village = {
+    bubble: 'Hello!', bed: 'gate', gateFlowers: 0, houseFlowers: 0, sign: '', flag: '',
+    basket: 0, bell: 0, ribbons: 0, shutters: false, raining: false, canopy: false,
+    picnic: false, banner: false, lamps: [], neighbours: [], stalls: [],
+  }
   const raw = JSON.stringify({
-    ...before, formatVersion: 1, packVersion: 1, lessonId: 'flowers', phase: 'solved',
+    ...before, world: village, entryWorld: village, formatVersion: 1, packVersion: 1, lessonId: 'flowers', phase: 'solved',
     completed: ['hello', 'house-sign', 'village-fair'], released: [], seenSections: [], pendingReveals: [],
     project: {...before.project, working: {'main.ts': '// saved draft'}},
   })
@@ -88,13 +93,18 @@ test('migration credits surviving ids across gaps, keeps the draft, and rechecks
   try {
     const save = await migrateBeginner(beginner, raw, async (trial, files) => { await runner.play(trial, files) })
     expect(decodeSave(beginner, JSON.stringify(save))).toMatchObject({
-      formatVersion: 2, phase: 'brief', lessonId: 'flowers', completed: ['hello', 'house-sign'],
-      world: {bubble: 'Hello!', gateFlowers: 0}, project: {working: {'main.ts': '// saved draft'}},
+      formatVersion: 2, phase: 'brief', lessonId: 'sign-spaces', completed: ['hello', 'house-sign'],
+      world: {album: {hello: 'Welcome to the village!'}},
+      drafts: {flowers: {files: {'main.ts': '// saved draft'}}},
     })
-    await runner.play(save, beginner.lessons[1].referenceSolution)
-    await runner.advance(save)
+    for (const lesson of beginner.lessons.slice(1, 8)) {
+      expect(save.lessonId).toBe(lesson.id)
+      if (lesson.id === 'flowers') expect(save.project.working['main.ts']).toBe('// saved draft')
+      await runner.play(save, lesson.referenceSolution)
+      await runner.advance(save)
+    }
     expect(save.lessonId).toBe('flag')
-    expect(save.world).toMatchObject({gateFlowers: 3, sign: 'Mira'})
+    expect(save.world.album).toMatchObject({flowers: '3 blooms', 'house-sign': 'Willow'})
     await expect(migrateBeginner(beginner, raw.replace('"gateFlowers":0', '"gateFlowers":null'), async () => {})).rejects.toThrow()
   } finally {
     runner.dispose()
