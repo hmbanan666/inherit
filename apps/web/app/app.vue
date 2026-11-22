@@ -17,6 +17,9 @@ const custom = studios[folder+id+'/Studio.vue']
 const render = views[folder+id+'/WorldView.vue']
 const studio = custom && defineAsyncComponent(custom)
 const world = render && defineAsyncComponent(render)
+// Design prototypes live outside the pack flow and are reached only by path.
+const prototype = /^\/prototype\/lesson\/?$/.test(location.pathname)
+  ? defineAsyncComponent(() => import('./prototype/lesson-v7/LessonPrototype.vue')) : undefined
 const maps = shallowRef<Record<string, MapLesson[]>>({})
 const selections: Record<string, string | null> = {}
 if (!id) onMounted(async () => {
@@ -39,7 +42,8 @@ if (!id) onMounted(async () => {
 useHead({title: (manifest?.title ?? 'Game packs') + ' · Inherit'})
 </script>
 <template>
-  <component :is="studio" v-if="studio"/>
+  <component :is="prototype" v-if="prototype"/>
+  <component :is="studio" v-else-if="studio"/>
   <PackStudio v-else-if="manifest && world" :manifest="manifest" :view="world"/>
   <main v-else-if="id || query.has('lesson')" class="showcase"><article><h1>Unknown pack</h1><a href="/">Choose a game pack</a></article></main>
   <main v-else class="showcase"><header class="hud"><a class="brand pack-brand" href="/"><img src="/mark.svg" alt=""/>Inherit<span>.</span></a></header>
