@@ -1,5 +1,5 @@
 import { definePack } from '../../framework/pack'
-import { lessons, units } from './lessons'
+import { lessons } from './lessons'
 import manifest from './manifest'
 import type { PlayerAPI } from './player'
 import { decodeWorld, initialWorld, villageAPI, type Village } from './world'
@@ -13,7 +13,7 @@ for (const lesson of lessons) {
 
 export default definePack<Village, PlayerAPI>({
   manifest,
-  units,
+  scenes: [...new Set(lessons.map(lesson => lesson.scene))],
   lessons,
   version: 2,
   initialWorld,
@@ -24,6 +24,11 @@ export default definePack<Village, PlayerAPI>({
   panels: [],
   available: (_, id) => available.get(id) ?? [],
   beginAttempt(world) {
-    return { api: villageAPI(world), finish() {} }
+    return {
+      api: villageAPI(world),
+      finish(logs: readonly string[] = []) {
+        if (world.prop === 'slip') world.slip = logs.join(' · ')
+      },
+    }
   },
 })
