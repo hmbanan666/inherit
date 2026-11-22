@@ -1,70 +1,174 @@
 import ts from 'typescript'
-import type { Files } from '../../framework/pack'
+import type { Evidence } from '../../framework/pack'
+import type { Village } from './world'
 
-let lastSource: string | undefined
-let lastTree: ts.SourceFile
-function tree(files: Files) {
-  if (files['main.ts'] !== lastSource) {
-    lastSource = files['main.ts']
-    lastTree = ts.createSourceFile('main.ts',lastSource,ts.ScriptTarget.Latest,true)
+type Seen = Evidence<Village>
+type Match = (node: ts.Node) => boolean
+
+// Resolve local names with the compiler so a shadowed or unused declaration
+// cannot earn credit for a value that reached the scene.
+let cached: { source: string; tree: ts.SourceFile; checker: ts.TypeChecker } | undefined
+function document(source: string) {
+  if (cached?.source === source) return cached
+  const tree = ts.createSourceFile('main.ts', source, ts.ScriptTarget.Latest, true)
+  const program = ts.createProgram(['main.ts'], { noLib: true, noResolve: true }, {
+    getSourceFile: name => name === 'main.ts' ? tree : undefined,
+    fileExists: name => name === 'main.ts',
+    readFile: name => name === 'main.ts' ? source : undefined,
+    writeFile() {},
+    getCurrentDirectory: () => '',
+    getDirectories: () => [],
+    getDefaultLibFileName: () => '',
+    getCanonicalFileName: name => name,
+    useCaseSensitiveFileNames: () => true,
+    getNewLine: () => '\n',
+  })
+  return cached = { source, tree, checker: program.getTypeChecker() }
+}
+
+function findNode(root: ts.Node, match: Match): ts.Node | undefined {
+  return match(root) ? root : ts.forEachChild(root, child => findNode(child, match))
+}
+
+function declaration(node: ts.Node) {
+  return cached?.checker.getSymbolAtLocation(node)?.valueDeclaration
+}
+
+function owner(node: ts.Node) {
+  return ts.findAncestor(node.parent, ts.isFunctionDeclaration)
+}
+
+function origin(node: ts.Node, match: Match, visited = new Set<ts.Node>()): boolean {
+  if (visited.has(node)) return false
+  visited.add(node)
+  if (match(node)) return true
+  const defined = ts.isIdentifier(node) ? declaration(node) : undefined
+  if (defined && ts.isVariableDeclaration(defined) && defined.initializer) {
+    if (match(defined) || origin(defined.initializer, match, visited)) return true
   }
-  return lastTree
+  return !!ts.forEachChild(node, child => origin(child, match, visited) || undefined)
 }
-function inside(node: ts.Node, match: (node: ts.Node) => boolean): boolean {
-  return match(node) || !!ts.forEachChild(node, child => inside(child,match) || undefined)
-}
-function namedCall(node: ts.Node, name: string): node is ts.CallExpression {
-  return ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name
-}
-export function boundArgument(files: Files, call: string, from?: string) {
-  const root = tree(files)
-  return inside(root, n => {
-    if (!namedCall(n,call) || !n.arguments.length || !ts.isIdentifier(n.arguments[0])) return false
-    const name = n.arguments[0].text
-    return inside(root, d => ts.isVariableDeclaration(d) && ts.isIdentifier(d.name) && d.name.text === name &&
-      !!d.initializer && (!from || namedCall(d.initializer,from)))
+
+function executed(e: Seen, operation: string, match: (call: ts.CallExpression) => boolean) {
+  const { tree } = document(e.files['main.ts'])
+  const lines = new Set(e.calls.filter(call => call.name === operation).map(call => call.line))
+  return !!findNode(tree, node => {
+    if (!ts.isCallExpression(node) || node.expression.getText(tree) !== operation) return false
+    const line = tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1
+    return lines.has(line) && match(node)
   })
 }
-export function reassignedFlag(files: Files) {
-  const root = tree(files)
-  return inside(root, c => namedCall(c,'hangFlag') && !!c.arguments[0] && ts.isIdentifier(c.arguments[0]) &&
-    inside(root, d => ts.isBinaryExpression(d) && d.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      ts.isIdentifier(d.left) && d.left.text === c.arguments[0].getText(root)))
+
+export function feeds(e: Seen, operation: string, ...matches: Match[]) {
+  return executed(e, operation, call => !!call.arguments[0] &&
+    matches.every(match => origin(call.arguments[0], match)))
 }
-function assigned(root:ts.SourceFile, node:ts.Node, matches:(expression:ts.Expression)=>boolean) {
-  return ts.isIdentifier(node) && inside(root, declaration=>ts.isVariableDeclaration(declaration) &&
-    declaration.name.getText(root)===node.text && !!declaration.initializer && matches(declaration.initializer))
+
+export const binary = (operator: string): Match => node =>
+  ts.isBinaryExpression(node) && node.operatorToken.getText() === operator
+
+export const name = (identifier: string): Match => node =>
+  ts.isIdentifier(node) && node.text === identifier
+
+export const shape = (kind: 'array' | 'object' | 'template' | 'index' | 'negation'): Match => node => {
+  switch (kind) {
+    case 'array': return ts.isArrayLiteralExpression(node)
+    case 'object': return ts.isObjectLiteralExpression(node)
+    case 'template': return ts.isTemplateExpression(node)
+    case 'index': return ts.isElementAccessExpression(node)
+    case 'negation': return ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken
+  }
 }
-export function addsCounts(files: Files) {
-  const root = tree(files)
-  const addition = (node:ts.Node) => ts.isBinaryExpression(node) && node.operatorToken.kind===ts.SyntaxKind.PlusToken &&
-    ts.isIdentifier(node.left) && ts.isIdentifier(node.right) && node.left.text!==node.right.text
-  return inside(root,n=>namedCall(n,'fillBasket') && !!n.arguments[0] &&
-    (addition(n.arguments[0]) || assigned(root,n.arguments[0],addition)))
+
+export const constant: Match = node => ts.isVariableDeclaration(node) &&
+  !!(node.parent.flags & ts.NodeFlags.Const)
+
+export const annotation = (type: string): Match => node => ts.isVariableDeclaration(node) &&
+  node.type?.getText().replace(/\s/g, '') === type
+
+export const inks: Match = node => {
+  if (!ts.isVariableDeclaration(node) || !node.type || !ts.isUnionTypeNode(node.type)) return false
+  const values = node.type.types.map(type => ts.isLiteralTypeNode(type) && ts.isStringLiteral(type.literal)
+    ? type.literal.text : undefined)
+  return values.length === 2 && values.includes('blue') && values.includes('gold')
 }
-export function readsWeather(files:Files) {
-  const root = tree(files)
-  return inside(root,node=>ts.isIfStatement(node) &&
-    assigned(root,node.expression,value=>namedCall(value,'isRaining')) &&
-    !!node.elseStatement && inside(node.thenStatement,n=>namedCall(n,'openCanopy')) &&
-    inside(node.elseStatement,n=>namedCall(n,'foldCanopy')))
+
+export const reading = (operation: string): Match => node => ts.isVariableDeclaration(node) &&
+  !!node.initializer && ts.isCallExpression(node.initializer) && node.initializer.expression.getText() === operation
+
+export function updated(e: Seen, operation: string, method?: 'push', copy?: string) {
+  return executed(e, operation, call => {
+    const argument = call.arguments[0]
+    if (!argument || !ts.isIdentifier(argument)) return false
+    const variable = declaration(argument)
+    if (!variable || !ts.isVariableDeclaration(variable)) return false
+    if (copy && (variable.initializer?.getText() !== copy || !origin(variable.initializer, constant))) return false
+    return !!findNode(call.getSourceFile(), node => {
+      if (node.pos < variable.end || node.end > call.pos) return false
+      if (method) return ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === method && declaration(node.expression.expression) === variable
+      return ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        declaration(node.left) === variable && !!(variable.parent.flags & ts.NodeFlags.Let)
+    })
+  })
 }
-export function parameterFeeds(files: Files, helper: string, call: string) {
-  return inside(tree(files),fn => ts.isFunctionDeclaration(fn) && fn.name?.text === helper && !!fn.body &&
-    fn.parameters.some(p => !!p.type && inside(fn.body!, c => namedCall(c,call) && c.arguments[0]?.getText() === p.name.getText())))
+
+export const property = (field: string): Match => node =>
+  ts.isPropertyAccessExpression(node) && node.name.text === field
+
+export const helperResult = (resultType?: string, arrow = false): Match => node => {
+  if (!ts.isCallExpression(node)) return false
+  const defined = declaration(node.expression)
+  if (!defined) return false
+  const fn = ts.isVariableDeclaration(defined) ? defined.initializer : defined
+  if (!fn || !(ts.isFunctionDeclaration(fn) || ts.isArrowFunction(fn)) || !fn.body) return false
+  if (arrow && !ts.isArrowFunction(fn) || resultType && fn.type?.getText() !== resultType) return false
+  return !ts.isBlock(fn.body) || !!findNode(fn.body, ts.isReturnStatement)
 }
-export function branchCalls(files: Files, yes: string, no?: string) {
-  return inside(tree(files),n => ts.isIfStatement(n) && inside(n.thenStatement,c=>namedCall(c,yes)) &&
-    (!no || (!!n.elseStatement && inside(n.elseStatement,c=>namedCall(c,no)))))
+
+export function insideHelper(e: Seen, operation: string, parameterTypes: string[]) {
+  return executed(e, operation, call => {
+    const fn = owner(call)
+    return !!fn && fn.parameters.length === parameterTypes.length &&
+      fn.parameters.every((parameter, index) => parameter.type?.getText() === parameterTypes[index] &&
+        !!call.arguments[0] && origin(call.arguments[0], node => declaration(node) === parameter))
+  })
 }
-export function comparesCount(files: Files) {
-  const root = tree(files)
-  return inside(root,n => ts.isIfStatement(n) && ts.isBinaryExpression(n.expression) &&
-    [n.expression.left,n.expression.right].some(v=>assigned(root,v,init=>namedCall(init,'basketCount'))) &&
-    [ts.SyntaxKind.GreaterThanEqualsToken,ts.SyntaxKind.LessThanEqualsToken,ts.SyntaxKind.GreaterThanToken,ts.SyntaxKind.LessThanToken].includes(n.expression.operatorToken.kind) &&
-    inside(n.thenStatement,c=>namedCall(c,'setPicnic')))
+
+export function inBlock(e: Seen, operation: string, ...blocks: ('for' | 'forOf' | 'while' | 'if' | 'elseIf')[]) {
+  return executed(e, operation, call => blocks.every(block => !!ts.findAncestor(call.parent, node => {
+    switch (block) {
+      case 'for': return ts.isForStatement(node)
+      case 'forOf': return ts.isForOfStatement(node)
+      case 'while': return ts.isWhileStatement(node)
+      case 'if': return ts.isIfStatement(node)
+      case 'elseIf': return ts.isIfStatement(node) && !!node.elseStatement && ts.isIfStatement(node.elseStatement)
+    }
+  })))
 }
-export function loopCalls(files: Files, call: string, list = false) {
-  return inside(tree(files),n => (list ? ts.isForOfStatement(n) : ts.isForStatement(n)) &&
-    inside((n as ts.IterationStatement).statement,c=>namedCall(c,call)))
+
+export function accumulated(e: Seen) {
+  return executed(e, 'showScore', call => {
+    const total = call.arguments[0] && declaration(call.arguments[0])
+    return !!total && !!findNode(call.getSourceFile(), loop => ts.isForOfStatement(loop) &&
+      !!findNode(loop.statement, node => ts.isBinaryExpression(node) && declaration(node.left) === total &&
+        (node.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken || origin(node.right, binary('+')))))
+  })
+}
+
+export const interfaceBooking: Match = node => {
+  if (!ts.isVariableDeclaration(node) || !node.type || !ts.isTypeReferenceNode(node.type)) return false
+  const definitions = cached?.checker.getSymbolAtLocation(node.type.typeName)?.declarations ?? []
+  return definitions.some(type => ts.isInterfaceDeclaration(type) &&
+    ['name:string', 'seats:number'].every(field => type.members.some(member =>
+      ts.isPropertySignature(member) && member.name.getText() + ':' + member.type?.getText() === field)))
+}
+
+export const numeral = (value: number): Match => node => ts.isNumericLiteral(node) && Number(node.text) === value
+
+export function ticketKept(e: Seen) {
+  const { tree } = document(e.files['main.ts'])
+  return !!findNode(tree, node => ts.isVariableDeclaration(node) && constant(node) &&
+    node.name.getText() === 'ticket' && !!node.initializer &&
+    ts.isStringLiteral(node.initializer) && node.initializer.text === 'West')
 }
