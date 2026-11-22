@@ -1,5 +1,14 @@
 export type Files = Record<string, string>
-export interface PackManifest {
+export interface Unit {
+  id: string
+  title: string
+  landmark: string
+}
+
+export type PackManifest = (
+  | { track: 'course'; units: readonly Unit[] }
+  | { track: 'challenges'; units?: never }
+) & {
   id: string
   title: string
   tagline: string
@@ -33,9 +42,31 @@ export type Colour = 'red' | 'amber' | 'green'
 export interface Check<W> {
   id: string
   label: string
+  input?: string
   evaluate(e: Evidence<W>): Colour
 }
+export interface Theory {
+  title: string
+  body: readonly string[]
+  example: string
+}
+
+export interface Task {
+  condition: string
+  examples: readonly string[]
+}
+
+export type InputValue = string | number | boolean | null | InputValue[] | { [key: string]: InputValue }
+
 export interface Lesson<W> {
+  unit?: string
+  kind: 'write' | 'fill' | 'fix' | 'predict'
+  theory?: Theory
+  task?: Task
+  prediction?: { question: string; choices: readonly string[]; answer: string }
+  scene: string
+  variants?: readonly { input: string; enter(world: W): void; maxTicks?: number }[]
+  inputs?(world: Readonly<W>): Record<string, { type: string; value: InputValue }>
   id: string
   goal: string
   idea: string
@@ -46,12 +77,11 @@ export interface Lesson<W> {
   referenceSolution: Files
   visibleEffect: { description: string; testId: string; text: string }
   solved: { reaction: string; did: string; idea: string }
-  reveals?: readonly string[]
   enter?(world: W): void
 }
 export interface Row { id: string; label: string; value: string; action?: {name:string;args:unknown[]} }
 export interface Entity<W> { id: string; label: string; rows(world: W): Row[] }
-export interface Panel<W> extends Entity<W> { placement: 'nav' | 'panel'; reveal?: string }
+export interface Panel<W> extends Entity<W> { placement: 'nav' | 'panel' }
 export interface Pack<W, A extends object> {
   manifest: PackManifest
   version: number
@@ -59,6 +89,7 @@ export interface Pack<W, A extends object> {
   decodeWorld(input: unknown): W
   entities: Entity<W>[]
   panels: Panel<W>[]
+  scenes: readonly string[]
   lessons: Lesson<W>[]
   exposure: 'globals' | 'module'
   retry: 'entry' | 'live'
@@ -69,7 +100,6 @@ export interface Pack<W, A extends object> {
   clock?: {intervalMs:number;handler:'onTick'}
   actions?: Record<string,(world:W,args:readonly unknown[])=>void>
   upgrade?(fromVersion:number,input:unknown):unknown
-  release?(world: W, id: string): void
 }
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }
 export function mainFile(source: string, line = source.split('\n').length): Starter {

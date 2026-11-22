@@ -8,7 +8,8 @@ const introduced: (keyof PlayerAPI)[][] = [
   ['isRaining','openCanopy','foldCanopy'], ['basketCount','setPicnic'], ['lightLamp'], ['greet'], ['openStall','hangBanner'],
 ]
 export default definePack<Village,PlayerAPI>({
-  manifest, lessons, version: 1, initialWorld, decodeWorld, exposure: 'globals', retry: 'entry',
+  scenes: ['village'],
+  manifest, lessons, version: 2, initialWorld, decodeWorld, exposure: 'globals', retry: 'entry',
   entities: [
     {id:'villager',label:'Mila',rows:w=>[{id:'speech',label:'Mila',value:w.bubble}]},
     {id:'beds',label:'Flower beds',rows:w=>[{id:'gate',label:'Gate',value:String(w.gateFlowers)},{id:'house',label:'House',value:String(w.houseFlowers)}]},

@@ -38,7 +38,7 @@ export const edits: Record<string,Edit> = {
   'harrow-deed': {goal:'Pay the family tab and take the deed',anchor:/^import /,note:'Add payBalance to the workshop import and call payBalance() below it to pay the bank.'},
 }
 function comments(note: string) { return note.split('\n').map(line=>'// '+line) }
-const authored = new Set(Object.values(edits).flatMap(e=>comments(e.note)))
+const authored = new Set(Object.values(edits).flatMap(e=>[...comments(e.note), '// TODO: '+e.goal+'.']))
 export function workshopStarter(id: string, previous: Files): Starter {
   const edit = edits[id]
   const files = Object.fromEntries(Object.entries(previous).map(([path,code])=>[path,
@@ -48,7 +48,7 @@ export function workshopStarter(id: string, previous: Files): Starter {
   let pos = edit.anchor ? lines.findIndex(line=>edit.anchor!.test(line)) : -1
   if (pos < 0) pos = lines.length
   const indent = lines[pos]?.match(/^\s*/)?.[0] ?? ''
-  const note = comments(edit.note).map(line=>indent+line)
+  const note = comments('TODO: '+edit.goal+'.').map(line=>indent+line)
   lines.splice(pos,0,...note)
   if (pos+note.length===lines.length) lines.push('')
   if (id==='bram-loop' && !lines.some(l=>/^export function onTick\(/.test(l)))
@@ -60,7 +60,7 @@ export function workshopStarter(id: string, previous: Files): Starter {
 /** Find the edit in a restored draft without replacing any of the player's code. */
 export function workshopEdit(id: string, files: Files): Starter['edit'] {
   const { edit } = workshopStarter(id, files)
-  const lastNote = comments(edits[id].note).at(-1)
+  const lastNote = comments('TODO: '+edits[id].goal+'.').at(-1)
   const lines = (files[edit.file] ?? '').split('\n')
   const comment = lines.findIndex(line => line.trim() === lastNote)
   return comment < 0 ? edit : { file: edit.file, line: comment + 2 }

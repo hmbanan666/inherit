@@ -1,15 +1,36 @@
 import ts from 'typescript'
 
+export interface ApiMethod {
+  name: string
+  signature: string
+  description: string
+  params: { name: string; description: string }[]
+  returns: string
+  example: string
+}
+
 export function readPlayerAPI(source: string) {
   const file = ts.createSourceFile('player.ts',source,ts.ScriptTarget.Latest,true)
   const types: Record<string,string> = {}
-  const methods: {name:string;signature:string;description:string}[] = []
+  const methods: ApiMethod[] = []
   for (const stmt of file.statements) {
     if (ts.isInterfaceDeclaration(stmt) && stmt.name.text === 'PlayerAPI') {
       for (const method of stmt.members) {
         if (!ts.isMethodSignature(method)) continue
         const doc = ts.getJSDocCommentsAndTags(method).find(ts.isJSDoc)
-        methods.push({name:method.name.getText(file),signature:method.getText(file),description:String(doc?.comment ?? '')})
+        const tags = ts.getJSDocTags(method)
+        const tagText = (name: string) => ts.getTextOfJSDocComment(tags.find(tag => tag.tagName.text === name)?.comment) ?? ''
+        methods.push({
+          name: method.name.getText(file),
+          signature: method.getText(file),
+          description: ts.getTextOfJSDocComment(doc?.comment) ?? '',
+          params: tags.filter(ts.isJSDocParameterTag).map(tag => ({
+            name: tag.name.getText(file),
+            description: ts.getTextOfJSDocComment(tag.comment) ?? '',
+          })),
+          returns: tagText('returns') || tagText('return'),
+          example: tagText('example'),
+        })
       }
     } else if (ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) {
       types[stmt.name.text] = stmt.getText(file).replace(/^export\s+/,'')
