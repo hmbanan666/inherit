@@ -5,6 +5,7 @@ import unit4 from './units/04-types-and-the-colon'
 import unit5 from './units/05-return-values'
 import unit6 from './units/06-choices'
 import unit7 from './units/07-arrays'
+import unit8 from './units/08-loops'
 
 const curriculum = [
   unit1,
@@ -14,6 +15,7 @@ const curriculum = [
   unit5,
   unit6,
   unit7,
+  unit8,
 ]
 
 export const units = curriculum.map(section => section.unit)
