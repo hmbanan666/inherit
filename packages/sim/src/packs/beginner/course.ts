@@ -71,18 +71,7 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
     scene,
     theory,
     prediction,
-    checks: variants.length ? [
-      {
-        ...checks[0],
-        evaluate: (e: Seen) => checks.every(check => check.evaluate(e) === 'green') ? 'green' as const : 'red' as const,
-      },
-      ...variants.map((variant, index) => ({
-        ...checks[1],
-        evaluate: (e: Seen) => checks.every(check => check.evaluate(e) === 'green') ? 'green' as const : 'red' as const,
-        id: checks[1].id + '-' + index,
-        input: variant.input,
-      })),
-    ] : checks,
+    checks,
     hints,
     task: { condition: page.reason, examples: [] },
     introduces: page.introduces ?? [],
