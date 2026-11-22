@@ -51,7 +51,7 @@ const typed = computed(() => !!v7.value?.ready(code.value) && code.value !== fai
 const guessed = computed(() => !prediction.value || !!choice.value)
 const runReady = computed(() => !busy.value && !solved.value && !ended.value && typed.value && guessed.value)
 const theory = computed(() => frame.value?.theory && { ...frame.value.theory,
-  body: frame.value.theory.body.map(line => (v7.value.reword ?? []).reduce((text, [from, to]) => text.replace(from, to), line)) })
+  body: frame.value.theory.body.map(line => (v7.value?.reword ?? []).reduce((text, [from, to]) => text.replace(from, to), line)) })
 const steps = computed(() => {
   const list = [{ label: v7.value?.write ?? '', done: typed.value || !!solved.value, run: false }]
   if (prediction.value) list.push({ label: 'Make a guess', done: guessed.value, run: false })

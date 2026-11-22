@@ -81,7 +81,7 @@ watch(() => props.busy, busy => { if (!busy) button.value?.focus({ preventScroll
 </template>
 
 <style scoped>
-.veil { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 16px; background: radial-gradient(closest-side, #0a0b0d8c, #0a0b0d40 70%, transparent); animation: veil .3s ease-out }
+.veil { position: absolute; inset: 0; z-index: 6; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 16px; background: radial-gradient(closest-side, #0a0b0d8c, #0a0b0d40 70%, transparent); animation: veil .3s ease-out }
 .solved { position: relative; width: min(400px, 100%); max-height: 100%; overflow: visible; padding: 22px 24px 24px; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--panel); box-shadow: 0 16px 50px var(--shadow); animation: rise .38s cubic-bezier(.3, 1.4, .5, 1) }
 .badge { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--mint); font: 12px var(--mono) }
 .tick { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--mint); color: var(--ink) }
