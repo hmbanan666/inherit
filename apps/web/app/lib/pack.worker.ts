@@ -10,6 +10,7 @@ let pack: ReturnType<typeof getPack>
 let save: PackSave<ReturnType<typeof pack.initialWorld>>
 let runner: ReturnType<typeof createPackRunner<any, any>>
 let logs: string[] = []
+let failedInputs: Record<string, string[]> = {}
 const current = () => pack.lessons.find(l => l.id === save.lessonId)
 
 async function open(command: Extract<PackCommand, { kind: 'open' }>) {
@@ -95,6 +96,7 @@ async function act(command: PackCommand) {
         moments = result.moments
         start = result.start
         statuses = result.checks
+        failedInputs = result.failedInputs
         logs = mode === 'tick' ? [...logs, ...result.logs].slice(-64) : result.logs
         if (mode === 'tick') tickCount++
         if (mode === 'deploy') tickCount = 0
@@ -105,6 +107,8 @@ async function act(command: PackCommand) {
     error = cause instanceof Error ? cause.message : 'Could not open the pack.'
     if (command.kind === 'open') { self.postMessage({ loadError: error }); return }
   }
+  if (command.kind === 'open' || command.kind === 'select' || previousId !== save.lessonId ||
+      (error && (command.kind === 'run' || command.kind === 'tick'))) failedInputs = {}
   const lesson = current()
   if (lesson && !save.edit) save.edit = lesson.starter(save.project.working).edit
   const names = lesson ? pack.available(save.world, lesson.id) : []
@@ -124,7 +128,7 @@ async function act(command: PackCommand) {
     noCalls: command.kind === 'run' && lesson?.mode === 'run' && !moments.length && !logs.length && !error,
     mode: lesson?.mode ?? 'run', clockMs: pack.clock?.intervalMs, goal: lesson?.goal ?? '',
     edit: save.edit ?? {file: 'main.ts', line: 1}, hints: lesson?.hints ?? [],
-    labels: lesson?.checks.map(({ id, label, input }) => ({id, text: label, input})) ?? [],
+    labels: lesson?.checks.map(({ id, label, input }) => ({id, text: label, input: failedInputs[id]?.join(', ') ?? input})) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],
     finishIdeas: lesson ? undefined : pack.lessons.map(l => l.idea),
     index: map.findIndex(l => l.id === save.lessonId), total: map.length,

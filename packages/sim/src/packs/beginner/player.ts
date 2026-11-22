@@ -1,94 +1,157 @@
+export interface Guest {
+  name: string
+  seats: number
+}
+
 export interface PlayerAPI {
-  /** Give Mila a speech bubble with your words.
-   * @param words The words Mila should speak.
+  /**
+   * Give Mila some words to say aloud.
+   * @param words Your words, up to 80 characters.
    * @returns No value.
    * @example say("Good morning!")
    */
   say(words: string): void
-  /** Plant this many flowers in the open bed.
-   * @param count Number of flowers to plant.
+  /**
+   * Copy the supplied text onto the next sign.
+   * @param text The words to letter on the sign.
    * @returns No value.
-   * @example plant(2)
+   * @example paintSign("East Pier")
    */
-  plant(count: number): void
-  /** Paint a name on the cottage sign.
-   * @param name Text for the sign.
-   * @returns No value.
-   * @example paintSign("Mila")
-   */
-  paintSign(name: string): void
-  /** Hang a blue or gold welcome flag.
-   * @param colour The new flag colour.
-   * @returns No value.
-   * @example hangFlag("blue")
-   */
-  hangFlag(colour: string): void
-  /** Gather apples from the two trees into the basket.
-   * @param count Number of apples in the basket.
-   * @returns No value.
-   * @example fillBasket(2)
-   */
-  fillBasket(count: number): void
-  /** Ring the brass morning bell.
+  paintSign(text: string): void
+  /**
+   * Swing the brass bell once.
    * @returns No value.
    * @example ringBell()
    */
   ringBell(): void
-  /** Swing the cottage shutters open.
+  /**
+   * Grow this many flowers in the next marked bed.
+   * @param count The number of flowers, from 0 to 32.
+   * @returns No value.
+   * @example plant(2)
+   */
+  plant(count: number): void
+  /**
+   * Place a whole number of apples in the basket.
+   * @param count The number of apples, from 0 to 32.
+   * @returns No value.
+   * @example fillBasket(4)
+   */
+  fillBasket(count: number): void
+  /**
+   * Set the scoreboard to a number.
+   * @param points A finite number to display.
+   * @returns No value.
+   * @example showScore(12)
+   */
+  showScore(points: number): void
+  /**
+   * Raise a blue or gold flag on the pole.
+   * @param colour The colour, either blue or gold.
+   * @returns No value.
+   * @example hangFlag("blue")
+   */
+  hangFlag(colour: string): void
+  /**
+   * Swing open the cottage shutters.
    * @returns No value.
    * @example openShutters()
    */
   openShutters(): void
-  /** Hang ribbons under the cottage windows.
-   * @param count Number of ribbons.
+  /**
+   * Set the signal to green for true or off for false.
+   * @param on The signal reading, true for green or false for off.
    * @returns No value.
-   * @example hangRibbons(4)
+   * @example setSignal(false)
    */
-  hangRibbons(count: number): void
-  /** Find out whether rain is falling in the village.
-   * @returns True when rain is falling.
+  setSignal(on: boolean): void
+  /**
+   * Read the number of apples in the basket.
+   * @returns How many apples are in the basket.
+   * @example const harvest = basketCount()
+   */
+  basketCount(): number
+  /**
+   * Read the weather sensor. Rain gives true and clear skies give false.
+   * @returns True in rain and false under clear skies.
    * @example const wet = isRaining()
    */
   isRaining(): boolean
-  /** Spread the striped shelter over the path.
+  /**
+   * Pull the canopy across the path.
    * @returns No value.
    * @example openCanopy()
    */
   openCanopy(): void
-  /** Fold the shelter to let the sunlight through.
+  /**
+   * Fold the canopy back from the path.
    * @returns No value.
    * @example foldCanopy()
    */
   foldCanopy(): void
-  /** Count the apples in the basket.
-   * @returns Number of apples currently in the basket.
-   * @example const count = basketCount()
-   */
-  basketCount(): number
-  /** Lay a cloth and plates for a picnic.
+  /**
+   * Fill the hooks with these flag colours, left to right.
+   * @param colours A list of blue and gold colours in hook order.
    * @returns No value.
-   * @example setPicnic()
+   * @example rackFlags(["blue", "gold"])
    */
-  setPicnic(): void
-  /** Light one path lamp by its number, from 1 to 5.
-   * @param lamp Lamp number along the path.
+  rackFlags(colours: string[]): void
+  /**
+   * Lay the numeric weights into the tray in order.
+   * @param weights A list of whole weights, each between 0 and 32.
    * @returns No value.
-   * @example lightLamp(2)
+   * @example loadWeights([3, 1])
    */
-  lightLamp(lamp: number): void
-  /** Invite a neighbour to the fair by name.
-   * @param name Name of the arriving neighbour.
+  loadWeights(weights: number[]): void
+  /**
+   * Invite one named guest onto the path.
+   * @param name The visitor’s name.
    * @returns No value.
    * @example greet("Pip")
    */
   greet(name: string): void
-  /** Open a fair stall for one of the neighbours.
-   * @param guest Name of a neighbour already at the fair.
+  /**
+   * Light the path lamp with this number, from one to five.
+   * @param number The number on the lamp post, from 1 to 5.
    * @returns No value.
-   * @example openStall("Ada")
+   * @example lightLamp(2)
    */
-  openStall(guest: string): void
-  /** Raise the welcome banner above the stalls.
+  lightLamp(number: number): void
+  /**
+   * Move the robot one square towards the dock.
+   * @returns No value.
+   * @example step()
+   */
+  step(): void
+  /**
+   * Dress the next rail with this many ribbons.
+   * @param count The number of ribbons for this rail, from 0 to 32.
+   * @returns No value.
+   * @example hangRibbons(3)
+   */
+  hangRibbons(count: number): void
+  /**
+   * Copy a booking's name and seat count onto the next stall card.
+   * @param card A booking with a name and a whole seat count from 0 to 32.
+   * @returns No value.
+   * @example postCard({ name: "Boats", seats: 2 })
+   */
+  postCard(card: { name: string; seats: number }): void
+  /**
+   * Read today's guest cards in arrival order.
+   * @returns A fresh list of today’s bookings in arrival order.
+   * @example const bookings = guests()
+   */
+  guests(): Guest[]
+  /**
+   * Open one named fair stall.
+   * @param name The stallholder’s name.
+   * @returns No value.
+   * @example openStall("Kites")
+   */
+  openStall(name: string): void
+  /**
+   * Raise the fair's welcome banner.
    * @returns No value.
    * @example hangBanner()
    */

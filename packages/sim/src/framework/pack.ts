@@ -93,7 +93,7 @@ export interface Pack<W, A extends object> {
   lessons: Lesson<W>[]
   exposure: 'globals' | 'module'
   retry: 'entry' | 'live'
-  beginAttempt(world: W, mode: 'run' | 'setup' | 'tick' | 'idle'): { api: A; finish(): void }
+  beginAttempt(world: W, mode: 'run' | 'setup' | 'tick' | 'idle'): { api: A; finish(logs: readonly string[]): void }
   available(world: W, lessonId: string): readonly (keyof A & string)[]
   guestModules?: Readonly<Record<string, { source: string; declarations: string }>>
   typeAliases?(world: W): Record<string, string[]>
