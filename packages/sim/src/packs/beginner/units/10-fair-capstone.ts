@@ -37,6 +37,10 @@ postCard(stall)`,
       check("Stand reads Kites with three seats", e =>
         same(e.world.cards, [{ name: 'Kites', seats: 3 }])),
     ],
+    solved: {
+      reaction: "The cardholder is filled.",
+      did: "You kept a stall’s name and seats together in an object.",
+    },
     effect: ["cards", "Kites · 3 seats"],
   },
   {
@@ -91,6 +95,10 @@ say(boat.name)`,
       check("A changed booking updates the board", e =>
         e.world.score === e.before.readings.booking!.seats),
     ],
+    solved: {
+      reaction: "The steward can see the booking.",
+      did: "You read one property from the booking card.",
+    },
     effect: ["score", "4"],
   },
   {
@@ -132,6 +140,10 @@ postCard(booking)`,
       check("Sol's card shows two seats", e =>
         same(e.world.cards, [{ name: 'Sol', seats: 2 }])),
     ],
+    solved: {
+      reaction: "The clerk has a reusable form.",
+      did: "Your interface checked the shape of a guest card.",
+    },
     effect: ["cards", "Sol · 2 seats"],
   },
   {
@@ -184,6 +196,10 @@ usher(card)`,
       check("The named visitor walks in", e =>
         same(e.world.neighbours, ['Fern'])),
     ],
+    solved: {
+      reaction: "The usher found the guest.",
+      did: "You passed a whole object to a typed parameter.",
+    },
     effect: ["neighbours", "Fern"],
   },
   {
@@ -240,6 +256,10 @@ for (const booking of bookings) {
       check("An empty ledger posts nothing", e =>
         same(e.world.cards, e.before.ledger)),
     ],
+    solved: {
+      reaction: "The rail matches the ledger.",
+      did: "You visited the objects in a returned list.",
+    },
     effect: ["cards", "Tea · 4 seats"],
   },
   {
@@ -304,6 +324,10 @@ for (const card of guests()) {
       check("Signs match both the single and mixed ledgers", e =>
         same(e.world.signs, e.before.ledger.map(card => `${card.name} ${card.seats}`))),
     ],
+    solved: {
+      reaction: "The stallholders found their signs.",
+      did: "You wrote a formatter and reused it for the whole ledger.",
+    },
     effect: ["signs", "Tea 4"],
   },
   {
@@ -375,6 +399,10 @@ showScore(seats(guests()))`,
       check("Mixed and empty ledgers show their exact totals", e =>
         e.world.score === e.before.ledger.reduce((total, card) => total + card.seats, 0)),
     ],
+    solved: {
+      reaction: "The steward can set the fair tables.",
+      did: "Your function turned a list of bookings into one seat count.",
+    },
     effect: ["score", "6"],
   },
   {
@@ -455,6 +483,10 @@ openFair(guests())`,
       check("The banner rises once for a nonempty seated fair", e =>
         calls(e, 'hangBanner').length === Number(e.before.ledger.some(card => card.seats > 0)) && e.world.banner === e.before.ledger.some(card => card.seats > 0)),
     ],
+    solved: {
+      reaction: "Welcome to the village fair!",
+      did: "Your ceremony opened the booked stalls and raised their banner.",
+    },
     effect: ["banner", "Fair open"],
   },
 ])

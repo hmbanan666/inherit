@@ -44,6 +44,10 @@ fillBox(4)`,
       check("Boxes bloom with two and four flowers", e =>
         same(e.world.beds, [2, 4])),
     ],
+    solved: {
+      reaction: "Both window boxes are blooming.",
+      did: "One parameter let your function plant two different widths.",
+    },
     effect: ["beds", "2 blooms · 4 blooms"],
   },
   {
@@ -85,6 +89,10 @@ dressRail(2, 4)`,
       check("The rails show six and eight", e =>
         same(e.world.rails, [6, 8])),
     ],
+    solved: {
+      reaction: "Both rails are dressed.",
+      did: "Two arguments described each window plan.",
+    },
     effect: ["rails", "6 · 8"],
   },
   {
@@ -137,6 +145,10 @@ showScore(count)`,
       check("Four and seven hooks need eight and fourteen pegs", e =>
         e.world.score === 2 * e.before.readings.hooks!),
     ],
+    solved: {
+      reaction: "The rack-maker can cut the pegs.",
+      did: "Your function promised and returned a number.",
+    },
     effect: ["score", "8"],
   },
   {
@@ -176,6 +188,10 @@ for (const runner of runners) {
       check("Signs show Red Bea and Red Pip", e =>
         same(e.world.signs, ['Red Bea', 'Red Pip'])),
     ],
+    solved: {
+      reaction: "The runners have their tags.",
+      did: "Your arrow function returned a different tag for each runner.",
+    },
     effect: ["signs", "Red Bea · Red Pip"],
   },
   {
@@ -224,6 +240,10 @@ announce("Sol")`,
       check("Both guests hear their own label", e =>
         same(e.world.announcements, ['Guest Uma', 'Guest Sol'])),
     ],
+    solved: {
+      reaction: "Both arrivals heard their names.",
+      did: "Your greeter used another function to make each label.",
+    },
     effect: ["speech", "Guest Sol"],
   },
 ])

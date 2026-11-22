@@ -41,6 +41,8 @@ export function initialWorld() {
     ledger: [] as Guest[],
     // Keep the player's results when the next activity sets up its own props.
     album: {} as Record<string, string>,
+    landmarks: [] as { id: string; title: string }[],
+    unit: { id: '', landmark: '', lessonIds: [] as string[] },
     bubble: '',
     announcements: [] as string[],
     sign: '',

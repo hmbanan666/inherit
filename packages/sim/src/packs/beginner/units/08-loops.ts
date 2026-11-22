@@ -53,6 +53,10 @@ export default courseUnit({
       check("A shorter card invites only its names", e =>
         same(e.world.neighbours, e.before.readings.visitors)),
     ],
+    solved: {
+      reaction: "The neighbours have arrived.",
+      did: "Your loop greeted one visitor per entry.",
+    },
     effect: ["neighbours", "Mila · Ren · Jo"],
   },
   {
@@ -89,6 +93,10 @@ export default courseUnit({
       check("Five separate pools of light appear", e =>
         same(e.world.lamps, [1, 2, 3, 4, 5])),
     ],
+    solved: {
+      reaction: "There’s light all the way to the fair.",
+      did: "Your counter visited each path lamp in order.",
+    },
     effect: ["lamps", "1 · 2 · 3 · 4 · 5"],
   },
   {
@@ -147,6 +155,10 @@ while (remaining > 0) {
       check("Zero takes no steps", e =>
         e.world.steps === e.before.readings.distance),
     ],
+    solved: {
+      reaction: "The robot reached its dock.",
+      did: "You stepped while a positive distance remained.",
+    },
     effect: ["robot", "4 steps"],
   },
   {
@@ -188,6 +200,10 @@ for (const lamp of lampNumbers) {
       check("Wet and unlisted lamps stay dark", e =>
         same(calls(e, 'lightLamp').map(call => call.args[0]), [3, 5])),
     ],
+    solved: {
+      reaction: "The dry path is lit.",
+      did: "Your loop tested each lamp before lighting it.",
+    },
     effect: ["lamps", "3 · 5"],
   },
   {
@@ -242,6 +258,10 @@ showScore(total)`,
       check("An empty delivery displays zero", e =>
         e.world.score === e.before.readings.weights!.reduce((sum, weight) => sum + weight, 0)),
     ],
+    solved: {
+      reaction: "The delivery is weighed.",
+      did: "You accumulated one total across a list.",
+    },
     effect: ["score", "8"],
   },
 ])

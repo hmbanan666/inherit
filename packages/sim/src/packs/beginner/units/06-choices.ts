@@ -48,6 +48,10 @@ setSignal(apples >= 3)`,
       check("It lights at three and four", e =>
         e.world.signal === (e.before.basket >= 3)),
     ],
+    solved: {
+      reaction: "Everyone can see when to share.",
+      did: "Your comparison included a basket with exactly enough apples.",
+    },
     effect: ["signal", "Green"],
   },
   {
@@ -93,6 +97,10 @@ if (raining) {
       check("Clear sky leaves the ropes still", e =>
         e.world.canopy === e.before.raining && calls(e, 'openCanopy').length === Number(e.before.raining)),
     ],
+    solved: {
+      reaction: "The walkers stay dry.",
+      did: "Your condition opened the shelter when it rained.",
+    },
     effect: ["canopy", "Open"],
   },
   {
@@ -130,13 +138,16 @@ if (raining) {
 } else {
   foldCanopy()
 }`,
-    fixture: { raining: true },
+    fixture: {
+      raining: false,
+      canopy: true,
+    },
     variants: [
       {
-        input: "Open on a sunny day",
+        input: "Rain on the path",
         fixture: {
-          raining: false,
-          canopy: true,
+          raining: true,
+          canopy: false,
         },
       },
     ],
@@ -146,7 +157,11 @@ if (raining) {
       check("Sunshine folds an open canopy", e =>
         e.before.raining || (inBlock(e, 'foldCanopy', 'if') && !e.world.canopy)),
     ],
-    effect: ["canopy", "Open"],
+    solved: {
+      reaction: "The keeper can leave the ropes with you.",
+      did: "You supplied an action for either weather.",
+    },
+    effect: ["canopy", "Folded"],
   },
   {
     id: "podium",
@@ -208,6 +223,10 @@ if (level < 1) {
       check("First and third show gold and bronze", e =>
         e.world.sign === ['gold', 'silver', 'bronze'][e.before.readings.position! - 1]),
     ],
+    solved: {
+      reaction: "The medals are in place.",
+      did: "You chose among three outcomes with an else if.",
+    },
     effect: ["signs", "silver"],
   },
   {
@@ -276,6 +295,10 @@ if (level < 1) {
       check("Every other pair holds the start", e =>
         e.world.signal === (e.before.readings.leftReady && e.before.readings.rightReady)),
     ],
+    solved: {
+      reaction: "Both judges have a say.",
+      did: "Your start signal waited for both flags.",
+    },
     effect: ["signal", "Off"],
   },
   {
@@ -344,6 +367,10 @@ if (level < 1) {
       check("Two closed gates clear it", e =>
         e.world.signal === (e.before.readings.nearOpen || e.before.readings.farOpen)),
     ],
+    solved: {
+      reaction: "The pond gates have an alarm.",
+      did: "Either open gate could light your warning.",
+    },
     effect: ["signal", "Green"],
   },
   {
@@ -387,6 +414,10 @@ if (level < 1) {
       check("Ringing blanks the lens", e =>
         e.world.signal === !e.before.readings.ringing),
     ],
+    solved: {
+      reaction: "The nursery has a quiet light.",
+      did: "You flipped the bell reading to signal silence.",
+    },
     effect: ["signal", "Off"],
   },
 ])

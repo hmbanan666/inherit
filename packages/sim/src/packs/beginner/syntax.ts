@@ -67,8 +67,7 @@ export function feeds(e: Seen, operation: string, ...matches: Match[]) {
 export const binary = (operator: string): Match => node =>
   ts.isBinaryExpression(node) && node.operatorToken.getText() === operator
 
-export const name = (identifier: string): Match => node =>
-  ts.isIdentifier(node) && node.text === identifier
+export const literal = (text: string): Match => node => ts.isStringLiteral(node) && node.text === text
 
 export const shape = (kind: 'array' | 'object' | 'template' | 'index' | 'negation'): Match => node => {
   switch (kind) {
@@ -96,13 +95,17 @@ export const inks: Match = node => {
 export const reading = (operation: string): Match => node => ts.isVariableDeclaration(node) &&
   !!node.initializer && ts.isCallExpression(node.initializer) && node.initializer.expression.getText() === operation
 
-export function updated(e: Seen, operation: string, method?: 'push', copy?: string) {
+export function updated(e: Seen, operation: string, method?: 'push', originalText?: string) {
   return executed(e, operation, call => {
     const argument = call.arguments[0]
     if (!argument || !ts.isIdentifier(argument)) return false
     const variable = declaration(argument)
     if (!variable || !ts.isVariableDeclaration(variable)) return false
-    if (copy && (variable.initializer?.getText() !== copy || !origin(variable.initializer, constant))) return false
+    if (originalText) {
+      const original = variable.initializer && declaration(variable.initializer)
+      if (!original || !ts.isVariableDeclaration(original) || !constant(original) ||
+        !original.initializer || !ts.isStringLiteral(original.initializer) || original.initializer.text !== originalText) return false
+    }
     return !!findNode(call.getSourceFile(), node => {
       if (node.pos < variable.end || node.end > call.pos) return false
       if (method) return ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
@@ -169,6 +172,6 @@ export const numeral = (value: number): Match => node => ts.isNumericLiteral(nod
 export function ticketKept(e: Seen) {
   const { tree } = document(e.files['main.ts'])
   return !!findNode(tree, node => ts.isVariableDeclaration(node) && constant(node) &&
-    node.name.getText() === 'ticket' && !!node.initializer &&
+    !!node.initializer &&
     ts.isStringLiteral(node.initializer) && node.initializer.text === 'West')
 }

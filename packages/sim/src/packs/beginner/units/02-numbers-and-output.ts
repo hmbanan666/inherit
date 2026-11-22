@@ -34,6 +34,10 @@ export default courseUnit({
       check("All three holes bloom", e =>
         e.world.gateFlowers === 3),
     ],
+    solved: {
+      reaction: "The planting holes are full.",
+      did: "You gave the planter a number.",
+    },
     effect: ["beds", "3 blooms"],
   },
   {
@@ -66,6 +70,10 @@ export default courseUnit({
       check("The basket shows five apples", e =>
         e.world.basket === 5),
     ],
+    solved: {
+      reaction: "Both trees are picked.",
+      did: "Your addition gathered two harvests in one basket.",
+    },
     effect: ["basket", "5 apples"],
   },
   {
@@ -98,6 +106,10 @@ export default courseUnit({
       check("Board shows eleven", e =>
         e.world.score === 11),
     ],
+    solved: {
+      reaction: "The cracked tile is out.",
+      did: "Your calculation scored the playable tiles.",
+    },
     effect: ["score", "11"],
   },
   {
@@ -129,6 +141,10 @@ export default courseUnit({
       check("The paper slip reads 10", e =>
         e.world.slip === '10'),
     ],
+    solved: {
+      reaction: "The carrier has a slip.",
+      did: "You printed the combined weight in the Console.",
+    },
     effect: ["slip", "10"],
   },
 ])

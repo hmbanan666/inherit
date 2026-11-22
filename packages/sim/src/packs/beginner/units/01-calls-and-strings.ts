@@ -35,6 +35,10 @@ export default courseUnit({
       check("Mila displays those words and waves", e =>
         e.world.bubble.length > 0 && e.world.bubble === calls(e, 'say').at(-1)?.args[0]),
     ],
+    solved: {
+      reaction: "Mila waves back.",
+      did: "You gave a function a string of your own.",
+    },
     effect: ["speech", "Welcome to the village!"],
   },
   {
@@ -65,6 +69,10 @@ export default courseUnit({
       check("The sign matches the ticket", e =>
         e.world.sign === 'Moon Ferry'),
     ],
+    solved: {
+      reaction: "The ferry has its name.",
+      did: "Your sign kept the spaces and capitals from the ticket.",
+    },
     effect: ["signs", "Moon Ferry"],
   },
   {
@@ -102,8 +110,12 @@ say("We're departing!")`,
       check("Boarding appears first", e =>
         e.world.announcements[0] === 'All aboard'),
       check("Departure appears second", e =>
-        e.world.announcements.length === 2 && /depart|leav|set off|off we go|pulling out/i.test(e.world.announcements[1])),
+        e.world.announcements.length === 2 && e.world.announcements[1].trim() !== 'All aboard'),
     ],
+    solved: {
+      reaction: "The train can leave.",
+      did: "You placed two announcements in the order passengers needed.",
+    },
     effect: ["speech", "We're departing!"],
   },
   {
@@ -135,6 +147,10 @@ say("We're departing!")`,
       check("The bell swings once", e =>
         e.world.bell === 1),
     ],
+    solved: {
+      reaction: "Someone’s at the gate!",
+      did: "You matched the spelling of the bell’s function.",
+    },
     effect: ["bell", "1 ring"],
   },
 ])

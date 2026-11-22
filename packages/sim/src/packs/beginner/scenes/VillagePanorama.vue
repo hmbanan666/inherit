@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppleTree from '../../../visuals/AppleTree.vue'
+import GardenBeds from './GardenBeds.vue'
 import Villager from '../../../visuals/Villager.vue'
 import type { Village } from '../world'
 import type { Call } from '../../../framework/pack'
@@ -40,7 +41,7 @@ const boundedName = (value:string) => value.length>15 ? value.slice(0,14)+'…' 
     <g stroke="#645c43" stroke-width="4"><path d="m5 330 124-33m-124 47 124-33m383-11 144-29m-144 44 144-29"/></g>
     <g fill="#95805d"><path v-for="i in 9" :key="i" :d="'M'+(i*15-10)+' '+(323-i*4)+'l3-5 3 4v36h-6z'"/><path v-for="i in 10" :key="'r'+i" :d="'M'+(507+i*14)+' '+(291-i*2.8)+'l3-5 3 4v35h-6z'"/></g>
     <AppleTree transform="translate(83 317) scale(1.16)" :apples="Math.max(0,2-world.basket)"/>
-    <AppleTree transform="translate(630 285) scale(1.07)" :apples="Math.min(3,5-world.basket)"/>
+    <AppleTree transform="translate(630 285) scale(1.07)" :apples="Math.max(0, Math.min(3, 5-world.basket))"/>
     <ellipse cx="307" cy="335" rx="140" ry="15" fill="#515e45" opacity=".35"/>
     <path d="M179 247 270 170l120 52v108l-211 6z" fill="url(#plaster)"/><path d="m390 222 46-29v123l-46 14z" fill="#ac8e6a"/>
     <path d="m179 317 211-4v17l-211 6z" fill="#9d927c"/><path d="m390 313 46-15v18l-46 14z" fill="#7b7665"/>
@@ -62,10 +63,11 @@ const boundedName = (value:string) => value.length>15 ? value.slice(0,14)+'…' 
     <g transform="translate(367 235)" :class="{ring: last==='ringBell'}"><path d="M-8-1q0-14 8-16 8 3 8 16l3 4h-22z" :fill="bell?'#edc66f':'#ac955d'"/><circle cy="4" r="2" fill="#72583e"/></g>
     <g data-testid="flagpole" role="img" :aria-label="world.flag==='gold'?'Gold flag':'Flag pole'"><path d="M156 337V219" stroke="#726549" stroke-width="4"/><path v-if="world.flag" d="M158 222q18-9 35-1l-8 9 6 8q-16-8-33 0z" :fill="world.flag==='gold'?'#efc462':'#759aa6'"/></g>
     <g transform="translate(136 335)" data-testid="house-sign" role="img" :aria-label="world.sign?'Sign painted':'Blank sign'"><path d="M-3 0V-34h6V0z" fill="#6a5948"/><rect x="-32" y="-45" width="64" height="21" rx="3" fill="#d8b784" stroke="#816749"/><text text-anchor="middle" y="-30" class="sign">{{ boundedName(world.sign) }}</text></g>
-    <g transform="translate(114 360)" data-testid="gate-bed" role="img" :aria-label="world.gateFlowers+' flowers'"><ellipse rx="36" ry="7" fill="#807558"/><use v-for="i in world.gateFlowers" :key="i" href="#flower" :transform="'translate('+((i-1)%8*10-19)+' '+(Math.floor((i-1)/8)*4)+')'" :color="i%2?'#d8919d':'#dbc174'"/></g>
-    <g transform="translate(222 332)" data-testid="house-bed" role="img" :aria-label="world.houseFlowers+' flowers'"><use v-for="i in world.houseFlowers" :key="i" href="#flower" :x="(i-1)%8*10" :y="Math.floor((i-1)/8)*4" color="#edc587"/></g>
+    <GardenBeds v-if="world.scene === 'garden' && world.prop === 'beds'" :world="world"/>
+    <g v-else transform="translate(114 360)" data-testid="gate-bed" role="img" :aria-label="world.gateFlowers+' flowers'"><ellipse rx="36" ry="7" fill="#807558"/><use v-for="i in world.gateFlowers" :key="i" href="#flower" :transform="'translate('+((i-1)%8*10-19)+' '+(Math.floor((i-1)/8)*4)+')'" :color="i%2?'#d8919d':'#dbc174'"/></g>
+    <g v-if="world.prop !== 'beds'" transform="translate(222 332)" data-testid="house-bed" role="img" :aria-label="world.houseFlowers+' flowers'"><use v-for="i in world.houseFlowers" :key="i" href="#flower" :x="(i-1)%8*10" :y="Math.floor((i-1)/8)*4" color="#edc587"/></g>
     <g transform="translate(492 348)" data-testid="orchard-basket" role="img" :aria-label="world.basket+' apples'"><path d="M-17-8q1-28 22-16l8 15" fill="none" stroke="#71593f" stroke-width="3"/><circle v-for="i in world.basket" :key="i" :cx="(i-1)%3*10-10" :cy="-9-Math.floor((i-1)/3)*6" r="5.4" fill="#b85f50"/><path d="M-19-9h36l-5 15h-27z" fill="#ac8659" stroke="#71593f" stroke-width="2"/></g>
-    <g transform="translate(552 383)" data-testid="picnic" role="img" :aria-label="world.picnic?'Table set':'Bare table'"><path d="M-24-9v12m44-12v12" stroke="#635540" stroke-width="5"/><path d="m-34-19 54-3 13 10-63 3z" :fill="world.picnic?'#c68b78':'#987e5a'"/><g v-if="world.picnic" fill="#f0dabb"><ellipse v-for="i in 3" :key="i" :cx="i*14-33" cy="-15" rx="6" ry="3"/></g></g>
+    <g transform="translate(552 383)" data-testid="picnic" role="img" :aria-label="world.picnic?'Table set':'Bare table'"><path d="M-24-9v12m44-12v12" stroke="#635540" stroke-width="5"/><path d="m-34-19 54-3 13 10-63 3z" :fill="world.picnic?'#c68b78':'#987e5a'"/><g v-if="world.picnic || world.scene === 'picnic'" fill="#f0dabb"><ellipse v-for="i in 3" :key="i" :cx="i*14-33" cy="-15" rx="6" ry="3"/></g></g>
     <g data-testid="path-canopy" role="img" :aria-label="world.canopy?'Canopy open':'Canopy folded'"><g v-if="world.canopy" transform="translate(552 362)"><path d="M0 9v-77" stroke="#6e5843" stroke-width="4"/><path d="M-47-49q9-22 47-23 33 2 45 23z" fill="#c17a66"/><path d="m0-72-15 23h-15q10-16 30-23zm3 1q15 4 25 22H14z" fill="#e2c395"/></g></g>
     <g v-for="(p,i) in lamps" :key="i" :transform="'translate('+p.join(' ')+')'" role="img" :data-testid="'lamp-'+(i+1)" :aria-label="'Lamp '+(i+1)+(world.lamps.includes(i+1)?' lit':' unlit')">
       <ellipse v-if="world.lamps.includes(i+1)" rx="25" ry="6" fill="#efc574" opacity=".35"/><path d="M-2 0v-37h4V0z" fill="#655a47"/>

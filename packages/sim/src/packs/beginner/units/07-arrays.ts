@@ -37,6 +37,10 @@ rackFlags(flags)`,
       check("All three flags match the pattern", e =>
         same(e.world.flags, ['gold', 'blue', 'gold'])),
     ],
+    solved: {
+      reaction: "The parade colours are ready.",
+      did: "You sent an ordered array to the rack.",
+    },
     effect: ["flags", "gold · blue · gold"],
   },
   {
@@ -81,6 +85,10 @@ paintSign(shades[0])`,
       check("A reordered queue calls its new second duck", e =>
         e.world.bubble === e.before.readings.queue![1]),
     ],
+    solved: {
+      reaction: "The second duck has a turn.",
+      did: "You read a name by its position in the queue.",
+    },
     effect: ["speech", "Fern"],
   },
   {
@@ -130,6 +138,10 @@ console.log(boats.length)`,
       check("Empty pier shows zero", e =>
         e.world.score === e.before.readings.waiting!.length),
     ],
+    solved: {
+      reaction: "The landing has a counter.",
+      did: "You used the list’s length to count the queue.",
+    },
     effect: ["score", "3"],
   },
   {
@@ -166,6 +178,10 @@ rackFlags(flags)`,
       check("A blue flag hangs on the last hook", e =>
         same(e.world.flags, ['gold', 'gold', 'blue'])),
     ],
+    solved: {
+      reaction: "The late float is in the parade.",
+      did: "You appended a flag after the original pair.",
+    },
     effect: ["flags", "gold · gold · blue"],
   },
   {
@@ -199,6 +215,10 @@ loadWeights(weights)`,
       check("Each pocket holds its marked weight", e =>
         same(e.world.tray, [2, 4, 1, 3])),
     ],
+    solved: {
+      reaction: "Every pocket has a weight.",
+      did: "You loaded a list with a numeric entry type.",
+    },
     effect: ["tray", "2 · 4 · 1 · 3"],
   },
 ])
