@@ -22,7 +22,7 @@ Nick's v5 playtest notes, verbatim.
 
 Feature **TypeScript from zero**, pack id `beginner`, with 52 lessons across ten units, about 3½ hours. Early on, the player gives Mila words of their own. At the finish they write a function that opens stalls from a list of typed bookings. Every new syntax element has theory before its first required edit. Each scene shows who needs the code and what changes when it runs. Completed units furnish the village visible at the finish.
 
-Keep the id `workshop` for twelve Game-level challenges. A player can go directly to a condition that tests their skill. Reuse the four shed stations as a parcel infeed, two bins and a cart. A label and an arrow identify each route. In *Dispatch from the final station* the cart accepts the press output by condition. *Count heavy parcels* needs the value returned by a pickup to decide which parcels count. Both are observable uses for lines that felt arbitrary in the chapter.
+Keep the id `workshop` for twelve Game-level challenges. A player can go directly to a condition that tests their skill. The arm serves four places on the parcel floor: `belt` (incoming belt), `left` and `right` (bins), and `cart` (dispatch cart). Counting challenges add a scale display. A label and an arrow identify each route. In *Dispatch from the right bin*, the arrows show both legs of the route: belt to right bin, then right bin to cart. *Count heavy parcels* needs the value returned by a pickup to decide which parcels count. Both are observable uses for lines that felt arbitrary in the chapter.
 
 ## User stories
 

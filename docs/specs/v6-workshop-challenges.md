@@ -1,47 +1,58 @@
 # Workshop · parcel challenges
 
-Game level. Choose any of twelve 5–15 minute challenges from Learn. All start from a clean fixture. Read the condition and two worked cases, inspect the parcel labels on the floor, then write main.ts. Code fences labelled Starter are the entire file. Reference sketches are for authors and validators. Only the hints and API entries go to the player. Direct entry includes the brief and the theory for every API the challenge uses.
+Game level. Choose any of twelve 5–15 minute challenges from Learn. Each starts with its own set of parcels. Learn shows the condition, two worked cases and the theory needed for that challenge. Inspect the labels on the floor, then write your solution in `main.ts`. Each Starter below is the whole file. Players can open hints and the API reference. The reference solutions are for pack authors.
 
-## The shed floor
+## The parcel floor
 
-Reuse the mine mouth as the incoming belt (`"mine"`), the open furnace bay as the left bin (`"furnace"`), the press bay as the right bin (`"press"`), and the cart as dispatch (`"cart"`). Paint these exact code names beside the stations, with arrows and plain labels **In**, **Left**, **Right**, **Out**. The furnace is cold and the press is parked. Parcels keep their identity and labels through every transfer. The only extra prop is a numeric scale display on counting challenges. The camera stays on the shed.
+The incoming belt (`belt`) brings parcels into the shed. The left bin (`left`) and right bin (`right`) each hold a queue. The dispatch cart (`cart`) collects outgoing parcels. Paint each code name on its station. Draw arrows for the route the current challenge needs. Counting challenges also show a scale display. The camera stays on this floor.
 
-The arm holds one parcel. A bin accepts parcels at the back and presents the front. The cart is a sink. Station capacities suffice for the fixture unless its brief says otherwise. A tick's deliveries arrive before its handler runs. An empty infeed can receive a later delivery. Blocked outlets carry an amber jam marker. For all variants, preserve every id exactly once. Compare ordered ids at named destinations, not just quantities. Grade the displayed fixture and fresh variants with separate runner instances. Report which input failed. Hidden inputs vary the data within the published rules. Show counts or a terminal tick so a program can finish without a wall-clock race.
+The arm carries one parcel at a time. It takes from the front of the belt or a bin. It adds parcels to the back of a bin or sends them to the cart. Parcels stay in the cart once dispatched. Every parcel keeps its id and label. Stations have room for the whole batch unless the challenge gives a limit.
 
-**Trying a solution.** A manual Run starts the fixture and executes the file once. Deploy starts a fresh fixture after valid setup and calls the exported handler on each tick. Top-level variables survive between those calls. Stop freezes the last committed floor. Run once in a clock challenge executes one handler against a disposable copy of the paused state for diagnosis. A new tested deployment begins from the fixture. Each timed condition below specifies its tick bound. No solution depends on a timer in player code.
+On clock challenges, deliveries arrive before `onTick` runs. More parcels may arrive after an empty tick. An amber marker shows a jammed bin.
+
+**Trying a solution**
+
+- **Run** resets the floor to the challenge’s starting parcels and runs your file once.
+- **Deploy** checks your setup. If it succeeds, you get a fresh floor. The clock calls your exported `onTick` function once per tick. Variables declared outside the function keep their values between ticks.
+- **Stop loop** stops the clock and leaves the floor as it was at the last completed tick.
+- **Run once** lets you try one tick on a copy of the paused floor. You can inspect the result and return to the paused floor.
+
+**Checking a solution.** Run the shown input and each hidden input separately. Hidden cases follow the rules in the brief. Verify that every parcel id appears exactly once and that each destination has its parcels in the required order. Name the failed input in its check. Each clock challenge specifies how many ticks to test. The player never needs to measure elapsed time.
 
 ## Drawer API reference
 
-On a manual challenge, import the jobs you use from `"inherit"`, for example `import { look } from "inherit"`. Type names are available in the editor's declarations for annotations. Returning a parcel or inspection gives a detached reading. Moving a parcel takes a floor call. Use ordinary TypeScript for helpers, comparisons, arrays and tables.
+Import the floor functions you need from `"inherit"`, for example `import { look } from "inherit"`. The editor also knows the types below. A parcel or inspection returned by a call is a snapshot. Changing the copy leaves the parcel on the floor where it was.
 
 | Type | Fields and meaning |
 | --- | --- |
-| `Parcel` | `id: string` unique in the fixture, `colour: "red" \| "blue"`, `weight: number` in whole units, `to: "north" \| "south" \| "dock"` from the shipping label. |
-| `Place` | One of `"mine" \| "furnace" \| "press" \| "cart"`. Each station displays its code name. The display takes numbers and is separate from Place. |
-| `Inspection` | `count: number` including blocked parcels, `front: Parcel \| undefined` visible front label (including in a jam), `jammed: boolean`. The cart reports its first dispatched parcel for inspection. |
+| `Parcel` | `id: string` identifies one parcel in the batch. `colour` is `"red"` or `"blue"`. `weight: number` gives the weight in whole units. `to` is the shipping label: `"north"`, `"south"` or `"dock"`. |
+| `Place` | `"belt" \| "left" \| "right" \| "cart"`. Each name matches the label on the floor. Use `display(value)` to write to the scale. |
+| `Inspection` | `count: number` includes blocked parcels. `front: Parcel \| undefined` gives the first parcel, even in a jam. At the cart, it gives the first parcel dispatched. `jammed: boolean` reports a blockage. |
 
 | Signature | What it does and parameters | Return and unsuccessful calls | Example |
 | --- | --- | --- | --- |
-| `take(place: Place): Parcel \| undefined` | Lift the front parcel at the named source into an empty hand. | A reading of that parcel. An empty source, jam, occupied hand or pickup at the cart returns undefined and leaves things in place. | `const lifted = take("press")` |
-| `put(place: Place): boolean` | Set the held parcel at the end of the named bin or cart. | True on delivery. An empty hand, jammed destination or attempt to feed the mine returns false. A rejected delivery leaves the parcel held. | `const delivered = put("furnace")` |
-| `look(place: Place): Inspection` | Read the named station at this instant, including its count, first label and jam flag. | A fresh inspection. At an empty station count is zero and front is undefined. | `const queued = look("press").count` |
-| `display(value: number): void` | Write a finite numeric value to the scale's display. The scale records its readings in order. | No returned value. A non-finite or nonnumeric value gives a diagnostic without changing the display. | `display(12)` |
-| `clearJam(place: Place): boolean` | Release the marked obstruction at the named bin. Its front parcel stays there, ready for pickup. | True if a jam cleared. A clear station returns false. | `const cleared = clearJam("furnace")` |
-| `export function onTick(): void` | Define this in main.ts for a clock challenge. Export makes it visible to the clock. It receives no parameters. Each tick calls it once after arrivals. | No returned value. A missing or non-callable export rejects Deploy with a diagnostic. Setup is validated before replacing a running controller. | `export function onTick() { display(look("cart").count) }` |
+| `take(place: Place): Parcel \| undefined` | Pick up the front parcel from the belt or a bin. | Returns a snapshot of the parcel. Returns `undefined` if the source is empty or jammed, the arm is full, or the source is the cart. A failed pickup moves nothing. | `const lifted = take("belt")` |
+| `put(place: Place): boolean` | Drop the held parcel into a bin or the dispatch cart. | Returns `true` on delivery. Returns `false` if the arm is empty, the destination is jammed, or the destination is the belt. A failed drop leaves any held parcel in the arm. | `const delivered = put("left")` |
+| `look(place: Place): Inspection` | Read the parcel count, front label and jam flag at a station. | Returns a fresh inspection. An empty station has a count of zero and an `undefined` front. | `const queued = look("right").count` |
+| `display(value: number): void` | Write a finite number to the scale display. The scale records readings in order. | Returns no value. Invalid input leaves the display unchanged and produces a diagnostic. | `display(12)` |
+| `clearJam(place: Place): boolean` | Clear the blockage at the named bin. Its front parcel stays ready for pickup. | Returns `true` if it cleared a jam and `false` if the station was clear. | `const cleared = clearJam("left")` |
+| `export function onTick(): void` | Define this function in `main.ts` for a clock challenge. The clock calls it after each tick’s deliveries. It takes no arguments. | Returns no value. Deploy checks that the file exports a callable `onTick`. A failed setup leaves the current controller running. | `export function onTick() { display(look("cart").count) }` |
 
-All calls with an unknown place or wrong argument type report the expected type and the bad value at the call site. The type checker catches these before Run where possible. Each challenge includes the reference entries its fixture needs. A standalone challenge that reuses an entry includes its Learn explanation on direct entry. Implement the table from player.ts signatures and JSDoc with @param, @returns and @example. Show the handler as a callback defined by the player. Console output, available as a language service, uses `console.log(value)` to append a diagnostic reading to Console and returns void, e.g. `console.log(look("cart").count)`.
+An unknown place or wrong argument type produces a diagnostic at the call. Show the bad value and the expected type. The editor flags these errors before Run when it can. For a diagnostic message of your own, use `console.log(value)`. For example, `console.log(look("cart").count)` writes the cart count to Console. It returns no value.
+
+Build the reference from the signatures in `player.ts` and their JSDoc `@param`, `@returns` and `@example` tags. Show the entries each challenge uses, even on direct entry. Identify `onTick` as a function the player defines.
 
 ## Challenge briefs
 
-In the cases below, letters are parcel ids. Other label fields can vary unless the condition needs them. A notation such as A/5 gives an id and weight. A check separated by a bullet is one compact check row. Retried fixture runs discard earlier evidence.
+Letters in the worked cases are parcel ids. A/5 means parcel A weighs 5 units. Each bullet in Checks is one row under the editor. Reset the floor and the check results for each attempt.
 
 ### `dispatch-batch` · Dispatch the waiting batch
 
-**Condition.** Empty the finite infeed into the cart during one Run. Keep arrival order. Leave the arm empty and stop on the first empty pickup.
+**Condition.** Move the whole batch from the belt to the cart in one Run. Keep arrival order. Leave the arm empty and stop on the first empty pickup.
 
-**Worked cases.** A,B,C → cart A,B,C. Empty belt → empty cart and one unsuccessful probe.
+**Worked cases.** A,B,C → cart A,B,C. Empty belt → empty cart after one pickup attempt.
 
-**Practice.** Writing a transfer helper and terminating on exhaustion.
+**Practice.** Writing a helper that tells its caller when the belt is empty.
 
 **Learn / API.** Introduce take and put. Import the jobs from the module. A pickup returns a parcel when it succeeds, and undefined when the belt is empty. The hand stays loaded until a drop succeeds. Example: a successful pickup from the right bin leaves that bin one parcel lighter.
 
@@ -57,17 +68,17 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 1. Use the helper's result to decide whether to continue.
 2. Try one pickup per transfer. A successful drop frees the hand.
 
-**Checks** · All ids reach the cart in order • Arm empty • Empty belt stops after one probe
+**Checks** · All ids reach the cart in order • Arm empty • One pickup attempt on an empty belt
 
-**Reference solution sketch.** Return false from a transfer helper on an empty pickup. Otherwise return the result of dropping in the cart. Loop while the helper succeeds. The final unsuccessful pickup terminates the loop.
+**Reference solution sketch.** Return false from a transfer helper on an empty pickup. Otherwise return the result of dropping in the cart. Loop while the helper succeeds. The loop stops at the first empty pickup.
 
 ### `heavy-tally` · Count heavy parcels
 
-**Condition.** Dispatch every parcel in order and write a single final reading for parcels weighing at least 5. The display starts blank.
+**Condition.** Move every parcel from the belt to the cart in order. When the belt is empty, display how many weighed at least 5. The display starts blank.
 
 **Worked cases.** A/2,B/5,C/8 → cart A,B,C and display 2. Empty belt → display 0.
 
-**Practice.** Accumulating a filtered count with an inclusive boundary.
+**Practice.** Counting parcels that meet a weight limit, including those exactly at the limit.
 
 **Learn / API.** Introduce display and the weight field of take's result. A weight is in whole units. The display keeps its last reading visible. Example: weights 1 and 6 contain one heavy parcel.
 
@@ -81,27 +92,27 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 **Hints**
 
 1. Start your count before taking anything.
-2. Compare each lifted weight to the inclusive limit, then dispatch it.
+2. A parcel that weighs exactly 5 counts. Send lighter parcels to the cart too.
 
 **Checks** · Boundary weight counted • All parcels dispatched in order • One final reading, including zero
 
-**Reference solution sketch.** Initialise a count at zero. Pick up until empty, increment for weight >= 5 and drop each parcel into the cart. Display the count after the loop.
+**Reference solution sketch.** Initialise a count at zero. Take one parcel at a time from the belt. Add one to the count if its weight is at least 5. Drop every parcel in the cart. Display the count after the loop.
 
 ### `colour-bins` · Sort parcels by colour
 
-**Condition.** Empty the infeed. Reds belong in the left bin, blues in the right. Preserve arrival order within each colour.
+**Condition.** Empty the belt. Send red parcels to the left bin and blue parcels to the right bin. Preserve arrival order within each colour.
 
 **Worked cases.** A/red,B/blue,C/red → left A,C and right B. Two blues → empty left and both blues on the right.
 
-**Practice.** Stable partitioning by a discriminating field.
+**Practice.** Sorting by colour while keeping each bin in arrival order.
 
-**Learn / API.** Use take, put and the colour field. Labels and bin swatches show the colour words. Example: a red parcel held over the blue bay still belongs on the left.
+**Learn / API.** Use take, put and the colour field. Labels and bin swatches show the colour words. Example: a red parcel held over the blue bin still belongs on the left.
 
 **Starter**
 
 ```ts
 // TODO: Read each parcel's colour.
-// TODO: Choose its marked bay and keep that bay in arrival order.
+// TODO: Drop it in the bin marked for that colour.
 ```
 
 **Hints**
@@ -111,11 +122,11 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 
 **Checks** · Left holds reds in order • Right holds blues in order • Belt and hand empty, including monochrome input
 
-**Reference solution sketch.** Loop over successful pickups. Give a destination helper the parcel colour, choose furnace for red and press for blue, and put there exactly once.
+**Reference solution sketch.** Loop over successful pickups. Have a helper return `"left"` for red or `"right"` for blue. Drop each parcel into the bin it selects.
 
 ### `route-table` · Route by shipping label
 
-**Condition.** Create a destination table keyed by the parcel’s to label. North goes left, south goes right, dock goes to the cart. Keep each route in order regardless of colour.
+**Condition.** Route every parcel from the belt using a table. Read the `to` field on its label. Send north to the left bin, south to the right bin and dock to the cart. Keep arrivals in order at each destination.
 
 **Worked cases.** Blue A/north and red B/south → left A, right B. A/dock,B/dock → cart A,B.
 
@@ -137,17 +148,17 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 
 **Checks** · Table covers every destination • Crossed colours follow labels • Each route keeps arrival order
 
-**Reference solution sketch.** Define a typed object mapping north to furnace, south to press and dock to cart. For each successful pickup, index the table with its to field and drop at the returned place.
+**Reference solution sketch.** Build a typed table with three entries: north → left, south → right, dock → cart. Pick up each parcel from the belt. Look up its `to` field in the table and drop it at that place.
 
 ### `peak-weight` · Find the heaviest parcel
 
-**Condition.** Dispatch the whole batch and display its greatest weight once, using zero for an empty belt. Weights range from 1 to 99.
+**Condition.** Move the batch from the belt to the cart. Display the heaviest weight once. Display zero for an empty belt. Weights range from 1 to 99.
 
 **Worked cases.** A/8,B/3,C/8 → 8, cart A,B,C. Empty → 0, cart empty.
 
 **Practice.** Tracking a maximum while handling an empty input.
 
-**Learn / API.** Reuse take, put, display. A running maximum needs only one number. A later smaller observation leaves it unchanged. Example: readings 4 then 2 still have peak 4.
+**Learn / API.** Reuse take, put, display. A running maximum needs only one number. Keep the saved weight when the next parcel is lighter. Example: readings 4 then 2 still have peak 4.
 
 **Starter**
 
@@ -163,23 +174,23 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 
 **Checks** · Descending inputs keep the first maximum • Ties dispatch both ids • Empty belt displays zero • One reading after dispatch
 
-**Reference solution sketch.** Start peak at zero. On each pickup compare its weight with peak, replace the larger-so-far value as needed and put the parcel in the cart. Display peak once at the end.
+**Reference solution sketch.** Start peak at zero. If the parcel is heavier than the saved peak, save its weight. Send the parcel to the cart either way. Display peak once at the end.
 
 ### `fragile-head` · Inspect before lifting
 
-**Condition.** Move the leading run of parcels weighing at most 3 into the cart. Leave the first heavier parcel and everything behind it untouched. Make no unsuccessful pickup.
+**Condition.** Read the label at the front of the belt. Dispatch parcels weighing 3 or less until you reach a heavier parcel or the belt is empty. Leave the heavier parcel and everything behind it on the belt. Every pickup must succeed.
 
 **Worked cases.** A/1,B/3,C/4,D/2 → cart A,B and belt C,D. Empty belt → no arm movement.
 
-**Practice.** Checking an optional front item without consuming it.
+**Practice.** Checking whether a parcel is there before trying to lift it.
 
-**Learn / API.** Introduce look. Its front can be undefined when a station is empty. Inspection reads a label without gripping it. Example: a front weight of 7 is still at the station after inspection.
+**Learn / API.** Introduce look. Its front can be undefined when a station is empty. Inspection reads a label without gripping it. For example, reading a weight of 7 leaves that parcel at the front of the belt.
 
 **Starter**
 
 ```ts
 // TODO: Inspect the next parcel before touching the belt.
-// TODO: Dispatch the safe prefix and stop at the first boundary.
+// TODO: Send light parcels to the cart and stop before the first heavy one.
 ```
 
 **Hints**
@@ -187,51 +198,51 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 1. Read front again after each delivery.
 2. Test for absence before reading the weight.
 
-**Checks** · Safe prefix reaches cart • First heavy and suffix stay in place • Empty input has no pickup attempts
+**Checks** · Leading light parcels reach cart • First heavy parcel and those behind it stay on belt • Empty input has no pickup attempts
 
-**Reference solution sketch.** Read the front in a loop. Break when absent or heavier than 3. Otherwise take from the mine and put into the cart. Repeat with a fresh inspection.
+**Reference solution sketch.** Read the front in a loop. Stop if the belt is empty or the parcel weighs more than 3. Otherwise move it from the belt to the cart. Repeat with a fresh inspection.
 
-### `merge-bays` · Merge two sorted bays
+### `merge-bins` · Merge two sorted bins
 
-**Condition.** Both bins start sorted by increasing weight. Merge them into the cart in weight order. On equal weights, take the left head first. Touch each parcel once.
+**Condition.** Both bins start sorted by increasing weight. Merge them into the cart in weight order. When two parcels weigh the same, take from the left bin first. Pick up each parcel once.
 
 **Worked cases.** Left A/2,C/6 and right B/2,D/4 → A,B,D,C. Empty left and right E/1 → E.
 
-**Practice.** Comparing optional heads and resolving ties stably.
+**Practice.** Choosing between two queues when their front parcels tie or one queue is empty.
 
-**Learn / API.** Reuse look, take and put. Compare the available fronts before picking a side. The hand cannot hold both candidates. Example: a sole remaining right parcel is the next one regardless of weight.
+**Learn / API.** Reuse look, take and put. Read the first label in each bin before picking up a parcel. If only the right bin has a parcel, take from there.
 
 **Starter**
 
 ```ts
-// TODO: Compare the two waiting heads.
-// TODO: Choose the next bay, including ties and a missing head.
+// TODO: Read the front label of each bin.
+// TODO: Choose which bin to unload next, even if one bin is empty.
 ```
 
 **Hints**
 
-1. Stop when both bays are empty.
-2. Prefer the left for equal weights and drain the surviving side.
+1. Stop when both bins are empty.
+2. For a tie, choose the left bin. If one bin is empty, use the other.
 
 **Checks** · Cart sorted by weight • Equal heads favour left • Empty sides drain cleanly • One pickup per parcel
 
-**Reference solution sketch.** Inspect both fronts. If neither exists, finish. Choose left if it exists and the right is absent or at least as heavy. Otherwise choose right. Transfer that head to the cart and inspect again.
+**Reference solution sketch.** Inspect both fronts. If neither exists, finish. If one bin is empty, take from the other. If both have parcels, choose the lighter one. On a tie, choose left. Move that parcel to the cart and check both bins again.
 
-### `stamp-dispatch` · Dispatch from the final station
+### `bin-dispatch` · Dispatch from the right bin
 
-**Condition.** Every parcel must visit the press bay before reaching the cart. The press begins with its own waiting batch. Dispatch that batch first, then route the incoming parcels through the press. No direct mine-to-cart trips.
+**Condition.** The cart takes deliveries from the right bin. Empty that bin into the cart first. Then move each incoming parcel from the belt to the right bin and from there to the cart.
 
-**Worked cases.** Press P and mine A,B → cart P,A,B with A and B visiting press. Press empty and mine C → cart C after its press visit.
+**Worked cases.** P in the right bin, A and B on the belt → cart P,A,B. Both A and B pass through the right bin. Empty right bin and C on the belt → C goes to the right bin, then to the cart.
 
 **Practice.** Designing a reusable move helper for a two-stage route.
 
-**Learn / API.** Reuse look, take and put. The press exit has an Out to cart arrow and the infeed points to the press. Every drop into the press records a station visit. Example: a parcel already in the press is ready for dispatch.
+**Learn / API.** Reuse look, take and put. The arrows show the route: belt → right bin → cart. A drop into the right bin records a visit. A parcel already waiting in that bin is ready to ship.
 
 **Starter**
 
 ```ts
 // TODO: Write a transfer helper with named source and destination.
-// TODO: Dispatch the waiting press batch, then pass incoming parcels through that station.
+// TODO: Dispatch the waiting batch first. Route each new parcel through the right bin.
 ```
 
 **Hints**
@@ -239,14 +250,13 @@ In the cases below, letters are parcel ids. Other label fields can vary unless t
 1. Read the arrows at the two pickup points.
 2. Draw the two trips for one incoming parcel before writing the loop.
 
-**Checks** · Waiting press batch leaves first • Every incoming id visits the press • Cart receives from the press only • Arm and queues end empty
+**Checks** · Parcels waiting in the right bin leave first • Each incoming parcel visits the right bin • Only the right bin supplies the cart • Arm and queues end empty
 
-**Reference solution sketch.** Write move(from, to) to pick up and drop on success. Drain the initial press queue to cart. While moving mine to press succeeds, move the just-arrived parcel from press to cart.
-
+**Reference solution sketch.** Write a helper that picks up from one place and drops at another. Use it to empty the right bin into the cart. Then move one parcel from the belt to the right bin. Move that parcel to the cart before taking the next one.
 
 ### `first-clock` · Dispatch on the clock
 
-**Condition.** Deploy a controller. On each of six ticks dispatch at most one waiting parcel, including arrivals after an empty tick. No moves during setup or on empty ticks.
+**Condition.** Deploy a controller. Watch the belt for six ticks. If a parcel is waiting, move one to the cart. Leave the arm still during setup and on empty ticks.
 
 **Worked cases.** Ticks 1:A, 3:B,C → cart counts 1,1,2,3,3,3. First arrival on tick 6 → five quiet ticks then one delivery.
 
@@ -271,7 +281,7 @@ export function onTick() {
 
 ```ts
 // TODO: Write the function the floor clock calls.
-// TODO: On each visit, inspect the infeed and dispatch at most one waiting parcel.
+// TODO: On each tick, check the belt and dispatch at most one parcel.
 ```
 
 **Hints**
@@ -281,17 +291,17 @@ export function onTick() {
 
 **Checks** · No setup transfers • Each arrival dispatched on its first available tick • Empty ticks leave the arm still • Six ticks conserve every id
 
-**Reference solution sketch.** Export onTick with no parameters. Read the mine front. If present, take it and put it in the cart. Leave the function after that one transfer. The runner supplies the repetition.
+**Reference solution sketch.** Export onTick with no parameters. Read the front of the belt. If a parcel is waiting, move it to the cart. Leave the function after that one transfer. The runner supplies the repetition.
 
 ### `clear-outlet` · Clear a blocked outlet
 
-**Condition.** Over four ticks drain the left bin to the cart, one parcel per working tick. On a jammed tick clear the jam as the only action. Never clear a healthy outlet. Up to two parcels and two jam ticks.
+**Condition.** Empty the left bin into the cart in four ticks. If the bin is jammed, spend the tick clearing it. Otherwise, ship one waiting parcel. The bin starts with at most two parcels and may jam on up to two ticks.
 
 **Worked cases.** A,B and obstruction before tick 2 → ship A, clear, ship B, idle. No jam and no parcels → four quiet ticks.
 
-**Practice.** Recovering from a reported fault without disturbing good work.
+**Practice.** Giving jam recovery its own turn in a controller.
 
-**Learn / API.** Introduce clearJam and Inspection.jammed. It frees the outlet and leaves the parcel at the head. A cleared parcel can wait for the next tick. Review the Run/Deploy/Stop strip on entry. Example: a jam before the first pickup leaves the cart empty until the next tick.
+**Learn / API.** Read the jam flag with `look("left").jammed`. The `clearJam` function frees the bin. Its front parcel stays in place until the next tick. Review the Run/Deploy/Stop strip on entry. Example: a jam before the first pickup leaves the cart empty until the next tick.
 
 **Starter**
 
@@ -307,39 +317,39 @@ export function onTick() {
 
 **Checks** · Only real jams cleared • No transfer on recovery ticks • Parcel order survives • Healthy empty ticks stay quiet
 
-**Reference solution sketch.** In onTick inspect furnace. If jammed, clear it and return. If a front exists, transfer it to the cart. Use the fixture schedule to assert individual tick actions, including repeated obstructions.
+**Reference solution sketch.** Inspect the left bin in `onTick`. If the bin is jammed, clear it and return. Otherwise, move its front parcel to the cart if one is waiting. Check each tick against the jam schedule.
 
-### `alternate-bays` · Give both bays a turn
+### `alternate-bins` · Give both bins a turn
 
-**Condition.** Serve one parcel per tick over six ticks. Prefer left initially. After a delivery prefer the opposite of the side just served. Fall back to the available side when needed. Keep the preference across empty ticks.
+**Condition.** Over six ticks, send one parcel to the cart whenever either bin has one. Start with the left bin. After each delivery, give the other bin the next turn. If the preferred bin is empty, use the other one. An empty tick keeps the preference.
 
 **Worked cases.** Left A,C and right B,D → cart A,B,C,D. Only right B at tick 1, empty tick 2, both sides receive at tick 3 → serve the new left head first.
 
 **Practice.** Maintaining fair service with state between ticks.
 
-**Learn / API.** Reuse look, take, put and onTick. A let declared outside onTick belongs to this deployment and keeps its value until the next call. A local created inside is new each tick. Review the three clock frames on direct entry.
+**Learn / API.** Reuse look, take, put and onTick. Declare a variable outside `onTick` with `let` to remember a bin between ticks. A variable declared inside the function starts fresh each tick. Review the three clock frames on direct entry.
 
 **Starter**
 
 ```ts
-// TODO: Keep the next preferred bay between ticks.
-// TODO: Serve whichever eligible bay has its turn, then update the preference.
+// TODO: Remember which bin gets the next turn.
+// TODO: Choose a bin with a parcel and update the preference after delivery.
 ```
 
 **Hints**
 
 1. Change preference after a delivery.
-2. Base tomorrow's preferred side on the side that actually supplied the parcel.
+2. Give the next turn to the bin that did not supply this parcel.
 
-**Checks** · Two busy bays alternate • A single busy bay drains • Empty ticks preserve preference • At most one delivery per tick
+**Checks** · Two busy bins alternate • A single busy bin drains • Empty ticks preserve preference • At most one delivery per tick
 
-**Reference solution sketch.** Set preferred to furnace during setup. In onTick inspect it, then its opposite if empty. Return if neither has a front. Move once from the selected side, then set preferred to the other side of that actual source.
+**Reference solution sketch.** Start with `"left"` as the preferred bin. Each tick, look there first. If it is empty, check the other bin. If both are empty, return. Move the chosen parcel to the cart. Give the other bin the next turn.
 
 ### `relay-controller` · Run a two-stage relay
 
-**Condition.** Move each incoming parcel through the press into the cart using at most one transfer per tick. The press holds at most one waiting parcel by condition. Dispatch a waiting press parcel before admitting another. Observe eight ticks. The first parcel is waiting on tick 1 in a four-parcel batch. Its next three arrive by tick 3. Smaller batches arrive by tick 3. Every tested batch can finish by tick 8.
+**Condition.** Move each parcel from the belt to the right bin, then to the cart. Make at most one transfer per tick. Empty the right bin before adding another parcel. Finish by tick 8. All parcels arrive by tick 3. In a batch of four, the first parcel arrives on tick 1.
 
-**Worked cases.** Mine A,B at tick 1 → admit A, ship A, admit B, ship B. Only C on tick 3 → two idle ticks, then admit C and ship C.
+**Worked cases.** A and B on the belt at tick 1 → A to right bin, A to cart, B to right bin, B to cart. Only C on tick 3 → two idle ticks, then C to right bin and C to cart.
 
 **Practice.** Designing a small state machine that survives gaps in supply.
 
@@ -354,25 +364,24 @@ export function onTick() {
 
 **Hints**
 
-1. The press starts empty, so the first possible move is admission.
+1. The right bin starts empty. Which trip brings a parcel to it?
 2. Switch phase only after the transfer finishes.
 
-**Checks** · One transfer maximum each tick • Press occupancy never exceeds one • Every id visits the press before cart • Gaps and burst arrivals preserve order
+**Checks** · One transfer maximum each tick • At most one parcel waits in the right bin • Every parcel visits the right bin before the cart • Gaps and burst arrivals preserve order
 
-**Reference solution sketch.** Keep a phase outside the handler. While waiting, if the mine has a parcel move it to press and switch to dispatch. On the next tick move press to cart and switch back. Verify transitions on every tick. An equivalent controller may derive the phase from the observable press occupancy.
-
+**Reference solution sketch.** Keep the current phase outside the handler. Wait until a parcel arrives on the belt. Move it to the right bin and switch to dispatch. On the next tick, send it to the cart and switch back to waiting. A solution can also choose its next move by checking the right bin.
 
 ## Remove the v5 chapter
 
-The paths below are implementation scope relative to `packages/sim/src/packs/workshop/` unless qualified. Trace imports, barrel exports and both Vue tag spellings before deleting a shared file. The new pack uses the generic PackStudio, QuickJS bridge, clock and per-id save. Preserve archival decoding independently of playable campaign dependencies.
+Paths below start at `packages/sim/src/packs/workshop/` unless they name another directory. Before deleting a shared file, check its imports, re-exports and both Vue tag spellings. Use the shared PackStudio, QuickJS bridge, clock and per-pack save. The archive reader must be able to open old code after the campaign is removed.
 
 | Delete or replace | Exact content to retire and replacement boundary |
 | --- | --- |
 | `chapter.ts`, `lesson-flow.ts`, `starter.ts`, `request-checks.ts`, `story.ts`, `surface.ts`, `reference/chapter-one.ts` | Remove Bram-to-Mayor request chain, paid orders, lessons that rewrite ship, earned sections, queued reveals, license and bridge/deed finish. Replace fixtures, starters, conditions, checks and references with the twelve briefs above. |
-| `campaign.ts`, `campaign-api.ts`, `town.ts`, `town-view.ts`, `panels.ts`, `prices.ts`, `catalog.ts`, `construction.ts`, `blueprints.ts` | Remove coins, wallet, prices, purchases, debt/installments, bank book, letters, inbox, town, districts, customers, orders and all building/upgrade progression. Remove sites, plots, roads, deposits, additional furnaces, cutter, assembler and ore/ingot/plate/wire/gear/bracket recipes. The four labelled stations operate on unchanged parcels. |
+| `campaign.ts`, `campaign-api.ts`, `town.ts`, `town-view.ts`, `panels.ts`, `prices.ts`, `catalog.ts`, `construction.ts`, `blueprints.ts` | Remove coins, wallet, prices, purchases, debt/installments, bank book, letters, inbox, town, districts, customers, orders and all building/upgrade progression. Remove the mine, furnace and press from the floor, along with the extra machines, cutter and assembler. Delete sites, plots, roads, deposits and ore/ingot/plate/wire/gear/bracket recipes. Draw a parcel belt, two bins and a dispatch cart. |
 | `game.ts`, `model.ts`, `production.ts`, `transport.ts`, `primitives.ts`, `declarations.ts`, `player.ts` | Remove chapter stock, iron/copper/coal types, heat, machine wear, trips, receipts, research and low-level build surface. Replace material inspection and hand shape with Parcel, Inspection and the API above. Remove buy, repair, replyLater and payBalance. Represent jams only in fixtures that need them. |
 | `Studio.vue`, `WorldView.vue`, `pack.ts`, `manifest.ts`, `cover.svg` | Remove custom studio and chapter adapter, Shed/Town/Inbox/Orders navigation, wallet pop, debt chip/bank menu, letters/toasts, unread/new badges, story speech, clock note, history/restore menu, library and machine counter. Use the standard studio, challenge metadata, pack-local shed drawing and new cover. Keep secondary Run once. |
 | `save.ts`, `persistence.ts` and the standalone v4 importer | Replace playable chapter restore with a read-only archival path for code/bytes. Remove import-to-live-campaign after migrating its callers. Do not require town tables, simulate payments or deploy old code to read an archive. |
 | Browser and test callers | Remove old section, economic, chapter reference and reveal expectations in pack tests, sim barrel/tests and e2e. Retire the custom Workshop branches in app.vue, useGame and runner.worker after moving shared execution/playback and archival readers. Remove MyLibrary, town-only views and bank panels after tracing callers. Keep shared visual parts used by Beginner. Replace Workshop validation and playthrough with every starter, reference, edge fixture, direct clock entry and archive recovery. |
 
-A completed challenge records its id and code. It pays nothing, changes no other fixture, opens no extra place and unlocks no challenge. The floor after selection always comes from that challenge’s input.
+Save the challenge id and the player’s code on completion. Players can choose any challenge from the start. Each one opens with its own starting parcels.

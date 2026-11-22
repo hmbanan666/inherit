@@ -34,7 +34,8 @@ A showcase of games played by writing TypeScript.
 | Term | Meaning on the shed floor |
 | --- | --- |
 | Parcel | An identifiable package with a colour, weight and destination on its label. |
-| Place | A labelled station on the floor that the player's code can address. |
+| Place | One of four parcel stations. `belt` is the incoming belt, `left` and `right` are the bins, and `cart` is the dispatch cart. |
+| Scale display | The readout that shows the number passed to `display` on a counting challenge. |
 | Arm | The mechanism that picks up and puts down parcels. Its hand holds one parcel. |
 | Controller | The player's program for the floor. It may export a function for the clock to call. |
 | Run | Try the program once and watch its actions. |
