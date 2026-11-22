@@ -40,6 +40,7 @@ let library: monaco.IDisposable
 let settingSource = false
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
+let tickMarks: monaco.editor.IEditorDecorationsCollection | undefined
 const callsToMove = computed(() => game.callsToMove?.value)
 let jobLines: monaco.editor.IEditorDecorationsCollection | undefined
 
@@ -74,6 +75,23 @@ const highlight = createLineHighlight(line => {
   }])
   if (game.watching.value) editor.revealLineInCenterIfOutsideViewport(line.line)
 })
+
+function markTickLines() {
+  if (!tickMarks) return
+  const file = activeFile.value
+  const lines = new Set<number>()
+  if (!game.watching.value && files.value[file] === deployed.value[file]) {
+    for (const call of game.tickCalls.value) {
+      if (call.file === file) lines.add(call.line)
+    }
+  }
+  const ranges = tickMarks.getRanges()
+  if (ranges.length === lines.size && ranges.every(range => lines.has(range.startLineNumber))) return
+  tickMarks.set(Array.from(lines, line => ({
+    range: new monaco.Range(line, 1, line, 1),
+    options: { linesDecorationsClassName: 'live-tick-line' },
+  })))
+}
 
 function lightCall() {
   const call = game.call.value
@@ -128,6 +146,7 @@ function display() {
   if (old) views.set(old.uri.path.slice(prefix.length), editor.saveViewState())
   tabs.value = [file]
   highlight.reset()
+  tickMarks?.clear()
   editor.setModel(model)
   editor.restoreViewState(views.get(file) ?? null)
 }
@@ -273,6 +292,7 @@ onMounted(() => {
     ariaLabel: game.label,
   })
   lineLight = editor.createDecorationsCollection()
+  tickMarks = editor.createDecorationsCollection()
   jobLines = editor.createDecorationsCollection()
   editor.onDidChangeModel(markJobCalls)
   editor.onDidChangeModelContent(markJobCalls)
@@ -314,6 +334,7 @@ onMounted(() => {
   const initial = game.navigation.value
   revealLine(initial.file, initial.line)
   lightCall()
+  markTickLines()
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
@@ -338,6 +359,7 @@ watch(callsToMove, () => {
   markJobCalls()
   showJobCalls()
 })
+watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLines, { flush: 'post' })
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)

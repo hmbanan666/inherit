@@ -26,7 +26,9 @@ const g = provideGame()
 const lesson = computed(()=>workshopLessons[g.campaign.value.lesson.index])
 provide(editorKey, { ...g, placeFunctions:['take','put','look'], id: manifest.id, label: 'Factory controller TypeScript',
   deployed: computed(() => g.campaign.value.project.deployed), multiFile: computed(() => g.surface.value.multiFile),
-  watching: g.playback.watching, call: g.playback.line, callsToMove: computed(() => g.step.value?.phase === 'solved' ? undefined : g.step.value?.step.callsToMove),
+  watching: g.playback.watching,
+  call: computed(() => g.playback.watching.value ? g.playback.call.value : undefined),
+  callsToMove: computed(() => g.step.value?.phase === 'solved' ? undefined : g.step.value?.step.callsToMove),
 })
 const { campaign, files, activeFile, dirty, ready, saved, error, surface, town, step, reveals, sections, letters } = g
 const townPerson = ref<Townsperson['id']>()
@@ -238,7 +240,14 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
             <small class="eyebrow"><Factory />Kettlewick · Chapter 1</small>
             <h1>{{ section === 'town' ? 'Kettlewick' : 'Uncle’s shed' }}</h1>
           </div>
-          <ClockControls v-if="lesson && g.active.value" v-model:paused="g.paused.value" v-model:speed="g.speed.value" />
+          <PlaybackBar
+            v-if="lesson && g.active.value"
+            v-model:paused="g.paused.value"
+            v-model:speed="g.speed.value"
+            :inert="g.stoppingLoop.value"
+            :tick-count="g.tickCount.value"
+            @stop="g.stopLoop"
+          />
           <div class="live" :class="{ off: !g.active.value }">
             <i />{{ !ready ? 'Starting' : g.paused.value ? 'Paused' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
           </div>

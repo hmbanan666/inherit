@@ -1,11 +1,12 @@
 import type { Call, Colour, Files, Row } from '@inherit/sim/pack'
 import type { PackSave } from '@inherit/sim/save'
 export type PackCommand = { kind: 'open'; id: string; stored: string | null; lesson?: string } |
-  { kind: 'run'; files: Files } | { kind: 'continue'|'tick' } | {kind:'action';panel:string;row:string}
+  { kind: 'run'; files: Files } | { kind: 'continue' | 'tick' | 'stopLoop' } | {kind:'action';panel:string;row:string}
 export interface PackFrame {
   save: PackSave<unknown>
   mode: 'run' | 'deploy'
   clockMs?: number
+  tickCount: number
   noCalls?: boolean
   finishIdeas?: string[]
   goal: string

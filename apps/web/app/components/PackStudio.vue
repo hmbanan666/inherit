@@ -18,6 +18,9 @@ const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(fa
 const settings = ref(false), panel = ref(''), contrast = useContrast(), width = ref(45)
 const runMessage = ref('')
 const activeCall = shallowRef<Call>()
+const tickCalls = shallowRef<Call[]>([])
+const tickCount = ref(0)
+const stoppingLoop = ref(false)
 const navigation = shallowRef({file:'main.ts',line:1})
 const lastRun = shallowRef<Files>({})
 const declarations = computed(() => frame.value?.declarations ?? '')
@@ -37,7 +40,11 @@ function persist() {
   if (!frame.value || blocked.value) return
   const save = frame.value.save
   try {
-    localStorage.setItem(key, JSON.stringify({...save, project:{...save.project, working: files.value, activeFile:activeFile.value}}))
+    localStorage.setItem(key, JSON.stringify({
+      ...save,
+      clockActive: save.clockActive && !stoppingLoop.value,
+      project: { ...save.project, working: files.value, activeFile: activeFile.value },
+    }))
     saved.value = true
   } catch { saved.value = false }
 }
@@ -63,6 +70,14 @@ function run() {
   paused.value = false
   send({kind:'run',files:files.value})
 }
+function stopLoop() {
+  if (!frame.value?.save.clockActive || stoppingLoop.value) return
+  stoppingLoop.value = true
+  paused.value = false
+  clock.cancel()
+  persist()
+  if (!busy.value) send({ kind: 'stopLoop' })
+}
 function advance() { if (solved.value) send({kind:'continue'}) }
 function shortcut(e:KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run() }
@@ -76,7 +91,7 @@ function resize(event: PointerEvent) {
 }
 provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:lastRun,
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
-  call:activeCall, watching, error, navigation,
+  call:activeCall, tickCalls, watching, error, navigation,
   setFile(path,code) {files.value = {...files.value,[path]:code};persist()},
   openFile(path) {activeFile.value = path},
 })
@@ -97,11 +112,12 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (data.moments.length) {
     const interval = tickStarted !== undefined && data.clockMs ? data.clockMs / data.moments.length : 650
     let nextMoment = tickStarted ?? clock.now()
-    watching.value = true
+    watching.value = tickStarted === undefined
     displayWorld.value = data.start
     for (const moment of data.moments) {
       if (!alive) return
-      activeCall.value = moment.call
+      if (stoppingLoop.value) break
+      if (watching.value) activeCall.value = moment.call
       calls.value = [...calls.value, moment.call]
       displayWorld.value = moment.world
       statuses.value = moment.checks
@@ -111,11 +127,17 @@ async function receive(data: PackFrame | {loadError:string}) {
   }
   if (!alive) return
   watching.value = false
-  if (tickStarted === undefined || !data.moments.length || !data.save.clockActive || data.solved) {
-    activeCall.value = undefined
-  }
+  activeCall.value = undefined
+  tickCount.value = data.tickCount
+  tickCalls.value = tickStarted !== undefined && data.save.clockActive ? calls.value : []
+  if (data.save.clockActive && data.save.project.deployed) lastRun.value = data.save.project.deployed
   displayWorld.value = data.save.world
   statuses.value = data.checks
+  if (stoppingLoop.value && data.save.clockActive) {
+    send({ kind: 'stopLoop' })
+    return
+  }
+  stoppingLoop.value = false
   busy.value = false
   scheduleTick()
 }
@@ -156,7 +178,14 @@ onBeforeUnmount(() => {
     </header>
     <main class="desk"><section class="world-shell pack-world" data-testid="world">
       <header class="world-title"><div><small class="eyebrow">{{ manifest.genre }}</small><h1>{{ manifest.title }}</h1></div><p v-if="runMessage" role="status" class="world-feedback">{{ runMessage }}</p>
-        <ClockControls v-if="frame?.save.clockActive && !complete" v-model:paused="paused" v-model:speed="speed" />
+        <PlaybackBar
+          v-if="frame?.save.clockActive && !complete"
+          v-model:paused="paused"
+          v-model:speed="speed"
+          :inert="stoppingLoop"
+          :tick-count="tickCount"
+          @stop="stopLoop"
+        />
       </header>
       <component :is="view" v-if="displayWorld" :world="displayWorld" :calls="calls"/>
       <aside v-for="p in frame?.panels.filter(p=>p.id===panel || p.placement==='panel')" :key="p.id" class="entity-panel"><h2>{{ p.label }}</h2><p v-for="row in p.rows" :key="row.id"><button v-if="row.action" :disabled="busy" @click="send({kind:'action',panel:p.id,row:row.id})">{{ row.label }} · {{ row.value }}</button><template v-else>{{ row.label }} · {{ row.value }}</template></p></aside>

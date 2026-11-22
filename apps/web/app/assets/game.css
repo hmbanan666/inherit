@@ -773,6 +773,9 @@ button.revisions:hover {
   background: color-mix(in srgb, var(--gold) 24%, transparent);
   border-bottom: 2px solid var(--gold);
 }
+.live-tick-line {
+  border-left: 3px solid var(--gold);
+}
 .machine-line {
   background: color-mix(in srgb, var(--gold) 13%, transparent);
   border-left: 2px solid var(--gold);

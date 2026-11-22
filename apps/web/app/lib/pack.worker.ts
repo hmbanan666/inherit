@@ -3,6 +3,7 @@ import { continueLesson, freshSave, decodeSave, type PackSave } from '@inherit/s
 import { declarations, createPackRunner } from '@inherit/sandbox/pack'
 import type { PackCommand, PackFrame } from './packProtocol'
 
+let tickCount = 0
 let pack: ReturnType<typeof getPack>
 let save: PackSave<unknown>
 let runner: ReturnType<typeof createPackRunner<any,any>>
@@ -11,6 +12,7 @@ async function act(command: PackCommand) {
   let statuses: PackFrame['checks'] | undefined
   try {
     if (command.kind === 'open') {
+      tickCount = 0
       pack = getPack(command.id)
       runner?.dispose()
       runner = createPackRunner(pack)
@@ -25,6 +27,9 @@ async function act(command: PackCommand) {
         }
       }
       if (save.clockActive && save.lessonId && save.project.deployed) await runner.play(save,save.project.deployed,'resume')
+    } else if (command.kind === 'stopLoop') {
+      runner.dispose()
+      save.clockActive = false
     } else if (command.kind === 'action') {
       const panel = pack.panels.find(p=>p.id===command.panel && (!p.reveal || save.released.includes(p.reveal)))
       const action = panel?.rows(save.world).find(r=>r.id===command.row)?.action
@@ -33,6 +38,8 @@ async function act(command: PackCommand) {
       const mode = command.kind === 'tick' ? 'tick' : pack.lessons.find(l=>l.id===save.lessonId)!.mode
       const result = await runner.play(save,command.kind==='run' ? command.files : save.project.deployed!,mode)
       ;({ moments, logs, start, checks: statuses } = result)
+      if (mode === 'tick') tickCount++
+      if (mode === 'deploy') tickCount = 0
     } else {continueLesson(pack, save); if (!save.lessonId) {save.clockActive=false;runner.dispose()}}
   } catch (cause) {
     error = cause instanceof Error ? cause.message : 'Could not open the pack.'
@@ -44,6 +51,7 @@ async function act(command: PackCommand) {
   const edit = save.edit ?? { file: 'main.ts', line: 1 }
   const names = pack.available(save.world, lesson?.id ?? '')
   self.postMessage({
+    tickCount,
     save, noCalls:command.kind==='run' && lesson?.mode==='run' && !moments.length && !logs.length && !error, mode:lesson?.mode ?? 'run', clockMs:pack.clock?.intervalMs, goal: lesson?.goal ?? '', edit, hints: lesson?.hints ?? [], labels: lesson?.checks.map(c => c.label) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],
     finishIdeas: lesson ? undefined : pack.lessons.map(l => l.idea),

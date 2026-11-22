@@ -16,6 +16,7 @@ export interface GameLog {
 export type Action =
   | { type: 'init'; campaign: Campaign; resumeClock?: boolean }
   | { type: 'step' }
+  | { type: 'stopLoop' }
   | { type: 'run'; files?: ProjectFiles }
   | { type: 'continue' }
   | { type: 'pay'; inFull?: boolean }
@@ -30,6 +31,7 @@ export interface Frame {
   project?: Campaign['project']
   api?: string
   reference?: import('@inherit/sim').ApiEntry[]
+  tickCount: number
   active: boolean
   error: string
   notice?: string

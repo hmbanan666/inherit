@@ -313,11 +313,11 @@ for (const speed of [1, 2, 4]) {
   })
 }
 
-test('the game clock controls pause, change speed and resume a deployment', async ({ page }) => {
+test('the playback bar counts handler calls, pauses, plays and stops the loop', async ({ page }) => {
   await openShed(page, '?step=bram-loop')
   const controls = page.getByRole('group', { name: 'Clock controls' })
   await expect(controls).toHaveCount(0)
-  await edit(page, 'let count = 0\nexport function onTick() { console.log(++count) }')
+  await edit(page, 'let count = 0\nexport function onTick() { console.log("calls " + ++count) }')
   await page.getByTestId('primary-button').click()
   await expect(page.getByTestId('world').getByRole('group', { name: 'Clock controls' })).toBeVisible()
   await expect(page.getByRole('banner').getByRole('group', { name: 'Clock controls' })).toHaveCount(0)
@@ -327,6 +327,10 @@ test('the game clock controls pause, change speed and resume a deployment', asyn
   await controls.getByRole('button', { name: 'Pause', exact: true }).click()
   await page.clock.install()
   await page.clock.runFor(500)
+  const lastMessage = await consolePanel.getByRole('listitem').first().innerText()
+  const count = lastMessage.match(/calls (\d+)/)![1]
+  const counter = controls.locator('output')
+  await expect(counter).toHaveText('onTick #' + count)
   const pausedTick = await consolePanel.locator('.tick').first().innerText()
   for (const speed of [2, 4]) {
     const button = controls.getByRole('button', { name: speed + 'x', exact: true })
@@ -335,22 +339,55 @@ test('the game clock controls pause, change speed and resume a deployment', asyn
   }
   await page.clock.runFor(1000)
   await expect(consolePanel.locator('.tick').first()).toHaveText(pausedTick)
-  await controls.getByRole('button', { name: 'Resume', exact: true }).click()
+  await expect(counter).toHaveText('onTick #' + count)
+  await controls.getByRole('button', { name: 'Play', exact: true }).click()
   await expect(consolePanel.locator('.tick').first()).not.toHaveText(pausedTick)
+  await controls.getByRole('button', { name: 'Pause' }).click()
+  await controls.getByRole('button', { name: 'Stop loop' }).click()
+  await expect(controls).toHaveCount(0)
+  const stopped = await consolePanel.innerText()
+  await page.clock.runFor(1000)
+  await expect(consolePanel).toHaveText(stopped, { useInnerText: true })
+  await page.reload()
+  const deploy = page.getByTestId('primary-button')
+  await expect(deploy).toBeEnabled()
+  await expect(controls).toHaveCount(0)
+  await deploy.click()
+  await expect(controls.locator('output')).toHaveText(/onTick #[1-9]\d*/)
 })
 
-test('the same executing line stays lit across live ticks', async ({ page }) => {
-  await openShed(page, '?step=bram-loop&speed=4')
-  await edit(page, 'import { take } from "inherit"\nexport function onTick() { take("mine"); console.log("tick") }')
+test('the gutter shows the last tick and keeps unchanged lines steady', async ({ page }) => {
+  await openShed(page, '?step=heat-inspect&speed=4')
+  await edit(page, [
+    'import { look } from "inherit"',
+    'let turns = 0',
+    'export function onTick() {',
+    '  if (++turns <= 32) look("furnace")',
+    '  look("mine")',
+    '  look("cart")',
+    '}',
+  ].join('\n'))
   await page.getByTestId('primary-button').click()
-  await page.getByRole('tab', { name: 'Console' }).click()
-  const line = page.locator('.machine-line')
-  await expect(line).toBeVisible()
-  const light = await line.elementHandle()
-  const tick = page.getByRole('tabpanel', { name: 'Console' }).locator('.tick').first()
-  for (let i = 0; i < 4; i++) {
-    const previous = await tick.innerText()
-    await expect(tick).not.toHaveText(previous)
-  }
-  expect(await light!.evaluate(node => node === document.querySelector('.machine-line'))).toBe(true)
+  const marks = page.locator('.margin-view-overlays .live-tick-line')
+  await expect(marks).toHaveCount(3)
+  await expect(marks).toHaveCount(2)
+  await expect(page.locator('.machine-line')).toHaveCount(0)
+  const controls = page.getByRole('group', { name: 'Clock controls' })
+  await expect(controls.getByRole('button', { name: '4x' })).toHaveAttribute('aria-pressed', 'true')
+  const first = await marks.first().elementHandle()
+  const lastCalls = await controls.locator('output').evaluate(counter => new Promise<string[]>(resolve => {
+    const places: string[] = []
+    const observer = new MutationObserver(() => {
+      places.push(document.querySelector('.station.acting .machine-label')?.textContent?.trim() ?? '')
+      if (places.length === 3) {
+        observer.disconnect()
+        resolve(places)
+      }
+    })
+    observer.observe(counter, { subtree: true, characterData: true, childList: true })
+  }))
+  expect(lastCalls).toEqual(['"cart"', '"cart"', '"cart"'])
+  expect(await first!.evaluate(node => node === document.querySelector('.live-tick-line'))).toBe(true)
+  await controls.getByRole('button', { name: 'Stop loop' }).click()
+  await expect(marks).toHaveCount(0)
 })

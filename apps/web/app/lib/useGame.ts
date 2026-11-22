@@ -64,6 +64,9 @@ function createGameStore() {
   const api = ref('')
   const clock = usePlaybackClock()
   const playback = usePlayback(clock)
+  const tickCalls = shallowRef<Frame['calls']>([])
+  const tickCount = ref(0)
+  const stoppingLoop = ref(false)
   const hand = computed(() => (playback.watching.value || playback.call.value)
     ? playback.hand.value
     : state.value.world.hand?.item ?? null)
@@ -88,7 +91,8 @@ function createGameStore() {
         ...state.value, ...acknowledged?.campaign,
         project: { ...(acknowledged?.project ?? state.value.project), working: files.value },
       }
-      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, acknowledged?.active ?? active.value)))
+      const clockActive = !stoppingLoop.value && (acknowledged?.active ?? active.value)
+      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, clockActive)))
       saved.value = true
     } catch {
       saved.value = false
@@ -96,6 +100,8 @@ function createGameStore() {
   }
   function stop() {
     playback.clear()
+    tickCalls.value = []
+    stoppingLoop.value = false
     busy.value = false
     buildCheck?.abort()
     clearTimeout(timer)
@@ -190,7 +196,13 @@ function createGameStore() {
       project: frame.project ?? state.value.project,
       seenSections: state.value.seenSections,
     }
+    if (action.type === 'stopLoop') stoppingLoop.value = false
     active.value = frame.active
+    tickCount.value = frame.tickCount
+    if (action.type === 'step' || !frame.active || action.type === 'deploy' || action.type === 'continue') {
+      tickCalls.value = action.type === 'step' && frame.active ? frame.calls : []
+    }
+    playback.hand.value = c.world.hand?.item ?? null
     if (!frame.active) paused.value = false
     if (action.type === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
       files.value = c.project.working
@@ -230,7 +242,7 @@ function createGameStore() {
     traces.value = frame.traces
     if (action.type !== 'step') persist()
     ready.value = true
-    if (['run', 'deploy', 'continue'].includes(action.type)) busy.value = false
+    if (!stoppingLoop.value && ['run', 'deploy', 'continue', 'stopLoop'].includes(action.type)) busy.value = false
     pump()
   }
   function start() {
@@ -257,6 +269,14 @@ function createGameStore() {
     busy.value = true
     playback.messages.value = []
     act({ type, files: files.value })
+    persist()
+  }
+  function stopLoop() {
+    if (!active.value || stoppingLoop.value) return
+    stoppingLoop.value = true
+    busy.value = true
+    paused.value = false
+    act({ type: 'stopLoop' })
     persist()
   }
   function advance() {
@@ -404,6 +424,7 @@ function createGameStore() {
     renameFile,
     deleteFile,
     submit, advance, busy, playback, hand,
+    stopLoop, stoppingLoop, tickCount, tickCalls,
     step, button, places, reveals, sections, letters,
     surface,
     reference,

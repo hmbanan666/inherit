@@ -19,6 +19,7 @@ import type { Action, Frame } from './gameProtocol'
 
 let campaign: Campaign
 let program: Program | undefined
+let tickCount = 0
 let traces: Frame['traces'] = Object.create(null)
 let error = '', lastSchema = ''
 
@@ -30,6 +31,7 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
   try {
     switch (action.type) {
       case 'init':
+        tickCount = 0
         lastSchema = ''
         campaign = loadSave(action.campaign)
         program?.dispose()
@@ -38,7 +40,12 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
           program = (await startChapter(campaign, campaign.project.deployed, 'resume')).program
         error = ''
         break
+      case 'stopLoop':
+        program?.dispose()
+        program = undefined
+        break
       case 'step':
+        if (program) tickCount++
         feedback = advanceGame(campaign, program, program?.drainLogs)
         calls = feedback.calls
         logs = feedback.logs
@@ -62,6 +69,7 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
         const next = await startChapter(campaign, files, action.type === 'run' ? 'run' : 'deploy', program)
         if (action.type !== 'run') {
           program?.dispose()
+          tickCount = 0
           program = next.program
           traces = Object.create(null)
           if (action.type === 'rollback') campaign.project.history.at(-1)!.name = 'Restore #' + action.id
@@ -115,6 +123,7 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
     campaign: live,
     town: townSnapshot(campaign),
     active: !!program,
+    tickCount,
     calls,
     logs,
     error,

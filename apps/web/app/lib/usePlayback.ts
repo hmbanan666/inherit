@@ -4,7 +4,6 @@ import type { usePlaybackClock } from './playback-clock'
 export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
   const watching = ref(false)
   const call = shallowRef<CallRecord>()
-  const line = shallowRef<CallRecord>()
   const place = ref<string>()
   const previousPlace = ref<string>()
   const travel = ref(1)
@@ -21,7 +20,6 @@ export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
     travel.value = 1
     stationStatuses.value = new Map()
     call.value = undefined
-    line.value = undefined
     returning.value = undefined
     place.value = undefined
     messages.value = []
@@ -41,7 +39,7 @@ export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
   ) {
     const watched = mode === 'run'
     if (!watched && !calls.length && !stationStatuses.value.size) {
-      line.value = undefined
+      call.value = undefined
       return
     }
     const statuses = new Map<string, Set<string>>()
@@ -54,7 +52,7 @@ export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
         statuses.set(place, atPlace)
       } else visible.push(record)
     }
-    if (!visible.length) line.value = undefined
+    if (!visible.length) call.value = undefined
     stationStatuses.value = statuses
     // All live calls share one tick. Absolute deadlines prevent per-call timer drift.
     const interval = watched ? 500 : TICK_MS / Math.max(1, visible.length)
@@ -73,7 +71,6 @@ export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
       returning.value = undefined
     }
     for (const record of visible) {
-      line.value = record
       call.value = record
       const destination = record.fn === 'buy' ? record.args[1] ?? record.args[0] : record.args[0]
       await travelTo(destination, start, start + interval / 2)
@@ -84,9 +81,8 @@ export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
       await clock.waitUntil(start)
       if (ticket !== generation) return
     }
-    if (mode !== 'tick') line.value = undefined
     watching.value = false
-    call.value = undefined
+    if (mode !== 'tick') call.value = undefined
   }
-  return { watching, call, line, place, previousPlace, travel, returning, hand, messages, stationStatuses, play, clear }
+  return { watching, call, place, previousPlace, travel, returning, hand, messages, stationStatuses, play, clear }
 }

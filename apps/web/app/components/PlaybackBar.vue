@@ -1,20 +1,25 @@
 <script setup lang="ts">
+defineProps<{ tickCount: number }>()
+defineEmits<{ stop: [] }>()
 const paused = defineModel<boolean>('paused', { required: true })
 const speed = defineModel<number>('speed', { required: true })
 </script>
 
 <template>
-  <div class="clock-controls" role="group" aria-label="Clock controls">
-    <button @click="paused = !paused">{{ paused ? 'Resume' : 'Pause' }}</button>
+  <div class="playback-bar" role="group" aria-label="Clock controls">
+    <output aria-live="off">onTick #{{ tickCount }}</output>
+    <button @click="paused = !paused">{{ paused ? 'Play' : 'Pause' }}</button>
     <button v-for="rate in [1, 2, 4]" :key="rate" :aria-pressed="speed === rate" @click="speed = rate">
       {{ rate }}x
     </button>
+    <button @click="$emit('stop')">Stop loop</button>
   </div>
 </template>
 
 <style scoped>
-.clock-controls {
+.playback-bar {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   padding: 2px;
@@ -22,11 +27,16 @@ const speed = defineModel<number>('speed', { required: true })
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.clock-controls button {
+.playback-bar output {
+  padding-inline: 4px;
+  font: 12px var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.playback-bar button {
   padding: 4px 6px;
   font: 12px var(--mono);
 }
-.clock-controls button[aria-pressed='true'] {
+.playback-bar button[aria-pressed='true'] {
   color: var(--gold);
   border-color: var(--accent-line);
 }
