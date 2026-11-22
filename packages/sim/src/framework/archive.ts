@@ -11,7 +11,7 @@ export function archivePrefix(pack: string) {
 }
 
 /** Verify the independent recovery copy before allowing the live slot to change. */
-export async function archiveSource(storage: Storage, pack: string, raw: string, project?: unknown) {
+export async function archiveSource(storage: Pick<Storage, 'getItem' | 'setItem'>, pack: string, raw: string, project?: unknown) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   const identity = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
   const key = archivePrefix(pack) + identity

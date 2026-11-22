@@ -32,6 +32,20 @@ export async function edit(page: Page, source: string, append = false) {
     await page.keyboard.press('Delete')
   }
 }
+/** Seed a reachable chapter boundary only for tests that exercise persistence. */
+export async function savedShed(page: Page, id: string, speed = 1) {
+  const { createCampaign, jumpToStep } = await import('../../packages/sim/src/index')
+  const { workshopSave } = await import('../../packages/sim/src/packs/workshop/save')
+  const { workshopStarter } = await import('../../packages/sim/src/packs/workshop/starter')
+  const campaign = jumpToStep(createCampaign(), id)
+  campaign.project.working = workshopStarter(id, campaign.project.working).files
+  const raw = JSON.stringify(workshopSave(campaign, 'main.ts', false))
+  await page.addInitScript(raw => {
+    if (!localStorage.getItem('inherit.pack.workshop')) localStorage.setItem('inherit.pack.workshop', raw)
+  }, raw)
+  await openShed(page, '?speed=' + speed)
+}
+
 export async function openShed(page: Page, query = '') {
   await page.goto('/?pack=workshop' + (query ? '&' + query.slice(1) : ''))
   await expect(page.getByTestId('primary-button')).toBeEnabled()

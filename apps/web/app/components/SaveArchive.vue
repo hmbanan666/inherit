@@ -19,7 +19,7 @@ function download(raw: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 function exportSlot() {
-  const raw = localStorage.getItem(packKey(props.pack)) ?? localStorage.getItem('inherit.workshop.v1')
+  const raw = localStorage.getItem(packKey(props.pack)) ?? (props.pack === 'workshop' ? localStorage.getItem('inherit.workshop.v1') : null)
   if (raw) download(raw)
 }
 </script>

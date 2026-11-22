@@ -109,3 +109,32 @@ test('shots captures the supplied preview and a matching transcript', async ({ba
     await rm(dir, {recursive: true, force: true})
   }
 })
+
+test('a failed Continue keeps the solved boundary available for one retry', async ({page}) => {
+  await page.goto('/?pack=beginner')
+  await expect(page.locator('.view-lines')).toBeVisible()
+  await page.getByRole('button', {name: 'Got it'}).click()
+  await page.keyboard.insertText('say("Hello!")')
+  await page.getByTestId('primary-button').click()
+  const next = page.getByTestId('continue')
+  await expect(next).toBeFocused()
+  await page.evaluate(() => {
+    const write = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'inherit.pack.beginner' && JSON.parse(value).lessonId === 'flowers') {
+        Storage.prototype.setItem = write
+        throw new DOMException('Storage full', 'QuotaExceededError')
+      }
+      return write.call(this, key, value)
+    }
+  })
+  await next.click()
+  await expect(page.getByRole('alert')).toContainText('Could not save progress')
+  await expect(next).toBeEnabled()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('inherit.pack.beginner')!))).toMatchObject({
+    lessonId: 'hello', phase: 'solved', completed: [],
+  })
+  await next.click()
+  await expect(page.getByTestId('task-card')).toContainText('three flowers')
+  await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1')
+})

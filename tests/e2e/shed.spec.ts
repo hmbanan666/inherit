@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { openShed, photo, edit, openTool } from './workshop'
+import { openShed, photo, edit, openTool, savedShed } from './workshop'
 
 test('Bram meets the player beside a labelled working shed', async ({ page }) => {
   await openShed(page)
@@ -306,7 +306,7 @@ for (const speed of [1, 2, 4]) {
 }
 
 test('the playback bar counts handler calls, pauses, plays and stops the loop', async ({ page }) => {
-  await openShed(page, '?step=bram-loop')
+  await savedShed(page, 'bram-loop')
   const controls = page.getByRole('group', { name: 'Clock controls' })
   await expect(controls).toHaveCount(0)
   await edit(page, 'let count = 0\nexport function onTick() { console.log("calls " + ++count) }')

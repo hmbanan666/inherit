@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { edits } from '../../packages/sim/src/packs/workshop/starter'
-import { openShed, openTool } from './workshop'
+import { openShed, openTool, savedShed } from './workshop'
 
 function browserErrors(page: Page) {
   const errors: string[] = []
@@ -29,7 +29,7 @@ test('the bank panels answer the letter and settle the balance only once',async(
   await openTool(page, 'learn')
   await page.getByRole('button',{name:'Pay later'}).click()
   await expect(page.getByTestId('solved-card')).toBeVisible()
-  await openShed(page,'?step=harrow-deed')
+  await savedShed(page, 'harrow-deed')
   await openTool(page, 'learn')
   await page.getByRole('button',{name:/Pay balance/}).click()
   await expect(page.getByTestId('solved-card')).toBeVisible()

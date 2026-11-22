@@ -27,6 +27,7 @@ export interface PackFrame {
   mode: 'run' | 'deploy'
   clockMs?: number
   tickCount: number
+  showLearn: boolean
   noCalls?: boolean
   finishIdeas?: string[]
   goal: string

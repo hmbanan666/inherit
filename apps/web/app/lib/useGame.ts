@@ -3,7 +3,7 @@ import { workshopEdit } from '../../../../packages/sim/src/packs/workshop/starte
 import { workshopLessons } from '../../../../packages/sim/src/packs/workshop/pack'
 import {
   createCampaign, currentStep, getSurface, jumpToStep,
-  loadSave, placeNames, primaryButton, revealed, serializeSave,
+  placeNames, primaryButton, revealed,
   TICK_MS,
   townSnapshot,
   type ProjectFiles,
@@ -78,17 +78,15 @@ function createGameStore() {
   let resumeClock = true
   const query = new URLSearchParams(location.search)
   const local = import.meta.dev || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
-  const preview = query.get('lesson')
-  // The old local step hook can still exercise reloads against a disposable slot.
-  const stepAlias = local && preview === null ? query.get('step') : null
-  const storageKey = stepAlias ? saveKey + '.preview.' + stepAlias : saveKey
+  const preview = query.get('lesson') ?? (local ? query.get('step') : null)
   const frontier = shallowRef<string>()
   const checkpoints: Record<string, string> = {}
   const drafts: Record<string, ProjectFiles> = {}
   const hints = ref<Record<string, number>>({})
   const attempts = ref<Record<string, number>>({})
+  const savedFrontierIndex = computed(() => frontier.value ? restoreWorkshop(frontier.value).campaign.lesson.index : undefined)
   const completed = computed(() => {
-    const index = frontier.value ? restoreWorkshop(frontier.value).campaign.lesson.index : state.value.lesson.index
+    const index = savedFrontierIndex.value ?? state.value.lesson.index
     return workshopLessons.slice(0, index).map(l => l.id)
   })
   function snapshot() {
@@ -140,6 +138,7 @@ function createGameStore() {
     watchdog: ReturnType<typeof setTimeout>,
     autosave: ReturnType<typeof setInterval>
   let buildCheck: AbortController | undefined
+  let continueBoundary: string | undefined
   let acknowledged: Frame | undefined
   function persist() {
     if (blockedSave.value || preview !== null) return
@@ -148,8 +147,9 @@ function createGameStore() {
         ...state.value, ...acknowledged?.campaign,
         project: { ...(acknowledged?.project ?? state.value.project), working: files.value },
       }
+      if (current?.type === 'continue' && acknowledged) return
       const clockActive = !stoppingLoop.value && (acknowledged?.active ?? active.value)
-      localStorage.setItem(storageKey, JSON.stringify({
+      localStorage.setItem(saveKey, JSON.stringify({
         ...workshopSave(save, activeFile.value, clockActive), frontier: frontier.value,
         checkpoints, drafts, hints: hints.value, attempts: attempts.value,
       }))
@@ -213,7 +213,7 @@ function createGameStore() {
     if (!worker || current) return
     current = queue.shift()
     if (!current) {
-      if (!paused.value) {
+      if (!paused.value && step.value?.phase !== 'solved') {
         const delay = Math.max(0, (nextTickAt - clock.now()) / speed.value)
         timer = setTimeout(() => act({ type: 'step' }), delay)
       }
@@ -302,6 +302,13 @@ function createGameStore() {
     cpu.value = frame.cpu
     traces.value = frame.traces
     if (action.type !== 'step') persist()
+    if (action.type === 'continue' && continueBoundary && !saved.value) {
+      restore(continueBoundary)
+      continueBoundary = undefined
+      notice.value = 'Could not save progress. Free space and try again.'
+      return
+    }
+    if (action.type === 'continue') continueBoundary = undefined
     ready.value = true
     if (!stoppingLoop.value && ['run', 'deploy', 'continue', 'stopLoop'].includes(action.type)) busy.value = false
     pump()
@@ -345,6 +352,7 @@ function createGameStore() {
     if (busy.value || step.value?.phase !== 'solved') return
     if (frontier.value) return returnToFrontier()
     drafts[step.value.step.id] = files.value
+    continueBoundary = snapshot()
     busy.value = true
     playback.clear()
     act({ type: 'continue' })
@@ -411,7 +419,8 @@ function createGameStore() {
     const lesson = workshopLessons[state.value.lesson.index]
     if (!lesson) return
     const { file, line } = workshopEdit(lesson.id, files.value)
-    openFile(file, line)
+    if (activeFile.value !== file && Object.hasOwn(files.value, activeFile.value)) openFile(activeFile.value)
+    else openFile(file, line)
   }
   function newGame() {
     stop()
@@ -437,12 +446,10 @@ function createGameStore() {
   }
   onMounted(async () => {
     try {
-      const id = preview ?? stepAlias
+      const id = preview
       speed.value = local ? Math.min(32, Math.max(1, Number(query.get('speed')) || 1)) : 1
-      const stored = preview !== null ? null : stepAlias ? localStorage.getItem(storageKey) : await readPackSlot('workshop')
-      const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-      const resumeAlias = stepAlias && stored && (entry?.type === 'reload' || entry?.type === 'back_forward')
-      if (id !== null && !resumeAlias) {
+      const stored = preview !== null ? null : await readPackSlot('workshop')
+      if (id !== null) {
         if (!workshopLessons.some(l => l.id === id)) throw new Error('Unknown lesson.')
         state.value = jumpToStep(createCampaign(), id)
         const starter = workshopLessons[state.value.lesson.index].starter(state.value.project.working)

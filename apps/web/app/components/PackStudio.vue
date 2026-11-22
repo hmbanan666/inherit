@@ -142,7 +142,7 @@ async function receive(data: PackFrame | {loadError:string}) {
     return
   }
   if (changed) {
-    drawer.value = !data.solved && (data.theory || data.task) && data.save.phase === 'brief' ? 'learn' : undefined
+    drawer.value = data.showLearn ? 'learn' : undefined
     files.value = data.save.project.working
     activeFile.value = data.save.project.activeFile
     navigation.value = data.edit
@@ -150,7 +150,7 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (!frame.value && data.save.clockActive) paused.value = true
   if (!data.save.clockActive) paused.value = false
   frame.value = data
-  runMessage.value = data.noCalls ? 'Your code ran. Try the line in the comment.' : ''
+  runMessage.value = data.noCalls ? 'Your code ran. Check the TODO and try again.' : ''
   error.value = saved.value ? data.error : 'Could not save progress. Free space and try again.'
   if (!changed && saved.value) persist()
   calls.value = []
@@ -174,7 +174,8 @@ async function receive(data: PackFrame | {loadError:string}) {
   watching.value = false
   activeCall.value = undefined
   tickCount.value = data.tickCount
-  tickCalls.value = tickStarted !== undefined && data.save.clockActive ? calls.value : []
+  if (!data.save.clockActive || changed) tickCalls.value = []
+  else if (tickStarted !== undefined && calls.value.length) tickCalls.value = calls.value
   if (data.save.clockActive && data.save.project.deployed) lastRun.value = data.save.project.deployed
   displayWorld.value = data.save.world
   statuses.value = data.checks

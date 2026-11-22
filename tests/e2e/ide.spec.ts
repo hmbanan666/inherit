@@ -1,4 +1,4 @@
-import { edit as replaceCode, photo, openShed, openTool } from './workshop'
+import { edit as replaceCode, photo, openShed, openTool, savedShed } from './workshop'
 import { expect, test, type Page } from '@playwright/test'
 
 const main = 'import { feed } from "./lib/drive"\nexport function onTick() {\n  feed()\n}'
@@ -13,8 +13,8 @@ async function projectFiles(page: Page) {
 }
 
 async function workshop(page: Page, unlock = true) {
-  await openShed(page, unlock ? '?step=mayor-tools&speed=8' : '')
-  if (!unlock) return
+  if (!unlock) return openShed(page)
+  await savedShed(page, 'mayor-tools', 8)
   await replaceCode(page, main)
   const tree = await projectFiles(page)
   await tree.getByRole('button', { name: 'New file' }).click()

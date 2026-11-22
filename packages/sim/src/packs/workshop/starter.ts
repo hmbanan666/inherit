@@ -63,5 +63,8 @@ export function workshopEdit(id: string, files: Files): Starter['edit'] {
   const lastNote = comments('TODO: '+edits[id].goal+'.').at(-1)
   const lines = (files[edit.file] ?? '').split('\n')
   const comment = lines.findIndex(line => line.trim() === lastNote)
-  return comment < 0 ? edit : { file: edit.file, line: comment + 2 }
+  if (comment >= 0) return { file: edit.file, line: comment + 2 }
+  const legacyNote = comments(edits[id].note).at(-1)
+  const legacy = lines.findIndex(line => line.trim() === legacyNote)
+  return legacy >= 0 ? { file: edit.file, line: legacy + 2 } : edit
 }

@@ -94,17 +94,17 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
     const lesson = pack.lessons.find(l => l.id === save.lessonId)
     if (mode !== 'tick') {
       results.clear()
-      for (const variant of lesson?.variants ?? []) {
-        const checks = lesson!.checks.filter(check => check.input === variant.input)
-        const trial = { ...save, world: structuredClone(save.entryWorld), attempts: {}, passed: [],
-          project: { ...save.project }, phase: 'brief' as PackSave<W>['phase'] }
+      if (lesson) for (const variant of lesson.variants ?? []) {
+        const checks = lesson.checks.filter(check => check.input === variant.input)
+        const trial: PackSave<W> = { ...save, world: structuredClone(save.entryWorld), attempts: {}, passed: [],
+          project: { ...save.project }, phase: 'brief' }
         variant.enter(trial.world)
         trial.entryWorld = structuredClone(trial.world)
-        const runner = fixtureRunner({ ...pack, lessons: [{ ...lesson!, checks }] }, new Map())
+        const runner = fixtureRunner({ ...pack, lessons: [{ ...lesson, checks }] }, new Map())
         try {
-          const result = await runner.play(trial, files, lesson!.mode)
+          const result = await runner.play(trial, files, lesson.mode)
           let statuses = result.checks
-          for (let tick = 0; lesson!.mode === 'deploy' && trial.phase !== 'solved' && tick < (variant.maxTicks ?? 120); tick++)
+          for (let tick = 0; lesson.mode === 'deploy' && trial.phase !== 'solved' && tick < (variant.maxTicks ?? 120); tick++)
             statuses = (await runner.play(trial, files, 'tick')).checks
           checks.forEach((check, i) => results.set(check.id, trial.passed.includes(check.id) ? 'green' : statuses[i]))
         } catch {

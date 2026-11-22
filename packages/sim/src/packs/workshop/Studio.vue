@@ -148,7 +148,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey, true))
         </template>
       </section>
     </main>
-    <footer class="statusbar"><span>{{ g.preview !== null ? 'Preview' : saved ? 'Saved locally' : 'Save unavailable' }}</span></footer>
+    <footer class="statusbar"><span v-if="g.notice.value" role="status">{{ g.notice.value }}</span><span>{{ g.preview !== null ? 'Preview' : saved ? 'Saved locally' : 'Save unavailable' }}</span></footer>
     <div v-if="confirmNew" class="scrim"><section class="confirm" role="dialog" aria-label="New game">
       <h2>Start a new factory?</h2><p>This replaces your saved floor, code and progress.</p>
       <button @click="confirmNew = false">Keep playing</button><button class="gold" @click="reset">New game</button>

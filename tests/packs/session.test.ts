@@ -147,3 +147,19 @@ test('a constant answer fails the alternate input while the visible scene still 
     expect(save.world.raining).toBe(false)
   } finally { runner.dispose() }
 })
+
+test('archive verification is idempotent and an interrupted copy leaves the original slot intact', async () => {
+  const { archiveSource } = await import('../../packages/sim/src/framework/archive')
+  const raw = '{"project":{"working":{"main.ts":"// an old draft"}}}'
+  const slots = new Map([['inherit.pack.workshop', raw]])
+  const storage = {
+    getItem: (key: string) => slots.get(key) ?? null,
+    setItem: (key: string, value: string) => { slots.set(key, value) },
+  }
+  await archiveSource(storage, 'workshop', raw, JSON.parse(raw).project)
+  await archiveSource(storage, 'workshop', raw, JSON.parse(raw).project)
+  expect(slots.size).toBe(2)
+  const broken = {...storage, setItem() { throw new Error('Storage full') }}
+  await expect(archiveSource(broken, 'workshop', raw + '\n')).rejects.toThrow()
+  expect(slots.get('inherit.pack.workshop')).toBe(raw)
+})

@@ -59,6 +59,9 @@ export interface Task {
 export type InputValue = string | number | boolean | null | InputValue[] | { [key: string]: InputValue }
 
 export interface Lesson<W> {
+  id: string
+  goal: string
+  idea: string
   unit?: string
   kind: 'write' | 'fill' | 'fix' | 'predict'
   theory?: Theory
@@ -67,9 +70,6 @@ export interface Lesson<W> {
   scene: string
   variants?: readonly { input: string; enter(world: W): void; maxTicks?: number }[]
   inputs?(world: Readonly<W>): Record<string, { type: string; value: InputValue }>
-  id: string
-  goal: string
-  idea: string
   mode: 'run' | 'deploy'
   starter(previous: Files): Starter
   hints?: readonly string[]
@@ -95,11 +95,11 @@ export interface Pack<W, A extends object> {
   retry: 'entry' | 'live'
   beginAttempt(world: W, mode: 'run' | 'setup' | 'tick' | 'idle'): { api: A; finish(): void }
   available(world: W, lessonId: string): readonly (keyof A & string)[]
-  guestModules?: Readonly<Record<string,{source:string;declarations:string}>>
-  typeAliases?(world: W): Record<string,string[]>
-  clock?: {intervalMs:number;handler:'onTick'}
-  actions?: Record<string,(world:W,args:readonly unknown[])=>void>
-  upgrade?(fromVersion:number,input:unknown):unknown
+  guestModules?: Readonly<Record<string, { source: string; declarations: string }>>
+  typeAliases?(world: W): Record<string, string[]>
+  clock?: { intervalMs: number; handler: 'onTick' }
+  actions?: Record<string, (world: W, args: readonly unknown[]) => void>
+  upgrade?(fromVersion: number, input: unknown): unknown
 }
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }
 export function mainFile(source: string, line = source.split('\n').length): Starter {
