@@ -21,6 +21,7 @@ import { editorKey } from '../../../../../apps/web/app/lib/editor'
 import manifest from './manifest'
 import { workshopLessons } from './pack'
 const WorkshopFloor = defineAsyncComponent(()=>import('./WorldView.vue'))
+const finishIdeas = workshopLessons.map(lesson => lesson.idea)
 const g = provideGame()
 const lesson = computed(()=>workshopLessons[g.campaign.value.lesson.index])
 provide(editorKey, { ...g, placeFunctions:['take','put','look'], id: manifest.id, label: 'Factory controller TypeScript',
@@ -93,12 +94,14 @@ function movePanel(event: KeyboardEvent) {
   event.preventDefault()
   focusPanel(next)
 }
-const editor = ref<{ focus(): void; revealLine(file: string, line: number): void }>()
 const celebration = shallowRef<TownSnapshot['changes']>([])
 const story = ref('')
 const archives = computed(() =>
   campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ') || r.name.startsWith('Previous')),
 )
+const historyLabel = computed(() => g.button.value === 'deploy' ? 'Deploy history' : 'History')
+const showHistory = computed(() => g.button.value === 'deploy' || archives.value.length > 0 ||
+  campaign.value.project.history.some(revision => revision.id !== 0))
 const coinPop = ref<{ tick: number; amount: number }>()
 watch(
   () => campaign.value.economy.money,
@@ -130,11 +133,7 @@ watch(g.notice, (message) => {
     g.notice.value = ''
   }
 })
-watch(g.navigation, async ({ file, line }) => {
-  tab.value = 'controller'
-  await nextTick()
-  editor.value?.revealLine(file, line)
-})
+watch(g.navigation, () => { tab.value = 'controller' })
 watch(() => step.value?.step.id, id => {
   if (id === 'mayor-tools') showFiles.value = true
   if (id && section.value === 'inbox' && id !== 'harrow-tab') openSection('factory')
@@ -181,7 +180,7 @@ function hotkey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 's' || e.key === 'Enter')) {
     e.preventDefault()
     e.stopPropagation()
-    g.submit()
+    if (lesson.value) g.submit()
   }
   if (e.key === 'Escape') {
     menu.value = ''
@@ -229,7 +228,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
   <div class="workshop" :class="{'high-contrast':contrast}" :style="{ '--dock-width': dockWidth + '%' }">
     <header class="hud">
       <PackNav :manifest="manifest" />
-      <nav class="section-nav" aria-label="Workshop sections">
+      <nav v-if="sections.length > 1" class="section-nav" aria-label="Workshop sections">
         <button v-for="item in sections" :data-testid="'nav-' + (item === 'factory' ? 'shed' : item)" :key="item" :aria-label="sectionNames[item]"
           :aria-description="sectionDescription(item)" :aria-pressed="section === item" @click="navigateTo(item)">
           {{ sectionNames[item] }}
@@ -237,6 +236,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
           <small v-if="!campaign.seenSections.includes(item)" class="section-new">new</small>
         </button>
       </nav>
+      <div class="hud-spacer" />
       <div v-if="showMoney" class="wallet" title="Workshop money">
         <Coins /><b>{{ campaign.economy.money.toLocaleString() }} coins</b
         ><small v-if="coinPop" :key="coinPop.tick" class="coin-pop" @animationend="coinPop = undefined"
@@ -279,16 +279,17 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
         </aside>
       </div>
       <small v-if="lesson?.id === 'bram-loop'" class="clock-note">Deploy starts the clock. It calls onTick for you.</small>
-      <div class="deploy-group">
-        <button v-if="g.button.value === 'deploy' || archives.length || campaign.project.history.length" class="revisions" :aria-label="g.button.value === 'deploy' ? 'Deploy history' : 'History'" @click="toggleMenu('history')">
-          <ChevronDown />
+      <div v-if="lesson" class="deploy-group">
+        <button v-if="showHistory" class="history-menu" :aria-expanded="menu === 'history'"
+          :title="g.button.value === 'deploy' ? 'Run once or restore a deployment' : 'Restore saved code'" @click="toggleMenu('history')">
+          {{ historyLabel }} <ChevronDown />
         </button>
         <button class="deploy primary-run" data-testid="primary-button" :disabled="g.busy.value || (!ready && !error)" @click="g.submit()">
           <Play />{{ g.playback.watching.value ? 'Playing your run' : g.button.value === 'run' ? 'Run' : 'Deploy' }} <kbd>Ctrl+Enter</kbd>
         </button>
         <aside v-if="menu === 'history'" class="hud-menu">
           <button v-if="g.button.value === 'deploy'" :disabled="g.busy.value" @click="menu = ''; g.submit('run')">Run once</button>
-          <h3>{{ g.button.value === 'deploy' ? 'Deploy history' : 'History' }}</h3>
+          <h3>{{ historyLabel }}</h3>
           <button
             v-for="r in [...campaign.project.history].reverse()"
             :key="r.id"
@@ -361,47 +362,49 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
         @keydown.right.prevent="dockWidth = Math.max(25, dockWidth - 2)"
       ></div>
       <section class="editor-dock" aria-label="Code workshop">
-        <header class="dock-header">
-          <span class="eyebrow"><Code2 />Code workshop</span>
-        </header>
-        <GoalBar v-if="lesson" :key="lesson.id" :goal="lesson.goal" :hints="lesson.hints ?? []" />
-        <section v-else class="lesson-card" aria-label="Chapter complete"><h2>The shed is yours.</h2><p>The bridge to Riverside stands. Your family tab is paid.</p></section>
-        <FileTree v-if="showFiles && surface.multiFile" />
-        <MyLibrary />
-        <div class="file-tabs">
-          <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
-            <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
-          </button>
-          <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
-        </div>
-        <div class="editor-pane">
-          <div v-show="tab === 'controller'" class="editor-host">
-            <LazyCodeEditor ref="editor" :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
+        <PackFinish v-if="!lesson" :manifest="manifest" :ideas="finishIdeas" @replay="reset">Well done! The shed is yours. The bridge to Riverside stands and your family tab is paid.</PackFinish>
+        <template v-else>
+          <header class="dock-header">
+            <span class="eyebrow"><Code2 />Code workshop</span>
+          </header>
+          <GoalBar :key="lesson.id" :goal="lesson.goal" :hints="lesson.hints ?? []" />
+          <FileTree v-if="showFiles && surface.multiFile" />
+          <MyLibrary />
+          <div class="file-tabs">
+            <button :aria-pressed="tab === 'controller'" @click="tab = 'controller'">
+              <FileCode2 />{{ activeFile }}<i v-if="dirty" class="dot" />
+            </button>
+            <button :aria-pressed="tab === 'api'" @click="tab = 'api'"><BookOpen />API reference</button>
           </div>
-          <ApiReference v-if="tab === 'api'" />
-        </div>
-        <div class="editor-foot" role="status">
-          <span><i class="dot" :class="{ clean: !dirty }" />{{ editorStatus }}</span
-          ><small>TypeScript</small>
-        </div>
-        <div class="panel-tabs">
-          <div role="tablist" aria-label="Workshop tools" @keydown="movePanel">
-            <button v-for="name in panels" :id="'tab-' + name" :key="name" role="tab"
-              :aria-selected="panel === name" :aria-controls="'panel-' + name"
-              :tabindex="panel === name ? 0 : -1" @click="openPanel(name)">{{ name }}</button>
+          <div class="editor-pane">
+            <div v-show="tab === 'controller'" class="editor-host">
+              <LazyCodeEditor :error="error" @reference="tab = 'api'" @focus-ids="highlightMachines" />
+            </div>
+            <ApiReference v-if="tab === 'api'" />
           </div>
-          <button class="panel-toggle" :aria-expanded="panelOpen" :aria-controls="'panel-' + panel"
-            :aria-label="panelOpen ? 'Collapse workshop panel' : 'Expand workshop panel'"
-            @click="panelOpen = !panelOpen"><ChevronDown /></button>
-        </div>
-        <div v-show="panelOpen" class="panel-slot" :class="{ compact: panel === 'Checks' }">
-          <div v-show="panel === 'Checks'" id="panel-Checks" role="tabpanel" aria-labelledby="tab-Checks" tabindex="0">
-            <ChecksPanel :key="step?.step.id" :checks="step?.checks ?? []" :error="error" :messages="step?.phase === 'working' || error ? g.playback.messages.value : []" />
+          <div class="editor-foot" role="status">
+            <span><i class="dot" :class="{ clean: !dirty }" />{{ editorStatus }}</span
+            ><small>TypeScript</small>
           </div>
-          <div v-show="panel === 'Console'" id="panel-Console" role="tabpanel" aria-labelledby="tab-Console" tabindex="0">
-            <ConsolePanel />
+          <div class="panel-tabs">
+            <div role="tablist" aria-label="Workshop tools" @keydown="movePanel">
+              <button v-for="name in panels" :id="'tab-' + name" :key="name" role="tab"
+                :aria-selected="panel === name" :aria-controls="'panel-' + name"
+                :tabindex="panel === name ? 0 : -1" @click="openPanel(name)">{{ name }}</button>
+            </div>
+            <button class="panel-toggle" :aria-expanded="panelOpen" :aria-controls="'panel-' + panel"
+              :aria-label="panelOpen ? 'Collapse workshop panel' : 'Expand workshop panel'"
+              @click="panelOpen = !panelOpen"><ChevronDown /></button>
           </div>
-        </div>
+          <div v-show="panelOpen" class="panel-slot" :class="{ compact: panel === 'Checks' }">
+            <div v-show="panel === 'Checks'" id="panel-Checks" role="tabpanel" aria-labelledby="tab-Checks" tabindex="0">
+              <ChecksPanel :key="step?.step.id" :checks="step?.checks ?? []" :error="error" :messages="step?.phase === 'working' || error ? g.playback.messages.value : []" />
+            </div>
+            <div v-show="panel === 'Console'" id="panel-Console" role="tabpanel" aria-labelledby="tab-Console" tabindex="0">
+              <ConsolePanel />
+            </div>
+          </div>
+        </template>
       </section>
     </main>
     <footer class="statusbar">
@@ -465,15 +468,15 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
   display: flex;
   align-items: center;
   gap: 7px;
-}
-.section-nav {
-  margin-right: auto;
   flex-wrap: wrap;
 }
 .section-nav button[aria-pressed='true'] {
   color: var(--gold);
   border-color: var(--gold);
 }
+.hud-spacer { flex: 1 }
+.history-menu { margin-right: 8px; font-size: 12px }
+.history-menu svg { width: 12px }
 .section-new { color: var(--accent-soft); }
 .statusbar { height: 34px; border-top: 0; box-shadow: inset 0 1px var(--line); }
 .statusbar .deploy-group, .statusbar .deploy, .statusbar .revisions { height: 100%; }

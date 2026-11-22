@@ -1783,7 +1783,6 @@ button.revisions:hover {
 .pack-switch a:hover { background: var(--hover) }
 .pack-settings { margin-left: auto }
 .hud .primary-run { min-width: 150px; height: 44px; border-radius: 6px; font-size: 16px }
-.hud .deploy-group .primary-run { border-radius: 6px 0 0 6px }
 .hud .revisions { height: 44px }
 .primary-run kbd { font: 10px var(--mono); padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px }
 .showcase { min-height: 100dvh; background: var(--base) }
@@ -1802,12 +1801,11 @@ button.revisions:hover {
 .solved-overlay { position:absolute; bottom:16px; left:4%; width:92%; z-index:4; background: var(--overlay); border:1px solid var(--accent-line); border-radius:8px; padding:14px 18px; box-shadow:0 5px 25px var(--shadow) }
 .solved-overlay button { margin-top:8px }
 .solved-overlay small { color:var(--gold) }
-.pack-checks,.pack-error,.pack-ending,.entity-panel { padding:12px 18px }
+.pack-checks,.pack-error,.entity-panel { padding:12px 18px }
 .pack-checks small { display:block; color:var(--sub); margin-bottom:5px }
 .pack-checks [data-state=red],.pack-error {color:var(--alert)}
 .pack-checks [data-state=green],.pack-checks button {color:var(--mint)}
 .pack-checks [data-state=amber] {color:var(--gold)}
-.pack-ending a {color:var(--gold)}
 .high-contrast { --sub: #ddd; --line: #888; --surface-low: #080809 }
 @media(max-width:800px) {
  .pack-cards { grid-template-columns:1fr }

@@ -19,7 +19,6 @@ const runMessage = ref('')
 const activeCall = shallowRef<Call>()
 const navigation = shallowRef({file:'main.ts',line:1})
 const lastRun = shallowRef<Files>({})
-const editor = ref<{revealLine(file:string,line:number):void}>()
 const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
 const solved = computed(() => !busy.value && frame.value?.solved)
@@ -95,9 +94,12 @@ async function receive(data: PackFrame | {loadError:string}) {
   statuses.value = data.checks
   busy.value = false
   if (data.clockMs && data.save.clockActive && !data.solved && !complete.value) timer = setTimeout(()=>send({kind:'tick'}),data.clockMs/speed)
-  if (changed && !complete.value) {await nextTick();editor.value?.revealLine(data.edit.file,data.edit.line)}
 }
 function start(reset = false) {
+  if (reset) {
+    panel.value = ''
+    lastRun.value = {}
+  }
   worker?.terminate()
   worker = new Worker(new URL('../lib/pack.worker.ts',import.meta.url),{type:'module'})
   const instance = worker
@@ -109,7 +111,7 @@ function start(reset = false) {
     error.value='Could not read this pack’s save. Allow storage or start a fresh pack.'
     saved.value=false; blocked.value=true; busy.value=false; return
   }
-  send({kind:'open',id:props.manifest.id,stored,lesson})
+  send({kind:'open',id:props.manifest.id,stored,lesson:reset ? undefined : lesson})
 }
 onMounted(()=>{start();window.addEventListener('keydown',shortcut,true);window.addEventListener('pagehide',persist)})
 onBeforeUnmount(()=>{alive = false;clearTimeout(timer);persist();worker?.terminate();window.removeEventListener('keydown',shortcut,true);window.removeEventListener('pagehide',persist)})
@@ -126,11 +128,11 @@ onBeforeUnmount(()=>{alive = false;clearTimeout(timer);persist();worker?.termina
       <aside v-for="p in frame?.panels.filter(p=>p.id===panel || p.placement==='panel')" :key="p.id" class="entity-panel"><h2>{{ p.label }}</h2><p v-for="row in p.rows" :key="row.id"><button v-if="row.action" :disabled="busy" @click="send({kind:'action',panel:p.id,row:row.id})">{{ row.label }} · {{ row.value }}</button><template v-else>{{ row.label }} · {{ row.value }}</template></p></aside>
       <SolvedCard v-if="solved" class="solved-overlay" :solved="solved" :busy="busy" @advance="advance"/>
     </section><div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)"/>
-    <section class="editor-dock"><template v-if="complete"><div class="pack-ending"><small>Pack complete</small><h2>{{ manifest.title }}</h2><p>You used {{ manifest.learningGoals.join(', ').toLowerCase() }}.</p><a href="/">Back to game packs</a></div></template>
+    <section class="editor-dock"><PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" @replay="start(true)"/>
       <template v-else-if="frame"><header class="dock-header"><small>Lesson {{ frame.index+1 }} of {{ frame.total }}</small></header>
       <GoalBar :key="frame.save.lessonId ?? ''" :goal="frame.goal" :hints="frame.hints"/>
       <div class="file-tabs"><button v-for="(_,path) in files" :key="path" :aria-pressed="path===activeFile" @click="activeFile=path">{{ path }}</button></div>
-      <div class="editor-pane"><div class="editor-host"><LazyCodeEditor ref="editor" :error="error"/></div></div>
+      <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :error="error"/></div></div>
       <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows"/>
       <section v-if="frame.logs.length" class="pack-checks"><small>Console</small><p v-for="(line,i) in frame.logs" :key="i">{{ line }}</p></section></template>
       <p v-if="error" class="pack-error" role="alert">{{ error }}</p><button v-if="blocked" @click="start(true)">Start a fresh pack</button>

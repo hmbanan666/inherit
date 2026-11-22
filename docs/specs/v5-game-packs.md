@@ -60,6 +60,7 @@ interface PackManifest {
   learningGoals: readonly string[]
   estimatedMinutes: { min: number; max: number }
   cover: string                  // file in this folder
+  next?: string                  // Recommended next pack id, when the path continues
   showcaseNote?: string          // “Start here” or “After the basics”
   featured?: boolean
 }
@@ -379,6 +380,9 @@ Move letters, Orders, Town, coins and debt into Workshop declarations. Preserve 
 - The Inherit logo returns to the showcase. In a pack, the top bar has its name and switcher, populated pack sections, settings and palette, then a wide primary Run or Deploy button at the far right. Use the header action group in `3058dbe:apps/web/app/app.vue` as the placement reference. Keep the label and keyboard shortcut legible. While watching a Run, disable both click and shortcut and show “Playing your run”. An error leaves the mode label alone. At desktop size give the primary action at least 128 × 44 CSS pixels. Keep a 44-pixel hit target when space is tight. The thin footer shows status only.
 - Game area left, editor right, resizer between them with a usable minimum on each side. On narrow screens stack the visible world above the IDE. The charcoal surfaces, warm accent and syntax colours follow ADRs 0006 and 0009. The opening village needs neither a map switch nor a tab just for the editor.
 - A single-line goal and Hint sit over Monaco. Inside the editor the cursor starts by the explanatory comment. Reveal one hint per press, from the idea to the exact line or lines. Below, show compact Checks in red, amber and green with text as well as colour. Collapse a fully green list. Reveal Console, files, API reference and other tools only when a lesson uses them. Always show actionable errors even if Console is hidden.
+- Focus the editor at column one of the starter’s edit line on load and after Continue opens a lesson.
+- In Workshop show section tabs together when Town opens. Show history once there is a deployment action or saved work to restore.
+- After the final Continue keep the world visible. The shared finish card lists every lesson’s idea in order, links to the recommended next pack when declared, and offers the showcase and a confirmed replay of this pack alone.
 - Show the solved card over the world. Keep Continue, the final world and pack switching available after playback. No auto-advance, timed goals, day counter or pressure. Expose speed controls only when a pack calls for them.
 - Keep `data-testid` hooks for the primary button, goal/task card, world, checks, Hint, solved card, Continue and each nav section. Add pack cards and switcher hooks. Support `?pack=<id>&lesson=<id>&speed=<n>` in local/dev tests; build lesson entry from real reference checkpoints, bound the speed and use a separate preview slot. Normal showcase links can select a pack without a lesson override. Preserve the v4 local `?step=` Workshop alias during the port.
 
@@ -392,6 +396,7 @@ interface PackSave<W> {
   packId: string
   packVersion: number
   lessonId: string | null        // null after the final Continue
+  edit?: Starter['edit']          // The active lesson’s starting file and line
   phase: 'brief' | 'working' | 'solved'
   completed: string[]
   passed: string[]

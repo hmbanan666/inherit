@@ -7,6 +7,7 @@ export interface PackFrame {
   mode: 'run' | 'deploy'
   clockMs?: number
   noCalls?: boolean
+  finishIdeas?: string[]
   goal: string
   edit: { file: string; line: number }
   hints: readonly string[]

@@ -8,6 +8,7 @@ export interface PackManifest {
   learningGoals: string[]
   estimatedMinutes: { min: number; max: number }
   cover: string
+  next?: string
   featured?: boolean
   showcaseNote?: string
 }

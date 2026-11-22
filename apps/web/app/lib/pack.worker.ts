@@ -6,7 +6,6 @@ import type { PackCommand, PackFrame } from './packProtocol'
 let pack: ReturnType<typeof getPack>
 let save: PackSave<unknown>
 let runner: ReturnType<typeof createPackRunner<any,any>>
-let edit = { file: 'main.ts', line: 1 }
 async function act(command: PackCommand) {
   let moments: PackFrame['moments'] = [], logs: string[] = [], start: unknown, error = ''
   let statuses: PackFrame['checks'] | undefined
@@ -41,11 +40,13 @@ async function act(command: PackCommand) {
   }
   const index = pack.lessons.findIndex(l => l.id === save.lessonId)
   const lesson = pack.lessons[index]
-  if (command.kind !== 'run' && lesson) edit = lesson.starter(save.project.working).edit
+  if (lesson && !save.edit) save.edit = lesson.starter(save.project.working).edit
+  const edit = save.edit ?? { file: 'main.ts', line: 1 }
   const names = pack.available(save.world, lesson?.id ?? '')
   self.postMessage({
     save, noCalls:command.kind==='run' && lesson?.mode==='run' && !moments.length && !logs.length && !error, mode:lesson?.mode ?? 'run', clockMs:pack.clock?.intervalMs, goal: lesson?.goal ?? '', edit, hints: lesson?.hints ?? [], labels: lesson?.checks.map(c => c.label) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],
+    finishIdeas: lesson ? undefined : pack.lessons.map(l => l.idea),
     index, total: pack.lessons.length, solved: save.phase === 'solved' ? lesson?.solved : undefined,
     declarations: declarations(playerSources['./' + pack.manifest.id + '/player.ts'], names, pack.exposure, pack.typeAliases?.(save.world)) + '\n' + Object.values(pack.guestModules ?? {}).map(m=>m.declarations).join('\n'),
     panels: pack.panels.filter(p => !p.reveal || save.released.includes(p.reveal)).map(p => ({

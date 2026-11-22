@@ -132,7 +132,6 @@ function revealLine(file: string, line: number, column = 1) {
   editor?.revealLineInCenterIfOutsideViewport(line)
   editor?.focus()
 }
-defineExpose({ revealLine, focus: () => editor?.focus() })
 
 const results = computed(() => {
   const needle = query.value.trim().toLowerCase()
@@ -324,6 +323,7 @@ watch(callsToMove, () => {
 watch(game.call, lightCall)
 watch(files, syncFiles)
 watch(activeFile, display)
+watch(game.navigation, ({ file, line }) => revealLine(file, line), { flush: 'post' })
 watch(api, updateLibrary)
 watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {

@@ -1,4 +1,4 @@
-import type { Files, Pack } from './pack'
+import type { Files, Pack, Starter } from './pack'
 
 export interface Revision { id: number; name: string; tick: number; files: Files }
 export interface PackSave<W> {
@@ -6,6 +6,7 @@ export interface PackSave<W> {
   packId: string
   packVersion: number
   lessonId: string | null
+  edit?: Starter['edit']
   phase: 'brief' | 'working' | 'solved'
   completed: string[]
   passed: string[]
@@ -23,7 +24,7 @@ export function freshSave<W, A extends object>(pack: Pack<W, A>, seed = 1): Pack
   const world = pack.initialWorld(seed)
   first.enter?.(world)
   const starter = first.starter({})
-  return { formatVersion: 1, packVersion: pack.version, packId: pack.manifest.id, lessonId: first.id,
+  return { formatVersion: 1, packVersion: pack.version, packId: pack.manifest.id, lessonId: first.id, edit: starter.edit,
     phase: 'brief', completed: [], passed: [], pendingReveals: [], released: [], seenSections: [], world,
     entryWorld: structuredClone(world), clockActive: false,
     project: { working: starter.files, deployed: null, activeFile: starter.edit.file, history: [], snapshots: [], nextRevision: 1 } }
@@ -49,6 +50,7 @@ export function decodeSave<W,A extends object>(pack: Pack<W,A>, input: string): 
     !(s.project.deployed===null || projectFiles(s.project.deployed)) || !Number.isInteger(s.project.nextRevision) ||
     !revisions(s.project.history) || !revisions(s.project.snapshots) || typeof s.clockActive !== 'boolean')
     throw new Error('This save could not be opened. Your original is still here.')
+  if (s.edit && (!Object.hasOwn(s.project.working, s.edit.file) || !Number.isInteger(s.edit.line) || s.edit.line < 1)) delete s.edit
   s.world = pack.decodeWorld(s.world)
   s.entryWorld = pack.decodeWorld(s.entryWorld)
   return s
@@ -64,12 +66,13 @@ export function continueLesson<W,A extends object>(pack: Pack<W,A>, save: PackSa
   const next = pack.lessons[pack.lessons.findIndex(l => l.id === save.lessonId) + 1]
   save.completed.push(save.lessonId)
   save.lessonId = next?.id ?? null
-  if (!next) return
+  if (!next) { delete save.edit; return }
   save.phase = 'brief'
   save.passed = []
   next.enter?.(save.world)
   save.entryWorld = structuredClone(save.world)
   const starter = next.starter(save.project.working)
+  save.edit = starter.edit
   save.project.working = starter.files
   save.project.activeFile = starter.edit.file
 }

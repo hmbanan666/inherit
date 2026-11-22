@@ -1,3 +1,4 @@
+import { workshopEdit } from '../../../../packages/sim/src/packs/workshop/starter'
 import { workshopLessons } from '../../../../packages/sim/src/packs/workshop/pack'
 import {
   createCampaign, currentStep, getSurface, jumpToStep,
@@ -320,12 +321,14 @@ function createGameStore() {
     persist()
   }
   function openDraft() {
-    const source = files.value['main.ts'] ?? ''
-    const line = source === step.value?.step.starter ? source.split('\n').length : 1
-    openFile('main.ts', line)
+    const lesson = workshopLessons[state.value.lesson.index]
+    if (!lesson) return
+    const { file, line } = workshopEdit(lesson.id, files.value)
+    openFile(file, line)
   }
   function newGame() {
     stop()
+    acknowledged = undefined
     state.value = createCampaign()
     town.value = townSnapshot(state.value)
     files.value = state.value.project.working
@@ -358,7 +361,7 @@ function createGameStore() {
       if (id && !(stored && resumePreview)) {
         state.value = jumpToStep(createCampaign(), id)
         const starter = workshopLessons[state.value.lesson.index]?.starter(state.value.project.working)
-        if (starter) { state.value.project.working = starter.files; navigation.value = starter.edit; activeFile.value = starter.edit.file }
+        if (starter) state.value.project.working = starter.files
       }
       else if (stored) {
         const restored = restoreWorkshop(stored)
@@ -373,7 +376,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
-    if (navigation.value.line === 1 && activeFile.value === 'main.ts') openDraft()
+    openDraft()
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)

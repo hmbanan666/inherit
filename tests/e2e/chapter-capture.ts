@@ -19,7 +19,7 @@ export async function chapterCapture(page: Page) {
           const words: { x: number; y: number; right: number; text: string }[] = []
           const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
           const range = document.createRange()
-          const overlays = ['.drawer','.solved-overlay','.hud-menu'].flatMap(selector=>
+          const overlays = ['.drawer','.solved-overlay','.hud-menu','dialog[open]'].flatMap(selector=>
             [...document.querySelectorAll(selector)].map(element=>({element,rect:element.getBoundingClientRect()})))
           while (walk.nextNode()) {
             const node = walk.currentNode

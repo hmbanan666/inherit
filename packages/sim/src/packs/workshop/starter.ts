@@ -56,3 +56,12 @@ export function workshopStarter(id: string, previous: Files): Starter {
   files[file]=lines.join('\n')
   return {files,edit:{file,line:pos+note.length+1}}
 }
+
+/** Find the edit in a restored draft without replacing any of the player's code. */
+export function workshopEdit(id: string, files: Files): Starter['edit'] {
+  const { edit } = workshopStarter(id, files)
+  const lastNote = comments(edits[id].note).at(-1)
+  const lines = (files[edit.file] ?? '').split('\n')
+  const comment = lines.findIndex(line => line.trim() === lastNote)
+  return comment < 0 ? edit : { file: edit.file, line: comment + 2 }
+}

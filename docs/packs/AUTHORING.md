@@ -8,7 +8,7 @@ Run `pnpm new-pack lantern-garden`. Open `pnpm dev` and choose Lantern Garden. I
 
 | File | What to supply |
 | --- | --- |
-| `manifest.ts`, `cover.svg` | Stable folder id, title, tagline, level, genre, learning goals, time range and local cover. |
+| `manifest.ts`, `cover.svg` | Stable folder id, title, tagline, level, genre, learning goals, time range and local cover. Set `next` to another pack’s id to recommend it on the finish card. |
 | `player.ts` | Export the typed `PlayerAPI` interface. Put one line of JSDoc on every method for hover help. |
 | `pack.ts` | Initial serializable world, decoder, entity rows, panels, lessons, available names and typed operations. |
 | `lessons.ts` | Ordered lessons and their complete reference projects. Keep browser reference data importable from Node. |

@@ -25,6 +25,10 @@ test('pack folders, manifests, rules and public methods agree', () => {
   for (const m of manifests) {
     expect(m.id).toMatch(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/)
     expect(['Beginner','Basics','Game','Advanced']).toContain(m.level)
+    if (m.next !== undefined) {
+      expect(ids).toContain(m.next)
+      expect(m.next).not.toBe(m.id)
+    }
     expect(m.learningGoals.length).toBeGreaterThan(0)
     ;[m.title,m.genre,m.tagline,...m.learningGoals].forEach(text)
     expect(m.estimatedMinutes.min).toBeGreaterThan(0)
