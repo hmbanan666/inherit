@@ -9,7 +9,7 @@ Run `pnpm new-pack lantern-garden`. Open `pnpm dev` and choose Lantern Garden. I
 | File | What to supply |
 | --- | --- |
 | `manifest.ts`, `cover.svg` | Stable folder id, title, tagline, level, genre, learning goals, time range and local cover. Set `next` to another pack’s id to recommend it on the finish card. |
-| `player.ts` | Export the typed `PlayerAPI` interface. Put one line of JSDoc on every method for hover help. |
+| `player.ts` | Export the typed `PlayerAPI` interface. Give every method a JSDoc summary, @param for each parameter, @returns (including empty/failure behaviour) and @example. The API tab reads these tags from the same file as Monaco. |
 | `pack.ts` | Initial serializable world, decoder, entity rows, panels, lessons, available names and typed operations. |
 | `lessons.ts` | Ordered lessons and their complete reference projects. Keep browser reference data importable from Node. |
 | `WorldView.vue` | Render the displayed world and played calls. Give each visible effect a test id and accessible name or visible text. |
@@ -17,15 +17,21 @@ Run `pnpm new-pack lantern-garden`. Open `pnpm dev` and choose Lantern Garden. I
 
 Implement each method in `beginAttempt(world)`. Check arguments before changing the world. Return ordinary data if a player needs a result. The same method definition supplies QuickJS and the declarations in Monaco. A Beginner pack exposes globals in one file, `main.ts`. Give each lesson access only to methods already introduced. A module pack can export names from `inherit`, supply guest modules with declarations, or supply a clock for an exported `onTick`. Workshop has its own live floor, history and simulation adapter.
 
-Give each saved entity an id and readable rows. A pack can declare a panel with an optional reveal id. Empty panels stay hidden. For cumulative decorations choose entry-state retries. A live simulation can keep its current world between attempts. Keep ids stable after release. When changing the saved shape, bump the pack version and supply an upgrade and decoder. The framework uses `inherit.pack.<id>` and leaves an unreadable slot available for recovery.
+Give each saved entity an id and readable rows. Optional panels with rows appear in Learn. For cumulative decorations choose entry-state retries. A live simulation can keep its current world between attempts. Keep ids stable after release. When changing the saved shape, bump the pack version and supply an upgrade and decoder. The framework uses `inherit.pack.<id>` and leaves an unreadable slot available for recovery.
 
 ## Write a lesson
 
-1. Write a short, plain goal, on one line of at most 70 characters.
-2. Pre-fill every line the player can leave alone. Put a comment immediately above the edit that explains the new idea and shows its shape. Point the starter at that file and one-based line. Give the player one new idea. In Beginner, store a returned value before using it in another call.
-3. Make the starter compile and run with the lesson still open. Make the reference project pass through the same runner. Check resulting state and calls. For a language idea, also check the syntax tree. Give each check a short label.
-4. Give progressive hints when needed. End with the exact edit. Write the solved reaction, what the player did and one sentence about what they learned. Leave progression to Continue. List optional reveals in order.
-5. Render each change from the worker snapshot. Give the effect marker the id and text in the lesson record. Check that the result is legible while the source line is highlighted.
+Set `manifest.track` to `course` or `challenges`. A course manifest owns an ordered `units: { id: string; title: string; landmark: string }[]`. Group the lesson array in that same order. A challenge manifest omits units. Each challenge starts from its own initial world and can be selected immediately.
+
+The exported TypeScript definitions in [pack.ts](../../packages/sim/src/framework/pack.ts) are the authoring contract. The [scaffold lesson](../../scripts/pack-template/lessons.ts.template) is a complete example.
+
+1. Choose a stable lesson id and a `scene` from the pack’s `scenes` array. The world view receives `world`, `scene`, `inputs` and ordered `calls`. Use `enter(world)` to set an activity's starting fixture. Optional `inputs(world)` returns a name-to-`{type, value}` record. Use serializable values and distinct names. The worker binds them read-only and declares them to Monaco.
+2. Set `kind` to `write`, `fill`, `fix` or `predict`. A write lesson offers a blank edit. A fill lesson completes a working fragment. A fix lesson repairs a wrong result. A predict lesson supplies `prediction: {question, choices, answer}` and records the first choice in Learn.
+3. Name the course `unit` and supply `theory: { title, body: string[], example }`. Write three to eight short lines explaining each new idea before the edit. Illustrate another situation. For challenges omit `unit` and supply `task: { condition, examples: string[] }` with the rules, edge conditions and at least two worked cases. Include theory for new syntax, APIs and automation.
+4. Give the scene a reason and write one goal of at most 70 characters. Return `{files, edit: {file, line}}` from `starter(previous)`. Put a TODO on or immediately above the one-based edit line describing the result the player should achieve. Keep starters compilable. Independent challenges use comments-only files.
+5. Run the starter and full `referenceSolution` from the same entry. The starter leaves a required check outstanding and the reference produces the specified `visibleEffect`. Each check has a stable id, a short label and a pure evaluator returning red, amber or green. Add an `input` label for every challenge case. Use `variants: [{input, enter(world), maxTicks?}]` to set alternate fixtures. Each runs the unchanged files in a fresh guest and supplies the results for checks with its input label. The display fixture supplies the remaining rows. A clock variant defaults to 120 ticks and can request up to 1200. A language check can inspect the syntax relationship being taught.
+6. Supply two or three progressive hints. Only a Beginner final hint may show the actual statement. Write the solved reaction, what happened and the idea learned. Continue records completion, preserves the entry and draft, and opens the next activity. A completed course lesson can be replayed from Learn. Its Continue returns to the frontier.
+7. Set the pack version for the world schema. Shared saves use envelope version 2. V5 migrations preserve original bytes under the pack's archive prefix. Lesson previews use memory and leave these slots alone.
 
 ## Drawing parts
 

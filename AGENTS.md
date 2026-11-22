@@ -20,6 +20,14 @@ Documentation-only PRs may skip the Chromium install and browser suite. Run both
 
 The browser test serves the generated site on loopback port 4173. Set `INHERIT_SHOTS` to a directory outside the checkout when capturing pack screenshots.
 
+Capture a lesson on an existing site with Node 24 and the installed Chromium shell.
+
+```sh
+INHERIT_SHOTS=/tmp/inherit-v6-ui pnpm shots --url http://127.0.0.1:4173 --pack beginner --lesson hello
+```
+
+The command opens an isolated lesson preview and writes `<pack>/<lesson>/start.png` and its matching `start.txt`. Set the output directory outside the checkout. The same command accepts a production URL.
+
 ## Commits and merging
 
 Omit `Co-authored-by` trailers and AI tool or model names from commit messages, PR titles and PR bodies. When squash-merging on GitHub, pass an explicit subject and body, for example `gh pr merge --squash --subject "..." --body "..."`. GitHub's default squash message appends `Co-authored-by` trailers for commit authors.
