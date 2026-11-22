@@ -34,10 +34,10 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
   async function play(save: PackSave<W>, files: Files, mode: RunMode = 'run') {
     const lesson = pack.lessons.find(l => l.id === save.lessonId)
     if (!lesson) throw new Error('This pack is complete.')
-    if (mode === 'run' || mode === 'deploy') save.attempts[lesson.id] = (save.attempts[lesson.id] ?? 0) + 1
+    if (mode === lesson.mode) save.attempts[lesson.id] = (save.attempts[lesson.id] ?? 0) + 1
     const world = structuredClone((mode === 'run' || mode === 'deploy') && pack.retry === 'entry' ? save.entryWorld : save.world)
-    const start = structuredClone(world)
     const { api, finish } = pack.beginAttempt(world, mode==='deploy' || mode==='resume' ? 'setup' : mode)
+    const start = structuredClone(world)
     const calls: Call[] = []
     const moments: Moment<W>[] = []
     const names = pack.available(world, lesson.id)

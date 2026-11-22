@@ -1,323 +1,123 @@
 <script setup lang="ts">
-import { Application } from 'pixi.js'
-import { Minus, Plus, Maximize, X } from '@lucide/vue'
-import { MACHINES, type CampaignWorld } from '@inherit/sim'
-import { useGame } from '../../../../../apps/web/app/lib/useGame'
-import ShedStreet from '../../../../../apps/web/app/components/town/ShedStreet.vue'
-import TownPortrait from '../../../../../apps/web/app/components/town/TownPortrait.vue'
-import { center, FloorScene, tile } from '../../../../../apps/web/app/lib/floor'
+import { computed } from 'vue'
+import FloorArm from '../../../../../apps/web/app/components/FloorArm.vue'
+import type { Call } from '../../framework/pack'
+import { places, type Floor } from './floor'
+import type { Place } from './player'
 
-const props = defineProps<{ highlighted: string[]; world: CampaignWorld }>()
-const g = useGame(),
-  { campaign, selected } = g
-const world = computed(() => props.world)
-const host = ref<HTMLElement>(),
-  mount = ref<HTMLElement>()
-const size = ref({ w: 800, h: 500 }),
-  pan = ref({ x: 0, y: 0 }),
-  zoom = ref(1)
-const renderError = ref('')
-let app: Application | undefined,
-  scene: FloorScene | undefined,
-  observer: ResizeObserver | undefined,
-  disposed = false
-let paintKey = ''
-const pointers = new Map<number, { x: number; y: number }>()
-const bounds = computed(() => {
-  const occupied = world.value.sites.flatMap(site => site.plots.filter(plot =>
-    world.value.machines.some(m => m.siteId === site.id && m.x >= plot.x && m.x < plot.x + plot.width &&
-      m.y >= plot.y && m.y < plot.y + plot.height),
-  ).map(plot => {
-    const corner = center(site.id, plot)
-    const x = corner.x - tile / 2, y = corner.y - tile / 2
-    return { left: x, right: x + plot.width * tile, top: y, bottom: y + plot.height * tile }
-  }))
-  const left = Math.min(...occupied.map(p => p.left)), right = Math.max(...occupied.map(p => p.right))
-  const top = Math.min(...occupied.map(p => p.top)), bottom = Math.max(...occupied.map(p => p.bottom))
-  return { x: (left + right) / 2, y: (top + bottom) / 2, w: right - left + .35 * tile, h: bottom - top + tile }
-})
-const scale = computed(() => Math.min(1.6, size.value.w / bounds.value.w, size.value.h / bounds.value.h) * zoom.value)
-const camera = computed(() => ({
-  x: size.value.w / 2 - bounds.value.x * scale.value + pan.value.x,
-  y: size.value.h * 0.56 - bounds.value.y * scale.value + pan.value.y,
-}))
-const story = computed(() => g.step.value?.step)
-const bramOrderComplete = computed(() => story.value?.id === 'bram-loop' && g.step.value?.phase === 'solved')
-const speaker = computed(() => g.town.value.people.find(p => p.id === story.value?.who))
-const travelRail = computed(() => {
-  const stops = world.value.machines.map(m => center(m.siteId, m))
-  if (!stops.every(stop => stop.y === stops[0]?.y)) return
-  const xs = stops.map(stop => stop.x)
-  return { left: (Math.min(...xs) - 24) + 'px', width: (Math.max(...xs) - Math.min(...xs) + 48) + 'px', top: (stops[0]!.y + tile * .94) + 'px' }
-})
-function armStop(place = world.value.hand?.origin) {
-  const target = world.value.machines.find(m => m.id === place)
-  const point = target ? center(target.siteId, target) : bounds.value
-  return { x: point.x + (target ? 0 : -tile), y: point.y + tile * .94 }
+const props = defineProps<{ world: Floor; calls: Call[]; nextCall?: Call; reach?: number }>()
+const stations = {
+  belt: { x: 120, y: 232 },
+  left: { x: 355, y: 116 },
+  right: { x: 355, y: 338 },
+  cart: { x: 606, y: 232 },
 }
-const armPoint = computed(() => {
-  const end = armStop(g.playback.place.value)
-  const fraction = g.playback.travel.value
-  if (fraction === 1) return end
-  const start = armStop(g.playback.previousPlace.value)
-  return {
-    x: start.x + (end.x - start.x) * fraction,
-    y: start.y + (end.y - start.y) * fraction,
+const arms = computed(() => {
+  const from = stations[props.world.station]
+  const destination = props.nextCall?.args[0] as Place
+  const to = ['take', 'put'].includes(props.nextCall?.name ?? '') && places.includes(destination) ? stations[destination] : from
+  const t = props.reach ?? 0
+  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t - 37 }
+})
+const routes = computed(() => {
+  switch (props.world.challenge) {
+    case 'colour-bins': return ['belt-left', 'belt-right']
+    case 'route-table': return ['belt-left', 'belt-right', 'belt-cart']
+    case 'merge-bins':
+    case 'alternate-bins': return ['left-cart', 'right-cart']
+    case 'bin-dispatch':
+    case 'relay-controller': return ['belt-right', 'right-cart']
+    case 'clear-outlet': return ['left-cart']
+    default: return ['belt-cart']
   }
 })
-function recenter() {
-  pan.value = { x: 0, y: 0 }
-  zoom.value = 1
+const paths: Record<string, string> = {
+  'belt-left': 'M193 213 286 158',
+  'belt-right': 'M194 258 283 306',
+  'belt-cart': 'M198 232H526',
+  'left-cart': 'M422 151 531 209',
+  'right-cart': 'M427 317 527 257',
 }
-function zoomBy(ratio: number, px = size.value.w / 2, py = size.value.h / 2) {
-  const before = zoom.value
-  zoom.value = Math.min(2.8, Math.max(0.32, before * ratio))
-  const f = zoom.value / before
-  pan.value = {
-    x: pan.value.x * f + (px - size.value.w / 2) * (1 - f),
-    y: pan.value.y * f + (py - size.value.h / 2) * (1 - f),
-  }
-}
-function wheel(e: WheelEvent) {
-  const r = host.value!.getBoundingClientRect()
-  zoomBy(Math.exp(-Math.max(-130, Math.min(130, e.deltaY)) * 0.0026), e.clientX - r.left, e.clientY - r.top)
-}
-const structure = computed(() =>
-  JSON.stringify([
-    world.value.machines.map((m) => [m.id, m.x, m.y, m.kind, m.siteId]),
-    world.value.belts.map((b) => [b.from, b.to, b.path]),
-  ]),
-)
-function sync() {
-  if (!app) return
-  if (!scene || paintKey !== structure.value) {
-    scene?.destroy()
-    scene = new FloorScene(world.value, false)
-    app.stage.addChild(scene.root)
-    paintKey = structure.value
-  }
-  scene.root.scale.set(scale.value)
-  scene.root.position.set(camera.value.x, camera.value.y)
-  scene.update(world.value)
-}
-watch([world, camera, scale], sync)
-function highlightLines() {
-  for (const id of props.highlighted) scene?.highlightMachine(id)
-}
-watch(() => props.highlighted, highlightLines)
-function inspect(id: string) {
-  scene?.highlightMachine(id)
-  g.selectMachine(id)
-}
-function down(e: PointerEvent) {
-  if ((e.target as HTMLElement).closest('button,aside') || e.button !== 0) return
-  host.value!.focus({ preventScroll: true })
-  host.value!.setPointerCapture(e.pointerId)
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-}
-function move(e: PointerEvent) {
-  const old = pointers.get(e.pointerId)
-  if (!old) return
-  const other = [...pointers].find(([id]) => id !== e.pointerId)?.[1]
-  if (other) {
-    const r = host.value!.getBoundingClientRect()
-    zoomBy(
-      Math.hypot(e.clientX - other.x, e.clientY - other.y) /
-        Math.max(1, Math.hypot(old.x - other.x, old.y - other.y)),
-      (e.clientX + other.x) / 2 - r.left,
-      (e.clientY + other.y) / 2 - r.top,
-    )
-  } else {
-    const dx = e.clientX - old.x,
-      dy = e.clientY - old.y
-    if (dx || dy) {
-      pan.value = { x: pan.value.x + dx, y: pan.value.y + dy }
-    }
-  }
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-}
-function up(e: PointerEvent) {
-  pointers.delete(e.pointerId)
-}
-function cancel() {
-  pointers.clear()
-}
-const machine = computed(() => world.value.machines.find((m) => m.id === selected.value))
-const inspectorOnRight = computed(() => {
-  const m = machine.value
-  if (!m) return false
-  const x = center(m.siteId, m).x * scale.value + camera.value.x
-  return x < size.value.w / 2
-})
-const bins = computed(() =>
-  Object.entries(
-    machine.value?.queue.reduce<Record<string, number>>((r, i) => {
-      r[i.kind] = (r[i.kind] ?? 0) + 1
-      return r
-    }, {}) ?? {},
-  ),
-)
-function pos(x: number, y: number) {
-  return { left: x + 'px', top: y + 'px' }
-}
-onMounted(async () => {
-  const renderer = new Application()
-  window.addEventListener('pointermove', move)
-  window.addEventListener('pointerup', up)
-  window.addEventListener('pointercancel', cancel)
-  try {
-    await renderer.init({
-      width: 1,
-      height: 1,
-      preference: 'canvas',
-      backgroundAlpha: 0,
-      antialias: true,
-      resolution: devicePixelRatio,
-      autoDensity: true,
-    })
-    if (disposed) {
-      renderer.destroy(true, { children: true })
-      return
-    }
-    app = renderer
-    mount.value!.appendChild(app.canvas)
-    function resize() {
-      const w = host.value!.clientWidth,
-        h = host.value!.clientHeight
-      size.value = { w, h }
-      renderer.renderer.resize(w, h, devicePixelRatio)
-      sync()
-    }
-    resize()
-    highlightLines()
-    observer = new ResizeObserver(resize)
-    observer.observe(host.value!)
-    renderer.ticker.maxFPS = 40
-    renderer.ticker.add(() => scene?.animate(performance.now(), g.tickInterval.value, g.paused.value))
-  } catch {
-    renderError.value = 'Could not open the floor renderer. Reload to retry.'
-  }
-})
-onBeforeUnmount(() => {
-  disposed = true
-  window.removeEventListener('pointermove', move)
-  window.removeEventListener('pointerup', up)
-  window.removeEventListener('pointercancel', cancel)
-  observer?.disconnect()
-  app?.destroy(true, { children: true })
-})
+const counting = computed(() => ['heavy-tally', 'peak-weight'].includes(props.world.challenge))
+const labels = computed(() => places.flatMap(place => props.world.queues[place]).concat(props.world.hand ?? []).sort((a,b) => a.id.localeCompare(b.id)))
 </script>
+
 <template>
-  <div
-    ref="host"
-    class="floor" data-testid="floor"
-    tabindex="0"
-    aria-label="Factory map"
-    @wheel.prevent="wheel"
-    @keydown.esc="selected = ''"
-    @pointerdown="down"
-  >
-    <div ref="mount" class="pixi-mount"></div>
-    <div
-      class="map-overlay"
-      :style="{ transform: 'translate(' + camera.x + 'px,' + camera.y + 'px) scale(' + scale + ')' }"
-    >
-      <ShedStreet class="shed-street" :town="g.town.value" />
-      <div
-        v-for="m in world.machines"
-        :key="m.id"
-        class="station"
-        :class="{ chosen: selected === m.id || highlighted.includes(m.id), acting: g.playback.call.value?.args[0] === m.id }"
-        :style="pos(center(m.siteId, m).x, center(m.siteId, m).y)"
-      >
-        <button class="machine-hit" :aria-label="'Inspect ' + m.id" @click="inspect(m.id)">
-          <span class="machine-label" :data-testid="'place-' + m.id"
-            >"{{ m.id }}"<b v-if="m.fault"> · {{ m.fault }}</b></span
-          >
-        </button>
-        <span v-if="g.step.value?.phase !== 'solved' && g.playback.stationStatuses.value.has(m.id)" class="station-status">
-          <span v-for="status in g.playback.stationStatuses.value.get(m.id)" :key="status">{{ status }}</span>
-        </span>
-        <span v-if="m.id === 'cart' && g.step.value?.checks[0]?.progress" class="cart-load" :class="{ complete: bramOrderComplete }">
-          {{ g.step.value.checks[0].progress }} delivered{{ bramOrderComplete ? ' · order complete' : '' }}
-        </span>
-      </div>
-      <div v-if="travelRail" class="travel-rail" :style="travelRail" aria-hidden="true"></div>
-      <FloorArm :x="armPoint.x" :y="armPoint.y" :call="g.playback.call.value" :hand="g.hand.value" :returning="g.playback.returning.value" />
+  <div class="shed" aria-label="Parcel floor" data-testid="floor">
+    <svg class="plan" viewBox="0 0 730 425" role="group" aria-label="Parcel stations and route arrows">
+      <defs>
+        <pattern id="tiles" width="42" height="42" patternUnits="userSpaceOnUse">
+          <path d="M0 42V0H42" fill="none" stroke="#3c3c3d" stroke-width="1"/>
+          <circle cx="3" cy="3" r="1" fill="#484747"/>
+        </pattern>
+        <pattern id="rollers" width="13" height="30" patternUnits="userSpaceOnUse" patternTransform="skewX(-16)">
+          <rect width="11" height="30" rx="3" fill="#92948d"/><path d="M3 1v28" stroke="#beb9a8"/>
+        </pattern>
+        <marker id="route-tip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto">
+          <path d="M0 0 10 5 0 10z" fill="#c3a46c"/>
+        </marker>
+      </defs>
+      <rect width="730" height="425" fill="#292a2b"/><rect width="730" height="425" fill="url(#tiles)"/>
+      <g stroke="#c3a46c" stroke-width="4" stroke-dasharray="9 7" fill="none" marker-end="url(#route-tip)">
+        <path v-for="route in routes" :key="route" :d="paths[route]" :data-route="route"/>
+      </g>
+      <g v-for="place in places" :key="place" :transform="'translate(' + stations[place].x + ' ' + stations[place].y + ')'"
+         :aria-label="place + ', ' + world.queues[place].length + ' parcels'">
+        <ellipse cy="15" rx="68" ry="12" fill="#161719" opacity=".55"/>
+        <g v-if="place === 'belt'">
+          <path d="M-60 2v16h9V5m93-3v16h9V4" fill="#92938f"/>
+          <path d="M-65-18h129l-8 24H-64q-12-10-1-24" fill="#4e5253" stroke="#141516" stroke-width="3"/>
+          <path d="M-59-26H67l-10 21H-68z" fill="url(#rollers)" stroke="#a6a394" stroke-width="3"/>
+          <circle v-for="x in [-58,-33,-8,17,42]" :key="x" :cx="x" cy="0" r="3" fill="#979788"/>
+        </g>
+        <g v-else-if="place === 'cart'">
+          <path d="M-58-27v31h112v-44h14" fill="none" stroke="#c3b79d" stroke-linecap="round" stroke-width="6"/>
+          <rect x="-59" y="-10" width="112" height="14" rx="3" fill="#ab9069" stroke="#564b3b" stroke-width="2"/>
+          <path d="M-55-26H50m-81 0v18m48-18v18" stroke="#989589" stroke-width="3"/>
+          <g v-for="x in [-42,36]" :key="x"><circle :cx="x" cy="13" r="10" fill="#1e2021" stroke="#8c8980" stroke-width="3"/><circle :cx="x" cy="13" r="3" fill="#bcb4a0"/></g>
+        </g>
+        <g v-else :class="place">
+          <path d="M-57-23-43-37H55L46-20z" fill="#393737" stroke="currentColor" stroke-width="3"/>
+          <path d="M-57-22H47l-5 35h-92z" fill="currentColor"/>
+          <path d="m47-22 9-15-6 37-8 13z" fill="currentColor" opacity=".7"/>
+          <path d="M-41-12h73m-67 13h62" stroke="#312d2d" stroke-width="3" opacity=".55"/>
+          <text v-if="world.jammed && place === 'left'" y="-46" class="jam">◆ Jammed</text>
+        </g>
+        <g v-for="(parcel, index) in world.queues[place].slice(0, 5)" :key="parcel.id" :transform="'translate(' + (-44 + index * 19) + ' -30)'">
+          <rect width="22" height="20" rx="2" :fill="parcel.colour === 'red' ? '#df9481' : '#92b1ca'" stroke="#433c37" stroke-width="2"/>
+          <path d="M8 1v5h6V1" fill="#dbc9a1"/>
+          <text x="11" y="16" class="parcel-id">{{ parcel.id }}</text>
+        </g>
+        <text y="42" class="name">{{ place }}</text>
+        <text y="60" :data-testid="'result-' + place" class="queue">{{ world.queues[place].map(p => p.id).join(' ') || 'Empty' }}</text>
+      </g>
+      <foreignObject :x="arms.x - 100" :y="arms.y - 75" width="200" height="106" pointer-events="none">
+        <div class="arm-mount"><FloorArm :x="100" :y="75" :hand="world.hand?.id ?? null" :colour="world.hand?.colour"/></div>
+      </foreignObject>
+    </svg>
+    <div class="manifest-board">
+      <div><h3>Parcel labels</h3><ul><li v-for="parcel in labels" :key="parcel.id">
+        <strong :class="parcel.colour">{{ parcel.id }}</strong> {{ parcel.colour }} · {{ parcel.weight }} · {{ parcel.to }}
+      </li></ul><p v-if="!labels.length">Waiting for arrivals</p></div>
+      <output v-if="counting" class="scale" aria-label="Scale display">Scale <b data-testid="result-scale">{{ world.readings.at(-1) ?? '—' }}</b></output>
     </div>
-    <div v-if="story" class="floor-story" data-testid="speech">
-      <TownPortrait v-if="speaker" :person="speaker" />
-      <div><strong>{{ speaker?.name ?? story.who }}</strong><p>{{ g.step.value?.phase === 'solved' ? story.solved.reaction : story.story }}</p></div>
-    </div>
-    <div v-if="g.button.value === 'deploy'" class="shed-clock" :class="{ running: g.active.value }" :style="{ transform: g.active.value ? `rotate(${(world.tick % 32) / 32}turn)` : undefined }" aria-label="Factory clock">◷</div>
-    <div class="map-controls">
-      <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
-      ><button aria-label="Center map" @click="recenter()"><Maximize /></button
-      ><button aria-label="Zoom in" @click="zoomBy(1.25)"><Plus /></button>
-    </div>
-    <div v-if="renderError" class="floor-help">{{ renderError }}</div>
-    <aside
-      v-if="machine"
-      class="inspect"
-      :class="{ opposite: inspectorOnRight }"
-      role="region"
-      aria-label="Machine inspector"
-    >
-      <header>
-        <strong>{{ selected }}</strong
-        ><button aria-label="Close inspector" @click="selected = ''"><X /></button>
-      </header>
-      <template v-if="machine"
-        ><p>
-          {{ machine.kind === 'dock' ? 'Cart' : MACHINES[machine.kind].name }} ·
-          {{ machine.fault ?? machine.status }}
-        </p>
-        <dl>
-          <dt>Bins</dt>
-          <dd>{{ bins.map(([k, n]) => n + ' ' + k).join(', ') || 'Empty' }}</dd>
-          <dt v-if="machine.recipe">Recipe</dt>
-          <dd v-if="machine.recipe">{{ machine.recipe }}</dd>
-          <template v-if="machine.kind === 'dock' && Object.keys(campaign.town.waiting).length">
-            <dt>Nobody ordered these yet</dt>
-            <dd>{{ Object.entries(campaign.town.waiting).map(([item,n]) => n + ' ' + item).join(', ') }}</dd>
-          </template>
-          <dt>Processed</dt>
-          <dd>{{ machine.stats.processed }} · {{ machine.stats.rate }}/min</dd>
-        </dl>
-        <button
-          v-for="s in g.traces.value[machine.id]"
-          :key="s.file + s.line"
-          @click="g.openFile(s.file, s.line)"
-        >
-          {{ s.fn }} · {{ s.file }}:{{ s.line }}
-        </button>
-      </template>
-    </aside>
   </div>
 </template>
-
 <style scoped>
-.shed-street { position: absolute; left: 465px; bottom: 0; width: 300px; pointer-events: none; }
-.cart-load { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); color: var(--gold); background: var(--panel); font: 13px var(--mono); padding: 3px 6px; white-space: nowrap; }
-.cart-load.complete { left: auto; right: -24px; transform: none; }
-.station-status {
-  display: grid; text-align: center; position: absolute; top: -44px; left: 0; transform: translateX(-50%);
-  padding: 2px 6px; border-radius: 6px; background: var(--overlay); color: var(--soft);
-  white-space: nowrap; font: 11px/1.3 var(--mono); pointer-events: none;
-}
-.travel-rail {
-  position: absolute; height: 7px; border: solid #242426; border-width: 2px 0;
-  background: repeating-linear-gradient(90deg, #756e63 0 4px, #4a4844 4px 12px);
-  box-shadow: 0 2px #303033, 0 4px 2px #262629;
-}
-.floor-story { position: absolute; top: 5%; left: 4%; right: 4%; display: flex; align-items: end; gap: 12px; pointer-events: none; }
-.floor-story canvas { width: clamp(48px, 6vw, 86px); image-rendering: pixelated; }
-.floor-story > div { max-width: 345px; padding: 12px 16px; border: 1px solid var(--line-strong); border-radius: 12px 12px 12px 1px; background: var(--panel); box-shadow: 0 4px 12px var(--shadow); }
-.floor-story strong { color: var(--accent-soft); font-size: 14px; }
-.floor-story p { margin: 4px 0 0; line-height: 1.45; font-size: 15px; }
-.shed-clock { position: absolute; right: 14px; top: 14px; color: var(--soft); font-size: 28px; }
-.shed-clock.running { color: var(--gold); }
-.acting .machine-label { color: var(--gold); border-color: var(--gold); }
-.chosen .machine-hit, .acting .machine-hit { box-shadow: 0 0 14px var(--gold); border-radius: 20%; }
-.machine-label { font-size: 13px; }
+.shed { display: flex; flex-direction: column; justify-content: center; align-items: stretch; min-height: 0; height: 100%; background: #232426; }
+.plan { display: block; width: 100%; min-height: 0; max-height: 72%; }
+.arm-mount { position: relative; width: 100%; height: 100%; }
+.left { color: #ba7f70; } .right { color: #819cae; }
+text { text-anchor: middle; font-family: var(--mono); }
+.name { fill: #eeece5; font-size: 18px; font-weight: 600; }
+.queue { fill: #d1c9b9; font-size: 14px; }
+.parcel-id { fill: #251f1b; font-size: 12px; font-weight: bold; }
+.jam { fill: #f6c259; font-size: 15px; }
+.manifest-board { display: flex; justify-content: space-between; gap: 1rem; margin: 0 4%; padding: 14px 0; border-top: 1px solid #5c5850; }
+h3 { margin: 0 0 8px; color: var(--soft); font-size: 13px; }
+ul { display: flex; flex-wrap: wrap; gap: 7px 16px; list-style: none; padding: 0; margin: 0; }
+li, p, .scale { font: 12px var(--mono); color: var(--soft); }
+.red { color: #e6a48e; } .blue { color: #adcde5; }
+.scale { flex: none; text-align: center; }
+.scale b { background: #292d25; display: block; min-width: 65px; padding: 3px 10px; border: 2px solid #696861; border-radius: 4px; color: #dfd4aa; font-size: 22px; }
 </style>

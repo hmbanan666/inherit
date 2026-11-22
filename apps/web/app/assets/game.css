@@ -130,36 +130,12 @@ small,
 .brand span {
   color: var(--gold);
 }
-.wallet,
-.rep,
 .clock,
-.cpu,
 .deploy-group,
 .settings,
 .speeds {
   display: flex;
   align-items: center;
-}
-.wallet,
-.rep {
-  gap: 7px;
-  font: 15px var(--mono);
-  font-variant-numeric: tabular-nums;
-}
-.wallet {
-  color: var(--gold);
-}
-.wallet svg,
-.rep svg {
-  width: 19px;
-  height: 19px;
-}
-.rep svg {
-  color: var(--sub);
-}
-.rep small {
-  color: var(--sub);
-  font-size: 10px;
 }
 .clock {
   gap: 13px;
@@ -199,28 +175,6 @@ small,
 .speeds svg {
   width: 13px;
   height: 13px;
-}
-.cpu {
-  gap: 8px;
-  color: var(--sub);
-  font: 10px var(--mono);
-}
-.cpu b {
-  color: var(--soft);
-  font-weight: 400;
-}
-.cpu > span > i {
-  display: block;
-  width: 74px;
-  height: 3px;
-  margin-top: 4px;
-  background: var(--line);
-  border-radius: 2px;
-}
-.cpu i i {
-  display: block;
-  height: 3px;
-  background: var(--gold);
 }
 .deploy-group,
 .settings {
@@ -504,12 +458,6 @@ button.revisions:hover {
     repeating-linear-gradient(135deg, var(--floor-base) 0 2px, var(--floor-stripe) 2px 5px);
   user-select: none;
 }
-.pixi-mount,
-.pixi-mount canvas {
-  position: absolute;
-  inset: 0;
-  display: block;
-}
 .map-overlay {
   position: absolute;
   left: 0;
@@ -769,10 +717,6 @@ button.revisions:hover {
   position: absolute;
   inset: 0;
 }
-.call-to-move {
-  background: color-mix(in srgb, var(--gold) 24%, transparent);
-  border-bottom: 2px solid var(--gold);
-}
 .live-tick-line {
   border-left: 3px solid var(--gold);
 }
@@ -876,10 +820,7 @@ button.revisions:hover {
   text-transform: capitalize;
 }
 .inspect p,
-.ticket p,
 .drawer-body > p,
-.research-row p,
-.letter p,
 .confirm p {
   color: var(--soft);
   font-size: 13px;
@@ -947,43 +888,6 @@ button.revisions:hover {
   border-color: var(--accent-line);
   background: var(--accent-surface);
 }
-.ticket {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface-raised);
-}
-.ticket-top,
-.ticket-meta,
-.shop-item,
-.letter button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ticket-meta {
-  justify-content: space-between;
-  border-top: 1px dashed var(--line);
-  padding: 8px 0;
-  font: 11px var(--mono);
-}
-.ticket-meta small {
-  color: var(--sub);
-  font-size: 10px;
-}
-.ticket-top b {
-  font-size: 14px;
-}
-.payout {
-  margin-left: auto;
-  color: var(--gold) !important;
-  font: 12px var(--mono);
-}
-.payout svg {
-  width: 12px;
-  height: 12px;
-}
 .avatar {
   padding: 6px;
   border-radius: 5px;
@@ -991,79 +895,11 @@ button.revisions:hover {
   color: var(--soft);
   font: 12px var(--mono);
 }
-.research-row,
-.letter {
-  border-top: 1px solid var(--line);
-  padding: 10px 0;
-}
-.research-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.research-row p {
-  margin: 3px 0;
-}
-.research-row small {
-  color: var(--sub);
-}
-.research-row button {
-  flex: none;
-  color: var(--gold);
-  font: 11px var(--mono);
-}
 .locked {
   color: var(--sub);
 }
-.shop-item {
-  width: 100%;
-  text-align: left;
-  justify-content: flex-start;
-  margin: 7px 0;
-  cursor: grab;
-  padding: 5px 9px 5px 5px;
-  touch-action: none;
-}
-.shop-art {
-  width: 88px;
-  height: 65px;
-  flex: none;
-  background-size: 500px 363px;
-  border-radius: 4px;
-}
-.shop-item span:nth-child(2),
-.letter button span {
-  display: grid;
-  gap: 5px;
-}
-.shop-item small {
-  color: var(--gold);
-}
-.shop-item svg:last-child {
-  margin-left: auto;
-  color: var(--sub);
-}
-.letter button {
-  width: 100%;
-  padding: 1px;
-  justify-content: flex-start;
-  text-align: left;
-  background: transparent;
-  border: 0;
-}
-.letter button svg {
-  color: var(--gold);
-}
-.letter small {
-  color: var(--sub);
-}
-.letter .dot {
-  margin-left: auto;
-}
 .runtime,
-.toast,
-.receipt {
+.toast {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -1090,39 +926,6 @@ button.revisions:hover {
 .toast button {
   padding: 2px;
 }
-.receipt {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  max-width: 100%;
-  transform: translateY(-50%);
-  background: var(--accent-soft);
-  border: 2px solid var(--accent-shadow);
-  color: var(--ink);
-  border-radius: 4px;
-  padding: 10px 16px;
-  box-shadow: 4px 5px 0 var(--shadow-light);
-  pointer-events: none;
-}
-.receipt > div {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-.receipt small {
-  text-transform: uppercase;
-  font: 9px var(--mono);
-  letter-spacing: 1.4px;
-}
-.receipt b {
-  font-size: 16px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.receipt span:last-child {
-  font: 10px var(--mono);
-}
 .stamp-mark {
   display: grid;
   place-items: center;
@@ -1132,16 +935,6 @@ button.revisions:hover {
   width: 32px;
   height: 32px;
   transform: rotate(-12deg);
-}
-.receipt i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 5px;
-  height: 8px;
-  background: var(--gold);
-  animation: burst 0.84s ease-out forwards;
-  --angle: calc(var(--i) * 30deg);
 }
 .stamp-enter-active {
   animation: stamp 0.28s ease-out;
@@ -1196,9 +989,6 @@ button.revisions:hover {
   .brand {
     padding-right: 12px;
   }
-  .cpu > svg {
-    display: none;
-  }
   .world-shell {
     padding: 0 11px 10px;
   }
@@ -1231,14 +1021,6 @@ button.revisions:hover {
   .brand img {
     width: 25px;
     height: 25px;
-  }
-  .wallet,
-  .rep {
-    font-size: 12px;
-  }
-  .rep small,
-  .cpu {
-    display: none;
   }
   .deploy-group {
     margin-left: auto;
@@ -1318,19 +1100,8 @@ button.revisions:hover {
   .floor-help {
     max-width: 65%;
   }
-  .statusbar:has(.toast) > span:first-child,
-  .receipt .stamp-mark {
+  .statusbar:has(.toast) > span:first-child {
     display: none;
-  }
-  .receipt {
-    padding: 4px 6px;
-  }
-  .receipt small {
-    font-size: 8px;
-    letter-spacing: 0;
-  }
-  .receipt b {
-    font-size: 12px;
   }
   .desk.collapsed .world-shell {
     height: calc(100dvh - 107px);
@@ -1475,16 +1246,9 @@ button.revisions:hover {
   width: 88px;
   height: 65px;
 }
-.machine-thumb .shop-art {
-  display: block;
-}
 .machine-strip .machine-thumb {
   width: 43px;
   height: 35px;
-}
-.machine-strip .shop-art {
-  transform: scale(0.5);
-  transform-origin: 0 0;
 }
 .build-cell {
   pointer-events: none;

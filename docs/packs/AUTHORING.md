@@ -15,7 +15,7 @@ Run `pnpm new-pack lantern-garden`. Open `pnpm dev` and choose Lantern Garden. I
 | `WorldView.vue` | Render the displayed world and played calls. Give each visible effect a test id and accessible name or visible text. |
 | `art/` | Local scenes and drawing parts where needed. |
 
-Implement each method in `beginAttempt(world)`. Check arguments before changing the world. Return ordinary data if a player needs a result. The same method definition supplies QuickJS and the declarations in Monaco. A Beginner pack exposes globals in one file, `main.ts`. Give each lesson access only to methods already introduced. A module pack can export names from `inherit`, supply guest modules with declarations, or supply a clock for an exported `onTick`. Workshop has its own live floor, history and simulation adapter.
+Implement each method in `beginAttempt(world)`. Check arguments before changing the world. Return ordinary data if a player needs a result. The same method definition supplies QuickJS and the declarations in Monaco. A Beginner pack exposes globals in one file, `main.ts`. Give each lesson access only to methods already introduced. A module pack can export names from `inherit`, supply guest modules with declarations, or supply a clock for an exported `onTick`. Workshop uses the shared studio and clock with pack-owned parcel fixtures.
 
 Give each saved entity an id and readable rows. Optional panels with rows appear in Learn. For cumulative decorations choose entry-state retries. A live simulation can keep its current world between attempts. Keep ids stable after release. When changing the saved shape, bump the pack version and supply an upgrade and decoder. The framework uses `inherit.pack.<id>` and leaves an unreadable slot available for recovery.
 
@@ -37,16 +37,13 @@ The exported TypeScript definitions in [pack.ts](../../packages/sim/src/framewor
 
 | Part | Source | Rendered example |
 | --- | --- | --- |
-| Ground and trees | `apps/web/app/lib/art/townLandscape.ts` (`landscape`, `fir`) | Hills behind the Workshop town |
-| Buildings and working wheels | `apps/web/app/lib/art/townBuildings.ts` (`drawBuilding`, `wheel`) | Riverside mill |
-| Street lamps | `apps/web/app/lib/art/townBuildings.ts` (`lamps`) | Lamp Street after Tomas’s delivery |
-| Faces | `apps/web/app/lib/art/townPortrait.ts` (`portrait`) | Bram on the shed floor |
+| Parcel arm | `apps/web/app/components/FloorArm.vue` | The arm on the Workshop conveyor |
 | Vector characters and fruit trees | `packages/sim/src/visuals/Villager.vue` and `AppleTree.vue` | Neighbours and the orchard at the fair |
 
 See the [machine drawing contact sheet](../../apps/web/app/lib/art/contact-sheet.png) for the reusable palette and line weights.
 
 ## Play the reference
 
-Run `pnpm test` for the discovered pack suite. It compiles starters and references against the declarations the editor sees, then plays both from the same checkpoint. A specialized simulation can supply a `validation.ts` checkpoint adapter that drives its production runner and bounded ticks. Keep ordinary packs on the default runner. The browser suite loads the ordinary lesson list automatically. A specialized studio can put its UI playthrough in a local `playthrough.ts`, as Workshop does.
+Run `pnpm test` for the discovered pack suite. It compiles starters and references against the declarations the editor sees, then plays both from the same checkpoint. A specialized simulation can supply a `validation.ts` checkpoint adapter that drives its production runner and bounded ticks. Keep ordinary packs on the default runner. The browser suite loads the ordinary lesson list automatically. A pack can put its UI playthrough in a local `playthrough.ts` to exercise clock controls and direct challenge selection.
 
 Build the site and run the browser suite. Set `INHERIT_SHOTS` to an external directory to inspect the opening, watched call and solved card. Check the ending, an unfinished draft after switching packs, and the narrow layout. The ordinary repo checks are listed in [AGENTS.md](../../AGENTS.md).

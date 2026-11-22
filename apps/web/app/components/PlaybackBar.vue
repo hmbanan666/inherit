@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ tickCount: number }>()
+defineProps<{ tickCount: number; live?: boolean }>()
 defineEmits<{ stop: [] }>()
 const paused = defineModel<boolean>('paused', { required: true })
 const speed = defineModel<number>('speed', { required: true })
@@ -8,11 +8,11 @@ const speed = defineModel<number>('speed', { required: true })
 <template>
   <div class="playback-bar" role="group" aria-label="Clock controls">
     <output aria-live="off">onTick #{{ tickCount }}</output>
-    <button @click="paused = !paused">{{ paused ? 'Play' : 'Pause' }}</button>
+    <button v-if="live !== false" @click="paused = !paused">{{ paused ? 'Play' : 'Pause' }}</button>
     <button v-for="rate in [1, 2, 4]" :key="rate" :aria-pressed="speed === rate" @click="speed = rate">
       {{ rate }}x
     </button>
-    <button @click="$emit('stop')">Stop loop</button>
+    <button v-if="live !== false" @click="$emit('stop')">Stop loop</button>
   </div>
 </template>
 

@@ -136,7 +136,10 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       text(lesson.task!.condition)
       expect(lesson.task!.examples.length, label).toBeGreaterThanOrEqual(2)
       lesson.task!.examples.forEach(text)
-      lesson.checks.forEach(check => text(check.input ?? ''))
+      for (const check of lesson.checks) {
+        if (check.input !== undefined) text(check.input)
+        else expect(lesson.variants?.length ?? 0, label + ' needs named inputs').toBeGreaterThan(0)
+      }
       for (const code of Object.values(starter.files)) {
         const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, code)
         expect(scanner.scan(), label).toBe(ts.SyntaxKind.EndOfFileToken)
@@ -159,8 +162,9 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       else {
         const runner = createPackRunner(pack)
         try {
-          await runner.play(trial,files,lesson.mode)
-          if (lesson.mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
+          const mode = !solves && m.track === 'challenges' ? 'run' : lesson.mode
+          await runner.play(trial,files,mode)
+          if (mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
           solved = trial.phase==='solved'
         } finally {runner.dispose()}
       }

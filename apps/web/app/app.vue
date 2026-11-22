@@ -7,15 +7,12 @@ import { packKey } from '@inherit/sim/save'
 const query = new URLSearchParams(location.search)
 const local = import.meta.dev || ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
 const speedQuery = local && query.has('speed') ? '&speed='+encodeURIComponent(query.get('speed')!) : ''
-const id = query.get('pack') ?? (local && query.has('step') ? 'workshop' : '')
+const id = query.get('pack') ?? ''
 const manifest = manifests.find(p => p.id === id)
 const views = import.meta.glob<{default: Component}>('../../../packages/sim/src/packs/*/WorldView.vue')
-const studios = import.meta.glob<{default: Component}>('../../../packages/sim/src/packs/*/Studio.vue')
 const covers = import.meta.glob<string>('../../../packages/sim/src/packs/*/cover.*',{eager:true,query:'?url',import:'default'})
 const folder = '../../../packages/sim/src/packs/'
-const custom = studios[folder+id+'/Studio.vue']
 const render = views[folder+id+'/WorldView.vue']
-const studio = custom && defineAsyncComponent(custom)
 const world = render && defineAsyncComponent(render)
 const maps = shallowRef<Record<string, MapLesson[]>>({})
 const selections: Record<string, string | null> = {}
@@ -39,8 +36,7 @@ if (!id) onMounted(async () => {
 useHead({title: (manifest?.title ?? 'Game packs') + ' · Inherit'})
 </script>
 <template>
-  <component :is="studio" v-if="studio"/>
-  <PackStudio v-else-if="manifest && world" :manifest="manifest" :view="world"/>
+  <PackStudio v-if="manifest && world" :manifest="manifest" :view="world"/>
   <main v-else-if="id || query.has('lesson')" class="showcase"><article><h1>Unknown pack</h1><a href="/">Choose a game pack</a></article></main>
   <main v-else class="showcase"><header class="hud"><a class="brand pack-brand" href="/"><img src="/mark.svg" alt=""/>Inherit<span>.</span></a></header>
     <article><header><h1>Game packs</h1><p>Learn TypeScript by making a world your own.</p></header>

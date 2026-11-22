@@ -11,6 +11,7 @@ const props = defineProps<{
   lessons: MapLesson[]
   selected?: string | null
   theory?: Theory
+  clock?: boolean
   task?: Task
   hints: readonly string[]
   rung: number
@@ -63,8 +64,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', escape))
     </header>
     <section :key="tab" id="drawer-panel" class="sheet-content" role="tabpanel" :aria-labelledby="'tab-' + tab">
       <template v-if="tab === 'learn'">
+        <ol v-if="clock" class="clock-strip" aria-label="The floor clock">
+          <li><b>Run</b>Read your file once.</li>
+          <li><b>Deploy</b>Call your exported onTick each tick.</li>
+          <li><b>Stop loop</b>Keep the last completed tick.</li>
+        </ol>
         <template v-if="theory"><h2>{{ theory.title }}</h2><p v-for="line in theory.body" :key="line">{{ line }}</p><pre>{{ theory.example }}</pre></template>
         <template v-if="task"><h3>Condition</h3><p>{{ task.condition }}</p><ul><li v-for="example in task.examples" :key="example">{{ example }}</li></ul></template>
+        <p v-if="clock">Pause holds the current reach. Choose 1×, 2× or 4× to change speed. Run once tries one tick on a copy.</p>
         <fieldset v-if="prediction"><legend>{{ prediction.question }}</legend>
           <button v-for="option in prediction.choices" :key="option" :aria-pressed="choice === option" :disabled="busy || !!choice" @click="emit('predict', option)">{{ option }}</button>
         </fieldset>
@@ -95,6 +102,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', escape))
 </template>
 
 <style scoped>
+.clock-strip { display: flex; list-style: none; padding: 0; gap: 4px; }
+.clock-strip li { flex: 1; font-size: 12px; background: var(--surface-raised); padding: 5px; }
+.clock-strip b { display: block; color: var(--gold); }
 .side-drawer { inset: 0 0 0 auto; width: min(360px, 40%); max-height: 100%; z-index: 5; border: 0; border-left: 1px solid var(--line-strong); border-radius: 0; background: var(--panel); box-shadow: -8px 0 22px var(--shadow); user-select: text }
 header { display: flex; justify-content: space-between; gap: 2px; padding: 6px !important; flex-wrap: wrap }
 [role=tablist] { flex-wrap: wrap; gap: 0 }

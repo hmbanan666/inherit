@@ -1,112 +1,140 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { chapterCapture } from '../../../../../tests/e2e/chapter-capture'
-import { edits } from './starter'
-import { lessons } from './chapter'
-import { workshopReference } from './reference/chapter-one'
-import { pasteProjectFile, openTool } from '../../../../../tests/e2e/workshop'
+import { pasteProjectFile } from '../../../../../tests/e2e/workshop'
+import { lessons } from './lessons'
 
-function browserErrors(page: Page) {
+test('Workshop plays twelve parcel challenges from the showcase to the finish', async ({ page }) => {
+  test.setTimeout(180_000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()) })
-  return errors
-}
-
-test('play every workshop reference in the editor, build the bridge and pay the tab', async ({ page }) => {
-  test.setTimeout(300000)
-  page.setDefaultTimeout(10000)
-  const errors = browserErrors(page)
   const capture = await chapterCapture(page)
-  const button = (name: string) => page.getByRole('button', { name, exact: true })
-  const card = page.getByTestId('task-card')
-  const primary = page.getByTestId('primary-button')
-  const next = page.getByTestId('continue')
-  const solved = page.getByTestId('solved-card')
-  const markedLines = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
-  async function expectMarkedLines(lines: string[]) {
-    await expect(markedLines).toHaveText(lines)
-    for (const line of await markedLines.all()) {
-      await expect(line.locator('.call-to-move').first()).toBeInViewport({ ratio: 1 })
-    }
-  }
-  await page.goto('/?speed=32')
+  await page.goto('/?speed=8')
   await page.getByTestId('pack-workshop').click()
-  await expect(page.locator('.view-lines')).toBeVisible()
-  await expect(primary).toBeEnabled()
-  for (const [index, step] of lessons.entries()) {
-    await test.step(step.id, async () => {
-      const prefix = 'workshop/'+step.id+'/'
-      await expect(card.getByRole('heading')).toHaveText(edits[step.id].goal)
-      await expect(page.getByTestId('speech')).toContainText(step.story)
-      if (step.id === 'bram-smelt') {
-        await expectMarkedLines(['take("mine")', 'put("furnace")'])
-        await expect(page.locator('.view-lines')).toContainText('TODO: Give the two furnace moves')
-      }
-      if (step.id === 'bram-loop') {
-        await expectMarkedLines(['smelt()', 'ship()'])
-        await expect(page.locator('.view-lines')).toContainText('TODO: Let the clock fill')
-      }
-      await capture(prefix + 'start')
-      await openTool(page, 'hints')
-      await button('Show hint 1 of 2').click()
-      await button('Show hint 2 of 2').click()
-      if (index < 8) await capture(prefix + 'hint')
-      await button('Close drawer').click()
-      {
-        const updated = workshopReference(step)
-        const tree = page.getByRole('region', { name: 'Project files' })
-        if (step.id === 'mayor-tools') {
-          await tree.getByRole('button', { name: 'New file' }).click()
-          await tree.getByLabel('Project path').fill('tools.ts')
-          await tree.getByRole('button', { name: 'Create', exact: true }).click()
-        }
-        for (const [file, source] of Object.entries(updated)) {
-          if (Object.keys(updated).length > 1) await tree.getByRole('button', { name: file, exact: true }).click()
-          await pasteProjectFile(page,source,'Factory controller TypeScript')
-          await page.keyboard.press('Control+Home')
-        }
-        await primary.click()
-        if (step.button === 'run') {
-          await expect(async () => {
-            if (await next.isVisible()) return
-            await expect(primary).toBeEnabled()
-            if (!await next.isVisible()) await primary.click()
-            await expect(next).toBeVisible({ timeout: 600 })
-          }).toPass({ timeout: 15000 })
-        }
-        if (step.id === 'bram-loop') {
-          await expect(page.locator('.cart-load')).toHaveText(/[12] \/ 3 delivered/)
-          await expect(page.locator('.call-to-move')).toHaveCount(0)
-          await capture(prefix+'deploy-filling')
-        }
-      }
-      await expect(solved).toContainText(step.solved.did, { timeout: 45000 })
-      await expect(page.getByTestId('speech')).toContainText(step.solved.reaction)
-      if (step.id === 'harrow-tab') {
-        await expect(solved).toContainText('12 coins for three more ingots')
-        await expect(page.getByTestId('nav-orders')).toBeHidden()
-      }
-      await capture(prefix + 'solved')
-      await next.click()
-      if (step.id === 'bram-loop') {
-        await expect(page.getByTestId('drawer')).toContainText('64 coins')
-        await expect(button('Pay later')).toBeVisible()
-        await capture(prefix + 'next')
-      }
-    })
-  }
-  const finish = page.getByRole('region', {name: 'Uncle’s Workshop'})
-  await expect(finish).toContainText('The shed is yours.')
-  await expect(finish.getByRole('listitem')).toHaveText(lessons.map(lesson => lesson.solved.idea))
-  await expect(finish.getByRole('link', {name: 'Back to game packs'})).toHaveAttribute('href', '/')
-  await expect(finish.getByRole('link', {name: /Next pack/})).toHaveCount(0)
-  await expect(page.getByTestId('floor')).toBeVisible()
-  await expect(page.getByRole('banner').getByRole('link', {name: 'Showcase', exact: true})).toBeVisible()
-  await capture('workshop/complete')
-  await finish.getByRole('button', {name: 'Replay this pack'}).click()
-  await page.getByRole('dialog').getByRole('button', {name: 'Replay this pack'}).click()
-  await expect(page.getByTestId('task-card')).toContainText('Lift a rock from the mine')
-  await expect(page.getByRole('navigation', {name: 'Workshop sections'})).toBeHidden()
-  await expect(page.getByRole('textbox', {name: 'Factory controller TypeScript'})).toBeFocused()
+  const primary = page.getByTestId('primary-button')
+  for (const lesson of lessons) await test.step(lesson.id, async () => {
+    const path = 'workshop/' + lesson.id + '/'
+    await expect(page.getByTestId('task-card')).toContainText(lesson.goal)
+    const learn = page.getByTestId('drawer')
+    await expect(learn).toContainText(lesson.task.condition)
+    if (lesson.mode === 'deploy') await expect(learn.getByRole('list', { name: 'The floor clock' })).toBeVisible()
+    await expect(page.locator('.view-lines')).toContainText('TODO:')
+    await capture(path + 'learn')
+    await learn.getByRole('button', { name: 'Got it' }).click()
+    await capture(path + 'start')
+    await pasteProjectFile(page, lesson.referenceSolution['main.ts'], 'Player TypeScript')
+    await primary.click()
+    if (lesson.mode === 'deploy') {
+      await expect(primary).toContainText('Deploy')
+      await primary.click()
+      await expect(primary).toContainText('Stop loop')
+    } else {
+      await expect(primary).toBeDisabled()
+    }
+    await capture(path + 'running')
+    await expect(page.getByTestId('solved-card')).toContainText(lesson.solved.did, { timeout: 15000 })
+    await expect(page.getByTestId(lesson.visibleEffect.testId)).toContainText(lesson.visibleEffect.text)
+    await capture(path + 'solved')
+    await page.getByTestId('continue').click()
+  })
+  await expect(page.getByText('Pack complete', { exact: true })).toBeVisible()
+  await capture('workshop/finished')
+  const completed = await page.evaluate(() => JSON.parse(localStorage.getItem('inherit.pack.workshop')!).completed)
+  expect(completed).toEqual(lessons.map(lesson => lesson.id))
   expect(errors).toEqual([])
+})
+
+for (const rate of [1, 2, 4]) test('direct clock entry, pause and parcel delivery at ' + rate + 'x', async ({ page }) => {
+  await page.goto('/?pack=workshop')
+  const primary = page.getByTestId('primary-button')
+  const drawer = page.getByTestId('drawer')
+  await drawer.getByRole('button', { name: /Dispatch on the clock/ }).click()
+  await expect(primary).toBeDisabled()
+  await expect(drawer).toContainText('Who calls my function?')
+  await drawer.getByTestId('drawer-api').click()
+  await expect(drawer).toContainText('onTick(): void')
+  await expect(drawer).toContainText('const lifted = take("belt")')
+  await drawer.getByRole('button', { name: 'Close drawer', exact: true }).click()
+  const clock = lessons.find(l => l.id === 'first-clock')!
+  await pasteProjectFile(page, clock.referenceSolution['main.ts'], 'Player TypeScript')
+  await primary.click()
+  await expect(primary).toContainText('Deploy')
+  await primary.click()
+  const bar = page.getByRole('group', { name: 'Clock controls' })
+  await bar.getByRole('button', { name: rate + 'x', exact: true }).click()
+  await page.waitForFunction(() => {
+    const arm = document.querySelector('.plan foreignObject')
+    const x = Number(arm?.getAttribute('x'))
+    if (x <= 20 || x >= 506) return false
+    const pause = [...document.querySelectorAll<HTMLButtonElement>('.playback-bar button')].find(b => b.textContent === 'Pause')
+    pause?.click()
+    return !!pause
+  }, undefined, { timeout: 10000 })
+  const counter = await bar.locator('output').innerText()
+  const position = await page.locator('.plan foreignObject').getAttribute('x')
+  await page.waitForTimeout(1000)
+  await expect(bar.locator('output')).toHaveText(counter)
+  await expect(page.locator('.plan foreignObject')).toHaveAttribute('x', position!)
+  await bar.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect(page.getByTestId('solved-card')).toBeVisible({ timeout: 12000 })
+  await expect(bar.locator('output')).toHaveText('onTick #6')
+  await expect(page.getByTestId('result-cart')).toHaveText('A B C')
+})
+
+test('Stop loop retains the floor and Run once inspects a disposable tick', async ({ page }) => {
+  await page.goto('/?pack=workshop')
+  const drawer = page.getByTestId('drawer')
+  await drawer.getByRole('button', { name: /Dispatch on the clock/ }).click()
+  await drawer.getByRole('button', { name: 'Got it' }).click()
+  await pasteProjectFile(page, lessons.find(l => l.id === 'first-clock')!.referenceSolution['main.ts'], 'Player TypeScript')
+  const primary = page.getByTestId('primary-button')
+  await primary.click()
+  await expect(primary).toContainText('Deploy')
+  await primary.click()
+  await expect(primary).toContainText('Stop loop')
+  await page.waitForFunction(() => {
+    const x = Number(document.querySelector('.plan foreignObject')?.getAttribute('x'))
+    if (x <= 20 || x >= 506) return false
+    document.querySelector<HTMLButtonElement>('[data-testid="primary-button"]')!.click()
+    return true
+  })
+  await expect(primary).toContainText('Deploy')
+  const before = (await page.getByTestId('result-cart').textContent())!
+  await page.getByRole('button', { name: 'Run once', exact: true }).click()
+  await expect(page.getByTestId('result-cart')).toHaveText('A')
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('inherit.pack.workshop')!).world.queues.cart)).toEqual([])
+  await page.getByRole('button', { name: 'Return to paused floor' }).click()
+  await expect(page.getByTestId('result-cart')).toHaveText(before)
+})
+
+test('a v5 save starts fresh and its original files open in Settings', async ({ page }) => {
+  const source = JSON.stringify({
+    formatVersion: 1, packId: 'workshop', packVersion: 1,
+    world: { version: 6 }, entryWorld: { version: 6 },
+    project: { working: { 'main.ts': '// old working file' }, deployed: null, history: [], snapshots: [] },
+  })
+  await page.goto('/')
+  await page.evaluate(raw => localStorage.setItem('inherit.pack.workshop', raw), source)
+  await page.getByTestId('pack-workshop').click()
+  await expect(page.getByTestId('task-card')).toHaveText(/Dispatch the waiting batch/)
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByText('v5 Workshop code', { exact: true }).click()
+  await expect(page.locator('.hud-menu pre')).toContainText('// old working file')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download original save' }).click()
+  expect((await download).suggestedFilename()).toBe('workshop-save.json')
+})
+
+test('challenge selection preserves working drafts and starts each floor fresh', async ({ page }) => {
+  await page.goto('/?pack=workshop')
+  const drawer = page.getByTestId('drawer')
+  await drawer.getByRole('button', { name: 'Got it' }).click()
+  await pasteProjectFile(page, '// my unfinished batch', 'Player TypeScript')
+  await page.getByTestId('hint').click()
+  await drawer.getByRole('button', { name: /Merge two sorted bins/ }).click()
+  await expect(page.getByTestId('result-left')).toHaveText('A C')
+  await drawer.getByRole('button', { name: /Dispatch the waiting batch/ }).click()
+  await expect(page.locator('.view-lines')).toContainText('// my unfinished batch')
+  await expect(page.getByTestId('result-belt')).toHaveText('A B C')
+  await page.reload()
+  await expect(page.locator('.view-lines')).toContainText('// my unfinished batch')
 })
