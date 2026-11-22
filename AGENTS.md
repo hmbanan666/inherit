@@ -16,6 +16,8 @@ pnpm exec playwright install chromium --only-shell
 pnpm test:browser
 ```
 
+Documentation-only PRs may skip the Chromium install and browser suite. Run both for changes to code, dependencies, build configuration or test tooling.
+
 The browser test serves the generated site on loopback port 4173. Set `INHERIT_SHOTS` to a directory outside the checkout when capturing pack screenshots.
 
 ## Commits and merging
@@ -26,7 +28,7 @@ Omit `Co-authored-by` trailers and AI tool or model names from commit messages, 
 
 ### Author a pack
 
-When adding a pack or designing a lesson, use [.agents/skills/author-pack/SKILL.md](.agents/skills/author-pack/SKILL.md) and [the authoring guide](docs/packs/AUTHORING.md). ADR 0018 and the v5 game packs spec govern pack decisions.
+When adding a pack or designing a lesson, use [.agents/skills/author-pack/SKILL.md](.agents/skills/author-pack/SKILL.md) and [the authoring guide](docs/packs/AUTHORING.md). Use [ADR 0019](docs/adr/0019-one-screen-two-tracks.md) and the [v6 spec](docs/specs/v6-course-and-challenges.md) for course and challenge decisions. ADR 0018 governs the shared pack foundation.
 
 ### Issue tracker
 
