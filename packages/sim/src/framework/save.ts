@@ -57,12 +57,12 @@ export function decodeSave<W,A extends object>(pack: Pack<W,A>, input: string): 
 }
 export function continueLesson<W,A extends object>(pack: Pack<W,A>, save: PackSave<W>) {
   if (save.phase !== 'solved' || !save.lessonId) return
-  const reveal = save.pendingReveals.shift()
-  if (reveal && !save.released.includes(reveal)) {
+  for (const reveal of save.pendingReveals) {
+    if (save.released.includes(reveal)) continue
     save.released.push(reveal)
     pack.release?.(save.world, reveal)
   }
-  if (reveal) return
+  save.pendingReveals = []
   const next = pack.lessons[pack.lessons.findIndex(l => l.id === save.lessonId) + 1]
   save.completed.push(save.lessonId)
   save.lessonId = next?.id ?? null

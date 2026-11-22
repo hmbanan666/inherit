@@ -10,13 +10,18 @@ test('a saved workshop starts in the shed and keeps its original controller file
   await openShed(page)
   await expect(page.getByTestId('task-card')).toContainText('Lift a rock from the mine')
   await page.reload()
-  await page.getByRole('button', { name: 'History' }).click()
-  await page.getByRole('button', { name: 'Open v2 code' }).click()
-  await expect(page.locator('.view-lines')).toContainText('from "./feed"')
+  await expect(page.getByTestId('primary-button')).toBeEnabled()
+  await expect(page.getByRole('button', { name: /history/i })).toHaveCount(0)
+  const snapshots = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('inherit.pack.workshop')!).project.snapshots,
+  )
+  expect(snapshots).toContainEqual(expect.objectContaining({
+    files: expect.objectContaining({ 'main.ts': expect.stringContaining('from "./feed"') }),
+  }))
   await expect(page.getByTestId('primary-button')).toContainText('Run')
 })
 
-test('a stopped controller keeps Deploy available and a revision restores the clock', async ({ page }) => {
+test('a stopped controller keeps Deploy available and a new deployment restarts the clock', async ({ page }) => {
   await openShed(page, '?step=bram-loop')
   const primary = page.getByTestId('primary-button')
   await edit(page, 'export function onTick() { console.log("ticking") }')
@@ -27,8 +32,9 @@ test('a stopped controller keeps Deploy available and a revision restores the cl
   await expect(page.getByTestId('checks')).toContainText('main.ts:2 · Valve closed')
   await expect(page.locator('.live')).toHaveText('Offline')
   await expect(primary).toContainText('Deploy')
-  await page.getByRole('button', { name: 'Deploy history' }).click()
-  await page.getByRole('button', { name: /Restore #1 / }).click()
+  await expect(page.getByRole('button', { name: /history|restore #/i })).toHaveCount(0)
+  await edit(page, 'export function onTick() { console.log("ticking again") }')
+  await primary.click()
   await expect(page.locator('.live')).toHaveText('Live')
   await expect(page.locator('.view-lines')).toContainText('ticking')
   await page.getByRole('button', { name: 'Settings' }).click()

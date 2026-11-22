@@ -14,7 +14,7 @@ defineProps<{ x: number; y: number; hand: string | null; call?: CallRecord; retu
   </div>
 </template>
 <style scoped>
-.arm { position: absolute; width: 0; height: 0; transition: left .23s ease-in-out, top .23s ease-in-out; z-index: 1; }
+.arm { position: absolute; width: 0; height: 0; z-index: 1; }
 .arm > span, .arm > i { position: absolute; }
 .carriage { bottom: 0; left: -19px; width: 40px; height: 15px; border: 3px solid #39393b; border-radius: 6px; background: linear-gradient(#c6b898, #796b55); box-shadow: 0 4px 3px #232323a8; }
 .boom, .forearm { background: linear-gradient(90deg,#746855,#e3c889 30%,#ae8f5d 72%,#6d6355); border: 2px solid #403e3a; border-radius: 5px; transform-origin: bottom; }

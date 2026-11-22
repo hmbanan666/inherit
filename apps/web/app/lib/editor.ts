@@ -12,6 +12,7 @@ export interface EditorSession {
   multiFile: Read<boolean>
   navigation: Read<{file: string; line: number}>
   call: Read<{file: string; line: number} | undefined>
+  tickCalls: Read<readonly { file: string; line: number }[]>
   watching: Read<boolean>
   error: Read<string>
   placeFunctions?: readonly string[]

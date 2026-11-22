@@ -8,6 +8,7 @@ import {
   type ProjectFiles,
   type WorkshopSection,
 } from '@inherit/sim'
+import { usePlaybackClock } from './playback-clock'
 import { usePlayback } from './usePlayback'
 import type { CpuStats } from '@inherit/sandbox'
 import { appendConsoleLines, type ConsoleRow } from './console-log'
@@ -61,12 +62,17 @@ function createGameStore() {
   const surface = computed(() => getSurface(state.value))
   const reference = shallowRef<import('@inherit/sim').ApiEntry[]>([])
   const api = ref('')
-  const playback = usePlayback()
+  const clock = usePlaybackClock()
+  const playback = usePlayback(clock)
+  const tickCalls = shallowRef<Frame['calls']>([])
+  const tickCount = ref(0)
+  const stoppingLoop = ref(false)
   const hand = computed(() => (playback.watching.value || playback.call.value)
     ? playback.hand.value
     : state.value.world.hand?.item ?? null)
   const busy = ref(false)
-  let speed = 1
+  const { speed, paused } = clock
+  const tickInterval = computed(() => TICK_MS / speed.value)
   let resumeClock = true
   let storageKey = saveKey
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
@@ -85,7 +91,8 @@ function createGameStore() {
         ...state.value, ...acknowledged?.campaign,
         project: { ...(acknowledged?.project ?? state.value.project), working: files.value },
       }
-      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, acknowledged?.active ?? active.value)))
+      const clockActive = !stoppingLoop.value && (acknowledged?.active ?? active.value)
+      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, clockActive)))
       saved.value = true
     } catch {
       saved.value = false
@@ -93,6 +100,8 @@ function createGameStore() {
   }
   function stop() {
     playback.clear()
+    tickCalls.value = []
+    stoppingLoop.value = false
     busy.value = false
     buildCheck?.abort()
     clearTimeout(timer)
@@ -101,6 +110,7 @@ function createGameStore() {
     worker = undefined
     current = undefined
     queue.length = 0
+    paused.value = false
     ready.value = false
     active.value = false
   }
@@ -143,10 +153,13 @@ function createGameStore() {
     if (!worker || current) return
     current = queue.shift()
     if (!current) {
-      timer = setTimeout(() => act({ type: 'step' }), Math.max(0, nextTickAt - performance.now()))
+      if (!paused.value) {
+        const delay = Math.max(0, (nextTickAt - clock.now()) / speed.value)
+        timer = setTimeout(() => act({ type: 'step' }), delay)
+      }
       return
     }
-    if (current.type === 'step') nextTickAt = performance.now() + TICK_MS / speed
+    if (current.type === 'step') nextTickAt = clock.now() + TICK_MS
     if (current.type === 'rollback') rollbackDraft = files.value
     watchdog = setTimeout(
       () => {
@@ -157,6 +170,7 @@ function createGameStore() {
     )
     worker.postMessage(current)
   }
+  watch([paused, speed], pump)
   function act(action: Action) {
     if (!worker) return
     queue.push(action)
@@ -171,7 +185,8 @@ function createGameStore() {
     const returned = mode === 'run' && frame.campaign.world.tick !== state.value.world.tick
       ? state.value.world.hand : undefined
     acknowledged = frame
-    await playback.play(frame.calls, mode, speed, returned)
+    const tickStarted = action.type === 'step' ? nextTickAt - TICK_MS : undefined
+    await playback.play(frame.calls, mode, returned, tickStarted)
     if (worker !== instance) return
     current = undefined
     if (frame.api !== undefined) api.value = frame.api
@@ -181,7 +196,14 @@ function createGameStore() {
       project: frame.project ?? state.value.project,
       seenSections: state.value.seenSections,
     }
+    if (action.type === 'stopLoop') stoppingLoop.value = false
     active.value = frame.active
+    tickCount.value = frame.tickCount
+    if (action.type === 'step' || !frame.active || action.type === 'deploy' || action.type === 'continue') {
+      tickCalls.value = action.type === 'step' && frame.active ? frame.calls : []
+    }
+    playback.hand.value = c.world.hand?.item ?? null
+    if (!frame.active) paused.value = false
     if (action.type === 'rollback' && !frame.error && !frame.notice && files.value === rollbackDraft) {
       files.value = c.project.working
       if (!(activeFile.value in files.value)) openFile('main.ts')
@@ -220,7 +242,7 @@ function createGameStore() {
     traces.value = frame.traces
     if (action.type !== 'step') persist()
     ready.value = true
-    if (['run', 'deploy', 'continue'].includes(action.type)) busy.value = false
+    if (!stoppingLoop.value && ['run', 'deploy', 'continue', 'stopLoop'].includes(action.type)) busy.value = false
     pump()
   }
   function start() {
@@ -243,9 +265,18 @@ function createGameStore() {
   function submit(type: 'deploy' | 'run' = button.value) {
     if (busy.value || (!ready.value && !error.value)) return
     if (!worker) start()
+    paused.value = false
     busy.value = true
     playback.messages.value = []
     act({ type, files: files.value })
+    persist()
+  }
+  function stopLoop() {
+    if (!active.value || stoppingLoop.value) return
+    stoppingLoop.value = true
+    busy.value = true
+    paused.value = false
+    act({ type: 'stopLoop' })
     persist()
   }
   function advance() {
@@ -301,14 +332,6 @@ function createGameStore() {
     if (activeFile.value === from) openFile(to)
     return true
   }
-  function restoreSnapshot(id: number) {
-    const r = state.value.project.snapshots.find((s) => s.id === id)
-    if (r) {
-      update({ ...r.files })
-      openFile('main.ts')
-      persist()
-    }
-  }
   function selectMachine(id: string) {
     selected.value = id
     const site = traces.value[id]?.at(-1)
@@ -348,7 +371,7 @@ function createGameStore() {
       const query = new URLSearchParams(local ? location.search : '')
       const id = query.get('lesson') ?? query.get('step')
       if (id) storageKey = saveKey + '.preview.' + id
-      speed = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
+      speed.value = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
       let stored = localStorage.getItem(storageKey)
       const legacy = !id && !stored && localStorage.getItem('inherit.workshop.v1')
       if (legacy) {
@@ -401,9 +424,7 @@ function createGameStore() {
     renameFile,
     deleteFile,
     submit, advance, busy, playback, hand,
-    rollback: (id: number) => act({ type: 'rollback', id }),
-    snapshot: (name: string) => act({ type: 'snapshot', name, files: files.value }),
-    restoreSnapshot,
+    stopLoop, stoppingLoop, tickCount, tickCalls,
     step, button, places, reveals, sections, letters,
     surface,
     reference,
@@ -417,6 +438,9 @@ function createGameStore() {
     traces,
     ready,
     active,
+    paused,
+    speed,
+    tickInterval,
     visitSection,
     error,
     notice,

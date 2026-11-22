@@ -79,9 +79,8 @@ test.each([1, 831, 19])(
           step.id + ' ' + JSON.stringify(c.world.machines.map((m) => [m.id, m.queue, m.output, m.fault])),
         ).toBe('solved')
         elapsed[step.id] = c.world.tick - start
-        do {
-          c = continueStep(c)
-        } while (currentStep(c)?.step.id === step.id)
+        c = continueStep(c)
+        expect(currentStep(c)?.step.id).not.toBe(step.id)
       }
       if (seed === 1) {
         const text = [

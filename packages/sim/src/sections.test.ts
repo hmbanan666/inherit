@@ -20,7 +20,7 @@ test('floor activity cannot open a section or dismiss a solved card', () => {
   expect(c.world.hand?.origin).toBe('mine')
 })
 
-test('Bram pays once and each Continue releases one saved reveal', () => {
+test('Bram pays once and one Continue releases everything and opens the bank lesson', () => {
   let c = jumpToStep(createCampaign(), 'bram-loop')
   c.lesson.phase = 'working'
   c.town.wired = true
@@ -40,14 +40,13 @@ test('Bram pays once and each Continue releases one saved reveal', () => {
     { kind: 'letter', id: 'tab' },
     { kind: 'debt' },
   ]
-  for (let i = 0; i < expected.length; i++) {
-    const before = serializeSave(c)
-    const next = continueStep(c)
-    expect(serializeSave(c)).toBe(before)
-    c = loadSave(serializeSave(next))
-    expect(revealed(c)).toEqual(expected.slice(0, i + 1))
-    expect(c.progress.messages.some((m) => m.id === 'tab')).toBe(i >= 2)
-  }
+  const before = serializeSave(c)
+  const next = continueStep(c)
+  expect(serializeSave(c)).toBe(before)
+  c = loadSave(serializeSave(next))
+  expect(revealed(c)).toEqual(expected)
+  expect(c.lesson.queue).toEqual([])
+  expect(c.progress.messages.filter(m => m.id === 'tab')).toHaveLength(1)
   expect(currentStep(c)).toMatchObject({ step: { id: 'harrow-tab' }, phase: 'brief' })
 })
 

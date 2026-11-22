@@ -1,34 +1,47 @@
 import { TICK_MS, type CallRecord, type CampaignWorld } from '@inherit/sim'
+import type { usePlaybackClock } from './playback-clock'
 
-export function usePlayback() {
+export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
   const watching = ref(false)
   const call = shallowRef<CallRecord>()
   const place = ref<string>()
+  const previousPlace = ref<string>()
+  const travel = ref(1)
   const returning = shallowRef<CampaignWorld['hand']>()
   const hand = ref<string | null>(null)
   const stationStatuses = shallowRef(new Map<string, Set<string>>())
   const messages = ref<string[]>([])
-  let finishWait: (() => void) | undefined
   let generation = 0
   function clear() {
     generation++
     watching.value = false
-    finishWait?.()
+    clock.cancel()
+    previousPlace.value = undefined
+    travel.value = 1
     stationStatuses.value = new Map()
     call.value = undefined
     returning.value = undefined
     place.value = undefined
     messages.value = []
   }
-  function wait(ms: number) {
-    return new Promise<void>(resolve => {
-      const timer = setTimeout(resolve, ms)
-      finishWait = () => { clearTimeout(timer); resolve() }
+  function travelTo(destination: string | undefined, start: number, end: number) {
+    previousPlace.value = place.value
+    place.value = destination
+    return clock.waitUntil(end, time => {
+      travel.value = Math.max(0, Math.min(1, (time - start) / (end - start)))
     })
   }
-  async function play(calls: CallRecord[], mode: 'run' | 'tick' | 'setup', speed: number, held?: CampaignWorld['hand']) {
+  async function play(
+    calls: CallRecord[],
+    mode: 'run' | 'tick' | 'setup',
+    held?: CampaignWorld['hand'],
+    start = clock.now(),
+  ) {
     const watched = mode === 'run'
-    if (!calls.length && !watched && !stationStatuses.value.size) return
+    if (!watched && !calls.length && !stationStatuses.value.size) {
+      call.value = undefined
+      return
+    }
     const statuses = new Map<string, Set<string>>()
     const visible: CallRecord[] = []
     for (const record of calls) {
@@ -39,40 +52,37 @@ export function usePlayback() {
         statuses.set(place, atPlace)
       } else visible.push(record)
     }
+    if (!visible.length) call.value = undefined
     stationStatuses.value = statuses
-    const interval = (watched ? 500 : TICK_MS / (2 * Math.max(1, visible.length))) / speed
+    // All live calls share one tick. Absolute deadlines prevent per-call timer drift.
+    const interval = watched ? 500 : TICK_MS / Math.max(1, visible.length)
     const ticket = generation
     watching.value = watched
     messages.value = []
-    if (watched) {
-      hand.value = held?.item ?? null
-      if (held) {
-        returning.value = held
-        place.value = held.origin
-        await wait(interval)
-        if (ticket !== generation) return
-        hand.value = null
-        await wait(interval / 2)
-        if (ticket !== generation) return
-        returning.value = undefined
-      }
+    hand.value = held?.item ?? null
+    if (watched && held) {
+      returning.value = held
+      await travelTo(held.origin, start, start + interval)
+      if (ticket !== generation) return
+      hand.value = null
+      start += interval * 1.5
+      await clock.waitUntil(start)
+      if (ticket !== generation) return
+      returning.value = undefined
     }
     for (const record of visible) {
       call.value = record
-      place.value = record.fn === 'buy' ? record.args[1] ?? record.args[0] : record.args[0]
-      // A watched call has two visible moments: reach the place, then lift or release.
-      if (watched) {
-        await wait(interval / 2)
-        if (ticket !== generation) return
-      }
+      const destination = record.fn === 'buy' ? record.args[1] ?? record.args[0] : record.args[0]
+      await travelTo(destination, start, start + interval / 2)
+      if (ticket !== generation) return
       hand.value = record.hand
       if (record.message && !messages.value.includes(record.message)) messages.value.push(record.message)
-      await wait(watched ? interval / 2 : interval)
+      start += interval
+      await clock.waitUntil(start)
       if (ticket !== generation) return
     }
-    finishWait = undefined
     watching.value = false
-    call.value = undefined
+    if (mode !== 'tick') call.value = undefined
   }
-  return { watching, call, place, returning, hand, messages, stationStatuses, play, clear }
+  return { watching, call, place, previousPlace, travel, returning, hand, messages, stationStatuses, play, clear }
 }

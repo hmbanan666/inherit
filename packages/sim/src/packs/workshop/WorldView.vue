@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize, X } from '@lucide/vue'
-import { MACHINES, TICK_MS, type CampaignWorld } from '@inherit/sim'
+import { MACHINES, type CampaignWorld } from '@inherit/sim'
 import { useGame } from '../../../../../apps/web/app/lib/useGame'
 import ShedStreet from '../../../../../apps/web/app/components/town/ShedStreet.vue'
 import TownPortrait from '../../../../../apps/web/app/components/town/TownPortrait.vue'
@@ -50,11 +50,20 @@ const travelRail = computed(() => {
   const xs = stops.map(stop => stop.x)
   return { left: (Math.min(...xs) - 24) + 'px', width: (Math.max(...xs) - Math.min(...xs) + 48) + 'px', top: (stops[0]!.y + tile * .94) + 'px' }
 })
-const armPoint = computed(() => {
-  const place = g.playback.place.value ?? world.value.hand?.origin
+function armStop(place = world.value.hand?.origin) {
   const target = world.value.machines.find(m => m.id === place)
   const point = target ? center(target.siteId, target) : bounds.value
   return { x: point.x + (target ? 0 : -tile), y: point.y + tile * .94 }
+}
+const armPoint = computed(() => {
+  const end = armStop(g.playback.place.value)
+  const fraction = g.playback.travel.value
+  if (fraction === 1) return end
+  const start = armStop(g.playback.previousPlace.value)
+  return {
+    x: start.x + (end.x - start.x) * fraction,
+    y: start.y + (end.y - start.y) * fraction,
+  }
 })
 function recenter() {
   pan.value = { x: 0, y: 0 }
@@ -184,7 +193,7 @@ onMounted(async () => {
     observer = new ResizeObserver(resize)
     observer.observe(host.value!)
     renderer.ticker.maxFPS = 40
-    renderer.ticker.add(() => scene?.animate(performance.now(), TICK_MS, false))
+    renderer.ticker.add(() => scene?.animate(performance.now(), g.tickInterval.value, g.paused.value))
   } catch {
     renderError.value = 'Could not open the floor renderer. Reload to retry.'
   }
@@ -240,7 +249,7 @@ onBeforeUnmount(() => {
       <TownPortrait v-if="speaker" :person="speaker" />
       <div><strong>{{ speaker?.name ?? story.who }}</strong><p>{{ g.step.value?.phase === 'solved' ? story.solved.reaction : story.story }}</p></div>
     </div>
-    <div v-if="g.button.value === 'deploy'" class="shed-clock" :class="{ running: g.active.value }" aria-label="Factory clock">◷</div>
+    <div v-if="g.button.value === 'deploy'" class="shed-clock" :class="{ running: g.active.value }" :style="{ transform: g.active.value ? `rotate(${(world.tick % 32) / 32}turn)` : undefined }" aria-label="Factory clock">◷</div>
     <div class="map-controls">
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
       ><button aria-label="Center map" @click="recenter()"><Maximize /></button
@@ -307,8 +316,7 @@ onBeforeUnmount(() => {
 .floor-story strong { color: var(--accent-soft); font-size: 14px; }
 .floor-story p { margin: 4px 0 0; line-height: 1.45; font-size: 15px; }
 .shed-clock { position: absolute; right: 14px; top: 14px; color: var(--soft); font-size: 28px; }
-.shed-clock.running { color: var(--gold); animation: clock-turn 8s linear infinite; }
-@keyframes clock-turn { to { transform: rotate(360deg); } }
+.shed-clock.running { color: var(--gold); }
 .acting .machine-label { color: var(--gold); border-color: var(--gold); }
 .chosen .machine-hit, .acting .machine-hit { box-shadow: 0 0 14px var(--gold); border-radius: 20%; }
 .machine-label { font-size: 13px; }

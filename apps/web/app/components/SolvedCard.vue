@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check } from '@lucide/vue'
-defineProps<{ next?: string; solved: { reaction: string; did: string; idea: string; reward?: string }; busy: boolean }>()
+defineProps<{ solved: { reaction: string; did: string; idea: string; reward?: string }; busy: boolean }>()
 defineEmits<{ advance: [] }>()
 </script>
 <template>
@@ -9,6 +9,5 @@ defineEmits<{ advance: [] }>()
     <p>{{ solved.reaction }}</p>
     <p><strong>{{ solved.did }}</strong> {{ solved.idea }}</p>
     <p v-if="solved.reward" class="reward">{{ solved.reward }}</p>
-    <p v-if="next">{{ next }}</p>
   </section>
 </template>

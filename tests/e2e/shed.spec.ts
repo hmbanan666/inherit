@@ -83,10 +83,13 @@ test('place completion and a typo point back to the floor', async ({ page }) => 
 })
 
 test('the furnace can be empty and a named shipping trip plays above the arm', async ({ page }) => {
+  await page.clock.install()
   await openShed(page)
   await edit(page, 'take("furnace")', true)
   await page.getByTestId('primary-button').click()
   await expect(page.getByTestId('arm')).toContainText('Nothing ready yet at furnace.')
+  await expect(page.getByTestId('primary-button')).toBeEnabled()
+  await page.clock.runFor(750)
   await expect(page.getByTestId('checks')).toContainText('Nothing ready yet at furnace.')
   await openShed(page, '?step=bram-cart')
   await edit(page, '\ntake("furnace")\nput("cart")', true)
@@ -205,17 +208,15 @@ test('the loop marks only the calls left outside the clock after Deploy', async 
   await expect(calls).toHaveText(['smelt()', 'ship()'])
 })
 
-test('the clock lesson keeps Deploy on error and releases one reveal per Continue', async ({ page }) => {
+test('the clock lesson keeps Deploy on error and opens the next lesson with all reveals on one Continue', async ({ page }) => {
   await openShed(page, '?step=bram-loop&speed=24')
   const primary = page.getByTestId('primary-button')
   await expect(primary).toContainText('Deploy')
   await photo(page, '04-bram-loop')
-  await edit(page, 'import { take } from "inherit"\nexport function onTick() { take("mine"); console.log("one turn") }')
-  await page.getByRole('button', {name:'Deploy history'}).click()
-  await page.getByRole('button', {name:'Run once'}).click()
-  await expect(page.getByTestId('hand')).toHaveText('iron ore')
-  await expect(primary).toBeEnabled()
-  await expect(page.locator('.live')).toHaveText('Ready')
+  const hud = page.getByRole('banner')
+  await expect(hud).not.toContainText(/clock|onTick|history/i)
+  await expect(page.locator('.view-lines')).toContainText('onTick')
+  await expect(page.getByRole('button', { name: /history/i })).toHaveCount(0)
   await edit(page, 'import { take, put } from "inherit"\nlet rocks = 0\nexport function onTick() { if (take("mine") && put("cart")) console.log("Rock " + ++rocks) }')
   await primary.click()
   await page.getByRole('tab', { name: 'Console' }).click()
@@ -237,24 +238,14 @@ test('the clock lesson keeps Deploy on error and releases one reveal per Continu
   const wallet = page.getByTitle('Workshop money')
   await expect(wallet).toBeHidden()
   await next.click()
+  await expect(page.getByTestId('task-card')).toContainText('Reply to Mrs Harrow')
   await expect(wallet).toContainText('64 coins')
-  await expect(page.getByTestId('nav-town')).toBeHidden()
-  await expect(page.getByTestId('nav-shed')).toBeHidden()
-  await next.click()
+  await expect(hud).not.toContainText(/coins|debt|history/i)
   await expect(page.getByTestId('nav-town')).toBeVisible()
-  await expect(page.getByTestId('nav-inbox')).toBeHidden()
-  await page.getByTestId('nav-town').click()
-  await expect(page.getByRole('img', {name:/Bram’s forge working/})).toBeVisible()
-  await page.getByTestId('nav-shed').click()
-  await next.click()
-  await expect(page.getByTestId('nav-inbox')).toBeVisible()
-  await expect(page.getByRole('button', {name:'Pay debt'})).toBeHidden()
   await expect(page.getByTestId('nav-inbox')).toContainText('1')
-  await expect(page.getByRole('button', {name:'Pay debt'})).toBeHidden()
-  await next.click()
-  await expect(page.getByRole('button', {name:'Pay debt'})).toBeVisible()
-  await page.getByRole('button', {name:'Deploy history'}).click()
-  await expect(page.getByRole('button', {name:'Run once'})).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Pay debt' })).toBeVisible()
+  await page.getByTestId('nav-town').click()
+  await expect(page.getByRole('img', { name: /Bram’s forge working/ })).toBeVisible()
 })
 
 test('opening the same step link again starts at the requested brief', async ({ page }) => {
@@ -277,4 +268,126 @@ test('reopening a workshop draft focuses the edit under its lesson comment', asy
   await expect(editor).toBeFocused()
   await page.keyboard.type('// ')
   await expect(page.locator('.view-line').nth(3)).toHaveText('// take("mine")')
+})
+
+for (const speed of [1, 2, 4]) {
+  test(`the live arm reaches each station before transferring its load at ${speed}x`, async ({ page }) => {
+    await openShed(page, '?step=bram-loop&speed=' + speed)
+    await edit(page, [
+      'import { take, put } from "inherit"',
+      'export function onTick() {',
+      '  take("mine")',
+      '  put("furnace")',
+      '  take("furnace")',
+      '  put("cart")',
+      '}',
+    ].join('\n'))
+    const transfers = await page.getByTestId('arm').evaluateHandle(arm => {
+      const hand = arm.querySelector('[data-testid="hand"]')!
+      let held = hand.textContent
+      const arrivals: { load: string | null; distance: number; atCart: boolean }[] = []
+      const observer = new MutationObserver(() => {
+        if (hand.textContent === held) return
+        held = hand.textContent
+        const station = document.querySelector<HTMLElement>('.station.acting')
+        if (station) arrivals.push({
+          load: held,
+          atCart: !!station.querySelector('[data-testid="place-cart"]'),
+          distance: Math.abs(parseFloat(getComputedStyle(arm).left) - parseFloat(station.style.left)),
+        })
+      })
+      observer.observe(arm, { subtree: true, characterData: true, childList: true })
+      return { arrivals, observer }
+    })
+    await page.getByTestId('primary-button').click()
+    await expect.poll(() => transfers.evaluate(({ arrivals }) =>
+      arrivals.some(arrival => arrival.atCart && arrival.load === 'empty hand'),
+    )).toBe(true)
+    const arrivals = await transfers.evaluate(({ arrivals, observer }) => {
+      observer.disconnect()
+      return arrivals
+    })
+    expect(arrivals.map(a => a.load)).toContain('iron ore')
+    expect(arrivals.map(a => a.load)).toContain('iron ingot')
+    for (const arrival of arrivals) expect(arrival.distance).toBeLessThan(1)
+  })
+}
+
+test('the playback bar counts handler calls, pauses, plays and stops the loop', async ({ page }) => {
+  await openShed(page, '?step=bram-loop')
+  const controls = page.getByRole('group', { name: 'Clock controls' })
+  await expect(controls).toHaveCount(0)
+  await edit(page, 'let count = 0\nexport function onTick() { console.log("calls " + ++count) }')
+  await page.getByTestId('primary-button').click()
+  await expect(page.getByTestId('world').getByRole('group', { name: 'Clock controls' })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('group', { name: 'Clock controls' })).toHaveCount(0)
+  const consolePanel = page.getByRole('tabpanel', { name: 'Console' })
+  await page.getByRole('tab', { name: 'Console' }).click()
+  await expect(consolePanel.locator('.tick').first()).toBeVisible()
+  await controls.getByRole('button', { name: 'Pause', exact: true }).click()
+  await page.clock.install()
+  await page.clock.runFor(500)
+  const lastMessage = await consolePanel.getByRole('listitem').first().innerText()
+  const count = lastMessage.match(/calls (\d+)/)![1]
+  const counter = controls.locator('output')
+  await expect(counter).toHaveText('onTick #' + count)
+  const pausedTick = await consolePanel.locator('.tick').first().innerText()
+  for (const speed of [2, 4]) {
+    const button = controls.getByRole('button', { name: speed + 'x', exact: true })
+    await button.click()
+    await expect(button).toHaveAttribute('aria-pressed', 'true')
+  }
+  await page.clock.runFor(1000)
+  await expect(consolePanel.locator('.tick').first()).toHaveText(pausedTick)
+  await expect(counter).toHaveText('onTick #' + count)
+  await controls.getByRole('button', { name: 'Play', exact: true }).click()
+  await expect(consolePanel.locator('.tick').first()).not.toHaveText(pausedTick)
+  await controls.getByRole('button', { name: 'Pause' }).click()
+  await controls.getByRole('button', { name: 'Stop loop' }).click()
+  await expect(controls).toHaveCount(0)
+  const stopped = await consolePanel.innerText()
+  await page.clock.runFor(1000)
+  await expect(consolePanel).toHaveText(stopped, { useInnerText: true })
+  await page.reload()
+  const deploy = page.getByTestId('primary-button')
+  await expect(deploy).toBeEnabled()
+  await expect(controls).toHaveCount(0)
+  await deploy.click()
+  await expect(controls.locator('output')).toHaveText(/onTick #[1-9]\d*/)
+})
+
+test('the gutter shows the last tick and keeps unchanged lines steady', async ({ page }) => {
+  await openShed(page, '?step=heat-inspect&speed=4')
+  await edit(page, [
+    'import { look } from "inherit"',
+    'let turns = 0',
+    'export function onTick() {',
+    '  if (++turns <= 32) look("furnace")',
+    '  look("mine")',
+    '  look("cart")',
+    '}',
+  ].join('\n'))
+  await page.getByTestId('primary-button').click()
+  const marks = page.locator('.margin-view-overlays .live-tick-line')
+  await expect(marks).toHaveCount(3)
+  await expect(marks).toHaveCount(2)
+  await expect(page.locator('.machine-line')).toHaveCount(0)
+  const controls = page.getByRole('group', { name: 'Clock controls' })
+  await expect(controls.getByRole('button', { name: '4x' })).toHaveAttribute('aria-pressed', 'true')
+  const first = await marks.first().elementHandle()
+  const lastCalls = await controls.locator('output').evaluate(counter => new Promise<string[]>(resolve => {
+    const places: string[] = []
+    const observer = new MutationObserver(() => {
+      places.push(document.querySelector('.station.acting .machine-label')?.textContent?.trim() ?? '')
+      if (places.length === 3) {
+        observer.disconnect()
+        resolve(places)
+      }
+    })
+    observer.observe(counter, { subtree: true, characterData: true, childList: true })
+  }))
+  expect(lastCalls).toEqual(['"cart"', '"cart"', '"cart"'])
+  expect(await first!.evaluate(node => node === document.querySelector('.live-tick-line'))).toBe(true)
+  await controls.getByRole('button', { name: 'Stop loop' }).click()
+  await expect(marks).toHaveCount(0)
 })

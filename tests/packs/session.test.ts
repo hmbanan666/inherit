@@ -23,10 +23,8 @@ test('a restored deployment starts its handler without replaying setup on the sa
     expect(restored.world.bell).toBe(1)
     expect(restored.phase).toBe('solved')
     continueLesson(pack,restored)
-    expect(restored.released).toEqual(['square'])
-    continueLesson(pack,restored)
     expect(restored.released).toEqual(['square','gate'])
-    continueLesson(pack,restored)
+    expect(restored.pendingReveals).toEqual([])
     expect(restored.lessonId).toBeNull()
   } finally { next.dispose() }
 })
