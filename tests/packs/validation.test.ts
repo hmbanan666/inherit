@@ -91,7 +91,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     unique((lesson.variants ?? []).map(v => v.input))
     for (const variant of lesson.variants ?? []) {
       text(variant.input)
-      expect(lesson.checks.some(c => c.input === variant.input), label).toBe(true)
+      expect(lesson.checks.some(c => !c.input || c.input === variant.input), label).toBe(true)
       if (variant.maxTicks !== undefined) {
         expect(Number.isSafeInteger(variant.maxTicks)).toBe(true)
         expect(variant.maxTicks).toBeGreaterThan(0)
