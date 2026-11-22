@@ -5,6 +5,7 @@ import { migrateBeginner } from '@inherit/sim/migrate'
 import { declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
 import type { PackCommand, PackFrame } from './packProtocol'
 
+let beforeTick: PackSave<unknown> | undefined
 let tickCount = 0
 let pack: ReturnType<typeof getPack>
 let save: PackSave<ReturnType<typeof pack.initialWorld>>

@@ -21,5 +21,5 @@ defineProps<{ x: number; y: number; hand: string | null; colour?: string }>()
 .item { width: 22px; height: 17px; left: -2px; bottom: 2px; color: #24211c; background: #e3a08f; border: 2px solid #493e38; font: bold 11px/14px var(--mono); text-align: center; }
 .item.blue { background: #96b6d4; }
 .carrying .claw { transform: rotate(-8deg); }
-.caption { position: absolute; transform: translateX(-50%); white-space: nowrap; top: 7px; padding: 2px 6px; color: var(--accent-soft); background: var(--overlay); border-radius: 3px; font: 12px var(--mono); }
+.caption { position: absolute; transform: translateX(-50%); white-space: nowrap; bottom: 53px; padding: 2px 6px; color: var(--accent-soft); background: var(--overlay); border-radius: 3px; font: 12px var(--mono); }
 </style>

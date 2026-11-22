@@ -26,6 +26,13 @@ export interface PackFrame {
   types: string[]
   mode: 'run' | 'deploy'
   clockMs?: number
+  activities: { id: string; title: string }[]
+  theory?: { title: string; body: string[]; example: string }
+  task?: { condition: string; examples: string[] }
+  reference: APIEntry[]
+  types: string[]
+  previewWorld?: unknown
+  notice?: string
   tickCount: number
   showLearn: boolean
   noCalls?: boolean

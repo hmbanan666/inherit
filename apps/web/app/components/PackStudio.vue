@@ -8,7 +8,18 @@ import type { PackFrame, PackCommand, DrawerTab } from '../lib/packProtocol'
 import { usePlaybackClock } from '../lib/playback-clock'
 import { useContrast } from '../lib/contrast'
 import { editorKey } from '../lib/editor'
+const readers = import.meta.glob<{ openArchivedSave(storage: Storage): Promise<string | null> }>('../../../../packages/sim/src/packs/*/archive.ts')
+const archiveViews = import.meta.glob<{ default: Component }>('../../../../packages/sim/src/packs/*/ArchiveView.vue')
 const props = defineProps<{manifest: PackManifest; view: Component}>()
+const packFolder = '../../../../packages/sim/src/packs/' + props.manifest.id
+const archiveLoader = archiveViews[packFolder + '/ArchiveView.vue']
+const archiveView = archiveLoader && defineAsyncComponent(archiveLoader)
+const drawer = ref(false)
+const setupTried = ref(false)
+const diagnostic = ref(false)
+const requested = ref<PackCommand['kind']>('open')
+const reach = ref(0)
+const nextCall = shallowRef<Call>()
 const frame = shallowRef<PackFrame>()
 const displayWorld = shallowRef<unknown>()
 const calls = shallowRef<Call[]>([])
@@ -77,6 +88,7 @@ function persist() {
 }
 function send(command: PackCommand) {
   clearTimeout(timer)
+  requested.value = command.kind
   tickStarted = command.kind === 'tick' ? clock.now() : undefined
   busy.value = true
   worker?.postMessage(command)
@@ -84,13 +96,14 @@ function send(command: PackCommand) {
 function scheduleTick() {
   clearTimeout(timer)
   const data = frame.value
-  if (!busy.value && !paused.value && data?.clockMs && data.save.clockActive && !data.solved && !complete.value) {
+  if (!busy.value && !diagnostic.value && !paused.value && data?.clockMs && data.save.clockActive && !data.solved && !complete.value) {
     const remaining = data.clockMs - (tickStarted === undefined ? 0 : clock.now() - tickStarted)
     timer = setTimeout(() => send({ kind: 'tick' }), Math.max(0, remaining / speed.value))
   }
 }
 watch([paused, speed], scheduleTick)
 function run() {
+  if (frame.value?.save.clockActive) { stopLoop(); return }
   runMessage.value = ''
   if (busy.value || blocked.value || complete.value) return
   if (solved.value) return
@@ -101,7 +114,10 @@ function run() {
   drawer.value = undefined
   lastRun.value = files.value
   paused.value = false
-  send({kind:'run',files:files.value})
+  drawer.value = false
+  diagnostic.value = false
+  const trySetup = frame.value?.mode === 'deploy' && !setupTried.value
+  send({kind: trySetup ? 'trySetup' : 'run', files: files.value})
 }
 function stopLoop() {
   if (!frame.value?.save.clockActive || stoppingLoop.value) return
@@ -109,7 +125,22 @@ function stopLoop() {
   paused.value = false
   clock.cancel()
   persist()
-  if (!busy.value) send({ kind: 'stopLoop' })
+  if (!busy.value) send({ kind: 'stopLoop', completedTicks: tickCount.value })
+}
+function select(id: string) {
+  if (busy.value) return
+  send({ kind: 'select', id, files: files.value, activeFile: activeFile.value })
+}
+function once() {
+  if (busy.value) return
+  if (diagnostic.value) {
+    diagnostic.value = false
+    displayWorld.value = frame.value?.save.world
+    scheduleTick()
+    return
+  }
+  drawer.value = false
+  send({ kind: 'runOnce', files: files.value })
 }
 function advance() { if (solved.value && frame.value?.save.lessonId) send({kind:'continue', id: frame.value.save.lessonId}) }
 function shortcut(e:KeyboardEvent) {
@@ -154,9 +185,9 @@ async function receive(data: PackFrame | {loadError:string}) {
   error.value = saved.value ? data.error : 'Could not save progress. Free space and try again.'
   if (!changed && saved.value) persist()
   calls.value = []
-  if (data.moments.length) {
+  if (data.moments.length && !(requested.value === 'runOnce' && paused.value)) {
     const interval = tickStarted !== undefined && data.clockMs ? data.clockMs / data.moments.length : 650
-    let nextMoment = tickStarted ?? clock.now()
+    let nextMoment = clock.now()
     watching.value = tickStarted === undefined
     displayWorld.value = data.start
     for (const moment of data.moments) {
@@ -164,6 +195,14 @@ async function receive(data: PackFrame | {loadError:string}) {
       if (stoppingLoop.value) break
       if (watching.value) activeCall.value = moment.call
       calls.value = [...calls.value, moment.call]
+      nextCall.value = moment.call
+      reach.value = 0
+      const start = nextMoment
+      if (data.task) await clock.waitUntil(start + interval * 0.55, time => {
+        reach.value = Math.min(1, (time - start) / (interval * 0.55))
+      })
+      if (!alive || stoppingLoop.value) break
+      nextCall.value = undefined
       displayWorld.value = moment.world
       statuses.value = moment.checks
       nextMoment += interval
@@ -172,6 +211,7 @@ async function receive(data: PackFrame | {loadError:string}) {
   }
   if (!alive) return
   watching.value = false
+  nextCall.value = undefined
   activeCall.value = undefined
   tickCount.value = data.tickCount
   if (!data.save.clockActive || changed) tickCalls.value = []
@@ -183,6 +223,15 @@ async function receive(data: PackFrame | {loadError:string}) {
     send({ kind: 'stopLoop' })
     return
   }
+  frame.value = data
+  tickCount.value = data.tickCount
+  if (requested.value !== 'tick') tickCalls.value = []
+  else if (calls.value.length) tickCalls.value = calls.value
+  if (data.save.clockActive && data.save.project.deployed) lastRun.value = data.save.project.deployed
+  diagnostic.value = data.previewWorld !== undefined
+  displayWorld.value = data.previewWorld ?? data.save.world
+  statuses.value = data.checks
+  persist()
   stoppingLoop.value = false
   busy.value = false
   scheduleTick()
