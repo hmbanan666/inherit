@@ -5,7 +5,7 @@ import beginner from '../../packages/sim/src/packs/beginner/pack'
 
 const [hello, sign, order] = beginner.lessons
 
-/** Frames for the PR and the rationale doc, under INHERIT_SHOTS/prototype/lesson-v7. */
+/** Frames for docs/prototypes/lesson-v7/shots, written under INHERIT_SHOTS/prototype/lesson-v7. */
 async function frames(page: Page) {
   const root = process.env.INHERIT_SHOTS
   const dir = root && join(root, 'prototype', 'lesson-v7')
@@ -50,7 +50,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     const box = (await run.boundingBox())!
     expect(box.width).toBeGreaterThanOrEqual(128)
     expect(box.x + box.width).toBeGreaterThan(1240)
-    await shot('01-lesson-1-idle')
+    await shot('lesson-1-idle')
   })
 
   await test.step('a typo gets a plain-words message, a marked token and a confused scene', async () => {
@@ -62,7 +62,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     await expect(world.getByTestId('speech')).toHaveText('?')
     await expect(card).toBeHidden()
     await expect(code).toBeFocused()
-    await shot('04-lesson-1-typo')
+    await shot('lesson-1-failure')
   })
 
   await test.step('typing the greeting turns Run into the next step', async () => {
@@ -73,7 +73,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     await expect(code).toHaveValue(/say\("Hello, traveller!"\)$/)
     await expect(next).toHaveText(/Press\s*Run/)
     await expect(run).toHaveClass(/ready/)
-    await shot('02-lesson-1-typing')
+    await shot('lesson-1-typing')
   })
 
   await test.step('Run plays in the scene, then one centred card offers one Continue', async () => {
@@ -81,7 +81,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     await expect(run).toHaveText(/Playing/)
     await expect(world.getByTestId('speech')).toHaveText('Hello, traveller!')
     await expect(page.getByTestId('checks').locator('[data-state=pass]')).toHaveCount(2)
-    await shot('03-lesson-1-run', 250)
+    await shot('lesson-1-run', 250)
     await expect(card).toContainText(hello.solved.reaction)
     await expect(card).toContainText(hello.solved.did)
     await expect(card.getByRole('button')).toHaveCount(1)
@@ -92,7 +92,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
       return Math.max(Math.abs(box.x + box.width / 2 - (area.x + area.width / 2)),
         Math.abs(box.y + box.height / 2 - (area.y + area.height / 2)))
     }).toBeLessThan(2)
-    await shot('05-lesson-1-solved')
+    await shot('lesson-1-success')
     await page.keyboard.press('Enter')
   })
 
@@ -100,34 +100,47 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     await expect(goal).toHaveText(sign.goal)
     await expect(code).toBeFocused()
     await expect(code).toHaveValue(/paintSign\(\)$/)
-    await shot('06-lesson-2-idle')
-    await page.keyboard.type('"moon ferry')
+    await shot('lesson-2-idle')
+    await page.keyboard.type('"Moon Ferry')
+    await expect(code).toHaveValue(/paintSign\("Moon Ferry"\)$/)
+    await expect(run).toHaveClass(/ready/)
+    await shot('lesson-2-typing')
+    await replaceCode(page, 'paintSign("moon ferry")')
     await page.keyboard.press('Control+Enter')
     await expect(feedback).toContainText('The sign says “moon ferry”. The ticket says “Moon Ferry”. Capital letters count.')
     await expect(page.getByTestId('checks').locator('[data-state=miss]')).toHaveCount(1)
-    await shot('07-lesson-2-near-miss')
+    await shot('lesson-2-failure')
     await replaceCode(page, 'paintSign("Moon Ferry")')
     await page.keyboard.press('Control+Enter')
     await expect(card).toContainText(sign.solved.reaction)
+    await shot('lesson-2-success')
     await card.getByTestId('continue').click()
   })
 
   await test.step('lesson 3 asks for a whole line and a guess before Run', async () => {
     await expect(goal).toHaveText(order.goal)
     await expect(code).toBeFocused()
-    await shot('08-lesson-3-idle')
+    await shot('lesson-3-idle')
     await page.keyboard.type('say("We are off!')
     await expect(next).toHaveText(/Make a guess/)
     await page.keyboard.press('Control+Enter')
     await expect(card).toBeHidden()
+    await expect(feedback).toBeHidden()
     await page.getByTestId('guess').getByRole('button', { name: order.prediction!.answer }).click()
     await expect(run).toHaveClass(/ready/)
-    await shot('09-lesson-3-ready')
+    await shot('lesson-3-typing')
+    await replaceCode(page, 'say("We are off!")\nsay("All aboard")')
+    await run.click()
+    await expect(feedback).toContainText('“We are off!” showed first.')
+    await expect(page.getByTestId('checks').locator('[data-state=miss]')).toHaveCount(2)
+    await expect(card).toBeHidden()
+    await shot('lesson-3-failure')
+    await replaceCode(page, 'say("All aboard")\nsay("We are off!")')
     await run.click()
     await expect(world.getByRole('list', { name: 'Departure board' })).toContainText('We are off!')
     await expect(card).toContainText(order.solved.reaction)
     await expect(card).toContainText('You called it.')
-    await shot('10-lesson-3-solved')
+    await shot('lesson-3-success')
     await page.keyboard.press('Enter')
     await expect(page.getByTestId('prototype-end')).toBeVisible()
   })
@@ -141,7 +154,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     await expect(page.getByTestId('course-map').getByRole('button', { name: sign.goal })).toBeDisabled()
     const map = (await page.getByTestId('course-map').boundingBox())!
     expect(map.x + map.width).toBeLessThanOrEqual(before[1]!.x)
-    await shot('11-course-map')
+    await shot('course-map')
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('course-map')).toBeHidden()
     await page.getByTestId('hint').click()
@@ -149,7 +162,7 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     await expect(page.getByTestId('drawer')).not.toContainText('Course map')
     await expect(page.getByTestId('drawer')).not.toContainText('TODO')
     expect([await world.boundingBox(), await page.locator('.proto-editor').boundingBox()]).toEqual(before)
-    await shot('12-help-drawer')
+    await shot('help')
     await page.keyboard.press('Escape')
     await expect(page.getByTestId('drawer')).toBeHidden()
   })
@@ -162,12 +175,12 @@ test('lesson screen v7 prototype walks lessons 1 to 3 with one obvious next step
     expect(scene.y + scene.height).toBeLessThanOrEqual(editor.y)
     expect((await run.boundingBox())!.y).toBeLessThan(scene.y)
     await expect(page.getByTestId('checks')).toBeInViewport()
-    await shot('13-narrow-idle')
+    await shot('narrow-idle')
     await page.keyboard.type('Hi there')
     await page.keyboard.press('Control+Enter')
     await expect(card).toBeVisible()
     await expect(card).toBeInViewport({ ratio: 1 })
-    await shot('14-narrow-solved')
+    await shot('narrow-success')
   })
 
   expect(await page.evaluate(() => localStorage.getItem('inherit.pack.beginner'))).toBeNull()

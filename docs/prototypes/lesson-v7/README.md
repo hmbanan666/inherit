@@ -14,14 +14,33 @@ Open `/prototype/lesson` on the dev server, or on any deployed build. Add `?less
 
 The prototype runs the shipped pack worker, so the code you type is really executed and the shipped checks decide success. It never reads or writes saved progress. A reload starts lesson 1 again.
 
-To capture every state as an image:
+## States
+
+The desktop frames are 1280x800. All of them live in [`shots/`](shots). Click one to see it at full size.
+
+| | Idle | Typing, Run invited | Success | Failure |
+| --- | --- | --- | --- | --- |
+| **Lesson 1** | ![Lesson 1 idle](shots/lesson-1-idle.png) | ![Lesson 1 typing](shots/lesson-1-typing.png) | ![Lesson 1 success](shots/lesson-1-success.png) | ![Lesson 1 failure](shots/lesson-1-failure.png) |
+| **Lesson 2** | ![Lesson 2 idle](shots/lesson-2-idle.png) | ![Lesson 2 typing](shots/lesson-2-typing.png) | ![Lesson 2 success](shots/lesson-2-success.png) | ![Lesson 2 failure](shots/lesson-2-failure.png) |
+| **Lesson 3** | ![Lesson 3 idle](shots/lesson-3-idle.png) | ![Lesson 3 typing](shots/lesson-3-typing.png) | ![Lesson 3 success](shots/lesson-3-success.png) | ![Lesson 3 failure](shots/lesson-3-failure.png) |
+
+The failures differ on purpose. Lesson 1 is a typo that stops the code. Lessons 2 and 3 are code that runs but gives the wrong result.
+
+| Scene reacts before the card | Course map popover | Help panel |
+| --- | --- | --- |
+| ![Lesson 1 run](shots/lesson-1-run.png) | ![Course map popover](shots/course-map.png) | ![Help panel](shots/help.png) |
+
+The narrow layout at 390x780:
+
+<img alt="Narrow idle" src="shots/narrow-idle.png" width="260" /> <img alt="Narrow success" src="shots/narrow-success.png" width="260" />
+
+To regenerate the frames after a change:
 
 ```sh
 pnpm build
 INHERIT_SHOTS=/tmp/inherit-v7 pnpm exec playwright test tests/e2e/prototype-lesson.spec.ts
+cp /tmp/inherit-v7/prototype/lesson-v7/*.png docs/prototypes/lesson-v7/shots/
 ```
-
-The frames land in `/tmp/inherit-v7/prototype/lesson-v7/`. They are attached to the pull request and are kept out of the repository.
 
 ## The problem
 
