@@ -6,7 +6,7 @@ import { manifests } from '../../packages/sim/src/packs/registry'
 import { getPack, packs, playerSources } from '../../packages/sim/src/packs/rules'
 import { readPlayerAPI } from '../../packages/sim/src/framework/declarations'
 import { freshSave, continueLesson, decodeSave } from '../../packages/sim/src/framework/save'
-import { declarations, runPack } from '../../packages/sandbox/src/pack-run'
+import { declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
 import type { Files } from '../../packages/sim/src/framework/pack'
 import { diagnostics } from './compiler'
 
@@ -36,6 +36,8 @@ test('pack folders, manifests, rules and public methods agree', () => {
     unique(pack.lessons.map(l=>l.id))
     unique(pack.entities.map(e=>e.id))
     const world = pack.decodeWorld(structuredClone(pack.initialWorld(1)))
+    const releases = new Set(pack.lessons.flatMap(lesson=>lesson.reveals ?? []))
+    for (const panel of pack.panels) if (panel.reveal) expect(releases.has(panel.reveal),m.id+' '+panel.id).toBe(true)
     for (const entity of [...pack.entities,...pack.panels]) {text(entity.label);unique(entity.rows(world).map(r=>r.id))}
     const schema = readPlayerAPI(playerSources['./'+m.id+'/player.ts'])
     expect(schema.methods.length).toBeGreaterThan(0)
@@ -55,7 +57,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     const methods = pack.available(world,lesson.id)
     const host = pack.beginAttempt(structuredClone(world),'run').api
     methods.forEach(name=>expect(typeof host[name],label+' '+name).toBe('function'))
-    const api = checkpoint?.declarations ?? declarations(source,methods,pack.exposure)
+    const api = checkpoint?.declarations ?? (declarations(source,methods,pack.exposure,pack.typeAliases?.(world))+'\n'+Object.values(pack.guestModules ?? {}).map(module=>module.declarations).join('\n'))
     const note = starter.files[starter.edit.file].split('\n')[starter.edit.line-2] ?? ''
     expect(starter.edit.line,label).toBeLessThanOrEqual(starter.files[starter.edit.file].split('\n').length)
     expect(ts.createScanner(ts.ScriptTarget.Latest,false,ts.LanguageVariant.Standard,note.trim()).scan(),label+' '+note).toBe(ts.SyntaxKind.SingleLineCommentTrivia)
@@ -72,7 +74,16 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     for (const [files,solves] of [[starter.files,false],[lesson.referenceSolution,true]] as const) {
       expect(diagnostics(files,api),label+' '+(solves?'solution':'starter')).toEqual([])
       const trial = solves ? save : structuredClone(save)
-      const solved = checkpoint ? await checkpoint.play(files) : (await runPack(pack,trial,files), trial.phase === 'solved')
+      let solved: boolean
+      if (checkpoint) solved = await checkpoint.play(files)
+      else {
+        const runner = createPackRunner(pack)
+        try {
+          await runner.play(trial,files,lesson.mode)
+          if (lesson.mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
+          solved = trial.phase==='solved'
+        } finally {runner.dispose()}
+      }
       expect(solved,label+' '+(solves?'solution':'starter')+' '+lesson.checks.map(c=>c.label).join(', ')).toBe(solves)
     }
     if (!checkpoint) {

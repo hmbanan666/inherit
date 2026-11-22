@@ -148,7 +148,10 @@ for (const input of ['paste', 'type']) {
       }
     }
     await expect(page.locator('.view-lines')).toContainText('function smelt()')
-    await expect(page.locator('.view-lines')).toContainText(/take\("furnace"\)\s*put\("cart"\)/)
+    // Monaco recycles line elements while typing. Their painted order is the source order.
+    await expect.poll(() => page.locator('.view-line').evaluateAll(lines => lines
+      .sort((a,b)=>a.getBoundingClientRect().top-b.getBoundingClientRect().top)
+      .map(line=>line.textContent).join('\n'))).toMatch(/take\("furnace"\)\s*put\("cart"\)/)
     await primary.click()
     await expect(page.getByTestId('solved-card')).toContainText('You named the two moves')
   })

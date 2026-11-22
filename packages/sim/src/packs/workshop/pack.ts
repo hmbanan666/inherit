@@ -2,10 +2,10 @@ import { definePack, type Lesson, type Call } from '../../framework/pack'
 import { createCampaign } from './campaign'
 import { loadChapterSave } from './persistence'
 import { lessons as chapter } from './chapter'
-import { chapterFiles } from './reference/chapter-one'
+import { workshopReference } from './reference/chapter-one'
 import { edits, workshopStarter } from './starter'
 import { panels } from './panels'
-import { observeLesson, type CallRecord } from './lesson-flow'
+import { observeLesson, revealsAfter, type CallRecord } from './lesson-flow'
 import { getSurface } from './surface'
 import { primitiveTick } from './primitives'
 import type { Campaign } from './model'
@@ -17,10 +17,10 @@ function chapterCall(call: Call): CallRecord {
 }
 export const workshopLessons: Lesson<Campaign>[] = chapter.map(step=>{
   const bank = step.id==='harrow-tab'?'replyLater':step.id==='harrow-deed'?'payBalance':undefined
-  const files = chapterFiles(step.beat,step.id)
-  if (bank) files['main.ts'] = 'import { '+bank+' } from "inherit"\n'+bank+'()\n'+files['main.ts']
+  const files = workshopReference(step)
   const hints = bank ? [step.hints[0], 'Add '+bank+' to the workshop import, then call it once.', 'import { '+bank+' } from "inherit"\n'+bank+'()'] : step.hints
   return { id:step.id, goal:edits[step.id].goal, idea:step.solved.idea, mode:step.button,
+    reveals:(revealsAfter[step.id] ?? []).map(r=>'id' in r ? r.kind+'.'+r.id : r.kind),
     starter:previous=>workshopStarter(step.id,previous), hints, referenceSolution:files, solved:step.solved,
     visibleEffect:{description:step.solved.did,testId:'speech',text:step.solved.reaction},
     checks:step.checks.map(check=>({id:check.id,label:check.text,evaluate:e=>{

@@ -263,11 +263,11 @@ onMounted(() => {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, pos) {
       const prefix = model.getLineContent(pos.lineNumber).slice(0, pos.column - 1)
-      const match = /\b(?:take|put|look)\s*\(\s*(["'])([^"']*)$/.exec(prefix)
-      if (!match) return { suggestions: [] }
+      const match = /\b([a-zA-Z_$][\w$]*)\s*\(\s*(["'])([^"']*)$/.exec(prefix)
+      if (!match || !game.placeFunctions?.includes(match[1]!)) return { suggestions: [] }
       const suffix = model.getLineContent(pos.lineNumber).slice(pos.column - 1)
-      const end = suffix.indexOf(match[1]!)
-      const range = new monaco.Range(pos.lineNumber, pos.column - match[2]!.length, pos.lineNumber, pos.column + Math.max(0, end))
+      const end = suffix.indexOf(match[2]!)
+      const range = new monaco.Range(pos.lineNumber, pos.column - match[3]!.length, pos.lineNumber, pos.column + Math.max(0, end))
       return { suggestions: (game.places?.value ?? []).map(name => ({
         label: name, insertText: name, kind: monaco.languages.CompletionItemKind.Value, range,
       })) }

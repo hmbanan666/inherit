@@ -1,12 +1,22 @@
-import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { chapterCapture } from './chapter-capture'
 import { expect, type Page } from '@playwright/test'
 
 export async function photo(page: Page, name: string) {
-  const dir = process.env.INHERIT_SHOTS
-  if (!dir) return
-  await mkdir(dir, { recursive: true })
-  await page.screenshot({ path: join(dir, name + '.png') })
+  await (await chapterCapture(page))('workshop/details/'+name)
+}
+export async function pasteProjectFile(page: Page, source: string, label: string) {
+  await page.getByRole('textbox',{name:label}).waitFor()
+  await page.context().grantPermissions(['clipboard-read','clipboard-write'])
+  await page.bringToFront()
+  await page.evaluate(text=>navigator.clipboard.writeText(text),source)
+  await page.locator('.monaco-editor .overflow-guard').click({position:{x:110,y:40},timeout:5000})
+  await page.keyboard.press('Control+a')
+  await page.keyboard.press('Control+v')
+  await expect.poll(() => page.evaluate(() => {
+    const id = new URLSearchParams(location.search).get('pack')
+    const save = JSON.parse(localStorage.getItem('inherit.pack.'+id) ?? 'null')
+    return Object.values(save?.project.working ?? {})
+  })).toContain(source)
 }
 export async function edit(page: Page, source: string, append = false) {
   await page.getByRole('textbox', { name: 'Factory controller TypeScript' }).focus()

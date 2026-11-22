@@ -44,7 +44,7 @@ async function act(command: PackCommand) {
   if (command.kind !== 'run' && lesson) edit = lesson.starter(save.project.working).edit
   const names = pack.available(save.world, lesson?.id ?? '')
   self.postMessage({
-    save, mode:lesson?.mode ?? 'run', clockMs:pack.clock?.intervalMs, goal: lesson?.goal ?? '', edit, hints: lesson?.hints ?? [], labels: lesson?.checks.map(c => c.label) ?? [],
+    save, noCalls:command.kind==='run' && lesson?.mode==='run' && !moments.length && !logs.length && !error, mode:lesson?.mode ?? 'run', clockMs:pack.clock?.intervalMs, goal: lesson?.goal ?? '', edit, hints: lesson?.hints ?? [], labels: lesson?.checks.map(c => c.label) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],
     index, total: pack.lessons.length, solved: save.phase === 'solved' ? lesson?.solved : undefined,
     declarations: declarations(playerSources['./' + pack.manifest.id + '/player.ts'], names, pack.exposure, pack.typeAliases?.(save.world)) + '\n' + Object.values(pack.guestModules ?? {}).map(m=>m.declarations).join('\n'),

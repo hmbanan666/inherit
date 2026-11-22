@@ -15,8 +15,10 @@ const files = shallowRef<Files>({})
 const activeFile = ref('main.ts')
 const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(false), saved = ref(true)
 const settings = ref(false), panel = ref(''), contrast = useContrast(), width = ref(45)
+const runMessage = ref('')
 const activeCall = shallowRef<Call>()
 const navigation = shallowRef({file:'main.ts',line:1})
+const lastRun = shallowRef<Files>({})
 const editor = ref<{revealLine(file:string,line:number):void}>()
 const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
@@ -39,7 +41,10 @@ function persist() {
 }
 function send(command: PackCommand) { clearTimeout(timer); busy.value = true; worker?.postMessage(command) }
 function run() {
-  if (!busy.value && !blocked.value && !complete.value) send({kind:'run',files:files.value})
+  runMessage.value = ''
+  if (busy.value || blocked.value || complete.value) return
+  lastRun.value = files.value
+  send({kind:'run',files:files.value})
 }
 function advance() { if (solved.value) send({kind:'continue'}) }
 function shortcut(e:KeyboardEvent) {
@@ -52,7 +57,7 @@ function resize(event: PointerEvent) {
   el.addEventListener('pointermove',move)
   el.addEventListener('lostpointercapture',() => el.removeEventListener('pointermove',move),{once:true})
 }
-provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:computed(()=>({})),
+provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:lastRun,
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
   call:activeCall, watching, error, navigation,
   setFile(path,code) {files.value = {...files.value,[path]:code};persist()},
@@ -67,6 +72,7 @@ async function receive(data: PackFrame | {loadError:string}) {
     navigation.value = data.edit
   }
   frame.value = data
+  runMessage.value = data.noCalls ? 'Your code ran. Try the line in the comment.' : ''
   error.value = data.error
   persist()
   calls.value = []
@@ -94,11 +100,15 @@ async function receive(data: PackFrame | {loadError:string}) {
 function start(reset = false) {
   worker?.terminate()
   worker = new Worker(new URL('../lib/pack.worker.ts',import.meta.url),{type:'module'})
-  worker.onmessage = ({data}) => receive(data)
+  const instance = worker
+  worker.onmessage = ({data}) => {if (worker===instance && alive) void receive(data)}
   worker.onerror = () => {error.value = 'Could not load the game. Reload and try again.';busy.value = false}
   blocked.value = false
   let stored = null
-  try {stored = reset ? null : localStorage.getItem(key)} catch {saved.value = false}
+  try {stored = reset ? null : localStorage.getItem(key)} catch {
+    error.value='Could not read this pack’s save. Allow storage or start a fresh pack.'
+    saved.value=false; blocked.value=true; busy.value=false; return
+  }
   send({kind:'open',id:props.manifest.id,stored,lesson})
 }
 onMounted(()=>{start();window.addEventListener('keydown',shortcut,true);window.addEventListener('pagehide',persist)})
@@ -106,12 +116,12 @@ onBeforeUnmount(()=>{alive = false;clearTimeout(timer);persist();worker?.termina
 </script>
 <template>
   <div class="workshop pack-studio" :class="{'high-contrast':contrast}" :style="{'--dock-width': width+'%'}">
-    <header class="hud"><PackNav :manifest="manifest"/><nav v-if="frame?.panels.some(p=>p.placement==='nav')"><button v-for="p in frame.panels.filter(p=>p.placement==='nav')" :key="p.id" @click="panel = panel === p.id ? '' : p.id">{{ p.label }}</button></nav>
+    <header class="hud"><PackNav :manifest="manifest"/><nav v-if="frame?.panels.some(p=>p.placement==='nav')"><button v-for="p in frame.panels.filter(p=>p.placement==='nav')" :key="p.id" :data-testid="'nav-'+p.id" @click="panel = panel === p.id ? '' : p.id">{{ p.label }}</button></nav>
       <div class="settings pack-settings"><button aria-label="Settings" @click="settings=!settings"><Settings2/></button><aside v-if="settings" class="hud-menu"><button @click="contrast=!contrast">High contrast {{ contrast ? 'on' : 'off' }}</button></aside></div>
       <button v-if="!complete" class="deploy primary-run" data-testid="primary-button" :disabled="busy || blocked" @click="run"><Play/>{{ watching ? 'Playing your run' : frame?.mode==='deploy' ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd></button>
     </header>
     <main class="desk"><section class="world-shell pack-world" data-testid="world">
-      <header class="world-title"><div><small class="eyebrow">{{ manifest.genre }}</small><h1>{{ manifest.title }}</h1></div></header>
+      <header class="world-title"><div><small class="eyebrow">{{ manifest.genre }}</small><h1>{{ manifest.title }}</h1></div><p v-if="runMessage" role="status" class="world-feedback">{{ runMessage }}</p></header>
       <component :is="view" v-if="displayWorld" :world="displayWorld" :calls="calls"/>
       <aside v-for="p in frame?.panels.filter(p=>p.id===panel || p.placement==='panel')" :key="p.id" class="entity-panel"><h2>{{ p.label }}</h2><p v-for="row in p.rows" :key="row.id"><button v-if="row.action" :disabled="busy" @click="send({kind:'action',panel:p.id,row:row.id})">{{ row.label }} · {{ row.value }}</button><template v-else>{{ row.label }} · {{ row.value }}</template></p></aside>
       <SolvedCard v-if="solved" class="solved-overlay" :solved="solved" :busy="busy" @advance="advance"/>

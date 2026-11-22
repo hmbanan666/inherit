@@ -6,6 +6,7 @@ export interface PackFrame {
   save: PackSave<unknown>
   mode: 'run' | 'deploy'
   clockMs?: number
+  noCalls?: boolean
   goal: string
   edit: { file: string; line: number }
   hints: readonly string[]

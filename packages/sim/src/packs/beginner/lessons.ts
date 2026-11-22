@@ -1,6 +1,6 @@
 import { mainFile, type Colour, type Evidence, type Lesson } from '../../framework/pack'
 import type { Village } from './world'
-import { addsCounts, boundArgument, branchCalls, comparesCount, loopCalls, parameterFeeds, reassignedFlag } from './syntax'
+import { addsCounts, boundArgument, branchCalls, comparesCount, loopCalls, parameterFeeds, readsWeather, reassignedFlag } from './syntax'
 
 type Seen = Evidence<Village>
 type Result = boolean | Colour
@@ -75,7 +75,7 @@ const pages: Page[] = [
     starter:'const raining = isRaining()\nif (raining) {\n  // This block runs in the rain. Put openCanopy() here.\n  \n} else {\n  foldCanopy()\n}',line:4,
     answer:'const raining = isRaining()\nif (raining) {\n  openCanopy()\n} else {\n  foldCanopy()\n}',
     hints:['Check the sky before choosing.', 'Open the shelter in the first block.', 'openCanopy()'],
-    enter:w=>{w.raining=true},check:'The canopy suits the weather',passes:e=>calls(e,'isRaining').length>0 && branchCalls(e.files,'openCanopy','foldCanopy') && e.world.canopy===e.world.raining && calls(e,e.world.raining?'openCanopy':'foldCanopy').length>0,
+    enter:w=>{w.raining=true},check:'The canopy suits the weather',passes:e=>calls(e,'isRaining').length>0 && readsWeather(e.files) && e.world.canopy===e.world.raining && calls(e,e.world.raining?'openCanopy':'foldCanopy').length>0,
     effect:['canopy','Canopy open','A striped canopy keeps the rain off the path.'],reaction:'Dry feet for our guests!',did:'You read the weather and chose a shelter.',
   }, {
     id:'picnic',goal:'Set the picnic table when there are enough apples',idea:'A comparison turns two numbers into true or false.',
@@ -99,7 +99,7 @@ const pages: Page[] = [
     check:'Three neighbours arrive in order',passes:e=>loopCalls(e.files,'greet',true) && calls(e,'greet').map(c=>c.args[0]).join()===guests.join()?'green':e.world.neighbours.length?'amber':'red',
     effect:['guests','3 neighbours','Three neighbours join Mila beside the path.'],reaction:'Everyone made it!',did:'You greeted each name in an array.',
   }, {
-    id:'village-fair',goal:'Open three stalls and hang Mira’s welcome banner',idea:'A function, a loop and a choice can work together.',
+    id:'village-fair',goal:'Open three stalls and hang Mira’s welcome banner',idea:'You used one function to welcome each guest and chose when to hang the banner.',
     starter:'function welcome(guest: string) {\n  openStall(guest)\n  // If guest === "Mira", call hangBanner() inside the if.\n  \n}\nconst guests = ["Mira", "Pip", "Ada"]\n// Loop over guests. Call welcome(guest) on each turn.\n',line:4,
     answer:'function welcome(guest: string) {\n  openStall(guest)\n  if (guest === "Mira") hangBanner()\n}\nconst guests = ["Mira", "Pip", "Ada"]\nfor (const guest of guests) {\n  welcome(guest)\n}',
     hints:['Each guest needs a stall. Only Mira brings the banner.', 'Use a choice inside welcome and a loop below it.', 'if (guest === "Mira") hangBanner()\n\nfor (const guest of guests) {\n  welcome(guest)\n}'],

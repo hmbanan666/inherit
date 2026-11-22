@@ -140,3 +140,10 @@ export function chapterFiles(beat: number, through?: string) {
   }
   return files
 }
+
+export function workshopReference(step: LessonStep): ProjectFiles {
+  const files = chapterFiles(step.beat,step.id)
+  const bank = step.id==='harrow-tab' ? 'replyLater' : step.id==='harrow-deed' ? 'payBalance' : undefined
+  if (bank) files['main.ts'] = 'import { '+bank+' } from "inherit"\n'+bank+'()\n'+files['main.ts']
+  return files
+}

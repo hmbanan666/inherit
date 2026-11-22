@@ -106,7 +106,7 @@ export function currentStep(c: Campaign): StepView | undefined {
 }
 
 const deliverySteps = new Set(['bram-loop', 'elsie-grate', 'tomas-lamps', 'wen-wheel', 'bridge-span'])
-const revealsAfter: Record<string, Reveal[]> = {
+export const revealsAfter: Record<string, Reveal[]> = {
   'bram-loop': [
     { kind: 'coins' },
     { kind: 'section', id: 'town' },

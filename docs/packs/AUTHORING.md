@@ -41,6 +41,6 @@ See the [machine drawing contact sheet](../../apps/web/app/lib/art/contact-sheet
 
 ## Play the reference
 
-Run `pnpm test` for the discovered pack suite. It compiles starters and references against the declarations the editor sees, then plays both from the same checkpoint. A specialized simulation can supply a `validation.ts` checkpoint adapter that drives its production runner and bounded ticks. Keep ordinary packs on the default runner.
+Run `pnpm test` for the discovered pack suite. It compiles starters and references against the declarations the editor sees, then plays both from the same checkpoint. A specialized simulation can supply a `validation.ts` checkpoint adapter that drives its production runner and bounded ticks. Keep ordinary packs on the default runner. The browser suite loads the ordinary lesson list automatically. A specialized studio can put its UI playthrough in a local `playthrough.ts`, as Workshop does.
 
 Build the site and run the browser suite. Set `INHERIT_SHOTS` to an external directory to inspect the opening, watched call and solved card. Check the ending, an unfinished draft after switching packs, and the narrow layout. The ordinary repo checks are listed in [AGENTS.md](../../AGENTS.md).

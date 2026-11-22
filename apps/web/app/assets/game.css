@@ -1818,3 +1818,9 @@ button.revisions:hover {
  .hud .primary-run kbd {display:none}
  .pack-world { min-height:280px }
 }
+
+/* Keep the sign, path and fair visible while the player reads the result. */
+@media (min-width: 801px) {
+  .pack-studio .solved-overlay { top: 102px; bottom: auto; }
+}
+.world-feedback { max-width: 22ch; margin: 0; color: var(--soft); font-size: 13px; }

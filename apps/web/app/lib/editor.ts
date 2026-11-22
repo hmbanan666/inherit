@@ -14,6 +14,7 @@ export interface EditorSession {
   call: Read<{file: string; line: number} | undefined>
   watching: Read<boolean>
   error: Read<string>
+  placeFunctions?: readonly string[]
   places?: Read<string[]>
   traces?: Read<Record<string, {file: string; line: number}[]>>
   callsToMove?: Read<{name: string; place?: string}[] | undefined>

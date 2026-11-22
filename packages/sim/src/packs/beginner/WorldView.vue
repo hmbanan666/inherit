@@ -71,7 +71,7 @@ const boundedName = (value:string) => value.length>15 ? value.slice(0,14)+'…' 
       <ellipse v-if="world.lamps.includes(i+1)" rx="25" ry="6" fill="#efc574" opacity=".35"/><path d="M-2 0v-37h4V0z" fill="#655a47"/>
       <circle v-if="world.lamps.includes(i+1)" cy="-39" r="17" fill="#f9d378" opacity=".24"/><path d="m-6-46 12 0-2 14h-8z" :fill="world.lamps.includes(i+1)?'#ffdc86':'#9c9b7b'" stroke="#595948" stroke-width="2"/><path d="m-8-46 8-6 8 6z" fill="#575a4c"/>
     </g>
-    <g transform="translate(405 389)"><Villager :key="calls.length" coat="#567b78" :waving="last==='say'"/><rect x="-22" y="8" width="44" height="17" rx="8" fill="#36473e"/><text y="20" class="name" text-anchor="middle">Mila</text></g>
+    <g transform="translate(405 389)"><Villager :class="{sniff:last==='plant'}" :key="calls.length" coat="#567b78" :waving="!world.bubble || last==='say'"/><rect x="-22" y="8" width="44" height="17" rx="8" fill="#36473e"/><text y="20" class="name" text-anchor="middle">Mila</text></g>
     <g v-if="world.bubble" transform="translate(407 306)" data-testid="speech" role="img" :aria-label="world.bubble"><rect :x="-Math.min(world.bubble.length*4+12,95)" y="-14" :width="Math.min(world.bubble.length*8+24,190)" height="28" rx="8" fill="#f6e8ca"/><path d="m-6 13 5 7 6-7" fill="#f6e8ca"/><text text-anchor="middle" y="5" class="bubble">{{ boundedName(world.bubble) }}</text></g>
     <g data-testid="guests" role="img" :aria-label="world.neighbours.length+' neighbours'"><g v-for="(name,i) in world.neighbours" :key="name" :transform="'translate('+(242+i*116)+' '+(479+i%2*13)+')'"><Villager :coat="coats[i%3]" :hair="['#714d3b','#4a4140','#9b7953'][i%3]"/><text text-anchor="middle" y="16" class="guest-name">{{ boundedName(name) }}</text></g></g>
     <g data-testid="fair" role="img" :aria-label="world.banner && world.stalls.length===3?'Fair open':'Village green'"><use v-for="(name,i) in world.stalls" :key="name" href="#stall" :transform="'translate('+(192+i*116)+' '+(513+i%2*9)+')'" :color="coats[i%3]"/>
@@ -80,7 +80,8 @@ const boundedName = (value:string) => value.length>15 ? value.slice(0,14)+'…' 
   </svg>
 </div></template>
 <style scoped>
-.village-scene{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(#69697c 0%,#b7988c 42%,#84926b 62%,#6a7856 95%)}
+.village-scene{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;background:linear-gradient(#69697c 0 35%,#8c956c 62%,#6a7856 70% 100%)}
 svg{width:100%;max-height:100%;display:block}.sign,.bubble,.guest-name,.name{font:600 13px 'Space Grotesk',sans-serif;fill:#463e31}.name{fill:#f2e1b8;font-size:11px}.guest-name{fill:#293a2f;paint-order:stroke;stroke:#b7bf94;stroke-width:3px}.bubble{font-size:15px}.smoke{animation:smoke 5s ease-in-out infinite alternate}.ring{transform-box:fill-box;transform-origin:top center;animation:ring .23s ease 2 alternate}@keyframes smoke{to{opacity:.4;translate:-3px -3px}}@keyframes ring{to{rotate:12deg}}
-@media(prefers-reduced-motion:reduce){.smoke,.ring{animation:none}}
+.sniff{transform-origin:center bottom;transform-box:fill-box;animation:sniff .7s ease-in-out}@keyframes sniff{50%{transform:rotate(-12deg)}}
+@media(prefers-reduced-motion:reduce){.smoke,.ring,.sniff{animation:none}}
 </style>

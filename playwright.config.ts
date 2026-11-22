@@ -6,6 +6,7 @@ const baseURL = 'http://127.0.0.1:' + port
 export default defineConfig({
   testDir: 'tests/e2e',
   workers: 1,
+  globalSetup:'./tests/e2e/capture-setup.ts',
   timeout: 90_000,
   use: { baseURL, viewport: { width: 1440, height: 900 } },
   webServer: {

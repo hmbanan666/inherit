@@ -37,3 +37,17 @@ test('the same decisions work in sunshine and with smaller harvests', async () =
     else expect(save.world.picnic).toBe(basket>=3)
   }
 })
+
+test('unrelated arithmetic and a constant choice leave their lessons open',async()=>{
+  for (const [id,source] of [
+    ['apple-basket','const a=2,b=3; const unused=a+b; fillBasket(5)'],
+    ['weather','const weather=isRaining(); if(true){openCanopy()}else{foldCanopy()}'],
+    ['picnic','const apples=basketCount(); if (8>=3) setPicnic()'],
+  ]) {
+    const save=freshSave(pack)
+    save.lessonId=id
+    Object.assign(save.entryWorld,{basket:5,raining:true})
+    await runPack(pack,save,{'main.ts':source})
+    expect(save.phase,id).toBe('working')
+  }
+})

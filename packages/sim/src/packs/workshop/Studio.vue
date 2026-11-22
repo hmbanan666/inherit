@@ -23,7 +23,7 @@ import { workshopLessons } from './pack'
 const WorkshopFloor = defineAsyncComponent(()=>import('./WorldView.vue'))
 const g = provideGame()
 const lesson = computed(()=>workshopLessons[g.campaign.value.lesson.index])
-provide(editorKey, { ...g, id: manifest.id, label: 'Factory controller TypeScript',
+provide(editorKey, { ...g, placeFunctions:['take','put','look'], id: manifest.id, label: 'Factory controller TypeScript',
   deployed: computed(() => g.campaign.value.project.deployed), multiFile: computed(() => g.surface.value.multiFile),
   watching: g.playback.watching, call: g.playback.call, callsToMove: computed(() => g.step.value?.phase === 'solved' ? undefined : g.step.value?.step.callsToMove),
 })
@@ -459,21 +459,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
 
 @media (min-width: 801px) {
   .panel-slot.compact { height: auto; min-height: 38px; max-height: 124px; overflow: auto; }
-  .desk.swapped {
-    grid-template-columns: var(--dock-width) 7px minmax(0, 1fr);
-  }
-  .swapped .editor-dock {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .swapped .resizer {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .swapped .world-shell {
-    grid-column: 3;
-    grid-row: 1;
-  }
+
 }
 .section-nav {
   display: flex;
