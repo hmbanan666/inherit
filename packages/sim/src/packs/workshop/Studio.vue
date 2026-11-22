@@ -48,7 +48,7 @@ function closeDrawer(edit = false) {
 }
 watch([ready, () => lesson.value?.id], () => {
   if (ready.value) drawer.value = lesson.value?.theory && step.value?.phase === 'brief' ? 'learn' : undefined
-  showFiles.value = lesson.value?.id === 'mayor-tools'
+  if (lesson.value?.id === 'mayor-tools') showFiles.value = true
 })
 watch(solved, value => { if (value) drawer.value = undefined })
 function submit() {
@@ -118,6 +118,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey, true))
           :hints="lesson?.hints ?? []" :rung="g.hints.value[lesson?.id] ?? 0" :entries="entries" :busy="g.busy.value"
           @tab="drawer = $event" @select="g.selectLesson" @hint="hint" @close="closeDrawer()" @edit="closeDrawer(true)">
           <template #learn>
+            <nav v-if="surface.multiFile" aria-label="Choose a project file">
+              <button v-for="(_, path) in files" :key="path" :aria-pressed="activeFile === path"
+                @click="drawer = undefined; g.openFile(path)">{{ path }}</button>
+            </nav>
             <section v-if="lesson?.id === 'harrow-tab' || lesson?.id === 'harrow-deed'">
               <h3>Kettlewick Bank</h3>
               <p>{{ campaign.economy.money }} coins · Debt {{ town.debt.owed }}</p>

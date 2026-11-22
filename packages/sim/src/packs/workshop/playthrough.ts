@@ -61,7 +61,7 @@ test('play every workshop reference in the editor, build the bridge and pay the 
           await tree.getByRole('button', { name: 'Create', exact: true }).click()
         }
         for (const [file, source] of Object.entries(updated)) {
-          if (await tree.isVisible()) await tree.getByRole('button', { name: file, exact: true }).click()
+          if (Object.keys(updated).length > 1) await tree.getByRole('button', { name: file, exact: true }).click()
           await pasteProjectFile(page,source,'Factory controller TypeScript')
           await page.keyboard.press('Control+Home')
         }
