@@ -17,7 +17,7 @@ import type { Action, CallSite, Frame, GameLog } from './gameProtocol'
 export type { CallSite, GameLog } from './gameProtocol'
 
 import { readPackSlot } from './pack-storage'
-import { packKey } from '@inherit/sim/save'
+import { packKey, type SolveStats } from '@inherit/sim/save'
 import { restoreWorkshop, workshopSave } from '../../../../packages/sim/src/packs/workshop/save'
 const saveKey = packKey('workshop')
 const reloadKey = 'inherit.workshop.reloadedBuild'
@@ -83,6 +83,7 @@ function createGameStore() {
   const checkpoints: Record<string, string> = {}
   const drafts: Record<string, ProjectFiles> = {}
   const hints = ref<Record<string, number>>({})
+  const awards = ref<Record<string, SolveStats>>({})
   const attempts = ref<Record<string, number>>({})
   const savedFrontierIndex = computed(() => frontier.value ? restoreWorkshop(frontier.value).campaign.lesson.index : undefined)
   const completed = computed(() => {
@@ -151,7 +152,7 @@ function createGameStore() {
       const clockActive = !stoppingLoop.value && (acknowledged?.active ?? active.value)
       localStorage.setItem(saveKey, JSON.stringify({
         ...workshopSave(save, activeFile.value, clockActive), frontier: frontier.value,
-        checkpoints, drafts, hints: hints.value, attempts: attempts.value,
+        checkpoints, drafts, hints: hints.value, attempts: attempts.value, awards: awards.value,
       }))
       saved.value = true
     } catch {
@@ -352,6 +353,8 @@ function createGameStore() {
     if (busy.value || step.value?.phase !== 'solved') return
     if (frontier.value) return returnToFrontier()
     drafts[step.value.step.id] = files.value
+    const id = step.value.step.id
+    awards.value[id] = { firstTry: attempts.value[id] === 1, noHints: !hints.value[id] }
     continueBoundary = snapshot()
     busy.value = true
     playback.clear()
@@ -428,6 +431,7 @@ function createGameStore() {
     frontier.value = undefined
     for (const id of Object.keys(checkpoints)) delete checkpoints[id]
     for (const id of Object.keys(drafts)) delete drafts[id]
+    awards.value = {}
     hints.value = {}
     attempts.value = {}
     state.value = createCampaign()
@@ -462,6 +466,7 @@ function createGameStore() {
         Object.assign(checkpoints, data.checkpoints)
         Object.assign(drafts, data.drafts)
         frontier.value = data.frontier
+        awards.value = data.awards ?? {}
         hints.value = data.hints ?? {}
         attempts.value = data.attempts ?? {}
         state.value = restored.campaign
@@ -505,7 +510,7 @@ function createGameStore() {
     deleteFile,
     submit, advance, busy, playback, hand,
     stopLoop, stoppingLoop, tickCount, tickCalls,
-    hints, attempts, completed, selectLesson, persist, blockedSave, preview,
+    awards, hints, attempts, completed, selectLesson, persist, blockedSave, preview,
     step, button, places, reveals, sections, letters,
     surface,
     reference,

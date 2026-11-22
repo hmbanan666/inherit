@@ -135,7 +135,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', hotkey, true))
       <section class="editor-dock" aria-label="Code workshop">
         <section v-if="g.blockedSave.value"><p role="alert">{{ error }}</p><template v-if="g.preview === null">
           <SaveArchive pack="workshop" recovery /><button @click="reset">Start a fresh pack</button></template></section>
-        <PackFinish v-else-if="!lesson" :manifest="manifest" :ideas="finishIdeas" @map="openDrawer('learn')" @replay="reset">The shed is yours. The bridge to Riverside stands and your family tab is paid.</PackFinish>
+        <PackFinish v-else-if="!lesson" :manifest="manifest" :ideas="finishIdeas" :awards="Object.values(g.awards.value)" @map="openDrawer('learn')" @replay="reset">The shed is yours. The bridge to Riverside stands and your family tab is paid.</PackFinish>
         <template v-else>
           <GoalBar :goal="lesson.goal" @help="openDrawer('learn')" />
           <FileTree v-if="showFiles && surface.multiFile" />

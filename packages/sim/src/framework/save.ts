@@ -1,5 +1,6 @@
 import type { Files, Lesson, Pack, Starter } from './pack'
 
+export interface SolveStats { firstTry: boolean; noHints: boolean }
 export interface Revision { id: number; name: string; tick: number; files: Files }
 interface Draft<W> extends Starter {
   activeFile: string
@@ -19,6 +20,7 @@ export interface PackSave<W> {
   hints: Record<string, number>
   predictions: Record<string, string>
   seenTheory: string[]
+  awards: Record<string, SolveStats>
   firstTryStreak: number
   finishedWorld?: W
   world: W
@@ -37,7 +39,7 @@ export function freshSave<W, A extends object>(pack: Pack<W, A>, seed = 1): Pack
   return {
     formatVersion: 2, packVersion: pack.version, packId: pack.manifest.id,
     lessonId: first.id, edit: starter.edit, phase: 'brief', completed: [], passed: [],
-    drafts: {}, hints: {}, attempts: {}, predictions: {}, seenTheory: [], firstTryStreak: 0,
+    drafts: {}, hints: {}, attempts: {}, predictions: {}, seenTheory: [], awards: {}, firstTryStreak: 0,
     world, entryWorld: structuredClone(world), clockActive: false,
     project: { working: starter.files, deployed: null, activeFile: starter.edit.file, history: [], snapshots: [], nextRevision: 1 },
   }
@@ -77,6 +79,7 @@ export function decodeSave<W, A extends object>(pack: Pack<W, A>, input: string)
     !Array.isArray(s.passed) || !s.passed.every((id: unknown) => typeof id === 'string') ||
     !validProject(s.project) || typeof s.clockActive !== 'boolean' || !count(s.firstTryStreak) ||
     !Array.isArray(s.seenTheory) || !s.seenTheory.every((id: string) => ids.has(id)) ||
+    !entries(s.awards, v => record(v) && typeof v.firstTry === 'boolean' && typeof v.noHints === 'boolean') ||
     !entries(s.hints, count) || !entries(s.attempts, count) || !entries(s.predictions, v => typeof v === 'string') ||
     !entries(s.drafts, v => record(v) && projectFiles(v.files) && typeof v.activeFile === 'string' &&
       Object.hasOwn(v.files, v.activeFile) && validEdit(v.edit as Starter['edit'], v.files)))
@@ -139,7 +142,8 @@ export function continueLesson<W, A extends object>(pack: Pack<W, A>, save: Pack
   const review = save.completed.includes(id)
   if (!review) {
     save.completed.push(id)
-    save.firstTryStreak = save.attempts[id] === 1 ? save.firstTryStreak + 1 : 0
+    save.awards[id] = { firstTry: save.attempts[id] === 1, noHints: !save.hints[id] }
+    save.firstTryStreak = save.awards[id].firstTry ? save.firstTryStreak + 1 : 0
   }
   const index = pack.lessons.findIndex(l => l.id === id)
   const ordered = pack.manifest.track === 'challenges'

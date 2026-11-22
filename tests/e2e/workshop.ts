@@ -1,3 +1,7 @@
+import { createCampaign } from '../../packages/sim/src/packs/workshop/campaign'
+import { jumpToStep } from '../../packages/sim/src/packs/workshop/lesson-flow'
+import { workshopSave } from '../../packages/sim/src/packs/workshop/save'
+import { workshopStarter } from '../../packages/sim/src/packs/workshop/starter'
 import { chapterCapture } from './chapter-capture'
 import { expect, type Page } from '@playwright/test'
 
@@ -34,9 +38,6 @@ export async function edit(page: Page, source: string, append = false) {
 }
 /** Seed a reachable chapter boundary only for tests that exercise persistence. */
 export async function savedShed(page: Page, id: string, speed = 1) {
-  const { createCampaign, jumpToStep } = await import('../../packages/sim/src/index')
-  const { workshopSave } = await import('../../packages/sim/src/packs/workshop/save')
-  const { workshopStarter } = await import('../../packages/sim/src/packs/workshop/starter')
   const campaign = jumpToStep(createCampaign(), id)
   campaign.project.working = workshopStarter(id, campaign.project.working).files
   const raw = JSON.stringify(workshopSave(campaign, 'main.ts', false))

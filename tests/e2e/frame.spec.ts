@@ -129,7 +129,7 @@ test('a failed Continue keeps the solved boundary available for one retry', asyn
     }
   })
   await next.click()
-  await expect(page.getByRole('alert')).toContainText('Could not save progress')
+  await expect(page.getByRole('alert').filter({hasText: 'Could not save progress'})).toBeVisible()
   await expect(next).toBeEnabled()
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('inherit.pack.beginner')!))).toMatchObject({
     lessonId: 'hello', phase: 'solved', completed: [],

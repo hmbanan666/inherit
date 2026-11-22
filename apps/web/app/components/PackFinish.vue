@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Check } from '@lucide/vue'
 import type { PackManifest } from '@inherit/sim/pack'
+import type { SolveStats } from '@inherit/sim/save'
 
-
-defineProps<{ manifest: PackManifest; ideas: readonly string[] }>()
+defineProps<{ manifest: PackManifest; ideas: readonly string[]; awards: SolveStats[] }>()
 const emit = defineEmits<{ replay: []; map: [] }>()
 const confirmation = ref<HTMLDialogElement>()
 function replay() {
@@ -17,16 +17,17 @@ function replay() {
     <header>
       <span class="eyebrow"><Check /> Pack complete</span>
       <h2 id="finish-title">{{ manifest.title }}</h2>
-      <p><slot>Well done! You finished all {{ ideas.length }} {{ ideas.length === 1 ? 'lesson' : 'lessons' }}.</slot></p>
+      <p v-if="$slots.default"><slot /></p>
     </header>
     <p>{{ ideas.length }} activities complete <template v-if="manifest.units">· {{ manifest.units.length }} units</template></p>
+    <p v-if="awards.length">{{ awards.filter(a => a.firstTry).length }} on the first try · {{ awards.filter(a => a.noHints).length }} without hints</p>
     <h3 id="finish-ideas">What you learned</h3>
     <ol aria-labelledby="finish-ideas" tabindex="0">
       <li v-for="(idea, index) in ideas" :key="index">{{ idea }}</li>
     </ol>
     <footer>
       <div class="finish-links">
-        <button @click="emit('map')">Course map</button>
+        <button @click="emit('map')">{{ manifest.track === 'course' ? 'Course map' : 'Challenge picker' }}</button>
         <a href="/">Back to game packs</a>
         <button @click="confirmation?.showModal()">Replay this pack</button>
       </div>
@@ -60,9 +61,6 @@ function replay() {
 .finish ol { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0; list-style: none; overflow: auto }
 .finish li { background: var(--surface-raised); border: 1px solid var(--line); border-radius: 12px; padding: 5px 10px; font-size: 13px }
 .finish footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line) }
-.next-pack { display: flex; align-items: center; gap: 10px; border-radius: 6px; background: var(--gold); color: var(--ink); text-decoration: none; padding: 12px 16px; font-weight: 700 }
-.next-pack span { font-weight: 500 }
-.next-pack svg { margin-left: auto; width: 18px }
 .finish-links, .finish form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px }
 .finish-links a, .finish-links button { color: var(--text); font: inherit; padding: 8px 0; border: 0; background: transparent; text-decoration: underline; text-underline-offset: 4px }
 .finish dialog { margin: auto; padding: 24px; max-width: min(420px, 90vw); background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px }

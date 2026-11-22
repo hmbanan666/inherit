@@ -259,7 +259,7 @@ onBeforeUnmount(() => {
       </section>
       <div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)" />
       <section class="editor-dock">
-        <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" @map="openDrawer('learn')" @replay="start(true)" />
+        <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @map="openDrawer('learn')" @replay="start(true)" />
         <template v-else-if="frame">
           <GoalBar :goal="frame.goal" @help="openDrawer('learn')" />
           <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :error="error" @reference="openDrawer('api')" /></div></div>
