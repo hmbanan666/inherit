@@ -12,7 +12,7 @@ for (const [width, height] of [[1440, 900], [1280, 720], [390, 844]]) {
     await page.setViewportSize({width, height})
     await page.goto('/?pack=beginner&lesson=hello')
     const drawer = page.getByTestId('drawer')
-    await expect(drawer).toContainText('Words in quotes')
+    await expect(drawer).toContainText('A call and a string')
     await expect(page.locator('.view-lines')).toBeVisible()
     await drawer.getByRole('button', {name: 'Got it'}).click()
     const bounds = () => Promise.all([
@@ -26,7 +26,7 @@ for (const [width, height] of [[1440, 900], [1280, 720], [390, 844]]) {
       expect(await bounds()).toEqual(closed)
       if (tab === 'api') {
         await expect(drawer).toContainText('say(words: string): void')
-        await expect(drawer).toContainText('The words Mila should speak.')
+        await expect(drawer).toContainText('Your words, up to 80 characters.')
         await expect(drawer).toContainText('Returns No value.')
         await expect(drawer).toContainText('say("Good morning!")')
         if (width === 1440) await (await chapterCapture(page))('beginner/hello/api')
@@ -57,20 +57,20 @@ test('Enter advances once and review restores the forward draft after reload', a
   expect(Math.abs(card.y + card.height / 2 - world.y - world.height / 2)).toBeLessThan(2)
   await expect(page.locator('.confetti')).toBeHidden()
   await page.keyboard.press('Enter')
-  await expect(page.getByTestId('task-card')).toContainText('Plant three flowers')
+  await expect(page.getByTestId('task-card')).toContainText('Print the two-word ferry name')
   await drawer.getByRole('button', {name: 'Got it'}).click()
-  await page.keyboard.insertText('// keep my flowers')
+  await page.keyboard.insertText('// keep my ferry sign')
   await openTool(page, 'learn')
   const map = drawer.getByRole('navigation', {name: 'Course map'})
-  await expect(map.getByRole('button', {name: /house sign/})).toBeDisabled()
-  await map.getByRole('button', {name: /Say hello/}).click()
+  await expect(map.getByRole('button', {name: /two station calls/})).toBeDisabled()
+  await map.getByRole('button', {name: /Give Mila a greeting/}).click()
   await expect(page.locator('.view-lines')).toContainText('say("Hello!")')
   await page.reload()
-  await expect(page.getByTestId('task-card')).toContainText('Say hello')
+  await expect(page.getByTestId('task-card')).toContainText('Give Mila a greeting')
   await page.getByTestId('primary-button').click()
   await expect(next).toBeFocused()
   await page.keyboard.press('Enter')
-  await expect(page.locator('.view-lines')).toContainText('// keep my flowers')
+  await expect(page.locator('.view-lines')).toContainText('// keep my ferry sign')
   await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1')
 })
 
@@ -89,9 +89,9 @@ for (const [pack, lesson] of [['beginner','hello'], ['workshop','bram-take']]) {
     await page.keyboard.insertText(pack === 'beginner' ? 'say("Hello!")' : 'take("mine")')
     await page.getByTestId('primary-button').click()
     await page.getByTestId('continue').click()
-    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'three flowers' : 'in the furnace')
+    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'two-word ferry name' : 'in the furnace')
     await page.reload()
-    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'Say hello' : 'Lift a rock')
+    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'Give Mila a greeting' : 'Lift a rock')
     expect(await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)))).toEqual(data)
   })
 }
@@ -104,7 +104,7 @@ test('shots captures the supplied preview and a matching transcript', async ({ba
     })
     const frame = join(dir, 'beginner', 'flowers', 'start')
     expect((await readFile(frame + '.png')).subarray(1, 4).toString()).toBe('PNG')
-    expect(await readFile(frame + '.txt', 'utf8')).toContain('Counting with numbers')
+    expect(await readFile(frame + '.txt', 'utf8')).toContain('Number values')
   } finally {
     await rm(dir, {recursive: true, force: true})
   }
@@ -121,7 +121,7 @@ test('a failed Continue keeps the solved boundary available for one retry', asyn
   await page.evaluate(() => {
     const write = Storage.prototype.setItem
     Storage.prototype.setItem = function (key, value) {
-      if (key === 'inherit.pack.beginner' && JSON.parse(value).lessonId === 'flowers') {
+      if (key === 'inherit.pack.beginner' && JSON.parse(value).lessonId === 'sign-spaces') {
         Storage.prototype.setItem = write
         throw new DOMException('Storage full', 'QuotaExceededError')
       }
@@ -135,6 +135,32 @@ test('a failed Continue keeps the solved boundary available for one retry', asyn
     lessonId: 'hello', phase: 'solved', completed: [],
   })
   await next.click()
-  await expect(page.getByTestId('task-card')).toContainText('three flowers')
+  await expect(page.getByTestId('task-card')).toContainText('two-word ferry name')
   await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1')
+})
+
+test('medal checks list both failed podium inputs in the same row', async ({page}) => {
+  await page.goto('/?pack=beginner&lesson=podium')
+  await page.getByRole('button', {name: 'Got it'}).click()
+  const editor = page.getByRole('textbox', {name: 'Player TypeScript'})
+  await editor.focus()
+  await page.keyboard.press('Control+a')
+  await page.keyboard.insertText([
+    'if (position === 1) {',
+    '  paintSign("silver")',
+    '} else if (position === 2) {',
+    '  paintSign("silver")',
+    '} else {',
+    '  paintSign("silver")',
+    '}',
+  ].join('\n'))
+  await page.getByTestId('primary-button').click()
+  const checks = page.getByTestId('checks')
+  await checks.getByRole('button', {name: '1 done'}).click()
+  await expect(checks.getByRole('listitem')).toHaveCount(2)
+  const failed = checks.locator('[data-state="red"]')
+  await expect(failed).toHaveCount(1)
+  await expect(failed).toContainText('First place, Third place')
+  await expect(failed).toContainText('First and third show gold and bronze')
+  await expect(page.getByTestId('signs')).toContainText('silver')
 })
