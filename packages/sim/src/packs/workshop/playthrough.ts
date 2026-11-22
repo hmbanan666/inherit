@@ -89,25 +89,21 @@ test('play every workshop reference in the editor, build the bridge and pay the 
         await expect(page.getByTestId('nav-orders')).toBeHidden()
       }
       await capture(prefix + 'solved')
+      await next.click()
       if (step.id === 'bram-loop') {
-        await next.click()
         await expect(page.locator('.wallet')).toBeVisible()
-        await capture(prefix+'reveal-coins')
-        await next.click()
         await expect(page.getByTestId('nav-town')).toBeVisible()
         await capture(prefix+'reveal-town')
         await page.getByTestId('nav-town').click()
         await expect(page.locator('.town-print canvas')).toBeVisible()
         await capture(prefix+'town')
         await page.getByTestId('nav-shed').click()
-        await next.click()
         await expect(page.getByTestId('nav-inbox')).toBeVisible()
         await page.getByTestId('nav-inbox').click()
         await expect(page.getByRole('heading', { name: 'Your uncle’s tab' })).toBeVisible()
         await capture(prefix+'reveal-inbox-letter')
         await button('Close drawer').click()
       }
-      await next.click()
     })
   }
   const finish = page.getByRole('region', {name: 'Uncle’s Workshop'})

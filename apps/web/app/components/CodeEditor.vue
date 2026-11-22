@@ -7,6 +7,7 @@ import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
+import { createLineHighlight } from '../lib/line-highlight'
 import { standaloneJobCalls } from '../lib/standalone-calls'
 import { editorKey } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
@@ -61,14 +62,29 @@ function showJobCalls() {
   }
 }
 
+const highlight = createLineHighlight(line => {
+  if (!line || !editor) {
+    lineLight?.clear()
+    return
+  }
+  if (game.watching.value) open(line.file)
+  lineLight?.set([{
+    range: new monaco.Range(line.line, 1, line.line, 1),
+    options: { isWholeLine: true, className: 'machine-line' },
+  }])
+  if (game.watching.value) editor.revealLineInCenterIfOutsideViewport(line.line)
+})
+
 function lightCall() {
   const call = game.call.value
-  lineLight?.clear()
-  if (!call || !editor || !models.has(call.file)) return
-  if (game.watching.value) open(call.file)
-  else if (activeFile.value !== call.file || files.value[call.file] !== deployed.value[call.file]) return
-  lineLight?.set([{ range: new monaco.Range(call.line, 1, call.line, 1), options: { isWholeLine: true, className: 'machine-line' } }])
-  if (game.watching.value) editor.revealLineInCenterIfOutsideViewport(call.line)
+  if (call) {
+    const matchesDraft = activeFile.value === call.file && files.value[call.file] === deployed.value[call.file]
+    if (!models.has(call.file) || (!game.watching.value && !matchesDraft)) {
+      highlight.reset()
+      return
+    }
+  }
+  highlight.show(call)
 }
 
 function syncFiles() {
@@ -111,6 +127,7 @@ function display() {
   const old = editor.getModel()
   if (old) views.set(old.uri.path.slice(prefix.length), editor.saveViewState())
   tabs.value = [file]
+  highlight.reset()
   editor.setModel(model)
   editor.restoreViewState(views.get(file) ?? null)
 }
@@ -296,6 +313,7 @@ onMounted(() => {
   // Navigation can arrive before the lazy editor mounts.
   const initial = game.navigation.value
   revealLine(initial.file, initial.line)
+  lightCall()
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
@@ -320,7 +338,7 @@ watch(callsToMove, () => {
   markJobCalls()
   showJobCalls()
 })
-watch(game.call, lightCall)
+watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
 watch(game.navigation, ({ file, line }) => revealLine(file, line), { flush: 'post' })
@@ -329,6 +347,7 @@ watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
   suggestions?.dispose()
+  highlight.reset()
   opener?.dispose()
   editor?.dispose()
   for (const model of models.values()) model.dispose()

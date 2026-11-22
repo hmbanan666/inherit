@@ -21,7 +21,7 @@ async function act(command: PackCommand) {
           await runner.play(save,lesson.referenceSolution,lesson.mode)
           for (let i=0; i<1200 && lesson.mode==='deploy' && save.phase!=='solved'; i++) await runner.play(save,lesson.referenceSolution,'tick')
           if (save.phase !== 'solved') throw new Error('Unable to open this lesson.')
-          do { continueLesson(pack, save) } while (save.lessonId === lesson.id)
+          continueLesson(pack, save)
         }
       }
       if (save.clockActive && save.lessonId && save.project.deployed) await runner.play(save,save.project.deployed,'resume')

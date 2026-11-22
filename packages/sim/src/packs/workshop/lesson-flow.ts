@@ -50,7 +50,6 @@ export interface StepView {
   checks: CheckView[]
   index: number
   total: number
-  nextReveal?: Reveal
 }
 
 export interface CallRecord {
@@ -77,7 +76,7 @@ export interface LessonProgress {
 }
 
 export function currentStep(c: Campaign): StepView | undefined {
-  const { index, phase, passed, queue } = c.lesson
+  const { index, phase, passed } = c.lesson
   let step = lessons[index]
   if (!step) return
   if (step.id === 'bram-cart' && phase === 'solved' && c.lesson.firstCartRunEmpty) {
@@ -91,7 +90,6 @@ export function currentStep(c: Campaign): StepView | undefined {
     phase,
     index,
     total: lessons.length,
-    nextReveal: queue[0],
     checks: step.checks.map((check) => ({
       ...check,
       text: step.id === 'bram-loop' ? "Ingots in Bram's cart: " + progress : check.text,
@@ -259,13 +257,12 @@ export function continueStep(c: Campaign): Campaign {
   if (c.lesson.phase !== 'solved') return c
   const next = structuredClone(c)
   const flow = next.lesson
-  const reveal = flow.queue.shift()
-  if (reveal) {
+  for (const reveal of flow.queue) {
     flow.released.push(reveal)
     if (reveal.kind === 'letter' && reveal.id === 'tab')
       letter(next, 'tab', 'Mrs Harrow', 'Your uncle’s tab', TAB_LETTER)
-    if (flow.queue.length) return next
   }
+  flow.queue = []
   next.town.solved.push(lessons[flow.index].id)
   const step = lessons[++flow.index]
   delete flow.firstCartRunEmpty
@@ -326,9 +323,7 @@ export function jumpToStep(c: Campaign, id: string): Campaign {
       }
       checkpoint.lesson = solved(checkpoint, step)
     }
-    do {
-      checkpoint = continueStep(checkpoint)
-    } while (checkpoint.lesson.phase === 'solved' && checkpoint.lesson.index < index)
+    checkpoint = continueStep(checkpoint)
   }
   return checkpoint
 }

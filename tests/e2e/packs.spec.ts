@@ -66,7 +66,7 @@ for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirecto
       await expect(page.getByTestId('checks').locator('.done-count')).toHaveAttribute('aria-expanded','false')
       await capture(path+'solved')
       await expect(goal).toHaveText(lesson.goal)
-      for (let i=0; i<= (lesson.reveals?.length ?? 0); i++) await world.getByTestId('continue').click()
+      await world.getByTestId('continue').click()
     })
     await expect(page.getByText('Pack complete',{exact:true})).toBeVisible()
     const finish = page.getByRole('region', {name: 'Village at Dawn'})

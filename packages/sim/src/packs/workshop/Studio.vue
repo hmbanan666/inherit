@@ -26,7 +26,7 @@ const g = provideGame()
 const lesson = computed(()=>workshopLessons[g.campaign.value.lesson.index])
 provide(editorKey, { ...g, placeFunctions:['take','put','look'], id: manifest.id, label: 'Factory controller TypeScript',
   deployed: computed(() => g.campaign.value.project.deployed), multiFile: computed(() => g.surface.value.multiFile),
-  watching: g.playback.watching, call: g.playback.call, callsToMove: computed(() => g.step.value?.phase === 'solved' ? undefined : g.step.value?.step.callsToMove),
+  watching: g.playback.watching, call: g.playback.line, callsToMove: computed(() => g.step.value?.phase === 'solved' ? undefined : g.step.value?.step.callsToMove),
 })
 const { campaign, files, activeFile, dirty, ready, saved, error, surface, town, step, reveals, sections, letters } = g
 const townPerson = ref<Townsperson['id']>()
@@ -54,21 +54,14 @@ const editorStatus = computed(() => {
   if (g.playback.watching.value) return 'Watching the arm'
   if (g.button.value === 'run') return 'Working copy · Run to watch your code'
   if (dirty.value) return 'Working copy · Deploy to run your edits'
+  if (g.paused.value) return 'Deployed · the clock is paused'
   return g.active.value ? 'Deployed · the clock is running' : 'Ready to deploy'
 })
 const tab = ref<'controller' | 'api'>('controller')
 const showFiles = ref(false)
-const menu = ref<'' | 'history' | 'settings' | 'bank'>('')
+const menu = ref<'' | 'settings' | 'bank'>('')
 const confirmNew = ref(false)
 const contrast = useContrast()
-const nextReveal = computed(() => {
-  const reveal = step.value?.nextReveal
-  if (!reveal) return ''
-  if (reveal.kind === 'section') return 'Continue to unlock ' + reveal.id[0]!.toUpperCase() + reveal.id.slice(1) + '.'
-  if (reveal.kind === 'letter') return 'Continue to receive a letter.'
-  if (reveal.kind === 'coins') return 'Continue to collect your coins.'
-  return 'Continue to see the family tab.'
-})
 const dockWidth = ref(43)
 type Panel = 'Checks' | 'Console'
 const panels = computed<Panel[]>(() => g.logs.value.length || g.error.value || (step.value?.index ?? 0) >= 5 ? ['Checks','Console'] : ['Checks'])
@@ -96,12 +89,6 @@ function movePanel(event: KeyboardEvent) {
 }
 const celebration = shallowRef<TownSnapshot['changes']>([])
 const story = ref('')
-const archives = computed(() =>
-  campaign.value.project.snapshots.filter((r) => r.name.startsWith('v2') || r.name.startsWith('Chapter ') || r.name.startsWith('Previous')),
-)
-const historyLabel = computed(() => g.button.value === 'deploy' ? 'Deploy history' : 'History')
-const showHistory = computed(() => g.button.value === 'deploy' || archives.value.length > 0 ||
-  campaign.value.project.history.some(revision => revision.id !== 0))
 const coinPop = ref<{ tick: number; amount: number }>()
 watch(
   () => campaign.value.economy.money,
@@ -140,14 +127,6 @@ watch(() => step.value?.step.id, id => {
 })
 function payBank(inFull = false) {
   g.act({ type: 'pay', inFull })
-  menu.value = ''
-}
-function restoreRevision(id: number) {
-  g.rollback(id)
-  menu.value = ''
-}
-function openArchive(id: number) {
-  g.restoreSnapshot(id)
   menu.value = ''
 }
 function askNewGame() {
@@ -237,37 +216,6 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
         </button>
       </nav>
       <div class="hud-spacer" />
-      <div v-if="showMoney" class="wallet" title="Workshop money">
-        <Coins /><b>{{ campaign.economy.money.toLocaleString() }} coins</b
-        ><small v-if="coinPop" :key="coinPop.tick" class="coin-pop" @animationend="coinPop = undefined"
-          >+{{ coinPop.amount }}</small
-        >
-      </div>
-      <div v-if="showDebt" class="settings bank-chip">
-        <button aria-label="Pay debt" @click="toggleMenu('bank')">
-          Debt {{ town.debt.owed }} <b v-if="town.debt.next">Pay</b>
-        </button>
-        <aside v-if="menu === 'bank'" class="hud-menu">
-          <h3>Kettlewick Bank</h3>
-          <p>{{ town.debt.paid }} paid · {{ town.debt.owed }} owed</p>
-          <p v-if="town.debt.reserve">Keep {{ town.debt.reserve }} coins for the machines the town needs.</p>
-          <template v-if="town.debt.next">
-            <button
-              class="gold"
-              :disabled="bankFunds < town.debt.next.amount"
-              @click="payBank()"
-            >
-              Pay {{ town.debt.next.amount }} coins
-            </button>
-            <button
-              v-if="town.debt.owed > town.debt.next.amount && bankFunds >= town.debt.owed"
-              @click="payBank(true)"
-            >
-              Pay balance ({{ town.debt.owed }} coins)
-            </button>
-          </template>
-        </aside>
-      </div>
       <div class="settings">
         <button aria-label="Settings" @click="toggleMenu('settings')"><Settings2 /></button>
         <aside v-if="menu === 'settings'" class="hud-menu">
@@ -278,34 +226,10 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
           </button>
         </aside>
       </div>
-      <small v-if="lesson?.id === 'bram-loop'" class="clock-note">Deploy starts the clock. It calls onTick for you.</small>
-      <div v-if="lesson" class="deploy-group">
-        <button v-if="showHistory" class="history-menu" :aria-expanded="menu === 'history'"
-          :title="g.button.value === 'deploy' ? 'Run once or restore a deployment' : 'Restore saved code'" @click="toggleMenu('history')">
-          {{ historyLabel }} <ChevronDown />
-        </button>
-        <button class="deploy primary-run" data-testid="primary-button" :disabled="g.busy.value || (!ready && !error)" @click="g.submit()">
-          <Play />{{ g.playback.watching.value ? 'Playing your run' : g.button.value === 'run' ? 'Run' : 'Deploy' }} <kbd>Ctrl+Enter</kbd>
-        </button>
-        <aside v-if="menu === 'history'" class="hud-menu">
-          <button v-if="g.button.value === 'deploy'" :disabled="g.busy.value" @click="menu = ''; g.submit('run')">Run once</button>
-          <h3>{{ historyLabel }}</h3>
-          <button
-            v-for="r in [...campaign.project.history].reverse()"
-            :key="r.id"
-            @click="restoreRevision(r.id)"
-          >
-            Restore #{{ r.id }} <small>tick {{ r.tick }}</small>
-          </button>
-          <button
-            v-for="r in archives"
-            :key="r.id"
-            @click="openArchive(r.id)"
-          >
-            Open {{ r.name }}
-          </button>
-        </aside>
-      </div>
+      <button v-if="lesson" class="deploy primary-run" data-testid="primary-button"
+        :disabled="g.busy.value || (!ready && !error)" @click="g.submit()">
+        <Play />{{ g.playback.watching.value ? 'Playing your run' : g.button.value === 'run' ? 'Run' : 'Deploy' }} <kbd>Ctrl+Enter</kbd>
+      </button>
     </header>
     <main class="desk" >
       <section ref="floorPane" tabindex="-1" aria-label="Factory and town" class="world-shell pack-world" data-testid="world">
@@ -314,8 +238,40 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
             <small class="eyebrow"><Factory />Kettlewick · Chapter 1</small>
             <h1>{{ section === 'town' ? 'Kettlewick' : 'Uncle’s shed' }}</h1>
           </div>
+          <ClockControls v-if="lesson && g.active.value" v-model:paused="g.paused.value" v-model:speed="g.speed.value" />
           <div class="live" :class="{ off: !g.active.value }">
-            <i />{{ !ready ? 'Starting' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
+            <i />{{ !ready ? 'Starting' : g.paused.value ? 'Paused' : g.active.value ? 'Live' : error ? 'Offline' : 'Ready' }}
+          </div>
+          <div v-if="showMoney" class="wallet" title="Workshop money">
+            <Coins /><b>{{ campaign.economy.money.toLocaleString() }} coins</b
+            ><small v-if="coinPop" :key="coinPop.tick" class="coin-pop" @animationend="coinPop = undefined"
+              >+{{ coinPop.amount }}</small
+            >
+          </div>
+          <div v-if="showDebt" class="settings bank-chip">
+            <button aria-label="Pay debt" @click="toggleMenu('bank')">
+              Debt {{ town.debt.owed }} <b v-if="town.debt.next">Pay</b>
+            </button>
+            <aside v-if="menu === 'bank'" class="hud-menu">
+              <h3>Kettlewick Bank</h3>
+              <p>{{ town.debt.paid }} paid · {{ town.debt.owed }} owed</p>
+              <p v-if="town.debt.reserve">Keep {{ town.debt.reserve }} coins for the machines the town needs.</p>
+              <template v-if="town.debt.next">
+                <button
+                  class="gold"
+                  :disabled="bankFunds < town.debt.next.amount"
+                  @click="payBank()"
+                >
+                  Pay {{ town.debt.next.amount }} coins
+                </button>
+                <button
+                  v-if="town.debt.owed > town.debt.next.amount && bankFunds >= town.debt.owed"
+                  @click="payBank(true)"
+                >
+                  Pay balance ({{ town.debt.owed }} coins)
+                </button>
+              </template>
+            </aside>
           </div>
         </header>
         <div class="map-frame" :data-phase="section !== 'town' ? town.phase : undefined">
@@ -332,7 +288,6 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
                 <small>{{ m.from }}</small>
                 <h3>{{ m.title }}</h3>
                 <p>{{ m.body }}</p>
-                <p v-if="m.id === 'tab' && step?.step.id === 'bram-loop'">Press Continue to see the family tab. Then you can reply here.</p>
                 <button v-if="m.unread && (m.id !== 'tab' || step?.step.id === 'harrow-tab')" @click="g.act({ type: 'read', id: m.id })">{{ m.id === 'tab' ? 'Pay later' : 'Mark read' }}</button>
               </article>
             </div>
@@ -349,7 +304,7 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
             </div>
           </aside>
         </div>
-        <SolvedCard class="solved-overlay" v-if="step?.phase === 'solved'" :solved="step.step.solved" :next="nextReveal" :busy="g.busy.value" @advance="g.advance" />
+        <SolvedCard class="solved-overlay" v-if="step?.phase === 'solved'" :solved="step.step.solved" :busy="g.busy.value" @advance="g.advance" />
       </section>
       <div
         class="resizer"
@@ -475,8 +430,8 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
   border-color: var(--gold);
 }
 .hud-spacer { flex: 1 }
-.history-menu { margin-right: 8px; font-size: 12px }
-.history-menu svg { width: 12px }
+.world-title { flex-wrap: wrap; }
+.floor-heading { flex-basis: 160px; }
 .section-new { color: var(--accent-soft); }
 .statusbar { height: 34px; border-top: 0; box-shadow: inset 0 1px var(--line); }
 .statusbar .deploy-group, .statusbar .deploy, .statusbar .revisions { height: 100%; }
@@ -500,9 +455,9 @@ useHead({ title: () => (step.value?.step.title ?? 'Kettlewick') + ' · inherit' 
   color: var(--gold);
 }
 .bank-chip .hud-menu {
+  z-index: 5;
   min-width: 200px;
-  left: 0;
-  right: auto;
+  right: 0;
 }
 .hud-menu {
   max-height: 65vh;

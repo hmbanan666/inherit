@@ -92,7 +92,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     }
     if (!checkpoint) {
       expect(decodeSave(pack,JSON.stringify(save)).world).toEqual(save.world)
-      do { continueLesson(pack,save) } while (save.lessonId===lesson.id)
+      continueLesson(pack, save)
     }
   }
 },120000)
