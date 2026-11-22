@@ -40,6 +40,10 @@ export function usePlayback(clock: ReturnType<typeof usePlaybackClock>) {
     start = clock.now(),
   ) {
     const watched = mode === 'run'
+    if (!watched && !calls.length && !stationStatuses.value.size) {
+      line.value = undefined
+      return
+    }
     const statuses = new Map<string, Set<string>>()
     const visible: CallRecord[] = []
     for (const record of calls) {

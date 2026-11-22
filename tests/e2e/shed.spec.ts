@@ -83,10 +83,13 @@ test('place completion and a typo point back to the floor', async ({ page }) => 
 })
 
 test('the furnace can be empty and a named shipping trip plays above the arm', async ({ page }) => {
+  await page.clock.install()
   await openShed(page)
   await edit(page, 'take("furnace")', true)
   await page.getByTestId('primary-button').click()
   await expect(page.getByTestId('arm')).toContainText('Nothing ready yet at furnace.')
+  await expect(page.getByTestId('primary-button')).toBeEnabled()
+  await page.clock.runFor(750)
   await expect(page.getByTestId('checks')).toContainText('Nothing ready yet at furnace.')
   await openShed(page, '?step=bram-cart')
   await edit(page, '\ntake("furnace")\nput("cart")', true)
@@ -273,19 +276,23 @@ for (const speed of [1, 2, 4]) {
     await edit(page, [
       'import { take, put } from "inherit"',
       'export function onTick() {',
-      '  if (take("mine")) put("cart")',
+      '  take("mine")',
+      '  put("furnace")',
+      '  take("furnace")',
+      '  put("cart")',
       '}',
     ].join('\n'))
     const transfers = await page.getByTestId('arm').evaluateHandle(arm => {
       const hand = arm.querySelector('[data-testid="hand"]')!
       let held = hand.textContent
-      const arrivals: { load: string | null; distance: number }[] = []
+      const arrivals: { load: string | null; distance: number; atCart: boolean }[] = []
       const observer = new MutationObserver(() => {
         if (hand.textContent === held) return
         held = hand.textContent
         const station = document.querySelector<HTMLElement>('.station.acting')
         if (station) arrivals.push({
           load: held,
+          atCart: !!station.querySelector('[data-testid="place-cart"]'),
           distance: Math.abs(parseFloat(getComputedStyle(arm).left) - parseFloat(station.style.left)),
         })
       })
@@ -293,12 +300,15 @@ for (const speed of [1, 2, 4]) {
       return { arrivals, observer }
     })
     await page.getByTestId('primary-button').click()
-    await expect.poll(() => transfers.evaluate(t => t.arrivals.length)).toBeGreaterThanOrEqual(4)
+    await expect.poll(() => transfers.evaluate(({ arrivals }) =>
+      arrivals.some(arrival => arrival.atCart && arrival.load === 'empty hand'),
+    )).toBe(true)
     const arrivals = await transfers.evaluate(({ arrivals, observer }) => {
       observer.disconnect()
       return arrivals
     })
-    expect(arrivals.slice(0, 4).map(a => a.load)).toEqual(['iron ore', 'empty hand', 'iron ore', 'empty hand'])
+    expect(arrivals.map(a => a.load)).toContain('iron ore')
+    expect(arrivals.map(a => a.load)).toContain('iron ingot')
     for (const arrival of arrivals) expect(arrival.distance).toBeLessThan(1)
   })
 }

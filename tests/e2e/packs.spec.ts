@@ -132,6 +132,7 @@ test('a beginner can finish the first lesson from the starter comment alone',asy
   page.on('pageerror',e=>errors.push(e.message))
   await page.goto('/')
   await page.getByTestId('pack-beginner').click()
+  await expect(page.getByRole('group', { name: 'Clock controls' })).toHaveCount(0)
   const editor = page.getByRole('textbox',{name:'Player TypeScript'})
   await expect(editor).toBeFocused()
   await page.keyboard.type('say("Hello!")')

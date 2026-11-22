@@ -138,7 +138,15 @@ function start(reset = false) {
   send({kind:'open',id:props.manifest.id,stored,lesson:reset ? undefined : lesson})
 }
 onMounted(()=>{start();window.addEventListener('keydown',shortcut,true);window.addEventListener('pagehide',persist)})
-onBeforeUnmount(()=>{alive = false;clock.cancel();clearTimeout(timer);persist();worker?.terminate();window.removeEventListener('keydown',shortcut,true);window.removeEventListener('pagehide',persist)})
+onBeforeUnmount(() => {
+  alive = false
+  clock.cancel()
+  clearTimeout(timer)
+  persist()
+  worker?.terminate()
+  window.removeEventListener('keydown', shortcut, true)
+  window.removeEventListener('pagehide', persist)
+})
 </script>
 <template>
   <div class="workshop pack-studio" :class="{'high-contrast':contrast}" :style="{'--dock-width': width+'%'}">
