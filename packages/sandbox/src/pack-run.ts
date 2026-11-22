@@ -1,4 +1,5 @@
 import ts from 'typescript'
+import { playerError } from './player-error'
 import type { Call, Colour, Files, Pack } from '../../sim/src/framework/pack'
 import type { PackSave } from '../../sim/src/framework/save'
 import { runOnce } from './index'
@@ -49,7 +50,9 @@ export async function runPack<W,A extends object>(pack: Pack<W,A>, save: PackSav
   save.project.working = files
   save.phase = 'working'
   save.passed = []
-  evidence.console = await runOnce({ files, exposure: pack.exposure, chapterExports: names, budget: 256 }, host)
+  try {
+    evidence.console = await runOnce({ files, exposure: pack.exposure, chapterExports: names, budget: 256 }, host)
+  } catch (error) { throw new Error(playerError(error,names)) }
   finish()
   const statuses = checks()
   save.world = world
