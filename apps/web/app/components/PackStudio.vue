@@ -8,7 +8,7 @@ import type { PackFrame, PackCommand, DrawerTab } from '../lib/packProtocol'
 import { usePlaybackClock } from '../lib/playback-clock'
 import { useContrast } from '../lib/contrast'
 import { editorKey } from '../lib/editor'
-const readers = import.meta.glob<{ openArchivedSave(storage: Storage): Promise<string | null> }>('../../../../packages/sim/src/packs/*/archive.ts')
+const readers = import.meta.glob<{ openArchivedSave(storage: Storage, fresh?: boolean): Promise<string | null> }>('../../../../packages/sim/src/packs/*/archive.ts')
 const archiveViews = import.meta.glob<{ default: Component }>('../../../../packages/sim/src/packs/*/ArchiveView.vue')
 const props = defineProps<{manifest: PackManifest; view: Component}>()
 const packFolder = '../../../../packages/sim/src/packs/' + props.manifest.id

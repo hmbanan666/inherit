@@ -40,3 +40,14 @@ test('checks identify the hidden input when a program only handles the shown bat
     expect(result.failures).toContain('Empty belt')
   } finally { runner.dispose() }
 })
+
+test('invalid floor arguments identify the bad value and player line in the real runner', async () => {
+  const save = freshSave(pack)
+  selectChallenge(pack, save, 'heavy-tally')
+  const runner = createPackRunner(pack)
+  const files = { 'main.ts': 'import { display } from "inherit"\ndisplay(Infinity)' }
+  try {
+    await expect(runner.play(save, files)).rejects.toThrow(/main.ts:2.*Infinity.*finite number/)
+    expect(save.world.readings).toEqual([])
+  } finally { runner.dispose() }
+})

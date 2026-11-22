@@ -2,11 +2,12 @@
 import { computed, ref } from 'vue'
 import { archivedFiles, archives, archiveTitle } from './archive'
 
-const saved = archives(localStorage)
+const props = defineProps<{ recovery?: boolean }>()
+const saved = computed(() => archives(localStorage, props.recovery))
 const selected = ref(0)
-const groups = computed(() => archivedFiles(saved[selected.value]?.raw ?? ''))
+const groups = computed(() => archivedFiles(saved.value[selected.value]?.raw ?? ''))
 function download() {
-  const url = URL.createObjectURL(new Blob([saved[selected.value].raw], { type: 'application/json' }))
+  const url = URL.createObjectURL(new Blob([saved.value[selected.value].raw], { type: 'application/json' }))
   const link = document.createElement('a')
   link.href = url
   link.download = 'v5-workshop.json'

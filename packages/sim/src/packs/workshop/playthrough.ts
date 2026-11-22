@@ -61,7 +61,14 @@ for (const rate of [1, 2, 4]) test('direct clock entry, pause and parcel deliver
   await primary.click()
   const bar = page.getByRole('group', { name: 'Clock controls' })
   await bar.getByRole('button', { name: rate + 'x', exact: true }).click()
-  await bar.getByRole('button', { name: 'Pause' }).click()
+  await page.waitForFunction(() => {
+    const arm = document.querySelector('.plan foreignObject')
+    const x = Number(arm?.getAttribute('x'))
+    if (x <= 20 || x >= 506) return false
+    const pause = [...document.querySelectorAll<HTMLButtonElement>('.playback-bar button')].find(b => b.textContent === 'Pause')
+    pause?.click()
+    return !!pause
+  }, undefined, { timeout: 10000 })
   const counter = await bar.locator('output').innerText()
   const position = await page.locator('.plan foreignObject').getAttribute('x')
   await page.waitForTimeout(1000)
@@ -84,10 +91,51 @@ test('Stop loop retains the floor and Run once inspects a disposable tick', asyn
   await expect(primary).toContainText('Deploy')
   await primary.click()
   await expect(primary).toContainText('Stop loop')
-  await primary.click()
+  await page.waitForFunction(() => {
+    const x = Number(document.querySelector('.plan foreignObject')?.getAttribute('x'))
+    if (x <= 20 || x >= 506) return false
+    document.querySelector<HTMLButtonElement>('[data-testid="primary-button"]')!.click()
+    return true
+  })
   await expect(primary).toContainText('Deploy')
-  const before = await page.getByTestId('result-cart').innerText()
+  const before = (await page.getByTestId('result-cart').textContent())!
   await page.getByRole('button', { name: 'Run once', exact: true }).click()
+  await expect(page.getByTestId('result-cart')).toHaveText('A')
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('inherit.pack.workshop')!).world.queues.cart)).toEqual([])
   await page.getByRole('button', { name: 'Return to paused floor' }).click()
   await expect(page.getByTestId('result-cart')).toHaveText(before)
+})
+
+test('a v5 save starts fresh and its original files open in Settings', async ({ page }) => {
+  const source = JSON.stringify({
+    formatVersion: 1, packId: 'workshop', packVersion: 1,
+    world: { version: 6 }, entryWorld: { version: 6 },
+    project: { working: { 'main.ts': '// old working file' }, deployed: null, history: [], snapshots: [] },
+  })
+  await page.goto('/')
+  await page.evaluate(raw => localStorage.setItem('inherit.pack.workshop', raw), source)
+  await page.getByTestId('pack-workshop').click()
+  await expect(page.getByTestId('task-card')).toHaveText(/Dispatch the waiting batch/)
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByText('v5 Workshop code', { exact: true }).click()
+  await page.getByText('Working files', { exact: true }).click()
+  await expect(page.locator('.archive pre')).toHaveText('// old working file')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download original save' }).click()
+  expect((await download).suggestedFilename()).toBe('v5-workshop.json')
+})
+
+test('challenge selection preserves working drafts and starts each floor fresh', async ({ page }) => {
+  await page.goto('/?pack=workshop')
+  const drawer = page.getByTestId('drawer')
+  await drawer.getByRole('button', { name: 'Got it' }).click()
+  await pasteProjectFile(page, '// my unfinished batch', 'Player TypeScript')
+  await page.getByRole('button', { name: 'Learn', exact: true }).first().click()
+  await drawer.getByRole('combobox').selectOption('merge-bins')
+  await expect(page.getByTestId('result-left')).toHaveText('A C')
+  await drawer.getByRole('combobox').selectOption('dispatch-batch')
+  await expect(page.locator('.view-lines')).toContainText('// my unfinished batch')
+  await expect(page.getByTestId('result-belt')).toHaveText('A B C')
+  await page.reload()
+  await expect(page.locator('.view-lines')).toContainText('// my unfinished batch')
 })

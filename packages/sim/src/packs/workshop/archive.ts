@@ -38,30 +38,43 @@ export function archivedFiles(raw: string) {
   return groups
 }
 
-export function archives(storage: StorageReader) {
-  return Array.from({ length: storage.length }, (_, i) => storage.key(i))
+function files(value: unknown) {
+  return object(value) && Object.values(value).every(source => typeof source === 'string')
+}
+function revisions(value: unknown) {
+  return Array.isArray(value) && value.every(revision => object(revision) && files(revision.files))
+}
+
+export function archives(storage: StorageReader, includeOriginal = false) {
+  const saved = Array.from({ length: storage.length }, (_, i) => storage.key(i))
     .filter((key): key is string => !!key?.startsWith(prefix))
     .map(key => ({ key, raw: storage.getItem(key)! }))
+  if (includeOriginal) {
+    const raw = storage.getItem(activeKey) ?? storage.getItem(legacyKey)
+    if (raw !== null && !saved.some(entry => entry.raw === raw)) saved.push({ key: 'Original', raw })
+  }
+  return saved
 }
 
 /** Return null only after the old bytes are durable. The worker validates the
  * fresh slot before the studio writes it. Keep pre-pack sources in place. */
-export async function openArchivedSave(storage: StorageReader): Promise<string | null> {
+export async function openArchivedSave(storage: StorageReader, fresh = false): Promise<string | null> {
   const active = storage.getItem(activeKey)
   const raw = active ?? storage.getItem(legacyKey)
   if (raw === null) return null
   let data: Record<string, unknown> | undefined
   try { data = JSON.parse(raw) } catch { /* Keep the exact source available for recovery. */ }
-  if (active !== null && data?.packId === 'workshop' && data.packVersion === 2) return active
+  if (active !== null && data?.packId === 'workshop' && data.packVersion === 2) return fresh ? null : active
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
   const key = prefix + hash
   if (storage.getItem(key) !== raw) storage.setItem(key, raw)
   if (storage.getItem(key) !== raw) throw new Error('Could not verify the Workshop code archive.')
+  if (fresh) return null
   const versionFive = data?.formatVersion === 1 && data.packVersion === 1 && data.packId === 'workshop' &&
     object(data.world) && data.world.version === 6 && object(data.entryWorld) && data.entryWorld.version === 6 &&
-    object(data.project) && object(data.project.working) && (data.project.deployed === null || object(data.project.deployed)) &&
-    Array.isArray(data.project.history) && Array.isArray(data.project.snapshots)
+    object(data.project) && files(data.project.working) && (data.project.deployed === null || files(data.project.deployed)) &&
+    revisions(data.project.history) && revisions(data.project.snapshots)
   const prePack = !active && data && (object(data.entries) ||
     (Number.isInteger(data.version) && Number(data.version) >= 1 && Number(data.version) <= 6 && object(data.project)))
   if (!versionFive && !prePack) throw new Error('Unrecognized Workshop save. Open Settings to recover the original.')
