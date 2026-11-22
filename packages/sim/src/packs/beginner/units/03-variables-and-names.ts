@@ -1,5 +1,5 @@
 import { courseUnit, same, sameHelper, check } from '../course'
-import { feeds, binary, constant, updated, ticketKept, name, shape } from '../syntax'
+import { feeds, binary, constant, updated, ticketKept, literal, shape } from '../syntax'
 
 export default courseUnit({
   id: "variables-and-names",
@@ -37,6 +37,10 @@ paintSign(cottage)`,
       check("The sign carries your chosen name", e =>
         e.world.sign.trim().length > 0),
     ],
+    solved: {
+      reaction: "The courier found the door.",
+      did: "You named a string once and read it at the sign.",
+    },
     effect: ["signs", "Willow"],
   },
   {
@@ -75,6 +79,10 @@ hangFlag(flagColour)`,
       check("A gold flag flies", e =>
         e.world.flag === 'gold'),
     ],
+    solved: {
+      reaction: "The marshal can start the parade.",
+      did: "You reassigned a variable before raising the flag.",
+    },
     effect: ["flag", "gold"],
   },
   {
@@ -112,8 +120,12 @@ paintSign(board)`,
       check("Ticket remains West", e =>
         ticketKept(e)),
       check("A reassigned copy paints East", e =>
-        updated(e, 'paintSign', undefined, 'ticket') && e.world.sign === 'East'),
+        updated(e, 'paintSign', undefined, 'West') && e.world.sign === 'East'),
     ],
+    solved: {
+      reaction: "The diversion is posted.",
+      did: "Your board changed direction while the printed ticket kept its value.",
+    },
     effect: ["signs", "East"],
   },
   {
@@ -145,10 +157,14 @@ const motto = "swim fast"
 paintSign(team + " " + motto)`,
     checks: [
       check("Both cards supply the lettering", e =>
-        feeds(e, 'paintSign', binary('+'), name('team'), name('motto'))),
+        feeds(e, 'paintSign', binary('+'), literal('Otters'), literal('swim fast'))),
       check("Ribbon reads Otters swim fast", e =>
         e.world.sign === 'Otters swim fast'),
     ],
+    solved: {
+      reaction: "The Otters have their banner.",
+      did: "You joined two pieces of text with a space.",
+    },
     effect: ["signs", "Otters swim fast"],
   },
   {
@@ -194,6 +210,10 @@ say(\`Stops: \${stops}\`)`,
       check("Changing lane to 2 updates the label", e =>
         e.world.sign === `Lane ${e.before.readings.lane}`),
     ],
+    solved: {
+      reaction: "The runner found the lane.",
+      did: "Your template inserted the marshal’s current number.",
+    },
     effect: ["signs", "Lane 3"],
   },
   {
@@ -235,6 +255,10 @@ wakeUp()`,
       check("Bell rings before shutters open", e =>
         same(e.calls.map(call => call.name), ['ringBell', 'openShutters']) && e.world.shutters),
     ],
+    solved: {
+      reaction: "The shutters swing open.",
+      did: "You ran two actions by calling a function you wrote.",
+    },
     effect: ["shutters", "Open"],
   },
 ])

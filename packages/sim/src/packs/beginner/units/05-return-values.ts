@@ -45,6 +45,10 @@ showScore(harvest)`,
       check("Counts 4 and 7 both display correctly", e =>
         e.world.score === e.before.basket),
     ],
+    solved: {
+      reaction: "The audience sees the harvest.",
+      did: "You saved a returned number and displayed it.",
+    },
     effect: ["score", "4"],
   },
   {
@@ -91,6 +95,10 @@ setSignal(raining)`,
       check("Clear sky turns it off", e =>
         e.world.signal === e.before.raining),
     ],
+    solved: {
+      reaction: "The gardener can read the sky.",
+      did: "You used the weather sensor’s returned boolean.",
+    },
     effect: ["signal", "Green"],
   },
   {
@@ -143,6 +151,10 @@ showScore(seats)`,
       check("Tables of 5 and 8 show 4 and 7", e =>
         e.world.score === e.before.readings.capacity! - 1),
     ],
+    solved: {
+      reaction: "The table can take another booking.",
+      did: "Your function returned a count for the chalkboard.",
+    },
     effect: ["score", "4"],
   },
 ])

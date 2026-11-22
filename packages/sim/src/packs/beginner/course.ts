@@ -47,10 +47,11 @@ interface Page {
   checks: Check<Village>[]
   fixture?: Fixture
   variants?: { input: string; fixture: Fixture }[]
+  solved: { reaction: string; did: string }
   effect: [Prop, string]
 }
 
-function lessonFor(unit: Unit, page: Page) {
+function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
   const { id, kind, goal, scene, theory, prediction, checks, hints } = page
   const [prop, text] = page.effect
   const editLine = page.starter.split('\n').findIndex(line => line.includes('// TODO:')) + 2
@@ -74,15 +75,22 @@ function lessonFor(unit: Unit, page: Page) {
     referenceSolution: { 'main.ts': page.reference },
     visibleEffect: { testId: prop, text, description: page.reason },
     solved: {
-      reaction: page.cue,
-      did: checks.at(-1)!.label,
+      ...page.solved,
       idea: theory.title,
     },
     enter(world: Village) {
-      const album = world.album
-      if (world.lessonId) album[world.lessonId] = propText(world, world.prop)
+      const { album, landmarks } = world
+      if (world.lessonId) {
+        album[world.lessonId] = propText(world, world.prop)
+        if (world.unit.lessonIds.every(id => Object.hasOwn(album, id)) &&
+          !landmarks.some(landmark => landmark.id === world.unit.id)) {
+          landmarks.push({ id: world.unit.id, title: world.unit.landmark })
+        }
+      }
       Object.assign(world, initialWorld(), {
         album,
+        landmarks,
+        unit: { id: unit.id, landmark: unit.landmark, lessonIds },
         lessonId: id,
         scene,
         prop,
@@ -94,5 +102,6 @@ function lessonFor(unit: Unit, page: Page) {
 }
 
 export function courseUnit(unit: Unit, pages: Page[]) {
-  return { unit, lessons: pages.map(page => lessonFor(unit, page)) }
+  const lessonIds = pages.map(page => page.id)
+  return { unit, lessons: pages.map(page => lessonFor(unit, lessonIds, page)) }
 }

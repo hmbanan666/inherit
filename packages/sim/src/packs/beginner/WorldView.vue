@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { Call } from '../../framework/pack'
 import { propText, type Village } from './world'
+import Landmarks from './scenes/Landmarks.vue'
 import SceneStage from './scenes/SceneStage.vue'
 import VillagePanorama from './scenes/VillagePanorama.vue'
 
@@ -35,6 +36,7 @@ const panoramaWorld = computed(() => {
     <div class="stage">
       <VillagePanorama v-if="panorama" :world="panoramaWorld" :calls="calls"/>
       <SceneStage v-else :world="world"/>
+      <Landmarks :world="world"/>
       <div v-if="readings.length || world.ledger.length" class="input-card">
         <template v-for="[name, reading] in readings" :key="name">
           <code>{{ name }}</code><span>{{ JSON.stringify(reading) }}</span>

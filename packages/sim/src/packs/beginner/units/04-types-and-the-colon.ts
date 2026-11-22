@@ -36,6 +36,10 @@ paintSign(destination)`,
       check("Cove appears on the sign", e =>
         e.world.sign === 'Cove'),
     ],
+    solved: {
+      reaction: "The ferry has a destination.",
+      did: "You annotated the text that reached the sign.",
+    },
     effect: ["signs", "Cove"],
   },
   {
@@ -68,6 +72,10 @@ plant(cells)`,
       check("All six cells sprout", e =>
         e.world.gateFlowers === 6),
     ],
+    solved: {
+      reaction: "The seed tray is full.",
+      did: "You used a number annotation for the tray’s capacity.",
+    },
     effect: ["beds", "6 blooms"],
   },
   {
@@ -101,6 +109,10 @@ setSignal(safe)`,
       check("The green lens lights", e =>
         e.world.signal === true),
     ],
+    solved: {
+      reaction: "The ducks can cross.",
+      did: "Your typed boolean turned the signal green.",
+    },
     effect: ["signal", "Green"],
   },
   {
@@ -135,6 +147,10 @@ showScore(points)`,
       check("Board prints 8", e =>
         e.world.score === 8),
     ],
+    solved: {
+      reaction: "The reader accepted the ticket.",
+      did: "You matched a numeric value to its declared type.",
+    },
     effect: ["score", "8"],
   },
   {
@@ -167,6 +183,10 @@ paintSign(ink)`,
       check("The sign reads blue", e =>
         e.world.sign === 'blue'),
     ],
+    solved: {
+      reaction: "The inspector stamped the sign.",
+      did: "Your union limited the choice to two inks.",
+    },
     effect: ["signs", "blue"],
   },
 ])
