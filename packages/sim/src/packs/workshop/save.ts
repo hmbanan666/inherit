@@ -1,7 +1,7 @@
-import type { Campaign } from '../../model'
-import { isStarterProject } from '../../campaign'
-import { lessons } from '../../lessons'
-import { loadChapterSave } from '../../persistence'
+import type { Campaign } from './model'
+import { isStarterProject } from './campaign'
+import { lessons } from './chapter'
+import { loadChapterSave } from './persistence'
 import type { PackSave } from '../../framework/save'
 
 const v4Order = [

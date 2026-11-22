@@ -10,6 +10,7 @@ import {
   type Campaign,
   type ProjectFiles,
 } from '@inherit/sim'
+import workshop, { workshopAttempt } from '../../sim/src/packs/workshop/pack'
 import { createProgram, runOnce, type Program } from './index'
 
 /** Initialize against a copy so a failed module cannot spend coins or move live stock. */
@@ -18,9 +19,9 @@ export async function startChapter(c: Campaign, files: ProjectFiles, mode: 'run'
   next.project.working = { ...files }
   if (mode === 'deploy') deployGameProject(next)
   const attempt = mode === primaryButton(next)
-  const tick = primitiveTick(next, mode === 'run' ? 'run' : 'deploy')
+  const tick = workshopAttempt(next, mode === 'run' ? 'run' : 'setup')
   const surface = getSurface(next)
-  const options = { files, budget: surface.budget, chapterExports: surface.exports }
+  const options = { files, budget: surface.budget, chapterExports: workshop.available(next, ''), exposure: workshop.exposure }
   let program: Program | undefined
   let draft: Program | undefined
   try {
@@ -33,7 +34,7 @@ export async function startChapter(c: Campaign, files: ProjectFiles, mode: 'run'
       // machines or move stock on the live floor during a single clock step.
       const sameSource = JSON.stringify(files) === JSON.stringify(c.project.deployed)
       if (!live || !sameSource) {
-        const setup = primitiveTick(cloneCampaign(c), 'deploy')
+        const setup = workshopAttempt(cloneCampaign(c), 'setup')
         draft = await createProgram(options, setup.api)
         draft.drainLogs()
       }

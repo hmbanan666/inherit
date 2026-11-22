@@ -20,8 +20,7 @@ const editor = ref<{revealLine(file:string,line:number):void}>()
 const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
 const solved = computed(() => !busy.value && frame.value?.solved)
-const allGreen = computed(() => statuses.value.length && statuses.value.every(c => c === 'green'))
-const expanded = ref(false)
+const checkRows = computed(() => frame.value?.labels.map((text,i) => ({id:text,text,status:statuses.value[i] ?? 'red' as Colour})) ?? [])
 const query = new URLSearchParams(location.search)
 const local = import.meta.dev || ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
 const lesson = local ? query.get('lesson') ?? undefined : undefined
@@ -64,7 +63,6 @@ async function receive(data: PackFrame | {loadError:string}) {
     files.value = data.save.project.working
     activeFile.value = data.save.project.activeFile
     navigation.value = data.edit
-    expanded.value = false
   }
   frame.value = data
   error.value = data.error
@@ -113,15 +111,14 @@ onBeforeUnmount(()=>{alive = false;persist();worker?.terminate();window.removeEv
       <header class="world-title"><div><small class="eyebrow">{{ manifest.genre }}</small><h1>{{ manifest.title }}</h1></div></header>
       <component :is="view" v-if="displayWorld" :world="displayWorld" :calls="calls"/>
       <aside v-for="p in frame?.panels.filter(p=>p.id===panel || p.placement==='panel')" :key="p.id" class="entity-panel"><h2>{{ p.label }}</h2><p v-for="row in p.rows" :key="row.id">{{ row.label }} · {{ row.value }}</p></aside>
-      <section v-if="solved" class="solved-overlay lesson-card" data-testid="solved-card"><small>Lesson complete</small><h2>{{ solved.reaction }}</h2><p>{{ solved.did }} {{ solved.idea }}</p><button class="gold" data-testid="continue" @click="advance">Continue</button></section>
+      <SolvedCard v-if="solved" class="solved-overlay" :solved="solved" :busy="busy" @advance="advance"/>
     </section><div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)"/>
     <section class="editor-dock"><template v-if="complete"><div class="pack-ending"><small>Pack complete</small><h2>{{ manifest.title }}</h2><p>You used {{ manifest.learningGoals.join(', ').toLowerCase() }}.</p><a href="/">Back to game packs</a></div></template>
       <template v-else-if="frame"><header class="dock-header"><small>Lesson {{ frame.index+1 }} of {{ frame.total }}</small></header>
       <GoalBar :key="frame.save.lessonId ?? ''" :goal="frame.goal" :hints="frame.hints"/>
       <div class="file-tabs"><button aria-pressed="true">{{ activeFile }}</button></div>
       <div class="editor-pane"><div class="editor-host"><LazyCodeEditor ref="editor" :error="error"/></div></div>
-      <section class="pack-checks" data-testid="checks"><small>Checks</small><button v-if="allGreen" @click="expanded=!expanded">✓ {{ statuses.length }} done</button>
-      <p v-for="(label,i) in frame.labels" v-show="!allGreen || expanded" :key="label" :data-state="statuses[i]">{{ statuses[i]==='green'?'✓':statuses[i]==='amber'?'◐':'○' }} {{ label }}</p></section>
+      <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows"/>
       <section v-if="frame.logs.length" class="pack-checks"><small>Console</small><p v-for="(line,i) in frame.logs" :key="i">{{ line }}</p></section></template>
       <p v-if="error" class="pack-error" role="alert">{{ error }}</p><button v-if="blocked" @click="start(true)">Start a fresh pack</button>
     </section></main><footer class="statusbar"><span>{{ saved ? 'Saved on this device' : 'Save unavailable' }}</span><span>TypeScript</span></footer>

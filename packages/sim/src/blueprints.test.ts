@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { blueprintCommands } from './blueprints'
+import { blueprintCommands } from './packs/workshop/blueprints'
 import { createCampaign } from './index'
 
 test('named machines charge once, respect story unlocks and report failed purchases', () => {

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize, X } from '@lucide/vue'
-import { MACHINES, TICK_MS } from '@inherit/sim'
-import { useGame } from '../lib/useGame'
-import ShedStreet from './town/ShedStreet.vue'
-import TownPortrait from './town/TownPortrait.vue'
-import { center, FloorScene, tile } from '../lib/floor'
+import { MACHINES, TICK_MS, type CampaignWorld } from '@inherit/sim'
+import { useGame } from '../../../../../apps/web/app/lib/useGame'
+import ShedStreet from '../../../../../apps/web/app/components/town/ShedStreet.vue'
+import TownPortrait from '../../../../../apps/web/app/components/town/TownPortrait.vue'
+import { center, FloorScene, tile } from '../../../../../apps/web/app/lib/floor'
 
-const props = defineProps<{ highlighted: string[] }>()
+const props = defineProps<{ highlighted: string[]; world: CampaignWorld }>()
 const g = useGame(),
   { campaign, selected } = g
-const world = computed(() => campaign.value.world)
+const world = computed(() => props.world)
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 800, h: 500 }),

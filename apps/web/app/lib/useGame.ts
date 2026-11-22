@@ -1,5 +1,6 @@
+import { workshopLessons } from '../../../../packages/sim/src/packs/workshop/pack'
 import {
-  apiDeclarations, apiReference, createCampaign, currentStep, getSurface, jumpToStep,
+  createCampaign, currentStep, getSurface, jumpToStep,
   loadSave, placeNames, primaryButton, revealed, serializeSave,
   TICK_MS,
   townSnapshot,
@@ -58,8 +59,8 @@ function createGameStore() {
     reveals.value.some(r => r.kind === 'letter' && r.id === m.id),
   ))
   const surface = computed(() => getSurface(state.value))
-  const reference = computed(() => apiReference(state.value))
-  const api = computed(() => apiDeclarations(state.value))
+  const reference = shallowRef<import('@inherit/sim').ApiEntry[]>([])
+  const api = ref('')
   const playback = usePlayback()
   const hand = computed(() => (playback.watching.value || playback.call.value)
     ? playback.hand.value
@@ -172,6 +173,8 @@ function createGameStore() {
     await playback.play(frame.calls, mode, speed, returned)
     if (worker !== instance) return
     current = undefined
+    if (frame.api !== undefined) api.value = frame.api
+    if (frame.reference) reference.value = frame.reference
     const c = {
       ...frame.campaign,
       project: frame.project ?? state.value.project,
@@ -183,10 +186,11 @@ function createGameStore() {
       if (!(activeFile.value in files.value)) openFile('main.ts')
     }
     if (action.type === 'continue') {
-      const starter = currentStep(c)?.step.starter
-      if (starter && currentStep(c)?.step.id !== step.value?.step.id) {
-        files.value = { ...files.value, 'main.ts': starter }
-        openFile('main.ts')
+      const next = workshopLessons[c.lesson.index]
+      if (next && next.id !== step.value?.step.id) {
+        const starter = next.starter(files.value)
+        files.value = starter.files
+        openFile(starter.edit.file,starter.edit.line)
       }
     }
     c.project.working = files.value
@@ -370,9 +374,13 @@ function createGameStore() {
         restoreWorkshop(stored)
         localStorage.setItem(storageKey, stored)
       }
-      const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-      const resumePreview = navigation?.type === 'reload' || navigation?.type === 'back_forward'
-      if (id && !(stored && resumePreview)) state.value = jumpToStep(createCampaign(), id)
+      const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+      const resumePreview = entry?.type === 'reload' || entry?.type === 'back_forward'
+      if (id && !(stored && resumePreview)) {
+        state.value = jumpToStep(createCampaign(), id)
+        const starter = workshopLessons[state.value.lesson.index]?.starter(state.value.project.working)
+        if (starter) { state.value.project.working = starter.files; navigation.value = starter.edit; activeFile.value = starter.edit.file }
+      }
       else if (stored) {
         const restored = restoreWorkshop(stored)
         state.value = restored.campaign
@@ -386,7 +394,7 @@ function createGameStore() {
       saved.value = false
       notice.value = 'Save could not be loaded. New game replaces it.'
     }
-    if (activeFile.value === 'main.ts') openDraft()
+    if (navigation.value.line === 1 && activeFile.value === 'main.ts') openDraft()
     start()
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)

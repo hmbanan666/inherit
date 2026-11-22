@@ -1,26 +1,11 @@
-import ts from 'typescript'
+import { readPlayerAPI, playerDeclarations } from '../../sim/src/framework/declarations'
 import { playerError } from './player-error'
 import type { Call, Colour, Files, Pack } from '../../sim/src/framework/pack'
 import type { PackSave } from '../../sim/src/framework/save'
 import { runOnce } from './index'
 
 export function declarations(source: string, names: readonly string[], exposure: 'globals' | 'module') {
-  const file = ts.createSourceFile('player.ts', source, ts.ScriptTarget.Latest, true)
-  const signatures: string[] = []
-  const types: string[] = []
-  for (const stmt of file.statements) {
-    if (ts.isInterfaceDeclaration(stmt) && stmt.name.text === 'PlayerAPI') {
-      for (const method of stmt.members) {
-        if (!ts.isMethodSignature(method) || !names.includes(method.name.getText(file))) continue
-        const doc = ts.getJSDocCommentsAndTags(method)[0]?.getText(file) ?? ''
-        signatures.push(doc + '\n' + (exposure === 'globals' ? 'declare' : 'export') + ' function ' + method.getText(file))
-      }
-    } else if (ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt)) {
-      types.push(stmt.getText(file).replace(/^export\s+/, ''))
-    }
-  }
-  return types.join('\n') + '\n' + (exposure === 'globals' ? signatures.join('\n') : 'declare module "inherit" {\n' + signatures.join('\n') + '\n}') +
-    '\ndeclare const console: {log(...words: unknown[]): void}'
+  return playerDeclarations(readPlayerAPI(source),names,exposure)
 }
 export interface Moment<W> { call: Call; world: W; checks: Colour[] }
 export async function runPack<W,A extends object>(pack: Pack<W,A>, save: PackSave<W>, files: Files) {

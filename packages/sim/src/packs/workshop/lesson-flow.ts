@@ -3,7 +3,7 @@ import { markMessageRead } from './story'
 import { applyChapterHint } from './reference/chapter-one'
 import { recording, routes } from './reference/recording'
 import { primitiveTick } from './primitives'
-import { deployGameProject, type ChapterMachine } from './research'
+import { deployGameProject, type ChapterMachine } from './surface'
 import type { Campaign } from './model'
 import {
   activeRequest,
@@ -14,7 +14,7 @@ import {
   settleTown,
   TAB_LETTER,
 } from './town'
-import { firstIngotAfterRetry, lessons } from './lessons'
+import { firstIngotAfterRetry, lessons } from './chapter'
 
 export type StepPhase = 'brief' | 'working' | 'solved'
 export type Reveal =
@@ -56,7 +56,7 @@ export interface StepView {
 export interface CallRecord {
   file: string
   line: number
-  fn: 'take' | 'put' | 'look' | 'buy' | 'repair'
+  fn: 'take' | 'put' | 'look' | 'buy' | 'repair' | 'replyLater' | 'payBalance'
   args: string[]
   ok: boolean
   result?: unknown
@@ -110,7 +110,6 @@ const revealsAfter: Record<string, Reveal[]> = {
   'bram-loop': [
     { kind: 'coins' },
     { kind: 'section', id: 'town' },
-    { kind: 'section', id: 'inbox' },
     { kind: 'letter', id: 'tab' },
     { kind: 'debt' },
   ],
@@ -189,6 +188,8 @@ export function observeLesson(c: Campaign, calls: CallRecord[], logs: string[] =
       return true
     }
     switch (step.id) {
+      case 'harrow-tab': return calls.some(r => r.ok && r.fn === 'replyLater') && c.progress.messages.some(m => m.id === 'tab' && !m.unread)
+      case 'harrow-deed': return calls.some(r => r.ok && r.fn === 'payBalance') && !debtRemaining(c)
       case 'bram-take':
         return c.world.hand?.origin === 'mine' && ran('take', 'mine')
       case 'bram-feed':

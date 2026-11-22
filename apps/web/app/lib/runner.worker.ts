@@ -1,6 +1,6 @@
 import { startChapter, type Program } from '@inherit/sandbox'
 import {
-  advanceGame,
+  apiDeclarations, apiReference, advanceGame,
   ChapterRunError,
   rollbackGameProject,
   continueStep,
@@ -20,7 +20,7 @@ import type { Action, Frame } from './gameProtocol'
 let campaign: Campaign
 let program: Program | undefined
 let traces: Frame['traces'] = Object.create(null)
-let error = ''
+let error = '', lastSchema = ''
 
 self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
   let calls: CallRecord[] = [],
@@ -30,6 +30,7 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
   try {
     switch (action.type) {
       case 'init':
+        lastSchema = ''
         campaign = loadSave(action.campaign)
         program?.dispose()
         program = undefined
@@ -106,7 +107,11 @@ self.onmessage = async ({ data: action }: MessageEvent<Action>) => {
       sites.push({ file: call.file, line: call.line, fn })
   }
   const { project, seenSections: _seenSections, ...live } = campaign
+  const schema = apiDeclarations(campaign)
+  const changed = schema !== lastSchema
+  lastSchema = schema
   self.postMessage({
+    api: changed ? schema : undefined, reference: changed ? apiReference(campaign) : undefined,
     campaign: live,
     town: townSnapshot(campaign),
     active: !!program,

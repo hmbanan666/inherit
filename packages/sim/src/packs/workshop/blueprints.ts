@@ -3,7 +3,7 @@ import { machineRecipes } from './catalog'
 import { connectBelt, placeMachine, removeMachine } from './construction'
 import type { Campaign, Tile } from './model'
 import { PRICES } from './prices'
-import { getSurface } from './research'
+import { getSurface } from './surface'
 
 const upstream: Partial<Record<MachineKind, MachineKind>> = {
   furnace: 'miner',

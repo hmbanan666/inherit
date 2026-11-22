@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { startChapter, type Program } from '../../../sandbox/src'
+import { startChapter, type Program } from '../../../../../sandbox/src'
 import {
   advanceGame,
   continueStep,
@@ -12,7 +12,7 @@ import {
   markMessageRead,
   payInstallment,
   TICK_MS,
-} from '../index'
+} from '../../../index'
 import { applyChapterHint } from './chapter-one'
 
 test.each([1, 831, 19])(

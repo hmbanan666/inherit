@@ -1,8 +1,8 @@
-import type { MachineKind } from '../campaign-api'
-import type { Campaign } from '../model'
-import { purchaseBelt, purchaseMachine, purchasePlot, purchaseRoad, sellBelt } from '../shop'
-import { research } from '../research'
-import { markMessageRead } from '../story'
+import type { MachineKind } from '../packs/workshop/campaign-api'
+import type { Campaign } from '../packs/workshop/model'
+import { purchaseBelt, purchaseMachine, purchasePlot, purchaseRoad, sellBelt } from '../packs/workshop/shop'
+import { research } from '../packs/workshop/surface'
+import { markMessageRead } from '../packs/workshop/story'
 import { acceptOrder, MOTOR_CUSTOMER } from '../orders'
 
 type MachineRef = string | { memory: string }

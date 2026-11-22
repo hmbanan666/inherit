@@ -1,4 +1,4 @@
-import { starter } from './lessons'
+import { starter } from './chapter'
 import { PRICES } from './prices'
 import { letter, newTown } from './town'
 import { placeMachine } from './construction'
@@ -59,7 +59,7 @@ export const initialSignals = () => ({
   confirmed: false,
 })
 export function isStarterProject(files: ProjectFiles): boolean {
-  return files['main.ts'] === starter
+  return files['main.ts'] === starter || files['main.ts']?.trimEnd() === starter.split('// take(')[0].trimEnd()
 }
 
 export function createCampaign(seed = 1): Campaign {

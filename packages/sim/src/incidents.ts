@@ -1,6 +1,6 @@
-import { RECIPES } from './catalog'
-import type { MaterialId } from './campaign-api'
-import type { CampaignWorld, Incident, OrderState } from './model'
+import { RECIPES } from './packs/workshop/catalog'
+import type { MaterialId } from './packs/workshop/campaign-api'
+import type { CampaignWorld, Incident, OrderState } from './packs/workshop/model'
 
 /** Trace the stopped parcel through the current recipes and belts to reachable docks. */
 export function affectedOrders(world: CampaignWorld, incident: Incident, orders: OrderState[]): string[] {

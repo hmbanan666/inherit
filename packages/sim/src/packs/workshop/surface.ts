@@ -1,11 +1,12 @@
 import type { BlueprintAPI, Factory, MachineKind } from './campaign-api'
 import type { Campaign, WorkshopSection } from './model'
-import { lessons } from './lessons'
+import { panels, releasedIds } from './panels'
+import { lessons } from './chapter'
 import { deployProject, rollbackProject } from './campaign'
 
 export type FactoryMethod = Exclude<keyof Factory, 'tick' | 'recipe'> | keyof BlueprintAPI
 export type GameEventName = 'onItemArrived' | 'onMachineIdle' | 'onTruckReturned'
-export type ChapterExport = 'take' | 'put' | 'look' | 'buy' | 'repair'
+export type ChapterExport = 'take' | 'put' | 'look' | 'buy' | 'repair' | 'replyLater' | 'payBalance'
 const licenses = { press: 3, furnace: 4, cutter: 5, assembler: 9 } as const
 export type ChapterMachine = keyof typeof licenses
 export function availableMachines(c: Campaign): ChapterMachine[] {
@@ -197,9 +198,12 @@ export function research(c: Campaign, id: string): boolean {
 }
 export function getSurface(c: Campaign): UnlockedSurface {
   const { beat } = c.town
-  const sections: WorkshopSection[] = ['factory']
-  for (const reveal of c.lesson.released) if (reveal.kind === 'section') sections.push(reveal.id)
+  const released = releasedIds(c)
+  const sections = panels.filter(p => p.placement === 'nav' && (!p.reveal || released.includes(p.reveal)) && p.rows(c).length)
+    .map(p => p.id as WorkshopSection)
   const exports: ChapterExport[] = ['take', 'put']
+  if (beat >= 2) exports.push('replyLater')
+  if (beat >= 10) exports.push('payBalance')
   if (beat >= 3) exports.push('buy')
   if (beat >= 6) exports.push('look')
   if (beat > 6 || beat === 6 && lessons[c.lesson.index]?.id !== 'heat-inspect') exports.push('repair')

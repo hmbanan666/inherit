@@ -1,7 +1,7 @@
 import type { MachineKind } from './campaign-api'
 import type { Campaign, Tile } from './model'
 import { autoPath, buyPlot, connectBelt, placeMachine, removeMachine, removeBelt } from './construction'
-import { getSurface } from './research'
+import { getSurface } from './surface'
 
 import { PRICES } from './prices'
 export { PRICES } from './prices'

@@ -2,7 +2,7 @@ import type { LessonStep } from './lesson-flow'
 
 export const starter = `// Uncle's workshop. His arm can take from a place and put into a place.
 import { take, put } from "inherit"
-
+// take("mine") tells the arm where to pick up a rock. Try it below.
 `
 export const firstIngotAfterRetry =
   'Your first Run found the furnace still working, so take came back empty. Running again collected the finished ingot.'

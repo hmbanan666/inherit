@@ -1,6 +1,6 @@
-import type { Campaign, CampaignMachine } from './model'
+import type { Campaign, CampaignMachine } from './packs/workshop/model'
 import type { Objective } from './objectives'
-import { RESEARCH } from './research'
+import { RESEARCH } from './packs/workshop/surface'
 
 type Highlight = Objective['highlight']
 type MachineTarget = Extract<Highlight, { type: 'machine' }>

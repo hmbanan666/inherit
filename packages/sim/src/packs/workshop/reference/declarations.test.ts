@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import ts from 'typescript'
 import { posix } from 'node:path'
-import { apiDeclarations, apiReference, createCampaign, jumpToStep, lessons } from '../index'
+import { apiDeclarations, apiReference, createCampaign, jumpToStep, lessons } from '../../../index'
 
 import { chapterFiles } from './chapter-one'
 
@@ -40,7 +40,7 @@ test('each exact hint and its growing project typecheck with only the unlocked e
   for (const lesson of lessons) {
     const c = jumpToStep(createCampaign(), lesson.id)
     const dir = '/workshop/' + lesson.id
-    const scope = (source: string) => source.replaceAll(/\bPlace\b/g, 'Place' + c.lesson.index).replaceAll('"inherit"', JSON.stringify('inherit-' + lesson.id))
+    const scope = (source: string) => source.replaceAll(/\b(Place|MachineKind|Inspection)\b/g, name => name + c.lesson.index).replaceAll('"inherit"', JSON.stringify('inherit-' + lesson.id))
     files.set(dir + '/api.d.ts', scope(apiDeclarations(c)))
     for (const [name, source] of Object.entries(chapterFiles(lesson.beat, lesson.id)))
       files.set(dir + '/' + name, scope(source))

@@ -1,14 +1,14 @@
 import { blueprintCommands } from './blueprints'
 import type { MaterialId, RecipeId } from './campaign-api'
-import { recordStats } from './engine'
+import { recordStats } from '../../engine'
 import { hasRoom, produce } from './transport'
-import { lessons } from './lessons'
+import { lessons } from './chapter'
 import { placeNames, type CallRecord } from './lesson-flow'
 import { RECIPES } from './catalog'
 import type { Campaign, CampaignMachine } from './model'
 import { finishProduction, work } from './production'
-import { availableMachines, type ChapterMachine } from './research'
-import { purchaseProblem, wanted } from './town'
+import { availableMachines, type ChapterMachine } from './surface'
+import { payInstallment, purchaseProblem, wanted } from './town'
 
 function recipeFor(machine: CampaignMachine, item?: MaterialId): RecipeId | undefined {
   switch (machine.kind) {
@@ -142,6 +142,14 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
         ok,
         ok ? undefined : (problem ?? commands.lastError()),
       )
+    },
+    replyLater() {
+      const m = c.progress.messages.find(m => m.id === 'tab')
+      if (m && c.town.beat >= 2) m.unread = false
+      return record('replyLater', [], !!m)
+    },
+    payBalance() {
+      return record('payBalance', [], c.town.beat >= 10 && (c.town.payments === 3 || payInstallment(c, true)))
     },
     repair(place: string) {
       const m = machine(place)

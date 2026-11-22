@@ -1,9 +1,9 @@
 import { dispatch, advanceTrips } from './freight'
-import type { Factory, MaterialItem, FactoryEvent, RecipeId } from './campaign-api'
-import { MACHINES, RECIPES, machineRecipes } from './catalog'
-import type { CampaignMachine, CampaignWorld } from './model'
-import { markDefect, work, finishProduction } from './production'
-import { emit, feed, moveBelts, openIncident, produce } from './transport'
+import type { Factory, MaterialItem, FactoryEvent, RecipeId } from './packs/workshop/campaign-api'
+import { MACHINES, RECIPES, machineRecipes } from './packs/workshop/catalog'
+import type { CampaignMachine, CampaignWorld } from './packs/workshop/model'
+import { markDefect, work, finishProduction } from './packs/workshop/production'
+import { emit, feed, moveBelts, openIncident, produce } from './packs/workshop/transport'
 
 function checkFurnaceInput(machine: CampaignMachine, recipe: RecipeId | undefined, beat: number) {
   if (beat < 4 || machine.kind !== 'furnace' || machine.fault || !recipe) return

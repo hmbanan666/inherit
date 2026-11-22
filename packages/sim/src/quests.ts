@@ -1,6 +1,6 @@
-import type { Factory, FactoryEvent, MaterialId } from './campaign-api'
+import type { Factory, FactoryEvent, MaterialId } from './packs/workshop/campaign-api'
 import { stepCampaign } from './engine'
-import type { Campaign, QuestRun } from './model'
+import type { Campaign, QuestRun } from './packs/workshop/model'
 
 export interface Quest {
   id: string

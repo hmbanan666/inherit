@@ -1,4 +1,4 @@
-import type { ProjectFiles } from '../model'
+import type { ProjectFiles } from '../packs/workshop/model'
 import { OBJECTIVES } from '../objectives'
 export * from './actions'
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
-import { startChapter } from '../../../sandbox/src'
-import { advanceGame, createCampaign, currentStep, jumpToStep } from '../index'
+import { startChapter } from '../../../../../sandbox/src'
+import { advanceGame, createCampaign, currentStep, jumpToStep } from '../../../index'
 import { applyChapterHint } from './chapter-one'
 
 test('the first sorting run has room for both samples before the cutter arrives', async () => {

@@ -1,5 +1,5 @@
-import type { MaterialId } from './campaign-api'
-import type { Campaign, OrderState } from './model'
+import type { MaterialId } from './packs/workshop/campaign-api'
+import type { Campaign, OrderState } from './packs/workshop/model'
 
 const sale: Record<MaterialId, number> = {
   'iron-ore': 1,

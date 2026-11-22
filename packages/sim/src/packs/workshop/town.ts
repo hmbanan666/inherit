@@ -1,5 +1,5 @@
 import { PRICES } from './prices'
-import type { ChapterMachine } from './research'
+import type { ChapterMachine } from './surface'
 import { updateBankStep } from './lesson-flow'
 import type { MaterialId } from './campaign-api'
 import type { Campaign } from './model'

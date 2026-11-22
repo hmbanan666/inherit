@@ -8,7 +8,7 @@ test('a saved workshop starts in the shed and keeps its original controller file
     if (!localStorage.getItem('inherit.workshop.v1')) localStorage.setItem('inherit.workshop.v1', save)
   }, JSON.stringify(oldWorkshop))
   await openShed(page)
-  await expect(page.getByTestId('task-card')).toContainText('A rock for the forge')
+  await expect(page.getByTestId('task-card')).toContainText('Lift a rock from the mine')
   await page.reload()
   await page.getByRole('button', { name: 'History' }).click()
   await page.getByRole('button', { name: 'Open v2 code' }).click()

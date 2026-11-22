@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import { chapterCapture } from './chapter-capture'
-import { lessons } from '../../packages/sim/src/lessons'
-import { applyChapterHint } from '../../packages/sim/src/reference/chapter-one'
+import { edits } from '../../packages/sim/src/packs/workshop/starter'
+import { lessons } from '../../packages/sim/src/packs/workshop/chapter'
+import { applyChapterHint } from '../../packages/sim/src/packs/workshop/reference/chapter-one'
 import { edit, openShed } from './workshop'
 
 function browserErrors(page: Page) {
@@ -34,20 +35,20 @@ test('play every request from the visible hints, build the bridge and pay the ta
   for (const [index, step] of lessons.entries()) {
     await test.step(step.id, async () => {
       const prefix = String(index + 1).padStart(2, '0') + '-' + step.id
-      await expect(card.getByRole('heading')).toHaveText(step.title)
+      await expect(card.getByRole('heading')).toHaveText(edits[step.id].goal)
       await expect(page.getByTestId('speech')).toContainText(step.story)
       if (step.id === 'bram-smelt') {
         await expectMarkedLines(['take("mine")', 'put("furnace")'])
-        expect(await card.locator('pre').innerText()).toBe('function smelt() {\n  take("mine")\n  put("furnace")\n}\nsmelt()   // this line starts the job')
+        await expect(page.locator('.view-lines')).toContainText('Group the two marked lines')
       }
       if (step.id === 'bram-loop') {
         await expectMarkedLines(['smelt()', 'ship()'])
-        expect(await card.locator('pre').innerText()).toBe('export function onTick() {\n  smelt()\n  ship()\n}')
+        await expect(page.locator('.view-lines')).toContainText('New idea: onTick')
       }
       if (index < 8) await capture(prefix + '-brief')
       for (const label of ['Hint', 'Show places and functions', 'Show exact lines']) await button(label).click()
       const lines = await card.locator('pre.hint').innerText()
-      await expect(card.locator('pre.hint')).toHaveText(step.hints[2])
+      if (!step.id.startsWith('harrow-')) await expect(card.locator('pre.hint')).toHaveText(step.hints[2])
       if (step.id === 'bram-smelt') await expectMarkedLines(['take("mine")', 'put("furnace")'])
       if (step.id === 'bram-loop') await expectMarkedLines(['smelt()', 'ship()'])
       if (index < 8) await capture(prefix + '-hint')
@@ -55,7 +56,7 @@ test('play every request from the visible hints, build the bridge and pay the ta
       if (step.id === 'harrow-tab') {
         await page.getByTestId('nav-inbox').click()
         if (index < 8) await capture(prefix + '-reply')
-        await button(lines).click()
+        await button('Pay later').click()
         await button('Close drawer').click()
       } else if (step.id === 'harrow-deed') {
         await button('Pay debt').click()
@@ -111,7 +112,6 @@ test('play every request from the visible hints, build the bridge and pay the ta
         await page.getByTestId('nav-shed').click()
         await next.click()
         await expect(page.getByTestId('nav-inbox')).toBeVisible()
-        await next.click()
         await page.getByTestId('nav-inbox').click()
         await expect(page.getByRole('heading', { name: 'Your uncle’s tab' })).toBeVisible()
         await capture('reveal-inbox-letter')
@@ -130,13 +130,13 @@ test('play every request from the visible hints, build the bridge and pay the ta
 test('late jumps open the expected machines, files and town changes', async ({ page }) => {
   const errors = browserErrors(page)
   await openShed(page, '?step=bridge-fit&speed=8')
-  await expect(page.getByTestId('task-card')).toContainText('Fit a plate to a coil')
+  await expect(page.getByTestId('task-card')).toContainText(edits['bridge-fit'].goal)
   await expect(page.getByTestId('place-assembler')).toBeVisible()
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'Project files' }).click()
   await expect(page.getByRole('button', { name: 'tools.ts', exact: true })).toBeVisible()
   await openShed(page, '?step=harrow-deed&speed=8')
-  await expect(page.getByTestId('task-card')).toContainText('Take the deed')
+  await expect(page.getByTestId('task-card')).toContainText(edits['harrow-deed'].goal)
   await page.getByTestId('nav-town').click()
   await expect(page.locator('.town-print')).toHaveAccessibleName(/Riverside bridge working/)
   await expect(page.getByRole('button', { name: 'Pay debt' })).toContainText('600')

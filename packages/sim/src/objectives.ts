@@ -1,6 +1,6 @@
-import type { MachineKind, MaterialId, RecipeId } from './campaign-api'
+import type { MachineKind, MaterialId, RecipeId } from './packs/workshop/campaign-api'
 import { activeCard } from './objective-highlights'
-import type { Campaign, ObjectiveRun } from './model'
+import type { Campaign, ObjectiveRun } from './packs/workshop/model'
 import { questStatus, QUESTS, restartQuest } from './quests'
 
 export interface Objective {

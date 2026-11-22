@@ -1,5 +1,5 @@
-import type { CampaignMachine, CampaignWorld } from './model'
-import { arrive, emit, hasRoom, openIncident, produce } from './transport'
+import type { CampaignMachine, CampaignWorld } from './packs/workshop/model'
+import { arrive, emit, hasRoom, openIncident, produce } from './packs/workshop/transport'
 
 export function dispatch(
   world: CampaignWorld,

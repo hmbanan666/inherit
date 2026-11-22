@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { useGame } from '../lib/useGame'
-
-const { step, error, playback } = useGame()
-const checks = computed(() => step.value?.checks ?? [])
+import type { Colour } from '@inherit/sim/pack'
+const props = defineProps<{
+  checks: { id: string; text: string; status: Colour; progress?: string }[]
+  error?: string
+  messages?: readonly string[]
+}>()
 const expanded = ref(false)
-const done = computed(() => checks.value.filter(check => check.status === 'green').length)
-const visible = computed(() => expanded.value ? checks.value : checks.value.filter(check => check.status !== 'green'))
+const done = computed(() => props.checks.filter(check => check.status === 'green').length)
+const visible = computed(() => expanded.value ? props.checks : props.checks.filter(check => check.status !== 'green'))
 const marks = { red: '○', amber: '◐', green: '✓' }
 const labels = { red: 'Still to do', amber: 'Getting closer', green: 'Done' }
 </script>
@@ -16,7 +18,7 @@ const labels = { red: 'Still to do', amber: 'Getting closer', green: 'Done' }
       <span aria-hidden="true">{{ expanded ? '▾' : '▸' }}</span>{{ done }} done
     </button>
     <p v-if="error" role="alert">{{ error }}</p>
-    <p v-for="message in step?.phase === 'working' || error ? playback.messages.value : []" :key="message">{{ message }}</p>
+    <p v-for="message in messages" :key="message">{{ message }}</p>
     <ul v-if="visible.length">
       <li v-for="check in visible" :key="check.id" :data-state="check.status"
         :aria-current="check.id === checks[0]?.id ? 'step' : undefined">

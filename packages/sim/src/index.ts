@@ -1,13 +1,13 @@
 import { stepCampaign } from './engine'
-import type { CampaignWorld } from './model'
-import type { Factory as CampaignFactory, FactoryEvent } from './campaign-api'
-export * from './model'
-export * from './catalog'
-export * from './campaign'
-export { lessons } from './lessons'
-export * from './request-checks'
-export * from './construction'
-export * from './persistence'
+import type { CampaignWorld } from './packs/workshop/model'
+import type { Factory as CampaignFactory, FactoryEvent } from './packs/workshop/campaign-api'
+export * from './packs/workshop/model'
+export * from './packs/workshop/catalog'
+export * from './packs/workshop/campaign'
+export { lessons } from './packs/workshop/chapter'
+export * from './packs/workshop/request-checks'
+export * from './packs/workshop/construction'
+export * from './packs/workshop/persistence'
 export * from './quests'
 export type {
   Factory as CampaignFactory,
@@ -19,7 +19,7 @@ export type {
   MachineStats,
   TruckOutcome,
   FactoryEvent,
-} from './campaign-api'
+} from './packs/workshop/campaign-api'
 import type { Belt, Factory, Item, Layout, Level, Machine, World } from './types'
 export type * from './types'
 export * from './levels'
@@ -254,17 +254,17 @@ export function evaluate(world: World): Check[] {
   )
   return checks
 }
-export * from './research'
-export * from './shop'
+export * from './packs/workshop/surface'
+export * from './packs/workshop/shop'
 export { acceptOrder, declineOrder, openBoard, orderMaterials } from './orders'
-export { apiDeclarations, apiReference, type ApiEntry } from './declarations'
+export { apiDeclarations, apiReference, type ApiEntry } from './packs/workshop/declarations'
 export { OBJECTIVES, objectiveTrack, objectiveProgress, retryObjective, type Objective } from './objectives'
-export { markMessageRead } from './story'
-export * from './game'
+export { markMessageRead } from './packs/workshop/story'
+export * from './packs/workshop/game'
 export { referenceFiles, referenceActions, applyReferenceAction, type ReferenceAction } from './reference'
 
-export * from './town-view'
-export { payInstallment, activeRequest, DAY } from './town'
-export { primitiveTick, type ChapterFactory } from './primitives'
+export * from './packs/workshop/town-view'
+export { payInstallment, activeRequest, DAY } from './packs/workshop/town'
+export { primitiveTick, type ChapterFactory } from './packs/workshop/primitives'
 
-export * from './lesson-flow'
+export * from './packs/workshop/lesson-flow'

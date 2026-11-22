@@ -36,6 +36,8 @@ export interface Frame {
   town: TownSnapshot
   campaign: Omit<Campaign, 'project' | 'seenSections'>
   project?: Campaign['project']
+  api?: string
+  reference?: import('@inherit/sim').ApiEntry[]
   active: boolean
   error: string
   notice?: string

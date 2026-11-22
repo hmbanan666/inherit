@@ -1,4 +1,4 @@
-import { lessons, starter } from '../lessons'
+import { lessons, starter } from '../chapter'
 import type { LessonStep } from '../lesson-flow'
 import type { ProjectFiles } from '../model'
 

@@ -43,6 +43,7 @@ test('Uncle supplies the import and the only player file is main.ts', () => {
   expect(c.project.working['main.ts'].trim().split('\n')).toEqual([
     "// Uncle's workshop. His arm can take from a place and put into a place.",
     'import { take, put } from "inherit"',
+    '// take("mine") tells the arm where to pick up a rock. Try it below.',
   ])
   expect(getSurface(c).multiFile).toBe(false)
 })

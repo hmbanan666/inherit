@@ -1,4 +1,4 @@
-import { lessons } from './lessons'
+import { lessons } from './chapter'
 import { createCampaign, snapshotProject } from './campaign'
 import { COMPETITION_LETTER, INSTALLMENTS, TAB_LETTER } from './town'
 import { MACHINES, MATERIALS, RECIPES } from './catalog'

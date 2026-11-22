@@ -5,7 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./api": "./src/api.ts",
-    "./campaign-api": "./src/campaign-api.ts",
+    "./campaign-api": "./src/packs/workshop/campaign-api.ts",
     "./pack": "./src/framework/pack.ts",
     "./save": "./src/framework/save.ts",
     "./registry": "./src/packs/registry.ts",
@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "vite": "8.3.8"
+  },
+  "dependencies": {
+    "typescript": "5.9.3"
   }
 }
