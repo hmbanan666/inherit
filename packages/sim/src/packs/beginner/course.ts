@@ -1,4 +1,6 @@
 import { mainFile, type Check, type Evidence, type Lesson } from '../../framework/pack'
+import { units } from './map'
+import { inputCards } from './inputs'
 import type { PlayerAPI } from './player'
 import { initialWorld, propText, type Fixture, type Prop, type Scene, type Village } from './world'
 
@@ -56,6 +58,11 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
   const [prop, text] = page.effect
   const editLine = page.starter.split('\n').findIndex(line => line.includes('// TODO:')) + 2
 
+  const variants = (page.variants ?? []).map(({ input, fixture }) => ({
+    input,
+    enter: (world: Village) => { Object.assign(world, structuredClone(fixture)) },
+  }))
+
   return {
     id,
     kind,
@@ -64,11 +71,23 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
     scene,
     theory,
     prediction,
-    checks,
+    checks: variants.length ? [
+      {
+        ...checks[0],
+        evaluate: (e: Seen) => checks.every(check => check.evaluate(e) === 'green') ? 'green' as const : 'red' as const,
+      },
+      ...variants.map((variant, index) => ({
+        ...checks[1],
+        evaluate: (e: Seen) => checks.every(check => check.evaluate(e) === 'green') ? 'green' as const : 'red' as const,
+        id: checks[1].id + '-' + index,
+        input: variant.input,
+      })),
+    ] : checks,
     hints,
     task: { condition: page.reason, examples: [] },
     introduces: page.introduces ?? [],
-    variants: page.variants ?? [],
+    variants,
+    inputs: inputCards,
     idea: theory.title,
     mode: 'run' as const,
     starter: () => mainFile(page.starter, editLine),
@@ -101,7 +120,9 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
   } satisfies Lesson<Village> & Record<string, unknown>
 }
 
-export function courseUnit(unit: Unit, pages: Page[]) {
+export function courseUnit(unitId: string, pages: Page[]) {
+  const unit = units.find(unit => unit.id === unitId)
+  if (!unit) throw new Error('Unknown course unit: ' + unitId)
   const lessonIds = pages.map(page => page.id)
   return { unit, lessons: pages.map(page => lessonFor(unit, lessonIds, page)) }
 }

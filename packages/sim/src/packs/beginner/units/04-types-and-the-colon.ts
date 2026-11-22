@@ -1,11 +1,7 @@
 import { courseUnit, check } from '../course'
 import { feeds, annotation, inks } from '../syntax'
 
-export default courseUnit({
-  id: "types-and-the-colon",
-  title: "Types and the colon",
-  landmark: "a typesetter’s kiosk",
-}, [
+export default courseUnit("types-and-the-colon", [
   {
     id: "ticket-type",
     kind: "fill",

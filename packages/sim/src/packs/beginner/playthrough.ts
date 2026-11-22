@@ -15,6 +15,9 @@ test('play TypeScript from zero from the gate to the fair', async ({ page }) => 
   for (const lesson of lessons) {
     await test.step(lesson.id, async () => {
       const path = 'beginner/' + lesson.id + '/'
+      const starter = lesson.starter()
+      const todo = starter.files['main.ts'].split('\n')[starter.edit.line - 2].trim()
+      await expect(page.locator('.view-lines')).toContainText(todo)
       await expect(drawer).toBeVisible()
       await expect(drawer).toContainText(lesson.theory.body[0])
       await expect(drawer).toContainText(lesson.theory.example)

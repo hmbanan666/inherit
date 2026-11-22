@@ -1,10 +1,6 @@
 import { courseUnit, calls, check } from '../course'
 
-export default courseUnit({
-  id: "calls-and-strings",
-  title: "Calls and strings",
-  landmark: "a painted welcome arch",
-}, [
+export default courseUnit("calls-and-strings", [
   {
     id: "hello",
     kind: "write",

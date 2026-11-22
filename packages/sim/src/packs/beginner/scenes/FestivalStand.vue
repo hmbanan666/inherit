@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Village } from '../world'
+import Villager from '../../../visuals/Villager.vue'
 defineProps<{ world: Village }>()
 </script>
 
@@ -33,10 +34,20 @@ defineProps<{ world: Village }>()
       </g>
     </g>
     <g v-else-if="world.scene === 'scoreboard' || world.prop === 'score'">
+      <g v-if="world.lessonId === 'score-maths'" transform="translate(98 146)">
+        <g v-for="tile in 12" :key="tile" :transform="`translate(${(tile-1)%4*14} ${Math.floor((tile-1)/4)*14})`">
+          <rect width="11" height="11" rx="2" :fill="tile === 12 ? '#9a8a79' : '#edd08c'"/>
+          <path v-if="tile === 12" d="m8 0-5 5 4 2-5 4" fill="none" stroke="#58493e" stroke-width="1.5"/>
+        </g>
+      </g>
       <rect x="180" y="129" width="190" height="70" rx="5" fill="#4c635c" stroke="#907b57" stroke-width="5"/>
       <text x="275" y="175" class="chalk">{{ world.score ?? (world.sign || '—') }}</text>
     </g>
     <g v-else>
+      <g v-for="(guest, index) in world.neighbours" :key="index" :transform="`translate(${260+index*56} 211)`">
+        <Villager coat="#698c86" waving/>
+        <text y="14">{{ guest }}</text>
+      </g>
       <g v-for="(card, index) in world.cards" :key="index" :transform="`translate(${130 + index * 100} 145)`">
         <path d="m-28 0 63-2 3 47-64 2z" fill="#f1dfad" stroke="#a58861"/>
         <text x="4" y="19">{{ card.name }}</text><text x="4" y="36">{{ card.seats }} seats</text>

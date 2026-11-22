@@ -1,11 +1,7 @@
 import { courseUnit, same, sameHelper, check } from '../course'
 import { feeds, binary, constant, updated, ticketKept, literal, shape } from '../syntax'
 
-export default courseUnit({
-  id: "variables-and-names",
-  title: "Variables and names",
-  landmark: "a cottage nameplate",
-}, [
+export default courseUnit("variables-and-names", [
   {
     id: "house-sign",
     kind: "write",

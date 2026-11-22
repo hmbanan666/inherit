@@ -1,11 +1,7 @@
 import { courseUnit, calls, same, check } from '../course'
 import { inBlock, accumulated } from '../syntax'
 
-export default courseUnit({
-  id: "loops",
-  title: "Loops",
-  landmark: "a lit path to the fair",
-}, [
+export default courseUnit("loops", [
   {
     id: "neighbours",
     kind: "write",

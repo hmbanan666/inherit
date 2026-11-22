@@ -24,6 +24,11 @@ const ducks = computed(() => props.world.readings.queue ?? ['Dot', 'Fern', 'Pip'
         <path d="M-38-24h82l-4-6h-73z" fill="#c67e62"/>
         <rect v-for="window in 5" :key="window" :x="window * 14 - 48" y="-20" width="9" height="11" rx="2" fill="#659295"/>
       </g>
+      <g v-if="world.prop === 'signs'" transform="translate(108 166)">
+        <path d="M-4 17v-48h8v48" fill="#876b50"/>
+        <rect x="-60" y="-56" width="120" height="29" rx="3" fill="#eed6a6" stroke="#97794f" stroke-width="3"/>
+        <text text-anchor="middle" y="-37">{{ world.sign }}</text>
+      </g>
       <g v-if="world.readings.waiting" fill="#555f60">
         <g v-for="(guest, index) in world.readings.waiting" :key="guest" :transform="`translate(${38 + index * 33} 176)`">
           <circle cy="-24" r="7" fill="#d7a87f"/><path d="M-8-16q8-6 16 0l3 18h-22z"/>

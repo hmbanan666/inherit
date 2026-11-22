@@ -22,5 +22,5 @@ const curriculum = [
   unit10,
 ]
 
-export const units = curriculum.map(section => section.unit)
+export { units } from './map'
 export const lessons = curriculum.flatMap(section => section.lessons)

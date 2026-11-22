@@ -1,11 +1,7 @@
 import { courseUnit, calls, check } from '../course'
 import { feeds, binary, shape, inBlock } from '../syntax'
 
-export default courseUnit({
-  id: "choices",
-  title: "Choices",
-  landmark: "a sheltered picnic table",
-}, [
+export default courseUnit("choices", [
   {
     id: "picnic-threshold",
     kind: "write",

@@ -1,11 +1,7 @@
 import { courseUnit, same, check } from '../course'
 import { feeds, binary, numeral } from '../syntax'
 
-export default courseUnit({
-  id: "numbers-and-output",
-  title: "Numbers and output",
-  landmark: "a planted gate bed",
-}, [
+export default courseUnit("numbers-and-output", [
   {
     id: "flowers",
     kind: "write",

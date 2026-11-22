@@ -1,6 +1,9 @@
 import type { PackManifest } from '../../framework/pack'
 
+import { units } from './map'
+
 export default {
+  units,
   id: 'beginner',
   title: 'TypeScript from zero',
   tagline: 'Give Mila her first words. Build a village fair from a ledger of bookings.',

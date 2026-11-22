@@ -1,11 +1,7 @@
 import { courseUnit, calls, check } from '../course'
 import { feeds, constant, reading, helperResult } from '../syntax'
 
-export default courseUnit({
-  id: "return-values",
-  title: "Return values",
-  landmark: "an orchard counting table",
-}, [
+export default courseUnit("return-values", [
   {
     id: "basket-reading",
     kind: "write",
