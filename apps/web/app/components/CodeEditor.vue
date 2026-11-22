@@ -237,6 +237,8 @@ onMounted(() => {
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
+    wordWrap: 'on',
+    wrappingIndent: 'same',
     minimap: { enabled: false },
     fontFamily: 'IBM Plex Mono, monospace',
     fontSize: 13,
