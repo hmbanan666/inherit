@@ -1,7 +1,7 @@
 // Evaluated inside QuickJS before loading any player modules. The returned helpers
 // stay in host-owned handles. Guest values only cross the boundary as primitives.
 export const guestSetup = String.raw`
-(function install(initial, operations, call, log, ambient) {
+(function install(initial, operations, call, log, ambient, bindings) {
   "use strict";
   delete Math.random;
   delete globalThis.Date;
@@ -70,6 +70,15 @@ export const guestSetup = String.raw`
       line += (i ? " " : "") + label(values[i]);
     log(stringify(cut(line, 0, 512)));
   } }));
+
+  function readonly(value) {
+    if (value && typeof value === "object") {
+      for (const key of keys(value)) readonly(value[key]);
+      freeze(value);
+    }
+    return value;
+  }
+  for (const [name, value] of Object.entries(parse(bindings))) global(name, readonly(value));
 
   const api = create(null);
   function result(reply) { return reply === undefined ? undefined : parse(reply); }

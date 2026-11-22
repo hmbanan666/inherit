@@ -1,11 +1,17 @@
 <script setup lang="ts">
-defineProps<{goal: string; hints: readonly string[]}>()
-const rung = ref(0)
+defineProps<{ goal: string }>()
+defineEmits<{ help: [] }>()
 </script>
+
 <template>
-  <section class="lesson-card goal-bar" aria-label="Current goal" data-testid="task-card">
-    <header><h2>{{ goal }}</h2><button v-if="hints.length" data-testid="hint" @click="rung = (rung + 1) % (hints.length + 1)">{{ !rung ? 'Hint' : rung === hints.length ? 'Hide hint' : rung + 1 === hints.length ? 'Show exact lines' : 'Show places and functions' }}</button></header>
-    <p v-if="rung && rung < hints.length" class="hint">{{ hints[rung-1] }}</p>
-    <pre v-else-if="rung" class="hint">{{ hints[rung-1] }}</pre>
+  <section class="goal-bar" aria-label="Current goal" data-testid="task-card">
+    <h2 :title="goal">{{ goal }}</h2>
+    <button aria-label="Open lesson drawer" data-testid="hint" @click="$emit('help')">?</button>
   </section>
 </template>
+
+<style scoped>
+.goal-bar { height: 48px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line) }
+h2 { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px }
+button { border-radius: 50%; width: 29px; height: 29px; color: var(--gold) }
+</style>

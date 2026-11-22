@@ -1,3 +1,7 @@
+import { createCampaign } from '../../packages/sim/src/packs/workshop/campaign'
+import { jumpToStep } from '../../packages/sim/src/packs/workshop/lesson-flow'
+import { workshopSave } from '../../packages/sim/src/packs/workshop/save'
+import { workshopStarter } from '../../packages/sim/src/packs/workshop/starter'
 import { chapterCapture } from './chapter-capture'
 import { expect, type Page } from '@playwright/test'
 
@@ -32,9 +36,26 @@ export async function edit(page: Page, source: string, append = false) {
     await page.keyboard.press('Delete')
   }
 }
+/** Seed a reachable chapter boundary only for tests that exercise persistence. */
+export async function savedShed(page: Page, id: string, speed = 1) {
+  const campaign = jumpToStep(createCampaign(), id)
+  campaign.project.working = workshopStarter(id, campaign.project.working).files
+  const raw = JSON.stringify(workshopSave(campaign, 'main.ts', false))
+  await page.addInitScript(raw => {
+    if (!localStorage.getItem('inherit.pack.workshop')) localStorage.setItem('inherit.pack.workshop', raw)
+  }, raw)
+  await openShed(page, '?speed=' + speed)
+}
+
 export async function openShed(page: Page, query = '') {
   await page.goto('/?pack=workshop' + (query ? '&' + query.slice(1) : ''))
   await expect(page.getByTestId('primary-button')).toBeEnabled()
   await expect(page.locator('.pixi-mount canvas')).toBeVisible()
   await expect(page.locator('.project-editor .view-lines')).toBeVisible()
+  if (await page.getByTestId('drawer').isVisible()) await page.getByRole('button', {name: 'Got it'}).click()
+}
+
+export async function openTool(page: Page, tool: 'learn' | 'hints' | 'api' | 'console') {
+  if (!await page.getByTestId('drawer').isVisible()) await page.getByTestId('hint').click()
+  await page.getByTestId('drawer-' + tool).click()
 }

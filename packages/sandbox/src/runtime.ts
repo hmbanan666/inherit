@@ -52,6 +52,7 @@ export async function openRuntime(
   operations: readonly string[],
   initialFactory?: FactoryContext,
   exposure: 'globals' | 'module' = 'module',
+  inputs: Record<string, unknown> = {},
 ) {
   if (!Number.isInteger(budget) || budget < 1 || budget > 4096)
     throw new Error('Budget must be an integer from 1 to 4096.')
@@ -161,10 +162,15 @@ export async function openRuntime(
         logs.push(JSON.parse(vm.getString(line)))
       }),
     )
+    for (const name of Object.keys(inputs)) {
+      if (names.includes(name) || !/^[a-zA-Z_$][a-zA-Z_$0-9]*$/.test(name))
+        throw new Error('Invalid scene input: ' + name)
+    }
+    const bindings = keep(vm.newString(hostJson(inputs)))
     const helpers = keep(
       usingHandle(vm.newString(initial), (seed) =>
         usingHandle(vm.newString(JSON.stringify(names)), (names) =>
-          invoke(install, seed, names, call, log, exposure === 'globals' ? vm.true : vm.false),
+          invoke(install, seed, names, call, log, exposure === 'globals' ? vm.true : vm.false, bindings),
         ),
       ),
     )

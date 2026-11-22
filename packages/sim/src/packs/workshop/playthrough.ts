@@ -3,7 +3,7 @@ import { chapterCapture } from '../../../../../tests/e2e/chapter-capture'
 import { edits } from './starter'
 import { lessons } from './chapter'
 import { workshopReference } from './reference/chapter-one'
-import { pasteProjectFile } from '../../../../../tests/e2e/workshop'
+import { pasteProjectFile, openTool } from '../../../../../tests/e2e/workshop'
 
 function browserErrors(page: Page) {
   const errors: string[] = []
@@ -40,19 +40,18 @@ test('play every workshop reference in the editor, build the bridge and pay the 
       await expect(page.getByTestId('speech')).toContainText(step.story)
       if (step.id === 'bram-smelt') {
         await expectMarkedLines(['take("mine")', 'put("furnace")'])
-        await expect(page.locator('.view-lines')).toContainText('Group the two marked lines')
+        await expect(page.locator('.view-lines')).toContainText('TODO: Give the two furnace moves')
       }
       if (step.id === 'bram-loop') {
         await expectMarkedLines(['smelt()', 'ship()'])
-        await expect(page.locator('.view-lines')).toContainText('New idea: onTick')
+        await expect(page.locator('.view-lines')).toContainText('TODO: Let the clock fill')
       }
       await capture(prefix + 'start')
-      for (const label of ['Hint', 'Show places and functions', 'Show exact lines']) await button(label).click()
-      if (!step.id.startsWith('harrow-')) await expect(card.locator('pre.hint')).toHaveText(step.hints[2])
-      if (step.id === 'bram-smelt') await expectMarkedLines(['take("mine")', 'put("furnace")'])
-      if (step.id === 'bram-loop') await expectMarkedLines(['smelt()', 'ship()'])
+      await openTool(page, 'hints')
+      await button('Show hint 1 of 2').click()
+      await button('Show hint 2 of 2').click()
       if (index < 8) await capture(prefix + 'hint')
-      await button('Hide hint').click()
+      await button('Close drawer').click()
       {
         const updated = workshopReference(step)
         const tree = page.getByRole('region', { name: 'Project files' })
@@ -62,7 +61,7 @@ test('play every workshop reference in the editor, build the bridge and pay the 
           await tree.getByRole('button', { name: 'Create', exact: true }).click()
         }
         for (const [file, source] of Object.entries(updated)) {
-          if (await tree.isVisible()) await tree.getByRole('button', { name: file, exact: true }).click()
+          if (Object.keys(updated).length > 1) await tree.getByRole('button', { name: file, exact: true }).click()
           await pasteProjectFile(page,source,'Factory controller TypeScript')
           await page.keyboard.press('Control+Home')
         }
@@ -85,24 +84,14 @@ test('play every workshop reference in the editor, build the bridge and pay the 
       await expect(page.getByTestId('speech')).toContainText(step.solved.reaction)
       if (step.id === 'harrow-tab') {
         await expect(solved).toContainText('12 coins for three more ingots')
-        await expect(page.getByTitle('Workshop money')).toContainText('64 coins')
         await expect(page.getByTestId('nav-orders')).toBeHidden()
       }
       await capture(prefix + 'solved')
       await next.click()
       if (step.id === 'bram-loop') {
-        await expect(page.locator('.wallet')).toBeVisible()
-        await expect(page.getByTestId('nav-town')).toBeVisible()
-        await capture(prefix+'reveal-town')
-        await page.getByTestId('nav-town').click()
-        await expect(page.locator('.town-print canvas')).toBeVisible()
-        await capture(prefix+'town')
-        await page.getByTestId('nav-shed').click()
-        await expect(page.getByTestId('nav-inbox')).toBeVisible()
-        await page.getByTestId('nav-inbox').click()
-        await expect(page.getByRole('heading', { name: 'Your uncle’s tab' })).toBeVisible()
-        await capture(prefix+'reveal-inbox-letter')
-        await button('Close drawer').click()
+        await expect(page.getByTestId('drawer')).toContainText('64 coins')
+        await expect(button('Pay later')).toBeVisible()
+        await capture(prefix + 'next')
       }
     })
   }
@@ -111,9 +100,8 @@ test('play every workshop reference in the editor, build the bridge and pay the 
   await expect(finish.getByRole('listitem')).toHaveText(lessons.map(lesson => lesson.solved.idea))
   await expect(finish.getByRole('link', {name: 'Back to game packs'})).toHaveAttribute('href', '/')
   await expect(finish.getByRole('link', {name: /Next pack/})).toHaveCount(0)
-  await page.getByTestId('nav-town').click()
-  await expect(page.locator('.town-print')).toHaveAccessibleName(/Riverside bridge working/)
-  await expect(button('Pay debt')).toHaveText('Debt 0')
+  await expect(page.getByTestId('floor')).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('link', {name: 'Showcase', exact: true})).toBeVisible()
   await capture('workshop/complete')
   await finish.getByRole('button', {name: 'Replay this pack'}).click()
   await page.getByRole('dialog').getByRole('button', {name: 'Replay this pack'}).click()

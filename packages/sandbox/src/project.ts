@@ -12,6 +12,7 @@ export interface ProjectOptions {
   memory?: JsonObject
   budget?: number
   exposure?: 'globals' | 'module'
+  inputs?: Record<string, JsonValue>
   operations?: readonly string[]
 }
 

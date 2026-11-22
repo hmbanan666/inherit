@@ -1,76 +1,26 @@
 <script setup lang="ts">
-import { useGame } from '../lib/useGame'
-
-const { reference } = useGame()
-
+import type { ApiMethod } from '@inherit/sim/declarations'
+defineProps<{ entries: ApiMethod[]; types?: string[] }>()
 </script>
 
 <template>
-  <section class="reference" aria-label="API reference" tabindex="0">
-    <section>
-      <h2>What inherit exports</h2>
-      <article v-for="entry in reference" :key="entry.name">
-        <h3>
-          <code><b>{{ entry.name }}</b>{{ entry.signature.slice(entry.name.length) }}</code>
-        </h3>
-        <p>{{ entry.description }}</p>
-        <code class="example">{{ entry.example }}</code>
-      </article>
-    </section>
+  <section class="reference" aria-label="API reference">
+    <article v-for="entry in entries" :key="entry.name">
+      <h3><code>{{ entry.signature }}</code></h3>
+      <p>{{ entry.description }}</p>
+      <dl v-if="entry.params.length"><template v-for="param in entry.params" :key="param.name">
+        <dt><code>{{ param.name }}</code></dt><dd>{{ param.description }}</dd>
+      </template></dl>
+      <p v-if="entry.returns"><b>Returns</b> {{ entry.returns }}</p>
+      <pre v-if="entry.example" class="example">{{ entry.example }}</pre>
+    </article>
+    <pre v-for="type in types" :key="type">{{ type }}</pre>
   </section>
 </template>
-
 <style scoped>
-.reference {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px;
-  overflow-wrap: anywhere;
-  scrollbar-color: var(--line-strong) var(--surface-low);
-}
-.reference section + section {
-  margin-top: 20px;
-}
-h2 {
-  margin: 0 0 8px;
-  color: var(--text);
-  font-size: 16px;
-}
-article {
-  padding: 10px 13px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-}
-article + article {
-  margin-top: 6px;
-}
-h3 {
-  color: var(--syntax-type);
-  font-size: 13px;
-  font-weight: 400;
-}
-code {
-  font-family: var(--mono);
-  line-height: 1.55;
-  white-space: pre-wrap;
-}
-b {
-  color: var(--accent-soft);
-  font-weight: 500;
-}
-p {
-  margin: 3px 0 6px;
-  color: var(--soft);
-  font-size: 14px;
-  line-height: 1.4;
-}
-.example {
-  display: block;
-  border-left: 2px solid var(--accent-line);
-  padding-left: 8px;
-  color: var(--text);
-  font-size: 12px;
-}
+article + article { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line) }
+h3 { font-size: 14px; color: var(--accent-soft); overflow-wrap: anywhere }
+p, dl { margin: 6px 0; line-height: 1.5; font-size: 13px }
+dt { color: var(--soft) }
+dd { margin-left: 10px }
 </style>

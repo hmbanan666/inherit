@@ -5,7 +5,7 @@ import { lessons as chapter } from './chapter'
 import { workshopReference } from './reference/chapter-one'
 import { edits, workshopStarter } from './starter'
 import { panels } from './panels'
-import { observeLesson, revealsAfter, type CallRecord } from './lesson-flow'
+import { observeLesson, type CallRecord } from './lesson-flow'
 import { getSurface } from './surface'
 import { primitiveTick } from './primitives'
 import type { Campaign } from './model'
@@ -16,11 +16,18 @@ function chapterCall(call: Call): CallRecord {
   return {...call,fn:call.name as CallRecord['fn'],args:call.args.map(String),hand:null}
 }
 export const workshopLessons: Lesson<Campaign>[] = chapter.map(step=>{
-  const bank = step.id==='harrow-tab'?'replyLater':step.id==='harrow-deed'?'payBalance':undefined
   const files = workshopReference(step)
-  const hints = bank ? [step.hints[0], 'Add '+bank+' to the workshop import, then call it once.', 'import { '+bank+' } from "inherit"\n'+bank+'()'] : step.hints
+  const approach = step.id === 'harrow-tab' ? 'Use the reply action in Learn or call the reply function from your program.'
+    : step.id === 'harrow-deed' ? 'Settle the balance in Learn or call the bank function from your program.'
+    : step.hints[1]
+  const hints = [step.hints[0], approach]
   return { id:step.id, goal:edits[step.id].goal, idea:step.solved.idea, mode:step.button,
-    reveals:(revealsAfter[step.id] ?? []).map(r=>'id' in r ? r.kind+'.'+r.id : r.kind),
+    scene: 'shed', unit: 'chapter', kind: 'fill',
+    theory: {
+      title: step.idea?.name ?? step.title,
+      body: [step.story, step.idea?.explain ?? edits[step.id].note, step.solved.idea],
+      example: step.button === 'run' ? 'console.log("Arm ready")' : 'export function onTick() { console.log("Another turn") }',
+    },
     starter:previous=>workshopStarter(step.id,previous), hints, referenceSolution:files, solved:step.solved,
     visibleEffect:{description:step.solved.did,testId:'speech',text:step.solved.reaction},
     checks:step.checks.map(check=>({id:check.id,label:check.text,evaluate:e=>{
@@ -34,7 +41,8 @@ export function workshopAttempt(c: Campaign,mode: 'run'|'setup'|'tick'|'idle') {
   return primitiveTick(c,mode==='setup'?'deploy':mode)
 }
 export default definePack<Campaign,PlayerAPI>({
-  manifest,version:1,lessons:workshopLessons,initialWorld:createCampaign,decodeWorld:loadChapterSave,
+  scenes: ['shed'],
+  manifest,version:2,lessons:workshopLessons,initialWorld:createCampaign,decodeWorld:loadChapterSave,
   retry:'live',exposure:'module',panels,entities:panels,beginAttempt:workshopAttempt,
   available:c=>getSurface(c).exports,
 })

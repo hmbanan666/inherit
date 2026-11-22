@@ -1,8 +1,9 @@
+import { isStarterProject } from '../../../../packages/sim/src/packs/workshop/campaign'
 import { workshopEdit } from '../../../../packages/sim/src/packs/workshop/starter'
 import { workshopLessons } from '../../../../packages/sim/src/packs/workshop/pack'
 import {
   createCampaign, currentStep, getSurface, jumpToStep,
-  loadSave, placeNames, primaryButton, revealed, serializeSave,
+  placeNames, primaryButton, revealed,
   TICK_MS,
   townSnapshot,
   type ProjectFiles,
@@ -15,8 +16,9 @@ import { appendConsoleLines, type ConsoleRow } from './console-log'
 import type { Action, CallSite, Frame, GameLog } from './gameProtocol'
 export type { CallSite, GameLog } from './gameProtocol'
 
-import { packKey } from '@inherit/sim/save'
-import { importWorkshop, restoreWorkshop, workshopSave } from '../../../../packages/sim/src/packs/workshop/save'
+import { readPackSlot } from './pack-storage'
+import { packKey, type SolveStats } from '@inherit/sim/save'
+import { restoreWorkshop, workshopSave } from '../../../../packages/sim/src/packs/workshop/save'
 const saveKey = packKey('workshop')
 const reloadKey = 'inherit.workshop.reloadedBuild'
 const key: InjectionKey<GameStore> = Symbol('campaign')
@@ -74,7 +76,61 @@ function createGameStore() {
   const { speed, paused } = clock
   const tickInterval = computed(() => TICK_MS / speed.value)
   let resumeClock = true
-  let storageKey = saveKey
+  const query = new URLSearchParams(location.search)
+  const local = import.meta.dev || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  const preview = query.get('lesson') ?? (local ? query.get('step') : null)
+  const frontier = shallowRef<string>()
+  const checkpoints: Record<string, string> = {}
+  const drafts: Record<string, ProjectFiles> = {}
+  const hints = ref<Record<string, number>>({})
+  const awards = ref<Record<string, SolveStats>>({})
+  const attempts = ref<Record<string, number>>({})
+  const savedFrontierIndex = computed(() => frontier.value ? restoreWorkshop(frontier.value).campaign.lesson.index : undefined)
+  const completed = computed(() => {
+    const index = savedFrontierIndex.value ?? state.value.lesson.index
+    return workshopLessons.slice(0, index).map(l => l.id)
+  })
+  function snapshot() {
+    return JSON.stringify(workshopSave(state.value, activeFile.value, active.value))
+  }
+  function rememberEntry() {
+    const id = step.value?.step.id
+    if (id && !checkpoints[id]) checkpoints[id] = snapshot()
+  }
+  function restore(raw: string) {
+    const saved = restoreWorkshop(raw)
+    stop()
+    acknowledged = undefined
+    state.value = saved.campaign
+    files.value = state.value.project.working
+    activeFile.value = saved.activeFile
+    town.value = townSnapshot(state.value)
+    logs.value = []
+    error.value = ''
+    resumeClock = false
+    openDraft()
+    start()
+  }
+  function selectLesson(id: string) {
+    if (busy.value || step.value?.step.id === id) return
+    if (frontier.value && JSON.parse(frontier.value).lessonId === id) return returnToFrontier()
+    if (!completed.value.includes(id)) return
+    const before = snapshot()
+    if (step.value) drafts[step.value.step.id] = files.value
+    frontier.value ??= before
+    const entry = checkpoints[id] ?? JSON.stringify(workshopSave(jumpToStep(createCampaign(), id)))
+    restore(entry)
+    if (drafts[id]) update(drafts[id])
+    persist()
+  }
+  function returnToFrontier() {
+    if (!frontier.value) return
+    if (step.value) drafts[step.value.step.id] = files.value
+    const raw = frontier.value
+    frontier.value = undefined
+    restore(raw)
+    persist()
+  }
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
   let worker: Worker | undefined, current: Action | undefined, rollbackDraft: ProjectFiles | undefined
@@ -83,16 +139,21 @@ function createGameStore() {
     watchdog: ReturnType<typeof setTimeout>,
     autosave: ReturnType<typeof setInterval>
   let buildCheck: AbortController | undefined
+  let continueBoundary: string | undefined
   let acknowledged: Frame | undefined
   function persist() {
-    if (blockedSave.value) return
+    if (blockedSave.value || preview !== null) return
     try {
       const save = {
         ...state.value, ...acknowledged?.campaign,
         project: { ...(acknowledged?.project ?? state.value.project), working: files.value },
       }
+      if (current?.type === 'continue' && acknowledged) return
       const clockActive = !stoppingLoop.value && (acknowledged?.active ?? active.value)
-      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, clockActive)))
+      localStorage.setItem(saveKey, JSON.stringify({
+        ...workshopSave(save, activeFile.value, clockActive), frontier: frontier.value,
+        checkpoints, drafts, hints: hints.value, attempts: attempts.value, awards: awards.value,
+      }))
       saved.value = true
     } catch {
       saved.value = false
@@ -153,7 +214,7 @@ function createGameStore() {
     if (!worker || current) return
     current = queue.shift()
     if (!current) {
-      if (!paused.value) {
+      if (!paused.value && step.value?.phase !== 'solved') {
         const delay = Math.max(0, (nextTickAt - clock.now()) / speed.value)
         timer = setTimeout(() => act({ type: 'step' }), delay)
       }
@@ -219,6 +280,7 @@ function createGameStore() {
     c.project.working = files.value
     state.value = c
     acknowledged = undefined
+    if (action.type === 'continue') rememberEntry()
     town.value = frame.town
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
@@ -241,6 +303,13 @@ function createGameStore() {
     cpu.value = frame.cpu
     traces.value = frame.traces
     if (action.type !== 'step') persist()
+    if (action.type === 'continue' && continueBoundary && !saved.value) {
+      restore(continueBoundary)
+      continueBoundary = undefined
+      notice.value = 'Could not save progress. Free space and try again.'
+      return
+    }
+    if (action.type === 'continue') continueBoundary = undefined
     ready.value = true
     if (!stoppingLoop.value && ['run', 'deploy', 'continue', 'stopLoop'].includes(action.type)) busy.value = false
     pump()
@@ -263,7 +332,8 @@ function createGameStore() {
     }
   }
   function submit(type: 'deploy' | 'run' = button.value) {
-    if (busy.value || (!ready.value && !error.value)) return
+    if (busy.value || blockedSave.value || (!ready.value && !error.value)) return
+    if (step.value) attempts.value[step.value.step.id] = (attempts.value[step.value.step.id] ?? 0) + 1
     if (!worker) start()
     paused.value = false
     busy.value = true
@@ -281,6 +351,11 @@ function createGameStore() {
   }
   function advance() {
     if (busy.value || step.value?.phase !== 'solved') return
+    if (frontier.value) return returnToFrontier()
+    drafts[step.value.step.id] = files.value
+    const id = step.value.step.id
+    awards.value[id] = { firstTry: attempts.value[id] === 1, noHints: !hints.value[id] }
+    continueBoundary = snapshot()
     busy.value = true
     playback.clear()
     act({ type: 'continue' })
@@ -347,13 +422,21 @@ function createGameStore() {
     const lesson = workshopLessons[state.value.lesson.index]
     if (!lesson) return
     const { file, line } = workshopEdit(lesson.id, files.value)
-    openFile(file, line)
+    if (activeFile.value !== file && Object.hasOwn(files.value, activeFile.value)) openFile(activeFile.value)
+    else openFile(file, line)
   }
   function newGame() {
     stop()
     acknowledged = undefined
+    frontier.value = undefined
+    for (const id of Object.keys(checkpoints)) delete checkpoints[id]
+    for (const id of Object.keys(drafts)) delete drafts[id]
+    awards.value = {}
+    hints.value = {}
+    attempts.value = {}
     state.value = createCampaign()
     town.value = townSnapshot(state.value)
+    state.value.project.working = workshopLessons[0].starter(state.value.project.working).files
     files.value = state.value.project.working
     blockedSave.value = false
     logs.value = []
@@ -365,42 +448,44 @@ function createGameStore() {
     persist()
     start()
   }
-  onMounted(() => {
+  onMounted(async () => {
     try {
-      const local = import.meta.dev || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
-      const query = new URLSearchParams(local ? location.search : '')
-      const id = query.get('lesson') ?? query.get('step')
-      if (id) storageKey = saveKey + '.preview.' + id
-      speed.value = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
-      let stored = localStorage.getItem(storageKey)
-      const legacy = !id && !stored && localStorage.getItem('inherit.workshop.v1')
-      if (legacy) {
-        stored = JSON.stringify(importWorkshop(legacy))
-        restoreWorkshop(stored)
-        localStorage.setItem(storageKey, stored)
-      }
-      const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-      const resumePreview = entry?.type === 'reload' || entry?.type === 'back_forward'
-      if (id && !(stored && resumePreview)) {
+      const id = preview
+      speed.value = local ? Math.min(32, Math.max(1, Number(query.get('speed')) || 1)) : 1
+      const stored = preview !== null ? null : await readPackSlot('workshop')
+      if (id !== null) {
+        if (!workshopLessons.some(l => l.id === id)) throw new Error('Unknown lesson.')
         state.value = jumpToStep(createCampaign(), id)
-        const starter = workshopLessons[state.value.lesson.index]?.starter(state.value.project.working)
-        if (starter) state.value.project.working = starter.files
-      }
-      else if (stored) {
+        const starter = workshopLessons[state.value.lesson.index].starter(state.value.project.working)
+        state.value.project.working = starter.files
+      } else if (!stored) {
+        state.value.project.working = workshopLessons[0].starter(state.value.project.working).files
+      } else if (stored) {
         const restored = restoreWorkshop(stored)
+        const data = JSON.parse(stored)
+        Object.assign(checkpoints, data.checkpoints)
+        Object.assign(drafts, data.drafts)
+        frontier.value = data.frontier
+        awards.value = data.awards ?? {}
+        hints.value = data.hints ?? {}
+        attempts.value = data.attempts ?? {}
         state.value = restored.campaign
         activeFile.value = restored.activeFile
         resumeClock = restored.clockActive
+        paused.value = resumeClock
       }
       town.value = townSnapshot(state.value)
       files.value = state.value.project.working
-    } catch {
+    } catch (cause) {
       blockedSave.value = true
       saved.value = false
-      notice.value = 'Save could not be loaded. New game replaces it.'
+      error.value = cause instanceof Error ? cause.message : 'Save could not be loaded.'
+      return
     }
     openDraft()
+    rememberEntry()
     start()
+    if (resumeClock && state.value.lesson.phase !== 'solved' && !isStarterProject(state.value.project.deployed)) paused.value = true
     autosave = setInterval(persist, 3000)
     window.addEventListener('pagehide', persist)
   })
@@ -425,6 +510,7 @@ function createGameStore() {
     deleteFile,
     submit, advance, busy, playback, hand,
     stopLoop, stoppingLoop, tickCount, tickCalls,
+    awards, hints, attempts, completed, selectLesson, persist, blockedSave, preview,
     step, button, places, reveals, sections, letters,
     surface,
     reference,

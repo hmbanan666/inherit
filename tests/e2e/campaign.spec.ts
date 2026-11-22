@@ -12,9 +12,10 @@ test('a saved workshop starts in the shed and keeps its original controller file
   await page.reload()
   await expect(page.getByTestId('primary-button')).toBeEnabled()
   await expect(page.getByRole('button', { name: /history/i })).toHaveCount(0)
-  const snapshots = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('inherit.pack.workshop')!).project.snapshots,
-  )
+  const snapshots = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find(key => key.startsWith('inherit.pack.workshop.archive.'))!
+    return JSON.parse(localStorage.getItem(key)!).project.snapshots
+  })
   expect(snapshots).toContainEqual(expect.objectContaining({
     files: expect.objectContaining({ 'main.ts': expect.stringContaining('from "./feed"') }),
   }))
@@ -26,16 +27,16 @@ test('a stopped controller keeps Deploy available and a new deployment restarts 
   const primary = page.getByTestId('primary-button')
   await edit(page, 'export function onTick() { console.log("ticking") }')
   await primary.click()
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.getByRole('group',{name:'Clock controls'})).toBeVisible()
   await edit(page, 'export function onTick() {\n  throw new Error("Valve closed")\n}')
   await page.keyboard.press('Control+Enter')
   await expect(page.getByTestId('checks')).toContainText('main.ts:2 · Valve closed')
-  await expect(page.locator('.live')).toHaveText('Offline')
+  await expect(page.getByRole('group',{name:'Clock controls'})).toBeHidden()
   await expect(primary).toContainText('Deploy')
   await expect(page.getByRole('button', { name: /history|restore #/i })).toHaveCount(0)
   await edit(page, 'export function onTick() { console.log("ticking again") }')
   await primary.click()
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.getByRole('group',{name:'Clock controls'})).toBeVisible()
   await expect(page.locator('.view-lines')).toContainText('ticking')
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name: 'New game' }).click()

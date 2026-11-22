@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Colour } from '@inherit/sim/pack'
 const props = defineProps<{
-  checks: { id: string; text: string; status: Colour; progress?: string }[]
+  checks: { id: string; text: string; status: Colour; input?: string; progress?: string }[]
   error?: string
   messages?: readonly string[]
 }>()
@@ -23,7 +23,7 @@ const labels = { red: 'Still to do', amber: 'Getting closer', green: 'Done' }
       <li v-for="check in visible" :key="check.id" :data-state="check.status"
         :aria-current="check.id === checks[0]?.id ? 'step' : undefined">
         <span class="mark" role="img" :aria-label="labels[check.status]">{{ marks[check.status] }}</span>
-        {{ check.text }}
+        <span v-if="check.input">{{ check.input }} ·</span> {{ check.text }}
         <span v-if="check.progress && !check.text.endsWith(check.progress)" class="count">{{ check.progress }}</span>
       </li>
     </ul>

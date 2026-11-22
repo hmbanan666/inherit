@@ -3,6 +3,7 @@ import manifest from './manifest'
 import { lessons } from './lessons'
 import type { PlayerAPI } from './player'
 export default definePack<{lit:boolean},PlayerAPI>({
+  scenes: ['garden'],
   manifest, version:1, lessons, exposure:'globals', retry:'entry',
   initialWorld: () => ({lit:false}),
   decodeWorld(input) {

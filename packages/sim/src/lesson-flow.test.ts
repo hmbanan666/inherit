@@ -28,3 +28,14 @@ test('checking a transfer returns new progress without changing the input campai
   expect(observeLesson(c, run.calls).phase).toBe('solved')
   expect(c).toEqual(before)
 })
+
+test('one Continue drains a saved queue once in its authored order', () => {
+  const campaign = createCampaign()
+  campaign.lesson.phase = 'solved'
+  campaign.lesson.queue = [{kind: 'coins'}, {kind: 'debt'}, {kind: 'debt'}]
+  campaign.lesson.released = [{kind: 'coins'}]
+  const next = continueStep(campaign)
+  expect(next.lesson.index).toBe(1)
+  expect(next.lesson.queue).toEqual([])
+  expect(next.lesson.released).toEqual([{kind: 'coins'}, {kind: 'debt'}])
+})

@@ -1,6 +1,12 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
-import { openShed, photo, edit } from './workshop'
+import { openShed, photo, edit, openTool, savedShed } from './workshop'
+
+async function waitForStock(page: Page, station: 'mine' | 'furnace') {
+  await page.getByRole('button', { name: 'Inspect ' + station }).click()
+  await expect(page.getByRole('region', { name: 'Machine inspector' })).toContainText('ready')
+  await page.getByRole('button', { name: 'Close inspector' }).click()
+}
 
 test('Bram meets the player beside a labelled working shed', async ({ page }) => {
   await openShed(page)
@@ -50,7 +56,7 @@ test('Run shows the rock and its source line before Continue becomes available',
   await expect(solved).toBeVisible()
   await expect(page.getByTestId('hand')).toHaveText('iron ore')
   await page.getByTestId('continue').click()
-  await expect(page.locator('.view-lines')).toContainText('Each Run starts at the top')
+  await expect(page.locator('.view-lines')).toContainText('TODO: Put the rock in the furnace')
   await expect(page.locator('.view-lines')).toContainText('take("mine")')
   await edit(page, '\nput("furnace")', true)
   await page.keyboard.press('Control+Enter')
@@ -77,7 +83,7 @@ test('place completion and a typo point back to the floor', async ({ page }) => 
   await page.getByTestId('primary-button').click()
   const message = 'There is no place called "mines". Places: mine, furnace, cart.'
   await expect(page.getByTestId('checks')).toContainText(message)
-  await page.getByRole('tab', { name: 'Console' }).click()
+  await openTool(page, 'console')
   await expect(page.getByRole('tabpanel', { name: 'Console' })).toContainText(message)
   await expect(page.getByTestId('continue')).toHaveCount(0)
 })
@@ -94,23 +100,25 @@ test('the furnace can be empty and a named shipping trip plays above the arm', a
   await openShed(page, '?step=bram-cart')
   await edit(page, '\ntake("furnace")\nput("cart")', true)
   await page.getByTestId('primary-button').click()
-  await expect(page.getByTestId('primary-button')).toBeEnabled()
-  if (!await page.getByTestId('solved-card').isVisible()) await page.getByTestId('primary-button').click()
+  const retry = page.getByTestId('primary-button').and(page.locator(':enabled'))
+  await expect(retry.or(page.getByTestId('solved-card')).first()).toBeVisible()
+  if (await retry.isVisible()) await retry.click()
   await expect(page.getByTestId('solved-card')).toContainText('first ingot')
   await page.getByTestId('continue').click()
-  await edit(page, 'import { take, put } from "inherit"\nfunction smelt() { take("mine"); put("furnace") }\nsmelt()\ntake("furnace")\nput("cart")')
+  await page.getByRole('button', {name: 'Got it'}).click()
+  await waitForStock(page, 'mine')
+  await edit(page, 'import { take, put } from "inherit"\nfunction smelt() { take("mine"); put("furnace") }\nsmelt()')
   await page.getByTestId('primary-button').click()
   await expect(page.getByTestId('arm')).toContainText('smelt()')
   await page.getByTestId('continue').click()
-  const card = page.getByTestId('task-card')
-  await card.getByRole('button', {name:'Hint', exact:true}).click()
-  await expect(card.locator('pre')).toHaveCount(0)
-  await card.getByRole('button', {name:'Show places and functions'}).click()
-  await expect(card.locator('pre')).toHaveCount(0)
-  await card.getByRole('button', {name:'Show exact lines'}).click()
-  await expect(card.locator('pre')).toContainText('function ship()')
+  await openTool(page, 'hints')
+  await page.getByRole('button', {name: 'Show hint 1 of 2'}).click()
+  await page.getByRole('button', {name: 'Show hint 2 of 2'}).click()
+  await expect(page.getByTestId('drawer').locator('pre')).toHaveCount(2)
+  await page.getByRole('button', {name: 'Close drawer'}).click()
+  await waitForStock(page, 'furnace')
   await edit(page, 'import { take, put } from "inherit"\nfunction smelt() { take("mine"); put("furnace") }\nfunction ship() { take("furnace"); put("cart") }\nsmelt()\nship()')
-  await expect(page.locator('.my-library')).not.toHaveAttribute('open')
+  await expect(page.locator('.my-library')).toHaveCount(0)
   await page.getByTestId('primary-button').click()
   await expect(page.getByTestId('arm')).toContainText('ship()')
   await page.getByTestId('continue').click()
@@ -122,18 +130,14 @@ for (const input of ['paste', 'type']) {
     await openShed(page, '?step=bram-smelt')
     const card = page.getByTestId('task-card')
     await expect(card).toContainText('Give the two furnace moves the name smelt')
-    await expect(page.locator('.view-lines')).toContainText('Group the two marked lines')
-    for (const name of ['Hint','Show places and functions','Show exact lines']) await page.getByRole('button',{name,exact:true}).click()
-    const block = await card.locator('pre').innerText()
-    expect(block).toBe('function smelt() {\n  take("mine")\n  put("furnace")\n}\nsmelt()')
+    await expect(page.locator('.view-lines')).toContainText('TODO: Give the two furnace moves')
+    const block = 'function smelt() {\n  take("mine")\n  put("furnace")\n}\nsmelt()'
     const primary = page.getByTestId('primary-button')
     await primary.click()
     await expect(primary).toBeEnabled()
     await expect(card).toBeVisible()
     // The starter consumes a rock. Wait for the next one before testing the edit.
-    await page.getByRole('button', { name: 'Inspect mine' }).click()
-    await expect(page.getByRole('region', { name: 'Machine inspector' })).toContainText('ready')
-    await page.getByRole('button', { name: 'Close inspector' }).click()
+    await waitForStock(page, 'mine')
     const marked = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
     await expect(marked).toHaveText(['take("mine")', 'put("furnace")'])
     await marked.first().click()
@@ -168,7 +172,7 @@ test('a busy furnace on the live clock reports at the furnace and in Console', a
   await edit(page, 'import { take, put } from "inherit"\nexport function onTick() {\n  if (take("mine")) {\n    put("furnace")\n    put("furnace")\n  }\n}')
   await page.getByTestId('primary-button').click()
   const message = 'The furnace cannot accept iron ore right now.'
-  await page.getByRole('tab', { name: 'Console' }).click()
+  await openTool(page, 'console')
   await expect(page.getByRole('tabpanel', { name: 'Console' })).toContainText(message, { timeout: 30000 })
   // Observe a second refused deposit, including transient highlights during playback.
   const consoleRows = page.getByRole('region', { name: 'Program console' }).getByRole('listitem')
@@ -204,7 +208,7 @@ test('the loop marks only the calls left outside the clock after Deploy', async 
   await expect(calls).toHaveText(['smelt()', 'ship()'])
   await edit(page, 'import {take,put} from "inherit"\nfunction smelt(){take("mine");put("furnace")}\nfunction ship(){take("furnace");put("cart")}\nsmelt()\nship()\nexport function onTick(){ship()}')
   await primary.click()
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.getByRole('group', {name: 'Clock controls'})).toBeVisible()
   await expect(calls).toHaveText(['smelt()', 'ship()'])
 })
 
@@ -219,9 +223,9 @@ test('the clock lesson keeps Deploy on error and opens the next lesson with all 
   await expect(page.getByRole('button', { name: /history/i })).toHaveCount(0)
   await edit(page, 'import { take, put } from "inherit"\nlet rocks = 0\nexport function onTick() { if (take("mine") && put("cart")) console.log("Rock " + ++rocks) }')
   await primary.click()
-  await page.getByRole('tab', { name: 'Console' }).click()
+  await openTool(page, 'console')
   await expect(page.getByRole('tabpanel', { name: 'Console' })).toContainText('Rock 3')
-  await page.getByRole('tab', { name: 'Checks' }).click()
+  await page.getByRole('button', { name: 'Close drawer' }).click()
   await expect(page.getByTestId('checks')).toContainText('0 / 3')
   await expect(page.getByTestId('continue')).toHaveCount(0)
   await edit(page, 'export const stopped = true')
@@ -239,13 +243,9 @@ test('the clock lesson keeps Deploy on error and opens the next lesson with all 
   await expect(wallet).toBeHidden()
   await next.click()
   await expect(page.getByTestId('task-card')).toContainText('Reply to Mrs Harrow')
-  await expect(wallet).toContainText('64 coins')
+  await expect(page.getByTestId('drawer')).toContainText('64 coins')
   await expect(hud).not.toContainText(/coins|debt|history/i)
-  await expect(page.getByTestId('nav-town')).toBeVisible()
-  await expect(page.getByTestId('nav-inbox')).toContainText('1')
-  await expect(page.getByRole('button', { name: 'Pay debt' })).toBeVisible()
-  await page.getByTestId('nav-town').click()
-  await expect(page.getByRole('img', { name: /Bram’s forge working/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Pay later' })).toBeVisible()
 })
 
 test('opening the same step link again starts at the requested brief', async ({ page }) => {
@@ -314,7 +314,7 @@ for (const speed of [1, 2, 4]) {
 }
 
 test('the playback bar counts handler calls, pauses, plays and stops the loop', async ({ page }) => {
-  await openShed(page, '?step=bram-loop')
+  await savedShed(page, 'bram-loop')
   const controls = page.getByRole('group', { name: 'Clock controls' })
   await expect(controls).toHaveCount(0)
   await edit(page, 'let count = 0\nexport function onTick() { console.log("calls " + ++count) }')
@@ -322,7 +322,7 @@ test('the playback bar counts handler calls, pauses, plays and stops the loop', 
   await expect(page.getByTestId('world').getByRole('group', { name: 'Clock controls' })).toBeVisible()
   await expect(page.getByRole('banner').getByRole('group', { name: 'Clock controls' })).toHaveCount(0)
   const consolePanel = page.getByRole('tabpanel', { name: 'Console' })
-  await page.getByRole('tab', { name: 'Console' }).click()
+  await openTool(page, 'console')
   await expect(consolePanel.locator('.tick').first()).toBeVisible()
   await controls.getByRole('button', { name: 'Pause', exact: true }).click()
   await page.clock.install()

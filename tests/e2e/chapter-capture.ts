@@ -19,7 +19,7 @@ export async function chapterCapture(page: Page) {
           const words: { x: number; y: number; right: number; text: string }[] = []
           const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
           const range = document.createRange()
-          const overlays = ['.drawer','.solved-overlay','.hud-menu','dialog[open]'].flatMap(selector=>
+          const overlays = ['.drawer','.celebration','.hud-menu','dialog[open]'].flatMap(selector=>
             [...document.querySelectorAll(selector)].map(element=>({element,rect:element.getBoundingClientRect()})))
           while (walk.nextNode()) {
             const node = walk.currentNode
@@ -75,6 +75,7 @@ export async function chapterCapture(page: Page) {
       await mkdir(dirname(join(dir,name)),{recursive:true})
       await writeFile(join(dir, name + '.png'), Buffer.from(data, 'base64'))
       if (workshop || town) text[1] += '\nMap signs: ' + signs
+      await writeFile(join(dir, name + '.txt'), text.join('\n\n') + '\n')
       await appendFile(join(dir,'visible-text.md'),'\n## '+name+'.png\n\n````text\n'+text.join('\n\n')+'\n````\n')
     } finally {
       await browser.send('Page.setWebLifecycleState', { state: 'active' })

@@ -40,8 +40,18 @@ test('pack folders, manifests, rules and public methods agree', () => {
     unique(pack.lessons.map(l=>l.id))
     unique(pack.entities.map(e=>e.id))
     const world = pack.decodeWorld(structuredClone(pack.initialWorld(1)))
-    const releases = new Set(pack.lessons.flatMap(lesson=>lesson.reveals ?? []))
-    for (const panel of pack.panels) if (panel.reveal) expect(releases.has(panel.reveal),m.id+' '+panel.id).toBe(true)
+    if (m.track === 'course') {
+      expect(m.units.length).toBeGreaterThan(0)
+      unique(m.units.map(unit => unit.id))
+      for (const unit of m.units) {
+        text(unit.title)
+        text(unit.landmark)
+        expect(pack.lessons.some(l => l.unit === unit.id)).toBe(true)
+      }
+      const order = pack.lessons.map(l => m.units.findIndex(u => u.id === l.unit))
+      expect(order).not.toContain(-1)
+      expect(order).toEqual([...order].sort((a, b) => a - b))
+    }
     for (const entity of [...pack.entities,...pack.panels]) {text(entity.label);unique(entity.rows(world).map(r=>r.id))}
     const schema = readPlayerAPI(playerSources['./'+m.id+'/player.ts'])
     expect(schema.methods.length).toBeGreaterThan(0)
@@ -53,6 +63,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
   const adapter = adapters['../../packages/sim/src/packs/'+m.id+'/validation.ts']
   const save = freshSave(pack)
   const source = playerSources['./'+m.id+'/player.ts']
+  const schemaNames = readPlayerAPI(source).methods.map(method => method.name)
   for (const lesson of pack.lessons) {
     const label = m.id+'/'+lesson.id
     const checkpoint = adapter?.checkpoint(lesson.id)
@@ -61,11 +72,76 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     const methods = pack.available(world,lesson.id)
     const host = pack.beginAttempt(structuredClone(world),'run').api
     methods.forEach(name=>expect(typeof host[name],label+' '+name).toBe('function'))
+    const inputs = lesson.inputs?.(world) ?? {}
+    const inputTypes = Object.entries(inputs).map(([name, binding]) => {
+      expect(schemaNames, label).not.toContain(name)
+      return 'declare const ' + name + ': ' + binding.type
+    })
     const api = checkpoint?.declarations ?? (declarations(source,methods,pack.exposure,pack.typeAliases?.(world))+'\n'+Object.values(pack.guestModules ?? {}).map(module=>module.declarations).join('\n'))
-    const note = starter.files[starter.edit.file].split('\n')[starter.edit.line-2] ?? ''
-    expect(starter.edit.line,label).toBeLessThanOrEqual(starter.files[starter.edit.file].split('\n').length)
-    expect(ts.createScanner(ts.ScriptTarget.Latest,false,ts.LanguageVariant.Standard,note.trim()).scan(),label+' '+note).toBe(ts.SyntaxKind.SingleLineCommentTrivia)
-    expect(note.trim().length,label).toBeGreaterThan(12)
+    expect(['write', 'fill', 'fix', 'predict']).toContain(lesson.kind)
+    expect(pack.scenes, label).toContain(lesson.scene)
+    if (m.track === 'course') expect(lesson.theory, label).toBeDefined()
+    if (lesson.theory) {
+      const { title, body, example } = lesson.theory
+      expect(body.length, label).toBeGreaterThanOrEqual(3)
+      expect(body.length, label).toBeLessThanOrEqual(8)
+      ;[title, ...body, example].forEach(text)
+      expect(Object.values(lesson.referenceSolution).map(s => s.trim()), label).not.toContain(example.trim())
+    }
+    unique((lesson.variants ?? []).map(v => v.input))
+    for (const variant of lesson.variants ?? []) {
+      text(variant.input)
+      expect(lesson.checks.some(c => c.input === variant.input), label).toBe(true)
+      if (variant.maxTicks !== undefined) {
+        expect(Number.isSafeInteger(variant.maxTicks)).toBe(true)
+        expect(variant.maxTicks).toBeGreaterThan(0)
+        expect(variant.maxTicks).toBeLessThanOrEqual(1200)
+      }
+    }
+    if (lesson.kind === 'predict') {
+      expect(lesson.prediction?.choices, label).toContain(lesson.prediction?.answer)
+      expect(lesson.prediction!.choices.length).toBeGreaterThan(1)
+    }
+    const lines = starter.files[starter.edit.file].split('\n')
+    const nearby = lines.slice(Math.max(0, starter.edit.line - 2), starter.edit.line)
+    const comments = nearby.filter(line => /^\s*\/\//.test(line))
+    expect(starter.edit.line, label).toBeGreaterThan(0)
+    expect(starter.edit.line, label).toBeLessThanOrEqual(lines.length)
+    expect(comments.some(line => line.trim().length > 12), label).toBe(true)
+    const normalize = (line: string) => line.trim().replace(/;$/, '').replace(/\s+/g, ' ')
+    const answers = Object.values(lesson.referenceSolution).flatMap(source => source.split('\n')).map(normalize)
+      .filter(line => line && !/^[{}]+$/.test(line) && !line.startsWith('//'))
+    for (const source of Object.values(starter.files)) {
+      const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source)
+      for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+        if (token !== ts.SyntaxKind.SingleLineCommentTrivia && token !== ts.SyntaxKind.MultiLineCommentTrivia) continue
+        for (const line of scanner.getTokenText().split('\n')) {
+          const todo = /\bTODO\b\s*:?[ \t]*(.*?)(?:\*\/)?$/i.exec(line)
+          if (todo) expect(answers, label + ' TODO gives the answer').not.toContain(normalize(todo[1]))
+        }
+      }
+    }
+    if (m.level === 'Game' || m.level === 'Advanced') {
+      expect(comments.some(line => /\bTODO\b/.test(line)), label).toBe(true)
+      for (const hint of lesson.hints ?? []) {
+        for (const line of hint.split('\n')) {
+          const words = normalize(line)
+          expect(answers.some(answer => words === answer || (answer.includes('(') && words.includes(answer))),
+            label + ' hint gives the answer').toBe(false)
+        }
+      }
+    }
+    if (m.track === 'challenges') {
+      expect(lesson.unit, label).toBeUndefined()
+      text(lesson.task!.condition)
+      expect(lesson.task!.examples.length, label).toBeGreaterThanOrEqual(2)
+      lesson.task!.examples.forEach(text)
+      lesson.checks.forEach(check => text(check.input ?? ''))
+      for (const code of Object.values(starter.files)) {
+        const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, code)
+        expect(scanner.scan(), label).toBe(ts.SyntaxKind.EndOfFileToken)
+      }
+    }
     expect(lesson.goal.length,label).toBeLessThanOrEqual(70)
     expect(lesson.goal,label).not.toMatch(/\n/)
     expect(lesson.checks.length,label).toBeGreaterThan(0)
@@ -76,7 +152,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       expect(files['main.ts'],label).not.toMatch(/\b(import|export|onTick)\b/)
     }
     for (const [files,solves] of [[starter.files,false],[lesson.referenceSolution,true]] as const) {
-      expect(diagnostics(files,api),label+' '+(solves?'solution':'starter')).toEqual([])
+      expect(diagnostics(files, [api, ...inputTypes].join('\n')),label+' '+(solves?'solution':'starter')).toEqual([])
       const trial = solves ? save : structuredClone(save)
       let solved: boolean
       if (checkpoint) solved = await checkpoint.play(files)

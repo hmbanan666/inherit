@@ -1,4 +1,4 @@
-import { edit as replaceCode, photo, openShed } from './workshop'
+import { edit as replaceCode, photo, openShed, openTool, savedShed } from './workshop'
 import { expect, test, type Page } from '@playwright/test'
 
 const main = 'import { feed } from "./lib/drive"\nexport function onTick() {\n  feed()\n}'
@@ -13,8 +13,8 @@ async function projectFiles(page: Page) {
 }
 
 async function workshop(page: Page, unlock = true) {
-  await openShed(page, unlock ? '?step=mayor-tools&speed=8' : '')
-  if (!unlock) return
+  if (!unlock) return openShed(page)
+  await savedShed(page, 'mayor-tools', 8)
   await replaceCode(page, main)
   const tree = await projectFiles(page)
   await tree.getByRole('button', { name: 'New file' }).click()
@@ -23,7 +23,7 @@ async function workshop(page: Page, unlock = true) {
   await replaceCode(page, helper)
   await tree.getByRole('button', { name: 'main.ts', exact: true }).click()
   await page.getByTestId('primary-button').click()
-  await expect(page.locator('.live')).toHaveText('Live')
+  await expect(page.getByRole('group',{name:'Clock controls'})).toBeVisible()
   await button(page, 'Settings').click()
   await button(page, 'Project files').click()
 }
@@ -32,10 +32,7 @@ const tab = (page: Page, name: string) =>
   page.locator('.editor-dock .file-tabs').getByRole('button', { name, exact: true })
 test('first shift opens a single player file', async ({ page }) => {
   await workshop(page, false)
-  await expect(tab(page, 'main.ts')).toBeVisible()
-  await expect(
-    page.locator('.editor-dock').getByRole('button', { name: 'main.ts', exact: true }),
-  ).toHaveCount(1)
+  await expect(page.getByRole('textbox', {name: 'Factory controller TypeScript'})).toBeVisible()
   await expect(page.getByRole('region', { name: 'Project files' })).toHaveCount(0)
   await expect(page.locator('.my-library')).toHaveCount(0)
 })
@@ -54,9 +51,9 @@ test('first shift distinguishes TypeScript tokens and explains the available cal
     return colors.size
   }, samples)).toBe(samples.length)
   await photo(page, 'main-ts')
-  await tab(page, 'API reference').click()
+  await openTool(page, 'api')
   const panel = page.getByRole('region', { name: 'API reference' })
-  await expect(panel).toContainText('What inherit exports')
+  await expect(panel).toContainText('Item name or undefined')
   await expect(panel.getByRole('heading', {name:/^take/})).toBeVisible()
   await expect(panel.locator('article')).toHaveCount(2)
   expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
@@ -66,33 +63,15 @@ test('first shift distinguishes TypeScript tokens and explains the available cal
 test('the compact workshop panel leaves every API card reachable at 1440 × 900', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await workshop(page)
-  await tab(page, 'API reference').click()
+  await openTool(page, 'api')
   const reference = page.getByRole('region', { name: 'API reference' })
-  const tabs = page.getByRole('tablist', { name: 'Workshop tools' })
-  const footer = page.locator('.statusbar')
-  for (const name of ['Checks', 'Console']) {
-    await tabs.getByRole('tab', { name }).click()
-    const panel = page.getByRole('tabpanel', { name })
-    const rect = (await panel.boundingBox())!
-    expect(rect.height).toBeGreaterThan(0)
-    expect(rect.height).toBeLessThanOrEqual(130)
-    expect(rect.y + rect.height).toBeLessThanOrEqual((await footer.boundingBox())!.y + 1)
-    const refRect = (await reference.boundingBox())!
-    expect(refRect.y + refRect.height).toBeLessThanOrEqual((await tabs.boundingBox())!.y)
-    const floor = reference.locator('section').filter({ has: page.getByRole('heading', { name: 'What inherit exports', exact: true }) })
-    for (const example of [floor.locator('.example').last(), reference.locator('.example').last()]) {
-      await example.scrollIntoViewIfNeeded()
-      expect(await example.evaluate(el => {
-        const r = el.getBoundingClientRect()
-        return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
-      })).toBe(true)
-    }
-    await button(page, 'Collapse workshop panel').click()
-    await expect(panel).toBeHidden()
-    expect((await reference.boundingBox())!.height).toBeGreaterThan(refRect.height)
-    await button(page, 'Expand workshop panel').click()
-    await expect(panel).toBeVisible()
-  }
+  const example = reference.locator('.example').last()
+  await example.scrollIntoViewIfNeeded()
+  expect(await example.evaluate(el => {
+    const r = el.getBoundingClientRect()
+    return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+  })).toBe(true)
+  await expect(page.getByTestId('checks')).toBeInViewport()
 })
 
 test('import completion inside braces lists the unlocked workshop exports', async ({page}) => {
@@ -152,7 +131,7 @@ test('follow definitions and references across files, search the draft and organ
   await page.keyboard.press('Shift+F12')
   await expect(editor.locator('.reference-zone-widget')).toContainText('main.ts')
   await page.keyboard.press('Escape')
-  await tab(page, 'API reference').click()
+  await openTool(page, 'api')
   await page.keyboard.press('Control+p')
   await page.getByRole('textbox', { name: 'Find file' }).fill('main')
   await page.keyboard.press('Enter')
@@ -164,7 +143,6 @@ test('follow definitions and references across files, search the draft and organ
   await expect(tab(page, 'lib/drive.ts')).toHaveAttribute('aria-pressed', 'true')
   await replaceCode(page, helper.replace('take("mine")', 'unknownCommand("mine")'))
   await expect(editor.locator('.squiggly-error').first()).toBeVisible()
-  await expect(page.locator('.editor-foot')).toContainText('Working copy')
 
   const tree = await projectFiles(page)
   await tree.getByRole('button', { name: 'New folder' }).click()
@@ -198,9 +176,8 @@ test('jump from a controller error to its module and clear the log ring', async 
     .getByRole('button', { name: 'lib/drive.ts' })
     .click()
   await replaceCode(page, 'export function feed() {\n  throw new Error("stuck valve")\n}')
-  await expect(page.locator('.editor-foot')).toContainText('Working copy')
-  await page.getByRole('tab', { name: 'Console' }).click()
   await page.keyboard.press('Control+s')
+  await openTool(page, 'console')
   const output = page.getByRole('region', { name: 'Program console' })
   const location = output.getByRole('button', { name: 'lib/drive.ts:2' })
   await expect(location).toBeVisible()
