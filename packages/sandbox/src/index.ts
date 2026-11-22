@@ -43,4 +43,3 @@ export async function runOnce(options: ProjectOptions, api: FactoryContext) {
     session.dispose()
   }
 }
-export { startChapter } from './chapter'

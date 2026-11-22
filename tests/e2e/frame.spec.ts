@@ -74,7 +74,7 @@ test('Enter advances once and review restores the forward draft after reload', a
   await expect(page.getByRole('progressbar')).toHaveAttribute('value', '1')
 })
 
-for (const [pack, lesson] of [['beginner','hello'], ['workshop','bram-take']]) {
+for (const [pack, lesson] of [['beginner','hello'], ['workshop','dispatch-batch']]) {
   test(pack + ' production preview leaves storage untouched on edit, Continue and reload', async ({page}) => {
     const data = { ['inherit.pack.' + pack]: 'original player bytes' }
     await page.addInitScript(data => {
@@ -86,12 +86,12 @@ for (const [pack, lesson] of [['beginner','hello'], ['workshop','bram-take']]) {
     await expect(page.getByTestId('primary-button')).toBeEnabled()
     await page.getByRole('button', {name: 'Got it'}).click()
     await editor.focus()
-    await page.keyboard.insertText(pack === 'beginner' ? 'say("Hello!")' : 'take("mine")')
+    await page.keyboard.insertText(pack === 'beginner' ? 'say("Hello!")' : 'import { take, put } from "inherit"\nwhile (take("belt")) put("cart")')
     await page.getByTestId('primary-button').click()
     await page.getByTestId('continue').click()
-    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'two-word ferry name' : 'in the furnace')
+    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'two-word ferry name' : 'Count heavy parcels')
     await page.reload()
-    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'Give Mila a greeting' : 'Lift a rock')
+    await expect(page.getByTestId('task-card')).toContainText(pack === 'beginner' ? 'Give Mila a greeting' : 'Dispatch the waiting batch')
     expect(await page.evaluate(() => Object.fromEntries(Object.entries(localStorage)))).toEqual(data)
   })
 }

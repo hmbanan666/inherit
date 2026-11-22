@@ -2,7 +2,7 @@
 
 Learn TypeScript by changing a game world. Choose a pack, edit the code beside its world and press **Run**. Calls play back beside their source lines. **Continue** opens the next lesson when you are ready.
 
-Start with **Village at Dawn**. Help Mila wake a village and build a fair in thirteen lessons, from one greeting to functions, choices and loops. **Uncle’s Workshop** follows the basics. Automate Bram’s shed, supply Kettlewick and rebuild the bridge. The pack switcher keeps each game and its working files on this device.
+Start with **Village at Dawn**. Help Mila wake a village and build a fair in thirteen lessons, from one greeting to functions, choices and loops. **Workshop** offers twelve independent parcel challenges. Route batches, compare labels and deploy a controller to respond to arrivals. The pack switcher keeps each game and its working files on this device.
 
 ## Run locally
 

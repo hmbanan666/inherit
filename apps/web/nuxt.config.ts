@@ -29,7 +29,7 @@ export default defineNuxtConfig({
   hooks: {
     'build:manifest'(manifest) {
       for (const resource of Object.values(manifest)) {
-        if (/^(runner|pack)\.worker-/.test(resource.file)) {
+        if (/^pack\.worker-/.test(resource.file)) {
           resource.preload = false
           resource.prefetch = false
         }
@@ -45,7 +45,7 @@ export default defineNuxtConfig({
           name: 'check-controller-worker',
           generateBundle(_, bundle) {
             const chunks = Object.values(bundle).filter((file) => file.type === 'chunk')
-            const runner = chunks.find((chunk) => /\/(runner|pack)\.worker\.ts$/.test(chunk.facadeModuleId ?? ''))
+            const runner = chunks.find((chunk) => /\/pack\.worker\.ts$/.test(chunk.facadeModuleId ?? ''))
             if (runner && (chunks.length !== 1 || runner.imports.length || runner.exports.length)) {
               this.error('The controller worker must be a single JavaScript chunk with no imports or exports.')
             }

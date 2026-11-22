@@ -8,7 +8,6 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
-import { standaloneJobCalls } from '../lib/standalone-calls'
 import { editorKey } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
@@ -41,28 +40,6 @@ let settingSource = false
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
 let tickMarks: monaco.editor.IEditorDecorationsCollection | undefined
-const callsToMove = computed(() => game.callsToMove?.value)
-let jobLines: monaco.editor.IEditorDecorationsCollection | undefined
-
-function markJobCalls() {
-  const model = editor?.getModel()
-  if (!jobLines || !model || model !== models.get('main.ts') || !callsToMove.value) {
-    jobLines?.clear()
-    return
-  }
-  jobLines.set(standaloneJobCalls(model.getValue(), callsToMove.value).map(({ from, to }) => ({
-    range: monaco.Range.fromPositions(model.getPositionAt(from), model.getPositionAt(to)),
-    options: { inlineClassName: 'call-to-move' },
-  })))
-}
-
-function showJobCalls() {
-  const ranges = jobLines?.getRanges()
-  if (ranges?.length && !editor?.hasTextFocus()) {
-    editor?.revealRangeInCenterIfOutsideViewport(ranges[0].plusRange(ranges[ranges.length - 1]))
-  }
-}
-
 const highlight = createLineHighlight(line => {
   if (!line || !editor) {
     lineLight?.clear()
@@ -294,10 +271,6 @@ onMounted(() => {
   })
   lineLight = editor.createDecorationsCollection()
   tickMarks = editor.createDecorationsCollection()
-  jobLines = editor.createDecorationsCollection()
-  editor.onDidChangeModel(markJobCalls)
-  editor.onDidChangeModelContent(markJobCalls)
-  editor.onDidLayoutChange(showJobCalls)
   suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, pos) {
@@ -359,10 +332,6 @@ onMounted(() => {
   })
   window.addEventListener('keydown', keys, true)
   emit('ready')
-})
-watch(callsToMove, () => {
-  markJobCalls()
-  showJobCalls()
 })
 watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLines, { flush: 'post' })
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })

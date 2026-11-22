@@ -22,6 +22,11 @@ const activeCall = shallowRef<Call>()
 const tickCalls = shallowRef<Call[]>([])
 const tickCount = ref(0)
 const stoppingLoop = ref(false)
+const setupTried = ref(false)
+const previewingTick = ref(false)
+const nextCall = shallowRef<Call>()
+const reach = ref(0)
+let requested: PackCommand['kind'] = 'open'
 const navigation = shallowRef({file:'main.ts',line:1})
 const lastRun = shallowRef<Files>({})
 const declarations = computed(() => frame.value?.declarations ?? '')
@@ -76,6 +81,7 @@ function persist() {
   if (frame.value && !blocked.value) write(frame.value.save, files.value, activeFile.value)
 }
 function send(command: PackCommand) {
+  requested = command.kind
   clearTimeout(timer)
   tickStarted = command.kind === 'tick' ? clock.now() : undefined
   busy.value = true
@@ -84,14 +90,16 @@ function send(command: PackCommand) {
 function scheduleTick() {
   clearTimeout(timer)
   const data = frame.value
-  if (!busy.value && !paused.value && data?.clockMs && data.save.clockActive && !data.solved && !complete.value) {
+  if (!busy.value && !previewingTick.value && !paused.value && data?.clockMs && data.save.clockActive && !data.solved && !complete.value) {
     const remaining = data.clockMs - (tickStarted === undefined ? 0 : clock.now() - tickStarted)
     timer = setTimeout(() => send({ kind: 'tick' }), Math.max(0, remaining / speed.value))
   }
 }
 watch([paused, speed], scheduleTick)
 function run() {
+  if (frame.value?.save.clockActive) { stopLoop(); return }
   runMessage.value = ''
+  if (drawer.value && frame.value?.mode === 'deploy' && !setupTried.value) return
   if (busy.value || blocked.value || complete.value) return
   if (solved.value) return
   if (frame.value?.prediction && !frame.value.save.predictions[frame.value.save.lessonId!]) {
@@ -101,7 +109,9 @@ function run() {
   drawer.value = undefined
   lastRun.value = files.value
   paused.value = false
-  send({kind:'run',files:files.value})
+  previewingTick.value = false
+  const setup = frame.value?.mode === 'deploy' && !setupTried.value
+  send({ kind: setup ? 'trySetup' : 'run', files: files.value })
 }
 function stopLoop() {
   if (!frame.value?.save.clockActive || stoppingLoop.value) return
@@ -109,7 +119,18 @@ function stopLoop() {
   paused.value = false
   clock.cancel()
   persist()
-  if (!busy.value) send({ kind: 'stopLoop' })
+  if (!busy.value) send({ kind: 'stopLoop', completedTicks: tickCount.value })
+}
+function runOnce() {
+  if (busy.value) return
+  if (previewingTick.value) {
+    previewingTick.value = false
+    displayWorld.value = frame.value?.save.world
+    scheduleTick()
+  } else {
+    drawer.value = undefined
+    send({ kind: 'runOnce', files: files.value })
+  }
 }
 function advance() { if (solved.value && frame.value?.save.lessonId) send({kind:'continue', id: frame.value.save.lessonId}) }
 function shortcut(e:KeyboardEvent) {
@@ -142,21 +163,24 @@ async function receive(data: PackFrame | {loadError:string}) {
     return
   }
   if (changed) {
+    setupTried.value = false
+    previewingTick.value = false
     drawer.value = data.showLearn ? 'learn' : undefined
     files.value = data.save.project.working
     activeFile.value = data.save.project.activeFile
     navigation.value = data.edit.file === activeFile.value ? data.edit : {file: activeFile.value, line: 1}
   }
   if (!frame.value && data.save.clockActive) paused.value = true
-  if (!data.save.clockActive) paused.value = false
-  frame.value = data
-  runMessage.value = data.noCalls ? 'Your code ran. Check the TODO and try again.' : ''
+  if (requested === 'trySetup' && !data.error) setupTried.value = true
+  if (!data.save.clockActive && requested !== 'tick') paused.value = false
+  if (requested !== 'tick') frame.value = data
+  runMessage.value = data.notice ?? (data.noCalls ? 'Your code ran. Check the TODO and try again.' : '')
   error.value = saved.value ? data.error : 'Could not save progress. Free space and try again.'
-  if (!changed && saved.value) persist()
+
   calls.value = []
-  if (data.moments.length) {
+  if (data.moments.length && !(requested === 'runOnce' && paused.value)) {
     const interval = tickStarted !== undefined && data.clockMs ? data.clockMs / data.moments.length : 650
-    let nextMoment = tickStarted ?? clock.now()
+    let nextMoment = clock.now()
     watching.value = tickStarted === undefined
     displayWorld.value = data.start
     for (const moment of data.moments) {
@@ -164,6 +188,16 @@ async function receive(data: PackFrame | {loadError:string}) {
       if (stoppingLoop.value) break
       if (watching.value) activeCall.value = moment.call
       calls.value = [...calls.value, moment.call]
+      if (data.task && (moment.call.name === 'take' || moment.call.name === 'put')) {
+        nextCall.value = moment.call
+        reach.value = 0
+        const start = nextMoment
+        await clock.waitUntil(start + interval * 0.55, time => {
+          reach.value = Math.min(1, (time - start) / (interval * 0.55))
+        })
+        if (!alive || stoppingLoop.value) break
+        nextCall.value = undefined
+      }
       displayWorld.value = moment.world
       statuses.value = moment.checks
       nextMoment += interval
@@ -173,16 +207,20 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (!alive) return
   watching.value = false
   activeCall.value = undefined
+  nextCall.value = undefined
+  if (stoppingLoop.value && requested === 'tick') {
+    send({ kind: 'stopLoop', completedTicks: tickCount.value })
+    return
+  }
+  frame.value = data
   tickCount.value = data.tickCount
   if (!data.save.clockActive || changed) tickCalls.value = []
   else if (tickStarted !== undefined && calls.value.length) tickCalls.value = calls.value
   if (data.save.clockActive && data.save.project.deployed) lastRun.value = data.save.project.deployed
-  displayWorld.value = data.save.world
+  previewingTick.value = data.previewWorld !== undefined
+  displayWorld.value = data.previewWorld ?? data.save.world
   statuses.value = data.checks
-  if (stoppingLoop.value && data.save.clockActive) {
-    send({ kind: 'stopLoop' })
-    return
-  }
+  if (!changed && saved.value) persist()
   stoppingLoop.value = false
   busy.value = false
   scheduleTick()
@@ -201,7 +239,7 @@ async function start(reset = false) {
   blocked.value = false
   let stored = null
   try {
-    stored = reset || lesson !== undefined ? null : await readPackSlot(props.manifest.id)
+    stored = lesson !== undefined ? null : await readPackSlot(props.manifest.id, reset)
   } catch {
     error.value='Could not read this pack’s save. Allow storage or start a fresh pack.'
     saved.value=false; blocked.value=true; busy.value=false; return
@@ -231,18 +269,19 @@ onBeforeUnmount(() => {
         </aside>
       </div>
       <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
-      <button v-else class="deploy primary-run" data-testid="primary-button" :disabled="busy || blocked || !!solved" @click="run">
-        <Play />{{ watching ? 'Playing your run' : frame?.mode === 'deploy' ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
+      <button v-else class="deploy primary-run" data-testid="primary-button" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved || (!!drawer && frame?.mode === 'deploy' && !setupTried)" @click="run">
+        <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
       </button>
     </header>
     <main class="desk">
       <section class="world-shell pack-world" data-testid="world">
-        <component :is="view" v-if="displayWorld" :world="displayWorld" :scene="frame?.scene" :inputs="frame?.inputs" :calls="calls" />
-        <div v-if="frame?.save.clockActive" class="world-controls">
-          <PlaybackBar v-model:paused="paused" v-model:speed="speed" :inert="stoppingLoop" :tick-count="tickCount" @stop="stopLoop" />
+        <component :is="view" v-if="displayWorld" :world="displayWorld" :scene="frame?.scene" :inputs="frame?.inputs" :calls="calls" :next-call="nextCall" :reach="reach" />
+        <div v-if="frame?.mode === 'deploy' && setupTried" class="world-controls">
+          <PlaybackBar v-if="frame.save.clockActive || tickCount" :live="frame.save.clockActive" v-model:paused="paused" v-model:speed="speed" :inert="stoppingLoop" :tick-count="tickCount" @stop="stopLoop" />
+          <button v-if="(!frame.save.clockActive || paused || previewingTick) && !solved" :disabled="busy" @click="runOnce">{{ previewingTick ? 'Return to paused floor' : 'Run once' }}</button>
         </div>
         <SideDrawer v-if="drawer && frame" :tab="drawer" :manifest="manifest" :lessons="frame.map" :selected="frame.save.lessonId"
-          :theory="frame.theory" :task="frame.task" :prediction="frame.prediction" :choice="frame.save.predictions[frame.save.lessonId!]"
+          :clock="frame.mode === 'deploy'" :theory="frame.theory" :task="frame.task" :prediction="frame.prediction" :choice="frame.save.predictions[frame.save.lessonId!]"
           :hints="frame.hints" :rung="frame.save.hints[frame.save.lessonId!] ?? 0" :entries="frame.reference" :types="frame.types"
           :busy="busy" :logs="frame.logs" @tab="drawer = $event" @close="closeDrawer()" @edit="closeDrawer(true)"
           @predict="send({kind: 'predict', choice: $event})" @hint="send({kind: 'hint'})" @select="select">

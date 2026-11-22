@@ -19,7 +19,6 @@ export interface EditorSession {
   placeFunctions?: readonly string[]
   places?: Read<string[]>
   traces?: Read<Record<string, {file: string; line: number}[]>>
-  callsToMove?: Read<{name: string; place?: string}[] | undefined>
   setFile(file: string, code: string): void
   openFile(file: string): void
 }
