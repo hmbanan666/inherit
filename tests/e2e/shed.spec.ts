@@ -1,6 +1,12 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { openShed, photo, edit, openTool, savedShed } from './workshop'
+
+async function waitForStock(page: Page, station: 'mine' | 'furnace') {
+  await page.getByRole('button', { name: 'Inspect ' + station }).click()
+  await expect(page.getByRole('region', { name: 'Machine inspector' })).toContainText('ready')
+  await page.getByRole('button', { name: 'Close inspector' }).click()
+}
 
 test('Bram meets the player beside a labelled working shed', async ({ page }) => {
   await openShed(page)
@@ -99,7 +105,9 @@ test('the furnace can be empty and a named shipping trip plays above the arm', a
   if (await retry.isVisible()) await retry.click()
   await expect(page.getByTestId('solved-card')).toContainText('first ingot')
   await page.getByTestId('continue').click()
-  await edit(page, 'import { take, put } from "inherit"\nfunction smelt() { take("mine"); put("furnace") }\nsmelt()\ntake("furnace")\nput("cart")')
+  await page.getByRole('button', {name: 'Got it'}).click()
+  await waitForStock(page, 'mine')
+  await edit(page, 'import { take, put } from "inherit"\nfunction smelt() { take("mine"); put("furnace") }\nsmelt()')
   await page.getByTestId('primary-button').click()
   await expect(page.getByTestId('arm')).toContainText('smelt()')
   await page.getByTestId('continue').click()
@@ -107,6 +115,8 @@ test('the furnace can be empty and a named shipping trip plays above the arm', a
   await page.getByRole('button', {name: 'Show hint 1 of 2'}).click()
   await page.getByRole('button', {name: 'Show hint 2 of 2'}).click()
   await expect(page.getByTestId('drawer').locator('pre')).toHaveCount(2)
+  await page.getByRole('button', {name: 'Close drawer'}).click()
+  await waitForStock(page, 'furnace')
   await edit(page, 'import { take, put } from "inherit"\nfunction smelt() { take("mine"); put("furnace") }\nfunction ship() { take("furnace"); put("cart") }\nsmelt()\nship()')
   await expect(page.locator('.my-library')).toHaveCount(0)
   await page.getByTestId('primary-button').click()
@@ -127,9 +137,7 @@ for (const input of ['paste', 'type']) {
     await expect(primary).toBeEnabled()
     await expect(card).toBeVisible()
     // The starter consumes a rock. Wait for the next one before testing the edit.
-    await page.getByRole('button', { name: 'Inspect mine' }).click()
-    await expect(page.getByRole('region', { name: 'Machine inspector' })).toContainText('ready')
-    await page.getByRole('button', { name: 'Close inspector' }).click()
+    await waitForStock(page, 'mine')
     const marked = page.locator('.view-line').filter({ has: page.locator('.call-to-move') })
     await expect(marked).toHaveText(['take("mine")', 'put("furnace")'])
     await marked.first().click()
