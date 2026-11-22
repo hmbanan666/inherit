@@ -4,6 +4,8 @@ import { archivedFiles, archives, openArchivedSave } from './archive'
 function memory() {
   const entries = new Map<string, string>()
   return {
+    clear: () => entries.clear(),
+    removeItem: (key: string) => { entries.delete(key) },
     get length() { return entries.size },
     key: (index: number) => [...entries.keys()][index] ?? null,
     getItem: (key: string) => entries.get(key) ?? null,
