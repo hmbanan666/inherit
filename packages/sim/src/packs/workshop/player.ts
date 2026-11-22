@@ -44,3 +44,13 @@ export interface PlayerAPI {
    */
   payBalance(): boolean
 }
+
+export interface PlayerConsole {
+  /**
+   * Write diagnostic values to Console during a run or clock tick.
+   * @param values The values to print on one line.
+   * @returns No value.
+   * @example console.log(look("cart").count)
+   */
+  log(...values: unknown[]): void
+}

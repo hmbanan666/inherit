@@ -5,6 +5,7 @@ import { migrateBeginner } from '@inherit/sim/migrate'
 import { declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
 import type { PackCommand, PackFrame } from './packProtocol'
 
+let schema: ReturnType<typeof readPlayerAPI>
 let beforeTick: PackSave<unknown> | undefined
 let tickCount = 0
 let pack: ReturnType<typeof getPack>

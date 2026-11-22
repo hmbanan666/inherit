@@ -14,7 +14,7 @@ export function readPlayerAPI(source: string) {
   const types: Record<string,string> = {}
   const methods: ApiMethod[] = []
   for (const stmt of file.statements) {
-    if (ts.isInterfaceDeclaration(stmt) && ['PlayerAPI', 'Controller'].includes(stmt.name.text)) {
+    if (ts.isInterfaceDeclaration(stmt) && ['PlayerAPI', 'Controller', 'PlayerConsole'].includes(stmt.name.text)) {
       for (const method of stmt.members) {
         if (!ts.isMethodSignature(method)) continue
         const doc = ts.getJSDocCommentsAndTags(method).find(ts.isJSDoc)
@@ -36,7 +36,7 @@ export function readPlayerAPI(source: string) {
       types[stmt.name.text] = stmt.getText(file).replace(/^export\s+/,'')
     }
   }
-  return {types,methods,handlers}
+  return {types,methods,handlers,consoleEntries}
 }
 
 export function playerDeclarations(schema: ReturnType<typeof readPlayerAPI>, names: readonly string[], exposure:'globals'|'module', aliases: Record<string,string[]> = {}, overloads: string[] = []) {

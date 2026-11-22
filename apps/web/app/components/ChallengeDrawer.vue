@@ -34,20 +34,19 @@ watch(() => props.frame.save.lessonId, () => { tab.value = 'Learn'; rung.value =
       <button v-if="rung < frame.hints.length" @click="rung++">Next hint</button>
     </div>
     <div v-if="tab === 'API'">
-      <p>Import floor functions by name from "inherit". The editor knows the parcel types.</p>
+      <p>Import module functions by name from "inherit". The editor also knows the types below.</p>
       <article v-for="entry in frame.reference" :key="entry.name">
         <h3>{{ entry.name }}</h3><code>{{ entry.signature }}</code><p>{{ entry.description }}</p>
         <p v-for="param in entry.params" :key="param">{{ param }}</p><p>{{ entry.returns }}</p><pre>{{ entry.example }}</pre>
       </article>
-      <details><summary>Parcel types</summary><pre v-for="type in frame.types" :key="type">{{ type }}</pre></details>
-      <p>console.log(value) writes a diagnostic to Console and returns no value.</p>
+      <details><summary>Types</summary><pre v-for="type in frame.types" :key="type">{{ type }}</pre></details>
     </div>
     <div v-if="tab === 'Console'"><pre>{{ frame.logs.join('\n') || 'No output yet.' }}</pre></div>
     <button @click="emit('close')">{{ tab === 'Learn' ? 'Got it' : 'Close' }}</button>
   </aside>
 </template>
 <style scoped>
-.drawer { position: absolute; inset: 0 0 0 auto; width: min(360px, 45%); z-index: 5; overflow: auto; padding: 16px; background: var(--overlay); border-left: 1px solid var(--line-strong); box-shadow: -4px 0 15px var(--shadow-light); }
+.drawer { position: absolute; inset: 0 0 0 auto; width: min(360px, 40%); z-index: 5; overflow: auto; padding: 16px; background: var(--overlay); border-left: 1px solid var(--line-strong); box-shadow: -4px 0 15px var(--shadow-light); }
 nav { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
 nav button { font-size: 12px; padding: 5px 8px; }
 [aria-pressed=true] { color: var(--gold); }
