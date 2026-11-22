@@ -1,11 +1,10 @@
 import { blueprintCommands } from './blueprints'
 import type { MaterialId, RecipeId } from './campaign-api'
-import { recordStats } from '../../engine'
-import { hasRoom, produce } from './transport'
+import { hasRoom, openIncident, produce } from './transport'
 import { lessons } from './chapter'
 import { placeNames, type CallRecord } from './lesson-flow'
 import { RECIPES } from './catalog'
-import type { Campaign, CampaignMachine } from './model'
+import type { Campaign, CampaignMachine, CampaignWorld } from './model'
 import { finishProduction, work } from './production'
 import { availableMachines, type ChapterMachine } from './surface'
 import { payInstallment, purchaseProblem, wanted } from './town'
@@ -207,3 +206,20 @@ export function primitiveTick(c: Campaign, mode: 'run' | 'tick' | 'idle' | 'depl
   return { api, finish, calls }
 }
 export type ChapterFactory = ReturnType<typeof primitiveTick>['api']
+
+function recordStats(world: CampaignWorld, machine: CampaignMachine) {
+  const stats = machine.stats
+  if (machine.status === 'working') stats.activeTicks++
+  else if (machine.status === 'blocked') stats.blockedTicks++
+  else stats.idleTicks++
+  machine.recentProduction = machine.recentProduction.filter((t) => t > world.tick - 240)
+  const sampledTicks = stats.activeTicks + stats.idleTicks + stats.blockedTicks
+  stats.rate = Math.round((machine.recentProduction.length * 240) / Math.min(240, sampledTicks))
+  if (machine.status === 'blocked') openIncident(world, machine.id, 'blocked')
+  else {
+    const incident = world.incidents.find(
+      (i) => i.cause === 'blocked' && i.machineId === machine.id && i.endTick === undefined,
+    )
+    if (incident) incident.endTick = world.tick
+  }
+}

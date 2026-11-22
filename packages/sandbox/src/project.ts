@@ -11,8 +11,7 @@ export interface ProjectOptions {
   memory?: JsonObject
   budget?: number
   exposure?: 'globals' | 'module'
-  chapterExports?: readonly string[]
-  unlockedEvents?: readonly string[]
+  operations?: readonly string[]
 }
 
 export function projectOptions(source: string | ProjectOptions): ProjectOptions {
@@ -48,7 +47,7 @@ function resolveImport(files: Map<string, string>, from: string, request: string
   throw new Error(`${location} · Cannot resolve ${request}.`)
 }
 
-export function compileProject(options: ProjectOptions, testing: boolean) {
+export function compileProject(options: ProjectOptions) {
   const files = new Map(Object.entries(options.files))
   if (files.size > 32) throw new Error('A project can contain at most 32 files.')
   let size = 0
@@ -60,7 +59,7 @@ export function compileProject(options: ProjectOptions, testing: boolean) {
       throw new Error('Project exceeds 64,000 characters per file or 256,000 total.')
     }
   }
-  const entry = testing ? 'tests.ts' : (options.entry ?? 'main.ts')
+  const entry = options.entry ?? 'main.ts'
   projectPath(entry)
   const compiled = new Map<string, { js: string; map: TraceMap }>()
   const resolve = (from: string, request: string) => resolveImport(files, from, request)

@@ -21,7 +21,7 @@ export async function startChapter(c: Campaign, files: ProjectFiles, mode: 'run'
   const attempt = mode === primaryButton(next)
   const tick = workshopAttempt(next, mode === 'run' ? 'run' : 'setup')
   const surface = getSurface(next)
-  const options = { files, budget: surface.budget, chapterExports: workshop.available(next, ''), exposure: workshop.exposure }
+  const options = { files, budget: surface.budget, operations: workshop.available(next, ''), exposure: workshop.exposure }
   let program: Program | undefined
   let draft: Program | undefined
   try {

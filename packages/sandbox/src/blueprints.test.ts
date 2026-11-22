@@ -7,7 +7,7 @@ test('the chapter module exposes exactly the documented functions and onTick rec
   for (const task of lessons) {
     c.town.beat = task.beat
     const program = await createProgram({
-      chapterExports: getSurface(c).exports,
+      operations: getSurface(c).exports,
       files: {
         'main.ts':
           'import * as workshop from "inherit"; export function onTick(){ console.log(Object.keys(workshop).sort().join(","), arguments.length) }',

@@ -4,7 +4,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./declarations": "./src/declarations.ts",
     "./pack": "./src/pack-run.ts"
   },
   "dependencies": {

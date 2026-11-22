@@ -4,7 +4,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./api": "./src/api.ts",
     "./campaign-api": "./src/packs/workshop/campaign-api.ts",
     "./pack": "./src/framework/pack.ts",
     "./save": "./src/framework/save.ts",

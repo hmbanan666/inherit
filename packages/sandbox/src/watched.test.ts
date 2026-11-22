@@ -19,7 +19,7 @@ test('watched calls keep source positions and the innermost function across file
     'tools.ts':
       'import { take, put } from "inherit"\ntype Name = string\nexport function outer() { inner() }\nfunction inner() {\n  take("mine")\n  put("furnace")\n  take("mines")\n}',
   }
-  await runOnce({ files }, tick.api)
+  await runOnce({ files, operations: ['take','put'] }, tick.api)
   expect(tick.calls.map(({ file, line, within, hand, ok }) => [file, line, within, hand, ok])).toEqual([
     ['tools.ts', 5, 'inner', 'iron-ore', true],
     ['tools.ts', 6, 'inner', null, true],
@@ -33,6 +33,7 @@ test('Deploy runs module scope once and calls the exported clock with zero argum
   const init = primitiveTick(c, 'deploy')
   const program = await createProgram(
     {
+      operations: ['take','put'],
       files: {
         'main.ts':
           'import { take, put } from "inherit"\ntake("mine")\nexport function onTick() {\n  if (arguments.length) throw Error("clock arguments")\n  put("cart")\n}',
