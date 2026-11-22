@@ -79,7 +79,8 @@ paintSign(shades[0])`,
       check("The second duck reaches the step", e =>
         feeds(e, 'say', shape('index')) && e.world.bubble === e.before.readings.queue![1]),
       check("A reordered queue calls its new second duck", e =>
-        e.world.bubble === e.before.readings.queue![1]),
+        e.world.bubble === e.before.readings.queue![1],
+        entry => entry.readings.queue![0] === 'Pip'),
     ],
     solved: {
       reaction: "The second duck has a turn.",
@@ -130,9 +131,10 @@ console.log(boats.length)`,
     ],
     checks: [
       check("Board matches the queue", e =>
-        feeds(e, 'showScore', property('length'))),
+        feeds(e, 'showScore', property('length')) && e.world.score === e.before.readings.waiting!.length),
       check("Empty pier shows zero", e =>
-        e.world.score === e.before.readings.waiting!.length),
+        e.world.score === 0,
+        entry => entry.readings.waiting!.length === 0),
     ],
     solved: {
       reaction: "The landing has a counter.",

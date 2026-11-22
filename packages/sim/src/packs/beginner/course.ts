@@ -19,11 +19,15 @@ export function sameHelper(e: Seen, first: keyof PlayerAPI, second: keyof Player
   return actions.length === 2 && !!actions[0].within && actions[0].within === actions[1].within
 }
 
-export function check(label: string, passes: (e: Seen) => boolean): Check<Village> {
+export function check(
+  label: string,
+  passes: (e: Seen) => boolean,
+  appliesTo: (entry: Readonly<Village>) => boolean = () => true,
+): Check<Village> {
   return {
     id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, ''),
     label,
-    evaluate: evidence => passes(evidence) ? 'green' : 'red',
+    evaluate: evidence => !appliesTo(evidence.before) || passes(evidence) ? 'green' : 'red',
   }
 }
 

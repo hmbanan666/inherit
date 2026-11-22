@@ -202,9 +202,11 @@ say(\`Stops: \${stops}\`)`,
     ],
     checks: [
       check("The sign reads Lane 3", e =>
-        feeds(e, 'paintSign', shape('template')) && e.world.sign === `Lane ${e.before.readings.lane}`),
+        feeds(e, 'paintSign', shape('template')) && e.world.sign === 'Lane 3',
+        entry => entry.readings.lane === 3),
       check("Changing lane to 2 updates the label", e =>
-        e.world.sign === `Lane ${e.before.readings.lane}`),
+        e.world.sign === 'Lane 2',
+        entry => entry.readings.lane === 2),
     ],
     solved: {
       reaction: "The runner found the lane.",

@@ -47,7 +47,8 @@ export default courseUnit("loops", [
       check("Guests arrive once in card order", e =>
         inBlock(e, 'greet', 'forOf') && same(e.world.neighbours, e.before.readings.visitors)),
       check("A shorter card invites only its names", e =>
-        same(e.world.neighbours, e.before.readings.visitors)),
+        same(e.world.neighbours, e.before.readings.visitors),
+        entry => entry.readings.visitors!.length === 1),
     ],
     solved: {
       reaction: "The neighbours have arrived.",
@@ -147,9 +148,11 @@ while (remaining > 0) {
     ],
     checks: [
       check("Distances one and four stop at the dock", e =>
-        e.world.steps === e.before.readings.distance && (e.world.steps === 0 || inBlock(e, 'step', 'while'))),
+        e.world.steps === e.before.readings.distance && inBlock(e, 'step', 'while'),
+        entry => entry.readings.distance! > 0),
       check("Zero takes no steps", e =>
-        e.world.steps === e.before.readings.distance),
+        e.world.steps === 0,
+        entry => entry.readings.distance === 0),
     ],
     solved: {
       reaction: "The robot reached its dock.",
@@ -250,9 +253,11 @@ showScore(total)`,
     ],
     checks: [
       check("Every sack contributes once", e =>
-        accumulated(e) && calls(e, 'showScore').length === 1),
-      check("An empty delivery displays zero", e =>
+        accumulated(e) && calls(e, 'showScore').length === 1 &&
         e.world.score === e.before.readings.weights!.reduce((sum, weight) => sum + weight, 0)),
+      check("An empty delivery displays zero", e =>
+        e.world.score === 0,
+        entry => entry.readings.weights!.length === 0),
     ],
     solved: {
       reaction: "The delivery is weighed.",
