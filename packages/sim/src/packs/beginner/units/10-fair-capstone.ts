@@ -87,9 +87,10 @@ say(boat.name)`,
     ],
     checks: [
       check("The board follows the seats field", e =>
-        feeds(e, 'showScore', property('seats'))),
+        feeds(e, 'showScore', property('seats')) && e.world.score === e.before.readings.booking!.seats),
       check("A changed booking updates the board", e =>
-        e.world.score === e.before.readings.booking!.seats),
+        e.world.score === e.before.readings.booking!.seats,
+        entry => entry.readings.booking!.name === 'Jam'),
     ],
     solved: {
       reaction: "The steward can see the booking.",
@@ -250,7 +251,8 @@ for (const booking of bookings) {
       check("Every booking appears in order", e =>
         calls(e, 'guests').length > 0 && same(e.world.cards, e.before.ledger)),
       check("An empty ledger posts nothing", e =>
-        same(e.world.cards, e.before.ledger)),
+        e.world.cards.length === 0,
+        entry => entry.ledger.length === 0),
     ],
     solved: {
       reaction: "The rail matches the ledger.",
@@ -332,7 +334,7 @@ for (const card of guests()) {
     goal: "Set the seat counter from all bookings that need places",
     scene: "fair",
     cue: "Shared seating · Standing guests take no places",
-    reason: "Standing guests have zero seats. Seated bookings share a bench and the steward needs the total on the board.",
+    reason: "Standing guests have zero seats. Seated bookings share a table and the steward needs the total on the board.",
     theory: {
       title: "Build a seating calculator",
       body: [

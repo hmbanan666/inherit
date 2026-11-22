@@ -40,9 +40,11 @@ setSignal(apples >= 3)`,
     ],
     checks: [
       check("The signal is off at two", e =>
-        calls(e, 'basketCount').length > 0 && e.world.signal === (e.before.basket >= 3)),
+        calls(e, 'basketCount').length > 0 && e.world.signal === false,
+        entry => entry.basket === 2),
       check("It lights at three and four", e =>
-        e.world.signal === (e.before.basket >= 3)),
+        e.world.signal === true,
+        entry => entry.basket >= 3),
     ],
     solved: {
       reaction: "Everyone can see when to share.",
@@ -89,9 +91,11 @@ if (raining) {
     ],
     checks: [
       check("Rain opens the shelter", e =>
-        !e.before.raining || inBlock(e, 'openCanopy', 'if')),
+        inBlock(e, 'openCanopy', 'if') && e.world.canopy,
+        entry => entry.raining),
       check("Clear sky leaves the ropes still", e =>
-        e.world.canopy === e.before.raining && calls(e, 'openCanopy').length === Number(e.before.raining)),
+        !e.world.canopy && calls(e, 'openCanopy').length === 0,
+        entry => !entry.raining),
     ],
     solved: {
       reaction: "The walkers stay dry.",
@@ -215,9 +219,11 @@ if (level < 1) {
     ],
     checks: [
       check("The middle branch awards silver", e =>
-        inBlock(e, 'paintSign', 'elseIf')),
+        inBlock(e, 'paintSign', 'elseIf') && e.world.sign === 'silver',
+        entry => entry.readings.position === 2),
       check("First and third show gold and bronze", e =>
-        e.world.sign === ['gold', 'silver', 'bronze'][e.before.readings.position! - 1]),
+        e.world.sign === (e.before.readings.position === 1 ? 'gold' : 'bronze'),
+        entry => entry.readings.position !== 2),
     ],
     solved: {
       reaction: "The medals are in place.",
@@ -287,9 +293,11 @@ if (level < 1) {
     ],
     checks: [
       check("Both ready starts the race", e =>
-        feeds(e, 'setSignal', binary('&&'))),
+        feeds(e, 'setSignal', binary('&&')) && e.world.signal === true,
+        entry => !!(entry.readings.leftReady && entry.readings.rightReady)),
       check("Every other pair holds the start", e =>
-        e.world.signal === (e.before.readings.leftReady && e.before.readings.rightReady)),
+        e.world.signal === false,
+        entry => !(entry.readings.leftReady && entry.readings.rightReady)),
     ],
     solved: {
       reaction: "Both judges have a say.",
@@ -359,9 +367,11 @@ if (level < 1) {
     ],
     checks: [
       check("Either or both gates light the lens", e =>
-        feeds(e, 'setSignal', binary('||'))),
+        feeds(e, 'setSignal', binary('||')) && e.world.signal === true,
+        entry => !!(entry.readings.nearOpen || entry.readings.farOpen)),
       check("Two closed gates clear it", e =>
-        e.world.signal === (e.before.readings.nearOpen || e.before.readings.farOpen)),
+        e.world.signal === false,
+        entry => !(entry.readings.nearOpen || entry.readings.farOpen)),
     ],
     solved: {
       reaction: "The pond gates have an alarm.",
@@ -406,9 +416,11 @@ if (level < 1) {
     ],
     checks: [
       check("Silent lights green", e =>
-        feeds(e, 'setSignal', shape('negation'))),
+        feeds(e, 'setSignal', shape('negation')) && e.world.signal === true,
+        entry => !entry.readings.ringing),
       check("Ringing blanks the lens", e =>
-        e.world.signal === !e.before.readings.ringing),
+        e.world.signal === false,
+        entry => entry.readings.ringing === true),
     ],
     solved: {
       reaction: "The nursery has a quiet light.",

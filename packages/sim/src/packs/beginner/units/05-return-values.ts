@@ -87,9 +87,11 @@ setSignal(raining)`,
     ],
     checks: [
       check("Rain lights the lamp", e =>
-        feeds(e, 'setSignal', reading('isRaining'))),
+        feeds(e, 'setSignal', reading('isRaining')) && e.world.signal === true,
+        entry => entry.raining),
       check("Clear sky turns it off", e =>
-        e.world.signal === e.before.raining),
+        e.world.signal === false,
+        entry => !entry.raining),
     ],
     solved: {
       reaction: "The gardener can read the sky.",
