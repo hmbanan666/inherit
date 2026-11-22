@@ -1,6 +1,6 @@
 import { readPlayerAPI, playerDeclarations } from '../../sim/src/framework/declarations'
 import { playerError } from './player-error'
-import type { Call, Colour, Files, Pack } from '../../sim/src/framework/pack'
+import type { Call, Check, Colour, Files, Pack } from '../../sim/src/framework/pack'
 import { continueLesson, type PackSave } from '../../sim/src/framework/save'
 import { createProgram, runOnce, type Program } from './index'
 
@@ -16,7 +16,18 @@ export interface Moment<W> { call: Call; world: W; checks: Colour[] }
 
 type RunMode = 'run' | 'deploy' | 'tick' | 'resume'
 
-function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Map<string, Colour>) {
+interface InputResult {
+  input: string
+  colour: Colour
+}
+
+function combinedColour(results: InputResult[]): Colour {
+  if (results.some(result => result.colour === 'red')) return 'red'
+  if (results.some(result => result.colour === 'amber')) return 'amber'
+  return 'green'
+}
+
+function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Map<string, InputResult[]>) {
   let program: Program | undefined
   let ticks = 0
   function dispose() { program?.dispose(); program = undefined }
@@ -33,7 +44,11 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
     let site: Pick<Call,'file'|'line'|'within'> = { file: 'main.ts', line: 1 }
     const host = { tick: ++ticks, traceSite(next: typeof site) { site = next } }
     const evidence = { before: save.entryWorld, world, calls, files, console: [] as string[] }
-    const checks = () => lesson.checks.map(check => variantResults.get(check.id) ?? check.evaluate(evidence))
+    function inputsFor(check: Check<W>): InputResult[] {
+      const alternates = variantResults.get(check.id) ?? []
+      if (check.input && alternates.length) return alternates
+      return [{ input: check.input ?? 'Scene input', colour: check.evaluate(evidence) }, ...alternates]
+    }
     for (const name of names) {
       const method = api[name]
       if (typeof method !== 'function') throw new Error('Missing player function: ' + name)
@@ -41,7 +56,7 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
         const result: unknown = Reflect.apply(method, api, args)
         const call = { ...site, name, args, result, ok: true }
         calls.push(call)
-        moments.push({ call, world: structuredClone(world), checks: checks() })
+        moments.push({ call, world: structuredClone(world), checks: lesson.checks.map(check => combinedColour(inputsFor(check))) })
         return result
       } })
     }
@@ -60,7 +75,7 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
         program.onTick(host)
         evidence.console = program.drainLogs()
       }
-      finish()
+      finish(evidence.console)
     } catch (error) {
       candidate?.dispose()
       if (mode==='tick') {dispose(); save.clockActive = false}
@@ -68,7 +83,14 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
       throw new Error(playerError(error,names))
     }
     if (candidate) { dispose(); program = candidate }
-    const statuses = checks()
+    const inputsByCheck = lesson.checks.map(inputsFor)
+    const statuses = inputsByCheck.map(combinedColour)
+    const failedInputs: Record<string, string[]> = {}
+    lesson.checks.forEach((check, index) => {
+      if (!variantResults.has(check.id)) return
+      const failed = inputsByCheck[index].filter(result => result.colour !== 'green')
+      if (failed.length) failedInputs[check.id] = failed.map(result => result.input)
+    })
     if (mode !== 'resume') {
       if (mode !== 'tick') save.project.working = {...files}
       if (mode === 'deploy') {
@@ -82,35 +104,41 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
       save.phase = save.passed.length === lesson.checks.length ? 'solved' : 'working'
       if (save.phase === 'solved') save.clockActive = false
     }
-    return {start, moments, logs:evidence.console, checks:statuses}
+    return {start, moments, logs:evidence.console, checks:statuses, failedInputs}
   }
   return {play,dispose}
 }
 /** Run alternate inputs on separate guests. Only the authored display fixture paints the scene. */
 export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
-  const results = new Map<string, Colour>()
+  const results = new Map<string, InputResult[]>()
   const visible = fixtureRunner(pack, results)
   async function play(save: PackSave<W>, files: Files, mode: RunMode = 'run') {
     const lesson = pack.lessons.find(l => l.id === save.lessonId)
     if (mode !== 'tick') {
       results.clear()
       if (lesson) for (const variant of lesson.variants ?? []) {
-        const checks = lesson.checks.filter(check => check.input === variant.input)
+        const checks = lesson.checks.filter(check => !check.input || check.input === variant.input)
         const trial: PackSave<W> = { ...save, world: structuredClone(save.entryWorld), attempts: {}, passed: [],
           project: { ...save.project }, phase: 'brief' }
         variant.enter(trial.world)
         trial.entryWorld = structuredClone(trial.world)
         const runner = fixtureRunner({ ...pack, lessons: [{ ...lesson, checks }] }, new Map())
+        let statuses: Colour[]
         try {
           const result = await runner.play(trial, files, lesson.mode)
-          let statuses = result.checks
+          statuses = result.checks
           for (let tick = 0; lesson.mode === 'deploy' && trial.phase !== 'solved' && tick < (variant.maxTicks ?? 120); tick++)
             statuses = (await runner.play(trial, files, 'tick')).checks
-          checks.forEach((check, i) => results.set(check.id, trial.passed.includes(check.id) ? 'green' : statuses[i]))
+          statuses = checks.map((check, i) => trial.passed.includes(check.id) ? 'green' : statuses[i])
         } catch {
           // A player error on one input leaves its rows outstanding.
-          checks.forEach(check => results.set(check.id, 'red'))
+          statuses = checks.map(() => 'red')
         } finally { runner.dispose() }
+        checks.forEach((check, index) => {
+          const cases = results.get(check.id) ?? []
+          cases.push({ input: variant.input, colour: statuses[index] })
+          results.set(check.id, cases)
+        })
       }
     }
     return visible.play(save, files, mode)
