@@ -12,6 +12,9 @@ test.each(pack.lessons)('$id starts at a TODO and handles every independent inpu
   expect(lines[starter.edit.line - 2]).toMatch(/^\/\/ TODO:/)
   const solutionLines = lesson.referenceSolution['main.ts'].split('\n').map(line => line.trim()).filter(line => line.length > 4)
   for (const hint of lesson.hints!) expect(solutionLines.some(line => hint.includes(line))).toBe(false)
+  for (const variant of lesson.variants ?? []) {
+    expect(lesson.checks.map(check => check.input)).toContain(variant.input)
+  }
   for (const fixture of inputs(lesson.id as ChallengeId)) {
     for (const reference of [false, true]) {
       const save = freshSave(pack)

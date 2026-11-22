@@ -1,3 +1,4 @@
+import { fixtureTickLimit } from '@inherit/sim/pack'
 import { getPack, playerSources } from '@inherit/sim/rules'
 import { continueLesson, freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
 import { courseMap } from '@inherit/sim/course'

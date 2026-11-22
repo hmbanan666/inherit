@@ -7,7 +7,7 @@ import { getPack, packs, playerSources } from '../../packages/sim/src/packs/rule
 import { readPlayerAPI } from '../../packages/sim/src/framework/declarations'
 import { freshSave, continueLesson, decodeSave } from '../../packages/sim/src/framework/save'
 import { declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
-import type { Files } from '../../packages/sim/src/framework/pack'
+import { fixtureTickLimit, type Files } from '../../packages/sim/src/framework/pack'
 import { diagnostics } from './compiler'
 
 type Checkpoint = {previous:Files;world:unknown;declarations:string;play(files:Files):Promise<boolean>}
@@ -159,8 +159,8 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       else {
         const runner = createPackRunner(pack)
         try {
-          await runner.play(trial,files, !solves && lesson.ticks ? 'run' : lesson.mode)
-          if (lesson.mode==='deploy') for (let tick=0; tick<(lesson.ticks ?? 1200) && trial.clockActive && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
+          await runner.play(trial,files, !solves && fixtureTickLimit(lesson) ? 'run' : lesson.mode)
+          if (lesson.mode==='deploy') for (let tick=0; tick<(fixtureTickLimit(lesson) || 1200) && trial.clockActive && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
           solved = trial.phase==='solved'
         } finally {runner.dispose()}
       }

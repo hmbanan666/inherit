@@ -23,14 +23,17 @@ export const lessons = (Object.keys(briefs) as ChallengeId[]).map(id => {
     checks: brief.checks.map((label, index) => ({
       id: id + '-' + (index + 1),
       label,
-      input: shown.name,
+      input: brief.checkInputs[index],
       evaluate: evidence => passes(evidence, index),
     })),
     referenceSolution: { 'main.ts': solutions[id] },
     visibleEffect: { description: brief.goal, testId: 'result-' + station, text },
     solved: { reaction: 'Batch checked', did: brief.goal, idea: brief.practice + '.' },
     enter(world: Floor) { Object.assign(world, createFloor(id, shown)) },
-    variants: hidden.map(input => ({ input: input.name, world: () => createFloor(id, input) })),
-    ticks: shown.turns?.length,
+    variants: hidden.map(fixture => ({
+      input: fixture.name,
+      enter(world: Floor) { Object.assign(world, createFloor(id, fixture)) },
+      maxTicks: fixture.turns?.length,
+    })),
   } satisfies Lesson<Floor>
 })

@@ -65,8 +65,7 @@ export interface Lesson<W> {
   theory?: { title: string; body: string[]; example: string }
   task?: { condition: string; examples: string[] }
   scene?: string
-  variants?: { input: string; world(): W }[]
-  ticks?: number
+  variants?: readonly { input: string; enter(world: W): void; maxTicks?: number }[]
   goal: string
   idea: string
   unit?: string
@@ -94,6 +93,7 @@ export interface Pack<W, A extends object> {
   version: number
   initialWorld(seed: number): W
   decodeWorld(input: unknown): W
+  scenes?: readonly string[]
   entities: Entity<W>[]
   panels: Panel<W>[]
   scenes: readonly string[]
@@ -111,4 +111,9 @@ export interface Pack<W, A extends object> {
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }
 export function mainFile(source: string, line = source.split('\n').length): Starter {
   return { files: { 'main.ts': source }, edit: { file: 'main.ts', line } }
+}
+
+/** A bounded challenge stops after its last scheduled fixture tick, even on an unsuccessful attempt. */
+export function fixtureTickLimit<W>(lesson: Lesson<W>) {
+  return Math.max(0, ...lesson.variants?.map(variant => variant.maxTicks ?? 0) ?? [])
 }

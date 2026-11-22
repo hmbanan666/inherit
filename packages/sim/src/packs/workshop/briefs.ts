@@ -12,6 +12,7 @@ interface Brief {
   todo: string[]
   hints: string[]
   checks: string[]
+  checkInputs: string[]
   api: (keyof PlayerAPI)[]
   effect: [string, string]
 }
@@ -45,6 +46,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Arm empty",
       "One pickup attempt on an empty belt",
     ],
+    checkInputs: ["Longer batch", "Waiting batch", "Empty belt"],
     api: ["take", "put"],
     effect: ["cart", "A B C"],
   },
@@ -76,6 +78,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "All parcels dispatched in order",
       "One final reading, including zero",
     ],
+    checkInputs: ["Every weight is on the boundary", "All light", "Empty belt"],
     api: ["take", "put", "display"],
     effect: ["scale", "2"],
   },
@@ -107,6 +110,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Right holds blues in order",
       "Belt and hand empty, including monochrome input",
     ],
+    checkInputs: ["Red only", "Blue only", "Empty belt"],
     api: ["take", "put"],
     effect: ["left", "A C"],
   },
@@ -138,6 +142,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Crossed colours follow labels",
       "Each route keeps arrival order",
     ],
+    checkInputs: ["Dock only", "Crossed colours", "Repeated labels"],
     api: ["take", "put"],
     effect: ["left", "D"],
   },
@@ -170,6 +175,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Empty belt displays zero",
       "One reading after dispatch",
     ],
+    checkInputs: ["Descending weights", "Tied maximum", "Empty belt", "Last is heaviest"],
     api: ["take", "put", "display"],
     effect: ["scale", "8"],
   },
@@ -201,6 +207,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "First heavy parcel and those behind it stay on belt",
       "Empty input has no pickup attempts",
     ],
+    checkInputs: ["All light", "Heavy first", "Empty belt"],
     api: ["look", "take", "put"],
     effect: ["cart", "A B"],
   },
@@ -233,6 +240,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Empty sides drain cleanly",
       "One pickup per parcel",
     ],
+    checkInputs: ["Empty right", "Repeated ties", "Empty left", "Equal heads"],
     api: ["look", "take", "put"],
     effect: ["cart", "A B D C"],
   },
@@ -265,6 +273,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Only the right bin supplies the cart",
       "Arm and queues end empty",
     ],
+    checkInputs: ["Two already waiting", "Empty right bin", "Waiting dispatch", "Empty right bin"],
     api: ["look", "take", "put"],
     effect: ["cart", "P A B"],
   },
@@ -298,6 +307,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Empty ticks leave the arm still",
       "Six ticks conserve every id",
     ],
+    checkInputs: ["Gap and burst", "Last tick arrival", "Gap and burst", "Last tick arrival"],
     api: ["look", "take", "put"],
     effect: ["cart", "A B C"],
   },
@@ -330,6 +340,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Parcel order survives",
       "Healthy empty ticks stay quiet",
     ],
+    checkInputs: ["Two obstructions", "Jam before tick two", "Two obstructions", "Empty healthy bin"],
     api: ["look", "take", "put", "clearJam"],
     effect: ["cart", "A B"],
   },
@@ -362,6 +373,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Empty ticks preserve preference",
       "At most one delivery per tick",
     ],
+    checkInputs: ["Both bins busy", "Idle between arrivals", "Left followed by a gap", "Both bins busy"],
     api: ["look", "take", "put"],
     effect: ["cart", "A B C D"],
   },
@@ -394,6 +406,7 @@ export const briefs: Record<ChallengeId, Brief> = {
       "Every parcel visits the right bin before the cart",
       "Gaps and burst arrivals preserve order",
     ],
+    checkInputs: ["Four by tick three", "Two together", "Delayed arrival", "Four by tick three"],
     api: ["look", "take", "put"],
     effect: ["cart", "A B"],
   },
