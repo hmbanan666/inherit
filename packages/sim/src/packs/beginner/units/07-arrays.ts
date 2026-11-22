@@ -1,11 +1,7 @@
 import { courseUnit, same, check } from '../course'
 import { feeds, updated, shape, annotation, property } from '../syntax'
 
-export default courseUnit({
-  id: "arrays",
-  title: "Arrays",
-  landmark: "a rack of festival flags",
-}, [
+export default courseUnit("arrays", [
   {
     id: "flag-rack",
     kind: "write",
@@ -172,6 +168,7 @@ rackFlags(flags)`,
     reference: `const flags = ["gold", "gold"]
 flags.push("blue")
 rackFlags(flags)`,
+    fixture: { flags: ["gold", "gold"] },
     checks: [
       check("Original flags stay in order", e =>
         updated(e, 'rackFlags', 'push') && same(e.world.flags.slice(0, 2), ['gold', 'gold'])),

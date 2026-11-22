@@ -1,11 +1,7 @@
 import { courseUnit, calls, same, check } from '../course'
 import { feeds, shape, helperResult, property, insideHelper, interfaceBooking } from '../syntax'
 
-export default courseUnit({
-  id: "fair-capstone",
-  title: "Objects, interfaces and the fair capstone",
-  landmark: "the open village fair",
-}, [
+export default courseUnit("fair-capstone", [
   {
     id: "stall-card",
     kind: "write",

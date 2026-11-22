@@ -28,6 +28,7 @@ export interface Fixture {
   canopy?: boolean
   ledger?: Guest[]
   flag?: string
+  flags?: string[]
 }
 
 export function initialWorld() {

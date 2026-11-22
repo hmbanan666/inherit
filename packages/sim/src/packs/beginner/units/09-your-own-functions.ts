@@ -1,11 +1,7 @@
 import { courseUnit, calls, same, sameHelper, check } from '../course'
 import { feeds, helperResult, insideHelper } from '../syntax'
 
-export default courseUnit({
-  id: "your-own-functions",
-  title: "Your own functions",
-  landmark: "a ribbon-making stall",
-}, [
+export default courseUnit("your-own-functions", [
   {
     id: "flower-row",
     kind: "write",

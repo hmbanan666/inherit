@@ -35,7 +35,7 @@ test.each(lessons)('$id explains its edit and has an independent example', lesso
   const world = pack.initialWorld(1)
   lesson.enter(world)
   const methods = pack.available(world, lesson.id)
-  for (const card of inputCards(world)) expect(methods).not.toContain(card.name)
+  for (const name of Object.keys(inputCards(world))) expect(methods).not.toContain(name)
   expect(world.scene).toBe(lesson.scene)
   if (lesson.kind === 'predict') expect(lesson.prediction?.choices).toContain(lesson.prediction?.answer)
 })
