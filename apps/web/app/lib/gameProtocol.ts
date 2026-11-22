@@ -13,16 +13,8 @@ export interface GameLog {
   file?: string
   line?: number
 }
-export interface MetricSample {
-  tick: number
-  money: number
-  cpu: number
-  budget: number
-  errors: number
-  machines: Record<string, { rate: number; idle: number; blocked: number; queue: number }>
-}
 export type Action =
-  | { type: 'init'; campaign: Campaign }
+  | { type: 'init'; campaign: Campaign; resumeClock?: boolean }
   | { type: 'step' }
   | { type: 'run'; files?: ProjectFiles }
   | { type: 'continue' }
@@ -36,6 +28,8 @@ export interface Frame {
   town: TownSnapshot
   campaign: Omit<Campaign, 'project' | 'seenSections'>
   project?: Campaign['project']
+  api?: string
+  reference?: import('@inherit/sim').ApiEntry[]
   active: boolean
   error: string
   notice?: string

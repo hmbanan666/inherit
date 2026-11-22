@@ -1,5 +1,7 @@
+import { workshopEdit } from '../../../../packages/sim/src/packs/workshop/starter'
+import { workshopLessons } from '../../../../packages/sim/src/packs/workshop/pack'
 import {
-  apiDeclarations, apiReference, createCampaign, currentStep, getSurface, jumpToStep,
+  createCampaign, currentStep, getSurface, jumpToStep,
   loadSave, placeNames, primaryButton, revealed, serializeSave,
   TICK_MS,
   townSnapshot,
@@ -9,10 +11,12 @@ import {
 import { usePlayback } from './usePlayback'
 import type { CpuStats } from '@inherit/sandbox'
 import { appendConsoleLines, type ConsoleRow } from './console-log'
-import type { Action, CallSite, Frame, GameLog, MetricSample } from './gameProtocol'
-export type { CallSite, GameLog, MetricSample } from './gameProtocol'
+import type { Action, CallSite, Frame, GameLog } from './gameProtocol'
+export type { CallSite, GameLog } from './gameProtocol'
 
-const saveKey = 'inherit.workshop.v1'
+import { packKey } from '@inherit/sim/save'
+import { importWorkshop, restoreWorkshop, workshopSave } from '../../../../packages/sim/src/packs/workshop/save'
+const saveKey = packKey('workshop')
 const reloadKey = 'inherit.workshop.reloadedBuild'
 const key: InjectionKey<GameStore> = Symbol('campaign')
 export type GameStore = ReturnType<typeof createGameStore>
@@ -43,8 +47,7 @@ function createGameStore() {
   const active = ref(false)
   const saved = ref(true),
     blockedSave = ref(false)
-  const logs = shallowRef<ConsoleRow[]>([]),
-    metrics = shallowRef<MetricSample[]>([])
+  const logs = shallowRef<ConsoleRow[]>([])
   const traces = shallowRef<Record<string, CallSite[]>>({})
   const cpu = shallowRef<CpuStats>({ calls: 0, interrupts: 0, used: 0, budget: 96 })
   const step = computed(() => currentStep(state.value))
@@ -56,14 +59,15 @@ function createGameStore() {
     reveals.value.some(r => r.kind === 'letter' && r.id === m.id),
   ))
   const surface = computed(() => getSurface(state.value))
-  const reference = computed(() => apiReference(state.value))
-  const api = computed(() => apiDeclarations(state.value))
+  const reference = shallowRef<import('@inherit/sim').ApiEntry[]>([])
+  const api = ref('')
   const playback = usePlayback()
   const hand = computed(() => (playback.watching.value || playback.call.value)
     ? playback.hand.value
     : state.value.world.hand?.item ?? null)
   const busy = ref(false)
   let speed = 1
+  let resumeClock = true
   let storageKey = saveKey
   const dirty = computed(() => JSON.stringify(files.value) !== JSON.stringify(state.value.project.deployed))
   const queue: Action[] = []
@@ -72,16 +76,16 @@ function createGameStore() {
   let timer: ReturnType<typeof setTimeout>,
     watchdog: ReturnType<typeof setTimeout>,
     autosave: ReturnType<typeof setInterval>
-  let buildCheck: AbortController | undefined,
-    errors = 0
+  let buildCheck: AbortController | undefined
+  let acknowledged: Frame | undefined
   function persist() {
     if (blockedSave.value) return
     try {
       const save = {
-        ...state.value,
-        project: { ...state.value.project, working: files.value },
+        ...state.value, ...acknowledged?.campaign,
+        project: { ...(acknowledged?.project ?? state.value.project), working: files.value },
       }
-      localStorage.setItem(storageKey, serializeSave(save))
+      localStorage.setItem(storageKey, JSON.stringify(workshopSave(save, activeFile.value, acknowledged?.active ?? active.value)))
       saved.value = true
     } catch {
       saved.value = false
@@ -166,9 +170,12 @@ function createGameStore() {
     // A Run that fails before executing leaves the previous hand in place.
     const returned = mode === 'run' && frame.campaign.world.tick !== state.value.world.tick
       ? state.value.world.hand : undefined
+    acknowledged = frame
     await playback.play(frame.calls, mode, speed, returned)
     if (worker !== instance) return
     current = undefined
+    if (frame.api !== undefined) api.value = frame.api
+    if (frame.reference) reference.value = frame.reference
     const c = {
       ...frame.campaign,
       project: frame.project ?? state.value.project,
@@ -180,14 +187,16 @@ function createGameStore() {
       if (!(activeFile.value in files.value)) openFile('main.ts')
     }
     if (action.type === 'continue') {
-      const starter = currentStep(c)?.step.starter
-      if (starter && currentStep(c)?.step.id !== step.value?.step.id) {
-        files.value = { ...files.value, 'main.ts': starter }
-        openFile('main.ts')
+      const next = workshopLessons[c.lesson.index]
+      if (next && next.id !== step.value?.step.id) {
+        const starter = next.starter(files.value)
+        files.value = starter.files
+        openFile(starter.edit.file,starter.edit.line)
       }
     }
     c.project.working = files.value
     state.value = c
+    acknowledged = undefined
     town.value = frame.town
     const tick = c.world.tick
     const lines: GameLog[] = frame.logs.map((text) => ({ tick, text, level: 'log' }))
@@ -203,33 +212,13 @@ function createGameStore() {
         file: loc?.[1],
         line: loc ? Number(loc[2]) : undefined,
       })
-      errors++
     }
     logs.value = appendConsoleLines(logs.value, lines)
     error.value = frame.error
     if (frame.notice) notice.value = frame.notice
     cpu.value = frame.cpu
     traces.value = frame.traces
-    if (action.type === 'step') {
-      const machines = Object.fromEntries(
-        c.world.machines.map((m) => {
-          const elapsed = Math.max(1, tick - m.builtAt)
-          return [
-            m.id,
-            {
-              rate: m.stats.rate,
-              idle: m.stats.idleTicks / elapsed,
-              blocked: m.stats.blockedTicks / elapsed,
-              queue: m.queue.length,
-            },
-          ]
-        }),
-      )
-      metrics.value = [
-        ...metrics.value.slice(-239),
-        { tick, money: c.economy.money, cpu: frame.cpu.used, budget: frame.cpu.budget, errors, machines },
-      ]
-    } else persist()
+    if (action.type !== 'step') persist()
     ready.value = true
     if (['run', 'deploy', 'continue'].includes(action.type)) busy.value = false
     pump()
@@ -246,7 +235,7 @@ function createGameStore() {
       instance.onmessage = ({ data }: MessageEvent<Frame>) => {
         if (worker === instance) receive(data)
       }
-      act({ type: 'init', campaign: state.value })
+      act({ type: 'init', campaign: state.value, resumeClock })
     } catch {
       void assetFailed(failed)
     }
@@ -273,6 +262,7 @@ function createGameStore() {
   function update(next: ProjectFiles) {
     files.value = next
     state.value = { ...state.value, project: { ...state.value.project, working: next } }
+    persist()
     return true
   }
   function valid(path: string) {
@@ -331,20 +321,20 @@ function createGameStore() {
     persist()
   }
   function openDraft() {
-    const source = files.value['main.ts'] ?? ''
-    const line = source === step.value?.step.starter ? source.split('\n').length : 1
-    openFile('main.ts', line)
+    const lesson = workshopLessons[state.value.lesson.index]
+    if (!lesson) return
+    const { file, line } = workshopEdit(lesson.id, files.value)
+    openFile(file, line)
   }
   function newGame() {
     stop()
+    acknowledged = undefined
     state.value = createCampaign()
     town.value = townSnapshot(state.value)
     files.value = state.value.project.working
     blockedSave.value = false
     logs.value = []
-    metrics.value = []
     traces.value = {}
-    errors = 0
     error.value = ''
     selected.value = ''
     notice.value = ''
@@ -356,13 +346,29 @@ function createGameStore() {
     try {
       const local = import.meta.dev || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
       const query = new URLSearchParams(local ? location.search : '')
-      const id = query.get('step')
+      const id = query.get('lesson') ?? query.get('step')
       if (id) storageKey = saveKey + '.preview.' + id
       speed = Math.min(32, Math.max(1, Number(query.get('speed')) || 1))
-      const stored = localStorage.getItem(storageKey)
-      const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-      const resumePreview = navigation?.type === 'reload' || navigation?.type === 'back_forward'
-      state.value = id && !(stored && resumePreview) ? jumpToStep(createCampaign(), id) : loadSave(stored)
+      let stored = localStorage.getItem(storageKey)
+      const legacy = !id && !stored && localStorage.getItem('inherit.workshop.v1')
+      if (legacy) {
+        stored = JSON.stringify(importWorkshop(legacy))
+        restoreWorkshop(stored)
+        localStorage.setItem(storageKey, stored)
+      }
+      const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+      const resumePreview = entry?.type === 'reload' || entry?.type === 'back_forward'
+      if (id && !(stored && resumePreview)) {
+        state.value = jumpToStep(createCampaign(), id)
+        const starter = workshopLessons[state.value.lesson.index]?.starter(state.value.project.working)
+        if (starter) state.value.project.working = starter.files
+      }
+      else if (stored) {
+        const restored = restoreWorkshop(stored)
+        state.value = restored.campaign
+        activeFile.value = restored.activeFile
+        resumeClock = restored.clockActive
+      }
       town.value = townSnapshot(state.value)
       files.value = state.value.project.working
     } catch {
@@ -409,7 +415,6 @@ function createGameStore() {
       logs.value = []
     },
     traces,
-    metrics,
     ready,
     active,
     visitSection,

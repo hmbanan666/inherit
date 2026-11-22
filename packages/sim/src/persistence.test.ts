@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest'
 import {
   connectBelt,
-  placeMachine,
-  removeBelt,
-  removeMachine,
   cloneCampaign,
   createCampaign,
   townSnapshot,
@@ -12,7 +9,7 @@ import {
   rollbackProject,
   serializeSave,
   snapshotProject,
-  step,
+  advanceGame,
 } from './index'
 
 test('save, load and preview preserve independent live and working projects and deterministic state', () => {
@@ -23,7 +20,7 @@ test('save, load and preview preserve independent live and working projects and 
   deployProject(c)
   c.project.working['main.ts'] += '// unfinished'
   c.memory = { runs: [1, { count: 2 }] }
-  step(c.world, (ctx) => ctx.dig('mine'))
+  advanceGame(c, api => api.take('mine'))
   const saved = serializeSave(c)
   const restored = loadSave(saved)
   const preview = cloneCampaign(restored)
@@ -31,7 +28,7 @@ test('save, load and preview preserve independent live and working projects and 
   expect(rollbackProject(preview, snap.id)).toBe(true)
   expect(preview.project.deployed['lib/feed.ts']).toContain('= 1')
   preview.memory.runs = []
-  step(preview.world, (ctx) => ctx.dig('mine'))
+  advanceGame(preview, api => api.take('mine'))
   expect(serializeSave(restored)).toBe(saved)
   expect(serializeSave(c)).toBe(saved)
 })
@@ -56,26 +53,6 @@ test('garbage, unknown versions and broken belt references start fresh', () => {
   connectBelt(broken, 'mine', 'furnace')!.to = 'missing'
   for (const data of ['{bad', null, false, [], { version: 65 }, broken])
     expect(loadSave(data)).toEqual(createCampaign())
-})
-test('reloading a loaded truck and an unacknowledged delivery keeps its original manifest', () => {
-  let c = createCampaign(44)
-  removeBelt(c, 'mine', 'furnace-a')
-  placeMachine(c, 'depot', 'shed', 2, 2, 'origin')
-  placeMachine(c, 'truck', 'shed', 3, 1, 'truck')
-  placeMachine(c, 'depot', 'yard', 0, 2, 'dest')
-  connectBelt(c, 'mine', 'origin')
-  c.world.tripScript = ['lostAck']
-  for (let t = 0; t < 15; t++) {
-    step(c.world, (ctx) => {
-      if (ctx.tick === 1) ctx.dig('mine')
-      ctx.dispatch('truck', 'origin', 'dest', 'shipment')
-    })
-    if (c.world.trips.length) expect(removeMachine(c, 'origin')).toBe(false)
-    c = loadSave(serializeSave(c))
-  }
-  expect(c.world.delivered).toEqual({})
-  expect(c.world.receipts).toMatchObject([{ key: 'shipment', acknowledged: true }])
-  expect(c.world.machines.find((m) => m.id === 'dest')?.queue).toEqual([{ kind: 'iron-ore' }])
 })
 test('an unfinished file rename can be saved without changing the deployed entry point', () => {
   const c = createCampaign()

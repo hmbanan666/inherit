@@ -1,0 +1,4 @@
+export interface PlayerAPI {
+  /** Light the garden lantern. */
+  light(): void
+}

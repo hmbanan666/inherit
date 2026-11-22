@@ -1,0 +1,10 @@
+import { mainFile, type Lesson } from '../../framework/pack'
+export const lessons: Lesson<{lit:boolean}>[] = [{
+  id: 'lantern', goal: 'Light the garden lantern', idea: 'A call asks a function to do its job.',
+  mode: 'run', starter: () => mainFile('// Type light() below to turn on the lantern.\n'),
+  referenceSolution: { 'main.ts': 'light()' },
+  hints: ['The lantern has a function of its own.', 'light()'],
+  checks: [{id:'lit', label:'The lantern is glowing', evaluate: e => e.world.lit ? 'green' : 'red'}],
+  visibleEffect: {description:'A warm light fills the lantern.', testId:'lantern', text:'Lantern lit'},
+  solved: {reaction:'A light for the path!', did:'You lit the lantern.', idea:'Parentheses call a function.'},
+}]

@@ -22,31 +22,6 @@ export interface FactoryContext {
   readonly tick: number
 }
 
-// Public methods shared by the chapter Factory and the campaign CampaignFactory.
-// A host wrapper can carry additional methods and state; those stay on the host.
-const mockFactory = {
-  take: () => undefined, put: () => false, look: () => ({}), buy: () => false,
-  tick: 0,
-  dig: () => false,
-  work: () => false,
-  route: () => false,
-  space: () => false,
-  stock: () => 0,
-  inspect: () => undefined,
-  machines: () => [],
-  recipes: () => [],
-  peek: () => undefined,
-  dispatch: () => false,
-  build: () => undefined,
-  clear: () => false,
-  repair: () => false,
-  orders: () => [],
-  connect: () => false,
-  dismantle: () => false,
-  lastError: () => undefined,
-}
-const operations = Object.keys(mockFactory).filter((key) => key !== 'tick')
-
 // QuickJSHandle.consume only disposes after a successful callback. A player
 // exception must release temporaries before unwinding the runtime as well.
 function usingHandle<T>(handle: QuickJSHandle, use: (value: QuickJSHandle) => T): T {
@@ -74,17 +49,16 @@ export async function openRuntime(
   project: ReturnType<typeof compileProject>,
   memory: object,
   budget: number,
-  testing: boolean,
-  chapterExports?: readonly string[],
+  operations: readonly string[],
   initialFactory?: FactoryContext,
+  exposure: 'globals' | 'module' = 'module',
 ) {
   if (!Number.isInteger(budget) || budget < 1 || budget > 4096)
     throw new Error('Budget must be an integer from 1 to 4096.')
   if (!memory || typeof memory !== 'object' || Array.isArray(memory))
     throw new Error('Memory must be a JSON object.')
-  const names = chapterExports ?? []
-  if (names.some(n => !['take', 'put', 'look', 'buy', 'repair'].includes(n))) throw new Error('Unknown chapter export.')
-  const allowed = chapterExports ?? operations
+  const names = operations
+  if (names.some(n => !/^[a-zA-Z_$][a-zA-Z_$0-9]*$/.test(n) || n in Object.prototype)) throw new Error('Invalid player function name.')
   const initial = hostJson(memory)
   const module = await (engineReady ??= engine())
   const runtime = module.newRuntime()
@@ -169,23 +143,18 @@ export async function openRuntime(
         meter.used++
         if (exceeded(false)) throw new Error(stopped)
         const key = vm.getString(name)
-        const method = allowed.includes(key) && Reflect.get(current, key)
+        const method = names.includes(key) && Reflect.get(current, key)
         if (typeof method !== 'function') throw new Error(`Factory method ${key} is unavailable.`)
         const params = args.slice(0, vm.getNumber(length)).map((h) => {
           const type = vm.typeof(h)
           if (type === 'number') return vm.getNumber(h)
           if (type === 'string') return JSON.parse(vm.getString(h))
         })
-        if (key === 'build') {
-          const [name, x, y, recipe, deposit] = params.splice(1)
-          params.push({ name, x, y, recipe, deposit })
-        }
-        if (chapterExports && current.traceSite) current.traceSite(project.callSite(vm.getString(args[4])))
+        current.traceSite?.(project.callSite(vm.getString(args[4])))
         const result = Reflect.apply(method, current, params)
         return result === undefined ? vm.undefined : vm.newString(hostJson(result))
       }),
     )
-    const tick = keep(vm.newFunction('tick', () => vm.newNumber(current?.tick ?? 0)))
     const log = keep(
       vm.newFunction('log', (line) => {
         if (logs.length === 64) logs.shift()
@@ -194,19 +163,13 @@ export async function openRuntime(
     )
     const helpers = keep(
       usingHandle(vm.newString(initial), (seed) =>
-        usingHandle(vm.newString(JSON.stringify(allowed)), (names) =>
-          invoke(install, seed, names, call, tick, log, testing ? vm.true : vm.false, chapterExports ? vm.true : vm.false),
+        usingHandle(vm.newString(JSON.stringify(names)), (names) =>
+          invoke(install, seed, names, call, log, exposure === 'globals' ? vm.true : vm.false),
         ),
       ),
     )
     const helper = (key: string) => keep(vm.getProp(helpers, key))
-    const api = helper('api'),
-      blueprintApi = helper('blueprintApi'),
-      parse = helper('parse'),
-      snapshot = helper('snapshot')
-    const runTest = helper('runTest'),
-      testName = helper('testName'),
-      finishTests = helper('finishTests')
+    const snapshot = helper('snapshot')
     const exported = helper('exported')
     formatError = helper('errorText')
 
@@ -219,7 +182,7 @@ export async function openRuntime(
     })
     begin(fresh())
     unwrap(vm.evalCode(inheritModule(names), 'inherit', { type: 'module' })).dispose()
-    runtime.setModuleLoader(project.load, project.resolve)
+    runtime.setModuleLoader(project.load, (from, request) => project.resolve(from, request))
     current = initialFactory
     const namespace = keep(
       unwrap(vm.evalCode(project.load(project.entry), project.entry, { type: 'module' })),
@@ -235,23 +198,16 @@ export async function openRuntime(
         const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
         if (vm.typeof(fn) === 'function') return fn
       },
-      dispatch(fn: QuickJSHandle, ctx: FactoryContext, event?: object) {
+      dispatch(fn: QuickJSHandle, ctx: FactoryContext) {
         if (lastTick !== ctx.tick) {
           frame = fresh()
           lastTick = ctx.tick
         }
         begin(frame)
         if (frame.used > budget) throw new Error(`Operation budget (${budget}) exceeded.`)
-        const surface = typeof Reflect.get(ctx, 'build') === 'function' ? blueprintApi : api
         current = ctx
         try {
-          if (event === undefined) usingHandle(chapterExports ? invoke(fn) : invoke(fn, surface), assertSynchronous)
-          else
-            usingHandle(vm.newString(hostJson(event)), (text) =>
-              usingHandle(invoke(parse, text), (data) =>
-                usingHandle(invoke(fn, data, surface), assertSynchronous),
-              ),
-            )
+          usingHandle(invoke(fn), assertSynchronous)
         } finally {
           current = undefined
         }
@@ -259,25 +215,6 @@ export async function openRuntime(
       exportMemory() {
         begin(fresh())
         return usingHandle(invoke(snapshot), (h) => JSON.parse(vm.getString(h)))
-      },
-      tests() {
-        begin(fresh())
-        const count = usingHandle(invoke(finishTests), (h) => vm.getNumber(h))
-        return Array.from({ length: count }, (_, i) =>
-          usingHandle(vm.newNumber(i), (index) => {
-            begin(fresh())
-            const name = usingHandle(invoke(testName, index), (h) => JSON.parse(vm.getString(h)) as string)
-            current = mockFactory
-            try {
-              usingHandle(invoke(runTest, index), assertSynchronous)
-              return { name, passed: true }
-            } catch (error) {
-              return { name, passed: false, error: error instanceof Error ? error.message : 'Test failed.' }
-            } finally {
-              current = undefined
-            }
-          }),
-        )
       },
     }
   } catch (error) {

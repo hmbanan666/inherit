@@ -35,7 +35,7 @@ Keep rules and check evaluation in `packages/sim`. Put all files for a pack unde
 
 | File | Responsibility |
 | --- | --- |
-| `manifest.ts`, `cover.webp` | Plain metadata and a local cover asset. The showcase reads only these. |
+| `manifest.ts`, `cover.svg` | Plain metadata and a local cover asset. The showcase reads only these. |
 | `pack.ts` | Default export from `definePack`. Compose the world schema, initial state, operations, lessons, section projections and any clock or save upgrades here. |
 | `player.ts` | Export a TypeScript interface named `PlayerAPI` with documented method signatures, and any pack-local supporting types. Type-only source. |
 | `lessons.ts` | Ordered lessons with starter builders and reference projects. Large chapters may split these by story beat. |
@@ -60,6 +60,7 @@ interface PackManifest {
   learningGoals: readonly string[]
   estimatedMinutes: { min: number; max: number }
   cover: string                  // file in this folder
+  next?: string                  // Recommended next pack id, when the path continues
   showcaseNote?: string          // “Start here” or “After the basics”
   featured?: boolean
 }
@@ -91,7 +92,7 @@ interface Evidence<W> {
 interface Check<W> {
   id: string
   label: string
-  evaluate(e: Evidence<W>): { status: 'red' | 'amber' | 'green'; progress?: string }
+  evaluate(e: Evidence<W>): 'red' | 'amber' | 'green'
 }
 
 interface Lesson<W> {
@@ -130,7 +131,7 @@ interface Entity<W> {
 }
 interface Panel<W> {
   id: string
-  title: string
+  label: string
   placement: 'nav' | 'panel'
   reveal?: string
   rows(world: Readonly<W>): readonly Row[]
@@ -164,9 +165,9 @@ Entity rows feed the generic read-only inspector. A panel can project rows from 
 
 Keep `packages/sandbox/src/project.ts` compilation, relative file resolution and source maps, and the bounded QuickJS runtime in `runtime.ts`. Pass the resolved public methods and exposure to the guest installer in `guest.ts`. Install frozen wrappers on the guest global or in the synthetic `inherit` module before evaluating the entry. Remove the fixed five-name list. Each wrapper marshals bounded data, calls only a registered host operation, records the original source site and returns a copied result (including `undefined`). The module resolver accepts only project-relative files, the active synthetic API and optional pack-bundled guest modules. A bundled module has a static name, guest source and matching declarations. It executes inside QuickJS with the same limits. Neither shipped pack needs a third-party guest module. Keep project, CPU, stack, memory and transfer limits. Player code runs only in QuickJS. Run evaluates the entry once. Deploy evaluates setup once, then ticks the installed handler. Workshop’s Run once and resume use the deployed clock state without repeating purchases. Unknown functions, misspellings and missing quotes get short errors at the source line, e.g. “I don’t know ‘plnat’. Did you mean ‘plant’?” and “Close the word with a quote.”
 
-**Run and render.** Replace the campaign-specific wire format in `gameProtocol.ts` with pack id, session generation, action sequence, world, call log, check views, lesson phase, visible panel rows and editor declarations. Serialize worker actions in order. A watched Run returns its initial world, the ordered calls with a world snapshot after each, and the settled final world. Pass only the displayed snapshot and call-log prefix to `WorldView.vue`; advance those together with the original file/line in Monaco at about two calls per second. Show final settlement and the solved card after playback. Drawers and inspectors may send a named pack action to the worker. Dispatch it through a pack-owned table of typed handlers, using the same world transitions as player calls. A renderer can select and inspect, but cannot mutate progress or replay game rules. For a live clock send the current snapshot and bounded tick trace. Preserve routine machine feedback from ADR 0017.
+**Run and render.** Each mounted studio owns a worker for one pack. Its message queue orders actions. Closing the studio terminates the worker. Replies carry world, call log, check views, lesson phase, visible panel rows and editor declarations. Serialize worker actions in order. A watched Run returns its initial world, the ordered calls with a world snapshot after each, and the settled final world. Pass only the displayed snapshot and call-log prefix to `WorldView.vue`; advance those together with the original file/line in Monaco at about two calls per second. Show final settlement and the solved card after playback. Drawers and inspectors may send a named pack action to the worker. Dispatch it through a pack-owned table of typed handlers, using the same world transitions as player calls. A renderer can select and inspect, but cannot mutate progress or replay game rules. For a live clock send the current snapshot and bounded tick trace. Preserve routine machine feedback from ADR 0017. A pack may supply a lazy `Studio.vue` beside its world view for a specialized simulation. Workshop uses its existing worker protocol there to retain live deployment, safe rollback and machine inspection. Both studios use the same editor, goal bar, checks, solved card and navigation components.
 
-Use the same props for both pack views:
+The standard studio passes these props to the pack view. Workshop’s studio passes its floor snapshot and reads the played call, selection and camera from its scoped session.
 
 ```ts
 interface WorldViewProps<W> {
@@ -379,6 +380,9 @@ Move letters, Orders, Town, coins and debt into Workshop declarations. Preserve 
 - The Inherit logo returns to the showcase. In a pack, the top bar has its name and switcher, populated pack sections, settings and palette, then a wide primary Run or Deploy button at the far right. Use the header action group in `3058dbe:apps/web/app/app.vue` as the placement reference. Keep the label and keyboard shortcut legible. While watching a Run, disable both click and shortcut and show “Playing your run”. An error leaves the mode label alone. At desktop size give the primary action at least 128 × 44 CSS pixels. Keep a 44-pixel hit target when space is tight. The thin footer shows status only.
 - Game area left, editor right, resizer between them with a usable minimum on each side. On narrow screens stack the visible world above the IDE. The charcoal surfaces, warm accent and syntax colours follow ADRs 0006 and 0009. The opening village needs neither a map switch nor a tab just for the editor.
 - A single-line goal and Hint sit over Monaco. Inside the editor the cursor starts by the explanatory comment. Reveal one hint per press, from the idea to the exact line or lines. Below, show compact Checks in red, amber and green with text as well as colour. Collapse a fully green list. Reveal Console, files, API reference and other tools only when a lesson uses them. Always show actionable errors even if Console is hidden.
+- Focus the editor at column one of the starter’s edit line on load and after Continue opens a lesson.
+- In Workshop show section tabs together when Town opens. Show history once there is a deployment action or saved work to restore.
+- After the final Continue keep the world visible. The shared finish card lists every lesson’s idea in order, links to the recommended next pack when declared, and offers the showcase and a confirmed replay of this pack alone.
 - Show the solved card over the world. Keep Continue, the final world and pack switching available after playback. No auto-advance, timed goals, day counter or pressure. Expose speed controls only when a pack calls for them.
 - Keep `data-testid` hooks for the primary button, goal/task card, world, checks, Hint, solved card, Continue and each nav section. Add pack cards and switcher hooks. Support `?pack=<id>&lesson=<id>&speed=<n>` in local/dev tests; build lesson entry from real reference checkpoints, bound the speed and use a separate preview slot. Normal showcase links can select a pack without a lesson override. Preserve the v4 local `?step=` Workshop alias during the port.
 
@@ -392,6 +396,7 @@ interface PackSave<W> {
   packId: string
   packVersion: number
   lessonId: string | null        // null after the final Continue
+  edit?: Starter['edit']          // The active lesson’s starting file and line
   phase: 'brief' | 'working' | 'solved'
   completed: string[]
   passed: string[]
@@ -427,7 +432,7 @@ Validate and round-trip the new slot before marking the import complete. Its pre
 2. **Run each pair from the same checkpoint.** Use the TypeScript checker against exactly the active pack declarations, with no DOM or other pack globals. Transpiling alone misses wrong argument types. Compile the actual materialized starter and complete reference project. Execute each through the production QuickJS/worker action handler on independent clones of the same reachable lesson entry. A starter runs without errors and fails the lesson's checks from that checkpoint. A misspelt function or a compiler error is never the reason a starter fails. The reference passes all, produces its specified visible world change and reaches the solved card. For live lessons drive deterministic bounded ticks and normal retries for the furnace. Check that doing nothing or waiting on the old deployment cannot solve the new edit. Drive Continue and ordered reveals before taking the next checkpoint. Report pack id, lesson id, failing check and source line. Run alternate seed/input cases for decisions and off-by-one loops.
 3. **Unit and integration.** Cover deterministic rule updates, typed return values, source maps, declaration/implementation agreement, unknown calls and limits. Check world snapshots against the call that produced them. Check red/partial/green, no auto-advance, one reveal per Continue, stable references to player files and isolation across switches. Exercise every v4 index and saves in brief/working/solved, between reveals, after a purchase and at the ending. Round-trip both slots. Test repeated import, stale replies, interrupted writes, unknown versions, malformed input, active clock resume, old archived code and preservation of an existing Beginner save.
 4. **Browser playthrough for every discovered pack.** Start from its showcase card with empty storage. Type/paste each reference into Monaco, use the visible Run/Deploy, handle normal retries, wait for the visible effect and solved card, then click through each reveal. Reach the ending in one continuous playthrough without debug jumps or direct progress writes. Assert the world is visible at entry and during edits, the button is large at the right edge of the header and disabled with a reason during playback, the active source line matches the action, and delays never advance a lesson. Check no empty nav tabs, switching and reloading unfinished drafts, narrowed layouts, fair decorations, Bram's change of mode, the bank routes and the standing bridge. Keep focused debug-hook tests separate. Extend `tests/e2e/chapter-capture.ts` to write opening, solved and reveal frames for every lesson to `$INHERIT_SHOTS/<pack-id>/<lesson-id>/`. Capture the switch to Deploy and lamps mid-loop. Store screenshots outside the checkout. Failure artifacts identify the pack and lesson.
-5. **CI.** Add `.nvmrc` containing `24` and `.github/workflows/check.yml` for `pull_request` and `push` to `main`. Check out, select Node from `.nvmrc`, enable Corepack with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` and use the root manifest's pinned pnpm. In order run `pnpm install --frozen-lockfile`, `pnpm test` (includes pack validation), `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm exec playwright install chromium --only-shell` and `pnpm test:browser`. Install Chromium system dependencies on the runner. Use the built site on loopback, `INHERIT_TEST_PORT` if needed and `INHERIT_SHOTS` under the runner temp directory. Upload the screenshots as PR run artifacts.
+5. **CI.** Add `.nvmrc` containing `24` and `.github/workflows/ci.yml` for `pull_request` and `push` to `main`. Check out, select Node from `.nvmrc`, enable Corepack with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` and use the root manifest's pinned pnpm. In order run `pnpm install --frozen-lockfile`, `pnpm test` (includes pack validation), `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm exec playwright install chromium --only-shell` and `pnpm test:browser`. Install Chromium system dependencies on the runner. Use the built site on loopback, `INHERIT_TEST_PORT` if needed and `INHERIT_SHOTS` under the runner temp directory. Upload the screenshots as PR run artifacts.
 
 ## Remove the v2 engine
 

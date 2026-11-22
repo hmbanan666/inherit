@@ -37,7 +37,6 @@ test('Bram pays once and each Continue releases one saved reveal', () => {
   const expected = [
     { kind: 'coins' },
     { kind: 'section', id: 'town' },
-    { kind: 'section', id: 'inbox' },
     { kind: 'letter', id: 'tab' },
     { kind: 'debt' },
   ]
@@ -47,7 +46,7 @@ test('Bram pays once and each Continue releases one saved reveal', () => {
     expect(serializeSave(c)).toBe(before)
     c = loadSave(serializeSave(next))
     expect(revealed(c)).toEqual(expected.slice(0, i + 1))
-    expect(c.progress.messages.some((m) => m.id === 'tab')).toBe(i >= 3)
+    expect(c.progress.messages.some((m) => m.id === 'tab')).toBe(i >= 2)
   }
   expect(currentStep(c)).toMatchObject({ step: { id: 'harrow-tab' }, phase: 'brief' })
 })

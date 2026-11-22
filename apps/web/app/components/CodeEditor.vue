@@ -8,11 +8,11 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { standaloneJobCalls } from '../lib/standalone-calls'
-import { useGame } from '../lib/useGame'
+import { editorKey } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
-const game = useGame()
-const { files, activeFile, campaign, surface, api, dirty } = game
+const game = inject(editorKey)!
+const { files, activeFile, deployed, multiFile, api, dirty } = game
 const props = defineProps<{
   ids?: string[]
   selected?: string
@@ -33,12 +33,13 @@ const models = new Map<string, monaco.editor.ITextModel>()
 const views = new Map<string, monaco.editor.ICodeEditorViewState | null>()
 let editor: monaco.editor.IStandaloneCodeEditor | undefined
 let opener: monaco.IDisposable
-const libraryUri = monaco.Uri.file('/api.d.ts')
+const prefix = '/packs/' + game.id + '/'
+const libraryUri = monaco.Uri.file(prefix + 'api.d.ts')
 let library: monaco.IDisposable
 let settingSource = false
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
-const callsToMove = computed(() => game.step.value?.phase === 'solved' ? undefined : game.step.value?.step.callsToMove)
+const callsToMove = computed(() => game.callsToMove?.value)
 let jobLines: monaco.editor.IEditorDecorationsCollection | undefined
 
 function markJobCalls() {
@@ -61,13 +62,13 @@ function showJobCalls() {
 }
 
 function lightCall() {
-  const call = game.playback.call.value
+  const call = game.call.value
   lineLight?.clear()
   if (!call || !editor || !models.has(call.file)) return
-  if (game.playback.watching.value) open(call.file)
-  else if (activeFile.value !== call.file || files.value[call.file] !== campaign.value.project.deployed[call.file]) return
+  if (game.watching.value) open(call.file)
+  else if (activeFile.value !== call.file || files.value[call.file] !== deployed.value[call.file]) return
   lineLight?.set([{ range: new monaco.Range(call.line, 1, call.line, 1), options: { isWholeLine: true, className: 'machine-line' } }])
-  if (game.playback.watching.value) editor.revealLineInCenterIfOutsideViewport(call.line)
+  if (game.watching.value) editor.revealLineInCenterIfOutsideViewport(call.line)
 }
 
 function syncFiles() {
@@ -84,7 +85,7 @@ function syncFiles() {
         }
       }
     } else {
-      const next = monaco.editor.createModel(code, 'typescript', monaco.Uri.file('/' + file))
+      const next = monaco.editor.createModel(code, 'typescript', monaco.Uri.file(prefix + file))
       models.set(file, next)
       next.onDidChangeContent(() => {
         if (!settingSource) game.setFile(file, next.getValue())
@@ -108,7 +109,7 @@ function display() {
   const model = models.get(file)
   if (!model || editor.getModel() === model) return
   const old = editor.getModel()
-  if (old) views.set(old.uri.path.slice(1), editor.saveViewState())
+  if (old) views.set(old.uri.path.slice(prefix.length), editor.saveViewState())
   tabs.value = [file]
   editor.setModel(model)
   editor.restoreViewState(views.get(file) ?? null)
@@ -131,13 +132,12 @@ function revealLine(file: string, line: number, column = 1) {
   editor?.revealLineInCenterIfOutsideViewport(line)
   editor?.focus()
 }
-defineExpose({ revealLine, focus: () => editor?.focus() })
 
 const results = computed(() => {
   const needle = query.value.trim().toLowerCase()
   const hits: { file: string; line: number; text?: string; column: number }[] = []
   for (const file of Object.keys(files.value).sort()) {
-    if (!surface.value.multiFile && file !== 'main.ts') continue
+    if (!multiFile.value && file !== 'main.ts') continue
     if (mode.value === 'open') {
       if (file.toLowerCase().includes(needle)) hits.push({ file, line: 1, column: 1 })
     } else if (needle) {
@@ -181,7 +181,7 @@ function runtimeMarker() {
   const match = /([\w./-]+\.ts):(\d+)/.exec(message)
   for (const [file, model] of models) {
     const line = Number(match?.[2])
-    const live = files.value[file] === campaign.value.project.deployed[file]
+    const live = files.value[file] === deployed.value[file]
     monaco.editor.setModelMarkers(
       model,
       'factory-runtime',
@@ -232,9 +232,12 @@ onMounted(() => {
     model: null,
     wordBasedSuggestions: 'off',
     autoClosingBrackets: 'never',
+    acceptSuggestionOnEnter: 'off',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
+    wordWrap: 'on',
+    wrappingIndent: 'same',
     minimap: { enabled: false },
     fontFamily: 'IBM Plex Mono, monospace',
     fontSize: 13,
@@ -250,7 +253,7 @@ onMounted(() => {
     tabSize: 2,
     fixedOverflowWidgets: true,
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
-    ariaLabel: 'Factory controller TypeScript',
+    ariaLabel: game.label,
   })
   lineLight = editor.createDecorationsCollection()
   jobLines = editor.createDecorationsCollection()
@@ -261,12 +264,12 @@ onMounted(() => {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, pos) {
       const prefix = model.getLineContent(pos.lineNumber).slice(0, pos.column - 1)
-      const match = /\b(?:take|put|look)\s*\(\s*(["'])([^"']*)$/.exec(prefix)
-      if (!match) return { suggestions: [] }
+      const match = /\b([a-zA-Z_$][\w$]*)\s*\(\s*(["'])([^"']*)$/.exec(prefix)
+      if (!match || !game.placeFunctions?.includes(match[1]!)) return { suggestions: [] }
       const suffix = model.getLineContent(pos.lineNumber).slice(pos.column - 1)
-      const end = suffix.indexOf(match[1]!)
-      const range = new monaco.Range(pos.lineNumber, pos.column - match[2]!.length, pos.lineNumber, pos.column + Math.max(0, end))
-      return { suggestions: game.places.value.map(name => ({
+      const end = suffix.indexOf(match[2]!)
+      const range = new monaco.Range(pos.lineNumber, pos.column - match[3]!.length, pos.lineNumber, pos.column + Math.max(0, end))
+      return { suggestions: (game.places?.value ?? []).map(name => ({
         label: name, insertText: name, kind: monaco.languages.CompletionItemKind.Value, range,
       })) }
     },
@@ -275,17 +278,17 @@ onMounted(() => {
     const pos = target.position
     const line = pos && editor?.getModel()?.getLineContent(pos.lineNumber)
     const place = line && [...line.matchAll(/(["'])([^"']+)\1/g)].find(m =>
-      pos!.column > m.index! && pos!.column <= m.index! + m[0].length && game.places.value.includes(m[2]!))
+      pos!.column > m.index! && pos!.column <= m.index! + m[0].length && game.places?.value.includes(m[2]!))
     emit('focusIds', place ? [place[2]!] : [])
   })
   editor.onMouseLeave(() => emit('focusIds', []))
   editor.onMouseDown(({ target }) => {
     if (!target.position || target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return
     const file = activeFile.value
-    if (files.value[file] !== campaign.value.project.deployed[file]) return
+    if (files.value[file] !== deployed.value[file]) return
     const line = target.position.lineNumber
-    emit('focusIds', Object.keys(game.traces.value).filter(id =>
-      game.traces.value[id]?.some(site => site.file === file && site.line === line),
+    emit('focusIds', Object.keys(game.traces?.value ?? {}).filter(id =>
+      game.traces?.value[id]?.some(site => site.file === file && site.line === line),
     ))
   })
   syncFiles()
@@ -300,7 +303,7 @@ onMounted(() => {
         emit('reference')
         return true
       }
-      const file = resource.path.slice(1)
+      const file = resource.path.slice(prefix.length)
       if (!models.has(file)) return false
       revealLine(
         file,
@@ -317,9 +320,10 @@ watch(callsToMove, () => {
   markJobCalls()
   showJobCalls()
 })
-watch(game.playback.call, lightCall)
+watch(game.call, lightCall)
 watch(files, syncFiles)
 watch(activeFile, display)
+watch(game.navigation, ({ file, line }) => revealLine(file, line), { flush: 'post' })
 watch(api, updateLibrary)
 watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
@@ -335,7 +339,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="project-editor" aria-label="Controller files">
     <Teleport :to="shellTabs ?? 'body'" :disabled="!shellTabs">
-      <nav v-if="!shellTabs || surface.multiFile" class="project-tabs" aria-label="Open files">
+      <nav v-if="!shellTabs || multiFile" class="project-tabs" aria-label="Open files">
         <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: activeFile === file }">
           <button
             :aria-label="file"
@@ -343,7 +347,7 @@ onBeforeUnmount(() => {
             @click="shellTabs ? game.openFile(file) : open(file)"
           >
             {{ file
-            }}<i v-if="files[file] !== campaign.project.deployed[file]" title="Undeployed edits"> ●</i>
+            }}<i v-if="files[file] !== deployed[file]" title="Undeployed edits"> ●</i>
           </button>
           <button v-if="file !== 'main.ts'" :aria-label="'Close ' + file" @click="close(file)">
             <X :size="11" />
@@ -353,7 +357,7 @@ onBeforeUnmount(() => {
         <span v-if="dirty && !shellTabs" class="draft" title="Working copy differs from the live program"
           >Draft</span
         >
-        <template v-if="surface.multiFile">
+        <template v-if="multiFile">
           <button title="Quick open (Ctrl/Cmd+P)" aria-label="Quick open" @click="find('open')">
             <FolderSearch :size="14" />
           </button>

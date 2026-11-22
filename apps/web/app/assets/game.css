@@ -1774,3 +1774,51 @@ button.revisions:hover {
 .solved-card { border-left-color: var(--mint); }
 .solved-card h2 { color: var(--mint); }
 .solved-card .reward { color: var(--gold); }
+
+.pack-brand { color: var(--text); text-decoration: none }
+.pack-switch { position: relative }
+.pack-switch > button { background: transparent; border: 0; font-weight: 600 }
+.pack-switch .hud-menu { left: 0; right: auto; min-width: 185px }
+.pack-switch a { display: block; color: var(--text); text-decoration: none; padding: 9px 12px }
+.pack-switch a:hover { background: var(--hover) }
+.pack-settings { margin-left: auto }
+.hud .primary-run { min-width: 150px; height: 44px; border-radius: 6px; font-size: 16px }
+.hud .revisions { height: 44px }
+.primary-run kbd { font: 10px var(--mono); padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px }
+.showcase { min-height: 100dvh; background: var(--base) }
+.showcase article { max-width: 1240px; padding: clamp(25px,5vw,75px); margin: 0 auto }
+.showcase h1 { font-size: clamp(38px,5.2vw,78px); letter-spacing: -.055em; margin-bottom: 8px }
+.showcase article header p { color: var(--soft); font-size: 19px }
+.pack-cards { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; margin-top: 36px }
+.pack-cover { color: var(--text); border: 1px solid var(--line); background: var(--panel); border-radius: 12px; overflow: hidden; text-decoration: none; display:flex; flex-direction:column }
+.pack-cover:hover { border-color: var(--accent-line) }
+.pack-cover img { width: 100%; height: clamp(160px,18vw,260px); object-fit:cover }
+.pack-copy { display: flex; flex-direction:column; flex:1; align-items:start; padding: 22px; gap: 10px }
+.pack-copy h2 { font-size: clamp(26px,2.8vw,42px); letter-spacing: -.045em }
+.pack-copy small,.pack-copy .learn { color: var(--sub) }
+.pack-copy b { margin-top:auto; padding-top: 14px; display: flex; align-items:center; gap:15px; color:var(--gold) }
+.pack-world { position:relative; overflow:hidden }
+.solved-overlay { position:absolute; bottom:16px; left:4%; width:92%; z-index:4; background: var(--overlay); border:1px solid var(--accent-line); border-radius:8px; padding:14px 18px; box-shadow:0 5px 25px var(--shadow) }
+.solved-overlay button { margin-top:8px }
+.solved-overlay small { color:var(--gold) }
+.pack-checks,.pack-error,.entity-panel { padding:12px 18px }
+.pack-checks small { display:block; color:var(--sub); margin-bottom:5px }
+.pack-checks [data-state=red],.pack-error {color:var(--alert)}
+.pack-checks [data-state=green],.pack-checks button {color:var(--mint)}
+.pack-checks [data-state=amber] {color:var(--gold)}
+.high-contrast { --sub: #ddd; --line: #888; --surface-low: #080809 }
+@media(max-width:800px) {
+ .pack-cards { grid-template-columns:1fr }
+ .hud { gap:5px; flex-wrap:wrap; min-height:60px; height:auto; padding:6px }
+ .hud .brand { font-size:18px; padding-right:5px }
+ .hud .brand img { width:20px; height:20px; margin-right:3px }
+ .hud .primary-run {min-width:68px; padding:4px 8px}
+ .hud .primary-run kbd {display:none}
+ .pack-world { min-height:280px }
+}
+
+/* Keep the sign, path and fair visible while the player reads the result. */
+@media (min-width: 801px) {
+  .pack-studio .solved-overlay { top: 102px; bottom: auto; }
+}
+.world-feedback { max-width: 22ch; margin: 0; color: var(--soft); font-size: 13px; }

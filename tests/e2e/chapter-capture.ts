@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import type { Page } from '@playwright/test'
 
 /** Capture the same clock instant for the image and its reading transcript. Monaco
@@ -9,7 +9,7 @@ export async function chapterCapture(page: Page) {
   if (!dir) return async (_name: string) => {}
   await mkdir(dir, { recursive: true })
   const browser = await page.context().newCDPSession(page)
-  const sections: string[] = []
+
   return async (name: string) => {
     await page.mouse.move(0, 0)
     await browser.send('Page.setWebLifecycleState', { state: 'frozen' })
@@ -19,7 +19,8 @@ export async function chapterCapture(page: Page) {
           const words: { x: number; y: number; right: number; text: string }[] = []
           const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
           const range = document.createRange()
-          const drawer = document.querySelector('.drawer')?.getBoundingClientRect()
+          const overlays = ['.drawer','.solved-overlay','.hud-menu','dialog[open]'].flatMap(selector=>
+            [...document.querySelectorAll(selector)].map(element=>({element,rect:element.getBoundingClientRect()})))
           while (walk.nextNode()) {
             const node = walk.currentNode
             const el = node.parentElement!
@@ -40,7 +41,7 @@ export async function chapterCapture(page: Page) {
               const r = range.getBoundingClientRect()
               const x = (r.left + r.right) / 2, y = (r.top + r.bottom) / 2
               if (!r.width || x < left || x > right || y < top || y > bottom) continue
-              if (drawer && !el.closest('.drawer') && x >= drawer.left && x <= drawer.right && y >= drawer.top && y <= drawer.bottom) continue
+              if (overlays.some(({element,rect})=>!element.contains(el) && x>=rect.left && x<=rect.right && y>=rect.top && y<=rect.bottom)) continue
               if (!word || Math.abs(word.y - y) > 4) {
                 word = { x: r.left, y, right: r.right, text: '' }
                 words.push(word)
@@ -61,18 +62,20 @@ export async function chapterCapture(page: Page) {
             return (gap > 3 ? ' ' : '') + word.text
           }).join('').replaceAll('\u00a0', ' ')).join('\n')
         }
+        if (document.querySelector('.showcase')) return [read(document.querySelector('.showcase')!)]
         const sections = ['.hud', '.world-shell', '.editor-dock', '.statusbar'].map(selector => read(document.querySelector(selector)!))
         const drawer = document.querySelector('.drawer')
         if (drawer) sections[1] += '\n\n' + read(drawer)
         return sections
       })
+      const workshop = await page.getByTestId('floor').isVisible()
       const town = await page.locator('.town-view').isVisible()
       const signs = town ? 'FORGE · BAKERY · BANK · TOWN HALL · MILL · RIVERSIDE' : 'FORGE · INHERIT / MACHINE WORKS'
       const { data } = await browser.send('Page.captureScreenshot', { format: 'png' })
+      await mkdir(dirname(join(dir,name)),{recursive:true})
       await writeFile(join(dir, name + '.png'), Buffer.from(data, 'base64'))
-      text[1] += '\nMap signs: ' + signs
-      sections.push('## ' + name + '.png\n\n````text\n' + text.join('\n\n') + '\n````\n')
-      await writeFile(join(dir, 'visible-text.md'), sections.join('\n'))
+      if (workshop || town) text[1] += '\nMap signs: ' + signs
+      await appendFile(join(dir,'visible-text.md'),'\n## '+name+'.png\n\n````text\n'+text.join('\n\n')+'\n````\n')
     } finally {
       await browser.send('Page.setWebLifecycleState', { state: 'active' })
     }

@@ -1,6 +1,6 @@
-const title = 'inherit — a factory you program'
+const title = 'Inherit · Game packs'
 const description =
-  'Your uncle left a factory and a debt. Build machines and belts with TypeScript to fill Kettlewick’s requests and rebuild its bridge.'
+  'Learn TypeScript by waking a village or running a workshop. Pick a game pack and watch your code change its world.'
 
 export default defineNuxtConfig({
   ssr: false,
@@ -29,7 +29,7 @@ export default defineNuxtConfig({
   hooks: {
     'build:manifest'(manifest) {
       for (const resource of Object.values(manifest)) {
-        if (resource.file.startsWith('runner.worker-')) {
+        if (/^(runner|pack)\.worker-/.test(resource.file)) {
           resource.preload = false
           resource.prefetch = false
         }
@@ -45,7 +45,7 @@ export default defineNuxtConfig({
           name: 'check-controller-worker',
           generateBundle(_, bundle) {
             const chunks = Object.values(bundle).filter((file) => file.type === 'chunk')
-            const runner = chunks.find((chunk) => chunk.facadeModuleId?.endsWith('/runner.worker.ts'))
+            const runner = chunks.find((chunk) => /\/(runner|pack)\.worker\.ts$/.test(chunk.facadeModuleId ?? ''))
             if (runner && (chunks.length !== 1 || runner.imports.length || runner.exports.length)) {
               this.error('The controller worker must be a single JavaScript chunk with no imports or exports.')
             }

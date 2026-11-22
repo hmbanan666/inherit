@@ -7,11 +7,12 @@ export interface JsonObject {
 }
 export interface ProjectOptions {
   files: Record<string, string>
+  guestModules?: Readonly<Record<string,{source:string;declarations:string}>>
   entry?: string
   memory?: JsonObject
   budget?: number
-  chapterExports?: readonly string[]
-  unlockedEvents?: readonly string[]
+  exposure?: 'globals' | 'module'
+  operations?: readonly string[]
 }
 
 export function projectOptions(source: string | ProjectOptions): ProjectOptions {
@@ -47,7 +48,7 @@ function resolveImport(files: Map<string, string>, from: string, request: string
   throw new Error(`${location} · Cannot resolve ${request}.`)
 }
 
-export function compileProject(options: ProjectOptions, testing: boolean) {
+export function compileProject(options: ProjectOptions) {
   const files = new Map(Object.entries(options.files))
   if (files.size > 32) throw new Error('A project can contain at most 32 files.')
   let size = 0
@@ -59,10 +60,18 @@ export function compileProject(options: ProjectOptions, testing: boolean) {
       throw new Error('Project exceeds 64,000 characters per file or 256,000 total.')
     }
   }
-  const entry = testing ? 'tests.ts' : (options.entry ?? 'main.ts')
+  const bundled = new Map<string,string>()
+  for (const [name, module] of Object.entries(options.guestModules ?? {})) {
+    if (!/^(?:@[a-z0-9-]+\/)?[a-z][a-z0-9-]*$/.test(name) || name === 'inherit')
+      throw new Error('Invalid bundled module name.')
+    const path = '@pack/'+name+'.ts'
+    files.set(path,module.source)
+    bundled.set(name,path)
+  }
+  const entry = options.entry ?? 'main.ts'
   projectPath(entry)
   const compiled = new Map<string, { js: string; map: TraceMap }>()
-  const resolve = (from: string, request: string) => resolveImport(files, from, request)
+  const resolve = (from: string, request: string, location = from) => bundled.get(request) ?? resolveImport(files, from, request, location)
   function compile(path: string) {
     if (path === 'inherit' || compiled.has(path)) return
     const source = files.get(path)
@@ -84,7 +93,7 @@ export function compileProject(options: ProjectOptions, testing: boolean) {
       const position = originalPositionFor(map, {
         line: prefix.split('\n').length, column: prefix.length - prefix.lastIndexOf('\n') - 1,
       })
-      compile(resolveImport(files, path, dependency.fileName, position.line ? path + ':' + position.line : path))
+      compile(resolve(path, dependency.fileName, position.line ? path + ':' + position.line : path))
     }
   }
   compile(entry)

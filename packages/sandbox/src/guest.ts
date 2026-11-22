@@ -1,7 +1,7 @@
 // Evaluated inside QuickJS before loading any player modules. The returned helpers
 // stay in host-owned handles. Guest values only cross the boundary as primitives.
 export const guestSetup = String.raw`
-(function install(initial, operations, call, tick, log, testing, chapter) {
+(function install(initial, operations, call, log, ambient) {
   "use strict";
   delete Math.random;
   delete globalThis.Date;
@@ -11,14 +11,13 @@ export const guestSetup = String.raw`
   const has = Function.prototype.call.bind(Object.prototype.hasOwnProperty);
   const cut = Function.prototype.call.bind(String.prototype.slice);
   const define = Object.defineProperty, freeze = Object.freeze, create = Object.create;
-  const Fault = Error, same = Object.is, string = String;
+  const Fault = Error, string = String;
   const memory = parse(initial);
   const global = (key, value) => define(globalThis, key, { value, configurable: false, writable: false });
-  if (!chapter) global("memory", memory);
 
   // Walk data properties only. Cap work before expanding arrays or constructing
   // the output string. Proxy traps, if present, execute under the VM interrupt.
-  function snapshot() {
+  function snapshot(data = memory) {
     let text = "", nodes = 0;
     const parents = create(null);
     function append(part) {
@@ -55,7 +54,7 @@ export const guestSetup = String.raw`
       }
       append(array ? "]" : "}");
     }
-    visit(memory, 0);
+    visit(data, 0);
     return text;
   }
 
@@ -73,60 +72,18 @@ export const guestSetup = String.raw`
   } }));
 
   const api = create(null);
-  define(api, "tick", { get: tick });
-  define(api, "memory", { value: memory });
-  const blueprintApi = create(null);
-  function arg(value) {
-    if (value === undefined) return undefined;
-    if (typeof value !== "string" || value.length > 256)
-      throw new Fault("Expected a short string factory argument.");
-    return stringify(value);
-  }
-  function coordinate(value) {
-    if (typeof value !== "number") throw new Fault("Expected a numeric build coordinate.");
-    return value;
-  }
   function result(reply) { return reply === undefined ? undefined : parse(reply); }
   for (const name of parse(operations)) {
-    if (name === "build") {
-      blueprintApi.build = (kind, opts) => {
-        if (opts !== undefined && (!opts || typeof opts !== "object" || isArray(opts)))
-          throw new Fault("Expected build options.");
-        return result(call(name, 6, arg(kind), arg(opts?.name),
-          opts?.x === undefined ? undefined : coordinate(opts.x),
-          opts?.y === undefined ? undefined : coordinate(opts.y),
-          arg(opts?.recipe), arg(opts?.deposit)));
-      };
-      continue;
-    }
-    const target = name === "connect" || name === "dismantle" || name === "lastError" ? blueprintApi : api;
-    target[name] = (...args) => {
-      if (args.length > 4) throw new Fault("Too many factory arguments.");
-      const at = i => i < args.length ? arg(args[i]) : undefined;
-      return result(call(name, args.length, at(0), at(1), at(2), at(3), chapter ? cut(new Fault().stack, 0, 4096) : undefined));
+    const method = (...args) => {
+      if (args.length > 4) throw new Fault("Use at most four arguments.");
+      const at = i => args[i] === undefined ? undefined : snapshot(args[i]);
+      return result(call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096)));
     };
+    api[name] = freeze(method);
+    if (ambient) global(name, method);
   }
   freeze(api);
-  const descriptors = Object.getOwnPropertyDescriptors(api);
-  delete descriptors.dispatch;
-  Object.defineProperties(blueprintApi, descriptors);
-  freeze(blueprintApi);
-
   define(globalThis, "__inherit", { value: api, configurable: true });
-
-  const cases = create(null);
-  let count = 0, collecting = testing;
-  if (!chapter) global("test", (name, fn) => {
-    if (!collecting) return;
-    if (count >= 32) throw new Fault("Maximum 32 player tests.");
-    if (typeof name !== "string" || typeof fn !== "function") throw new Fault("Expected test(name, fn).");
-    cases[count++] = { name: cut(name, 0, 128), fn };
-  });
-  if (!chapter) global("assert", (ok, message) => { if (!ok) throw new Fault(label(message ?? "Assertion failed.")); });
-  if (!chapter) global("equal", (actual, expected, message) => {
-    if (!same(actual, expected))
-      throw new Fault(message === undefined ? "Expected " + label(expected) + ", received " + label(actual) : label(message));
-  });
 
   function errorText(e) {
     if (typeof e === "string") return "[" + stringify(cut(e, 0, 1024)) + ',""]';
@@ -141,8 +98,7 @@ export const guestSetup = String.raw`
     const property = own(namespace, name);
     return property && has(property, "value") ? property.value : undefined;
   }
-  return { api, blueprintApi, snapshot, parse, errorText, exported, finishTests() { collecting = false; return count; },
-    testName(i) { return stringify(cases[i].name); }, runTest(i) { return cases[i].fn(blueprintApi); } };
+  return { snapshot, errorText, exported };
 })
 `
 
