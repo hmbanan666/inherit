@@ -159,8 +159,8 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       else {
         const runner = createPackRunner(pack)
         try {
-          await runner.play(trial,files,lesson.mode)
-          if (lesson.mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
+          await runner.play(trial,files, !solves && lesson.ticks ? 'run' : lesson.mode)
+          if (lesson.mode==='deploy') for (let tick=0; tick<(lesson.ticks ?? 1200) && trial.clockActive && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
           solved = trial.phase==='solved'
         } finally {runner.dispose()}
       }

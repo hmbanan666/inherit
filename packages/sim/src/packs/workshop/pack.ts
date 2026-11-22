@@ -10,10 +10,11 @@ import { getSurface } from './surface'
 import { primitiveTick } from './primitives'
 import type { Campaign } from './model'
 import manifest from './manifest'
-import type { PlayerAPI } from './player'
+import type { Parcel, PlayerAPI } from './player'
 
-function chapterCall(call: Call): CallRecord {
-  return {...call,fn:call.name as CallRecord['fn'],args:call.args.map(String),hand:null}
+function validParcel(value: Parcel) {
+  return value && typeof value.id === 'string' && ['red', 'blue'].includes(value.colour) &&
+    ['north', 'south', 'dock'].includes(value.to) && Number.isInteger(value.weight)
 }
 export const workshopLessons: Lesson<Campaign>[] = chapter.map(step=>{
   const files = workshopReference(step)

@@ -19,3 +19,16 @@ test('the parcel arm holds one original label and inspections return independent
   expect(() => api.look('mine' as never)).toThrow(/mine.*Place/)
   expect(() => api.display(Infinity)).toThrow(/Infinity.*finite number/)
 })
+
+test('a jam blocks pickup and drop while keeping the label available to inspect', () => {
+  const world = createFloor('clear-outlet', fixtures['clear-outlet'][1])
+  const api = floorActions(world, 'tick')
+  expect(api.look('left')).toMatchObject({ count: 2, jammed: true, front: { id: 'D' } })
+  expect(api.take('left')).toBeUndefined()
+  expect(api.clearJam('left')).toBe(true)
+  expect(api.clearJam('left')).toBe(false)
+  expect(api.take('left')?.id).toBe('D')
+  world.jammed = true
+  expect(api.put('left')).toBe(false)
+  expect(world.hand?.id).toBe('D')
+})

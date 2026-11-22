@@ -7,15 +7,12 @@ import { packKey } from '@inherit/sim/save'
 const query = new URLSearchParams(location.search)
 const local = import.meta.dev || ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
 const speedQuery = local && query.has('speed') ? '&speed='+encodeURIComponent(query.get('speed')!) : ''
-const id = query.get('pack') ?? (local && query.has('step') ? 'workshop' : '')
+const id = query.get('pack') ?? ''
 const manifest = manifests.find(p => p.id === id)
 const views = import.meta.glob<{default: Component}>('../../../packages/sim/src/packs/*/WorldView.vue')
-const studios = import.meta.glob<{default: Component}>('../../../packages/sim/src/packs/*/Studio.vue')
 const covers = import.meta.glob<string>('../../../packages/sim/src/packs/*/cover.*',{eager:true,query:'?url',import:'default'})
 const folder = '../../../packages/sim/src/packs/'
-const custom = studios[folder+id+'/Studio.vue']
 const render = views[folder+id+'/WorldView.vue']
-const studio = custom && defineAsyncComponent(custom)
 const world = render && defineAsyncComponent(render)
 const maps = shallowRef<Record<string, MapLesson[]>>({})
 const selections: Record<string, string | null> = {}

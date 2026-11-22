@@ -85,7 +85,7 @@ export const guestSetup = String.raw`
   for (const name of parse(operations)) {
     const method = (...args) => {
       if (args.length > 4) throw new Fault("Use at most four arguments.");
-      const at = i => args[i] === undefined ? undefined : snapshot(args[i]);
+      const at = i => args[i] === undefined || typeof args[i] === "number" ? args[i] : snapshot(args[i]);
       return result(call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096)));
     };
     api[name] = freeze(method);

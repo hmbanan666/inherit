@@ -84,7 +84,7 @@ function manualConditions({ world, before, calls, files }: Evidence<Floor>): boo
         inspected = false
         return ok
       })
-      return [same(cart, belt.slice(0, count)), same(queues.belt, belt.slice(count)), guarded && pickups.every(a => a.ok)]
+      return [same(cart, belt.slice(0, count)), same(queues.belt, belt.slice(count)), guarded && pickups.every(a => a.ok) && calls.some(c => c.name === 'look' && c.args[0] === 'belt')]
     }
     case 'merge-bins': {
       const merged = [...left, ...right].sort((a,b) => a.weight - b.weight)

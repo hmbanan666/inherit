@@ -13,6 +13,7 @@ export type PackManifest = (
   title: string
   tagline: string
   level: 'Beginner' | 'Basics' | 'Game' | 'Advanced'
+  track?: 'course' | 'challenges'
   genre: string
   learningGoals: string[]
   estimatedMinutes: { min: number; max: number }
@@ -60,6 +61,12 @@ export type InputValue = string | number | boolean | null | InputValue[] | { [ke
 
 export interface Lesson<W> {
   id: string
+  kind?: 'write' | 'fill' | 'fix' | 'predict'
+  theory?: { title: string; body: string[]; example: string }
+  task?: { condition: string; examples: string[] }
+  scene?: string
+  variants?: { input: string; world(): W }[]
+  ticks?: number
   goal: string
   idea: string
   unit?: string

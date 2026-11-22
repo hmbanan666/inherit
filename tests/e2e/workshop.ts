@@ -5,9 +5,6 @@ import { workshopStarter } from '../../packages/sim/src/packs/workshop/starter'
 import { chapterCapture } from './chapter-capture'
 import { expect, type Page } from '@playwright/test'
 
-export async function photo(page: Page, name: string) {
-  await (await chapterCapture(page))('workshop/details/'+name)
-}
 export async function pasteProjectFile(page: Page, source: string, label: string) {
   await page.getByRole('textbox',{name:label}).waitFor()
   await page.context().grantPermissions(['clipboard-read','clipboard-write'])

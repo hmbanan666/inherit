@@ -1,4 +1,5 @@
 import type { PackManifest } from '../../framework/pack'
+
 export default {
   track: 'course',
   units: [

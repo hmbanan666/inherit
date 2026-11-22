@@ -38,6 +38,7 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
     const world = structuredClone((mode === 'run' || mode === 'deploy') && pack.retry === 'entry' ? save.entryWorld : save.world)
     const start = structuredClone(world)
     const { api, finish } = pack.beginAttempt(world, mode==='deploy' || mode==='resume' ? 'setup' : mode)
+    const start = structuredClone(world)
     const calls: Call[] = []
     const moments: Moment<W>[] = []
     const names = pack.available(world, lesson.id)
@@ -100,7 +101,7 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
         save.project.history = [...save.project.history.slice(-31),{id,tick:ticks,name:'Deploy '+id,files:{...files}}]
       }
       save.world = world
-      save.passed = lesson.checks.filter((check,i) => statuses[i]==='green' || mode==='tick' && save.passed.includes(check.id)).map(c=>c.id)
+      save.passed = lesson.checks.filter((check,i) => statuses[i]==='green').map(c=>c.id)
       save.phase = save.passed.length === lesson.checks.length ? 'solved' : 'working'
       if (save.phase === 'solved') save.clockActive = false
     }
