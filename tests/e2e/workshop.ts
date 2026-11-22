@@ -37,4 +37,10 @@ export async function openShed(page: Page, query = '') {
   await expect(page.getByTestId('primary-button')).toBeEnabled()
   await expect(page.locator('.pixi-mount canvas')).toBeVisible()
   await expect(page.locator('.project-editor .view-lines')).toBeVisible()
+  if (await page.getByTestId('drawer').isVisible()) await page.getByRole('button', {name: 'Got it'}).click()
+}
+
+export async function openTool(page: Page, tool: 'learn' | 'hints' | 'api' | 'console') {
+  if (!await page.getByTestId('drawer').isVisible()) await page.getByTestId('hint').click()
+  await page.getByTestId('drawer-' + tool).click()
 }

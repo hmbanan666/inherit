@@ -13,6 +13,7 @@ export interface EditorSession {
   navigation: Read<{file: string; line: number}>
   call: Read<{file: string; line: number} | undefined>
   tickCalls: Read<readonly { file: string; line: number }[]>
+  readOnly?: Read<boolean>
   watching: Read<boolean>
   error: Read<string>
   placeFunctions?: readonly string[]

@@ -1,9 +1,29 @@
-import type { Call, Colour, Files, Row } from '@inherit/sim/pack'
+import type { Call, Colour, Files, Lesson, Row, Task, Theory } from '@inherit/sim/pack'
+import type { ApiMethod } from '@inherit/sim/declarations'
+import type { MapLesson } from '@inherit/sim/course'
 import type { PackSave } from '@inherit/sim/save'
-export type PackCommand = { kind: 'open'; id: string; stored: string | null; lesson?: string } |
-  { kind: 'run'; files: Files } | { kind: 'continue' | 'tick' | 'stopLoop' } | {kind:'action';panel:string;row:string}
+
+export type DrawerTab = 'learn' | 'hints' | 'api' | 'console'
+export type PackCommand =
+  | { kind: 'open'; id: string; stored: string | null; lesson?: string }
+  | { kind: 'run'; files: Files }
+  | { kind: 'select'; id: string; files: Files; activeFile: string }
+  | { kind: 'hint' }
+  | { kind: 'predict'; choice: string }
+  | { kind: 'continue'; id: string }
+  | { kind: 'tick' | 'stopLoop' }
+  | { kind: 'action'; panel: string; row: string }
+
 export interface PackFrame {
   save: PackSave<unknown>
+  map: MapLesson[]
+  scene?: string
+  inputs: ReturnType<NonNullable<Lesson<unknown>['inputs']>>
+  theory?: Theory
+  task?: Task
+  prediction?: Lesson<unknown>['prediction']
+  reference: ApiMethod[]
+  types: string[]
   mode: 'run' | 'deploy'
   clockMs?: number
   tickCount: number
@@ -12,9 +32,9 @@ export interface PackFrame {
   goal: string
   edit: { file: string; line: number }
   hints: readonly string[]
-  labels: string[]
+  labels: {id: string; text: string; input?: string}[]
   checks: Colour[]
-  solved?: {reaction: string; did: string; idea: string}
+  solved?: Lesson<unknown>['solved']
   index: number
   total: number
   declarations: string

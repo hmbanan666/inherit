@@ -266,6 +266,7 @@ onMounted(() => {
   defineWorkshopTheme(host.value!)
   editor = monaco.editor.create(host.value!, {
     model: null,
+    readOnly: game.readOnly?.value ?? false,
     wordBasedSuggestions: 'off',
     autoClosingBrackets: 'never',
     acceptSuggestionOnEnter: 'off',
@@ -328,6 +329,10 @@ onMounted(() => {
       game.traces?.value[id]?.some(site => site.file === file && site.line === line),
     ))
   })
+  const dock = host.value?.closest<HTMLElement>('.editor-dock')
+  const fitContent = () => dock?.style.setProperty('--source-height', Math.max(115, editor!.getContentHeight()) + 'px')
+  editor.onDidContentSizeChange(fitContent)
+  fitContent()
   syncFiles()
   runtimeMarker()
   // Navigation can arrive before the lazy editor mounts.
@@ -364,6 +369,7 @@ watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
 watch(game.navigation, ({ file, line }) => revealLine(file, line), { flush: 'post' })
+watch(() => game.readOnly?.value, value => editor?.updateOptions({ readOnly: !!value }))
 watch(api, updateLibrary)
 watch([() => props.error ?? game.error.value, files], runtimeMarker)
 onBeforeUnmount(() => {
@@ -380,7 +386,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="project-editor" aria-label="Controller files">
     <Teleport :to="shellTabs ?? 'body'" :disabled="!shellTabs">
-      <nav v-if="!shellTabs || multiFile" class="project-tabs" aria-label="Open files">
+      <nav v-if="multiFile" class="project-tabs" aria-label="Open files">
         <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: activeFile === file }">
           <button
             :aria-label="file"
@@ -395,9 +401,6 @@ onBeforeUnmount(() => {
           </button>
         </span>
         <span class="space" />
-        <span v-if="dirty && !shellTabs" class="draft" title="Working copy differs from the live program"
-          >Draft</span
-        >
         <template v-if="multiFile">
           <button title="Quick open (Ctrl/Cmd+P)" aria-label="Quick open" @click="find('open')">
             <FolderSearch :size="14" />

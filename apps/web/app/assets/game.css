@@ -1801,9 +1801,6 @@ button.revisions:hover {
 .pack-copy small,.pack-copy .learn { color: var(--sub) }
 .pack-copy b { margin-top:auto; padding-top: 14px; display: flex; align-items:center; gap:15px; color:var(--gold) }
 .pack-world { position:relative; overflow:hidden }
-.solved-overlay { position:absolute; bottom:16px; left:4%; width:92%; z-index:4; background: var(--overlay); border:1px solid var(--accent-line); border-radius:8px; padding:14px 18px; box-shadow:0 5px 25px var(--shadow) }
-.solved-overlay button { margin-top:8px }
-.solved-overlay small { color:var(--gold) }
 .pack-checks,.pack-error,.entity-panel { padding:12px 18px }
 .pack-checks small { display:block; color:var(--sub); margin-bottom:5px }
 .pack-checks [data-state=red],.pack-error {color:var(--alert)}
@@ -1820,8 +1817,12 @@ button.revisions:hover {
  .pack-world { min-height:280px }
 }
 
-/* Keep the sign, path and fair visible while the player reads the result. */
-@media (min-width: 801px) {
-  .pack-studio .solved-overlay { top: 102px; bottom: auto; }
+
+.pack-world { padding: 10px; isolation: isolate }
+.world-controls { position: absolute; top: 16px; left: 16px; z-index: 3 }
+.console-count { align-self: flex-start; margin: 3px 12px }
+.hud a.primary-run { display: inline-flex; align-items: center; justify-content: center; text-decoration: none }
+@media (min-width: 781px) {
+  .editor-dock > .editor-pane { flex: 0 1 var(--source-height, 220px); min-height: 100px }
+  .editor-dock > .checks { max-height: 24%; overflow: auto; border-top: 1px solid var(--line) }
 }
-.world-feedback { max-width: 22ch; margin: 0; color: var(--soft); font-size: 13px; }

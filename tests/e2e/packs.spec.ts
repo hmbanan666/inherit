@@ -47,7 +47,10 @@ for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirecto
       if (entry.name==='beginner') await expect(page.locator('body')).not.toContainText(/coins|debt|inbox|orders/i)
       await capture(path+'start')
       for (const [file,source] of Object.entries(lesson.referenceSolution)) {
-        await page.getByRole('button',{name:file,exact:true}).first().click()
+        if (Object.keys(lesson.referenceSolution).length > 1) {
+          await page.getByTestId('hint').click()
+          await page.getByTestId('drawer').getByRole('button', {name: file, exact: true}).click()
+        }
         await pasteProjectFile(page,source,'Player TypeScript')
       }
       await primary.click()
@@ -76,7 +79,7 @@ for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirecto
     if (entry.name==='beginner') {
       await expect(world.getByTestId('fair')).toHaveAccessibleName('Fair open')
       await expect(world.getByTestId('lamp-5')).toHaveAccessibleName('Lamp 5 lit')
-      await finish.getByRole('link', {name: /Next pack.*Uncle’s Workshop/}).click()
+      await page.getByRole('banner').getByRole('link', {name: 'Next pack →'}).click()
       await expect(page.getByTestId('task-card')).toContainText('Lift a rock from the mine')
       await pasteProjectFile(page, '// My workshop draft', 'Factory controller TypeScript')
       await page.getByTestId('pack-switcher').click()
@@ -127,7 +130,7 @@ test('an unreadable save stays untouched until the player starts a fresh village
   await expect(page.getByTestId('primary-button')).toBeEnabled()
 })
 
-test('a beginner can finish the first lesson from the starter comment alone',async({page})=>{
+test('a beginner can finish the first lesson after reading Learn',async({page})=>{
   const errors: string[] = []
   page.on('pageerror',e=>errors.push(e.message))
   await page.goto('/')
