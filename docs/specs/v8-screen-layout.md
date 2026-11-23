@@ -12,14 +12,14 @@ The quest rail does not grow. It stays 280px, inside the 260–300px band, and i
 
 The file tree is one 140px column inside the editor row, with one Files toggle on its own bar. Under 1280px it starts closed, as a narrow rail with that same toggle. The choice is saved in this browser.
 
-The editor and the checks fill the rest of the bottom row. Checks sit under the code.
+The editor and the checks fill the rest of the bottom row. The file tree is the left of that row. The code is the middle. Checks are a fixed 300px pane on the right, inside the 280–320px band.
 
 ## Reading order
 
 1. Nav. Where you are, what you hold, whether the clock is running.
 2. Quest rail. Who is asking, the one goal, the hint, the reward, the one button.
 3. Works. The map.
-4. Editor. The file, the code, Deploy when it differs, then the checks.
+4. Editor. The open file tab, the code, Deploy, and the checks beside the code.
 5. Status bar. One live sentence, then the quantities.
 
 On a narrow window the rail stacks above the map, and the map stacks above the editor. The same five stops stay in that order.
@@ -44,7 +44,13 @@ The map fills the top row beside the quest rail. On load, and whenever that row 
 
 ## Editor
 
-The file tree is the left column of the editor row when it is open. Its bar is the only Files toggle. The editor header carries the open file name and Deploy. Deploy is on that header only while the editor differs from the deployed files. Ctrl+Enter still deploys. Checks for the open quest sit under the editor, pass or fail, in the check's own words. Console, API, and Charts open one at a time in the slot under the checks. The console is the log of tick messages.
+The file tree is the left column of the editor row. Its Files toggle and the new, rename, and delete tools share one header row with the editor. That row is 36px, with a 1px bottom border, and it is the top line of both panels.
+
+The editor side of the row is the open file tabs, then Deploy, then quick open and search. Deploy is always on that row. There is no second title for the open file. Ctrl+Enter still deploys.
+
+Checks are the 300px pane to the right of the code. Before a quest is taken the pane says "Take a quest to see checks". Once a quest is open, each check is pass or fail in the check's own words. The pane's header is the same 36px row. Borders on this row are 1px.
+
+Console, API, and Charts open one at a time under the code. The console is the log of tick messages.
 
 ## Status bar
 
@@ -57,8 +63,8 @@ One sentence on the left. A runtime error, a save problem, the floor renderer, t
 | Credits, level, CPU, Running | Nav |
 | Portrait, goal, hint, reward, Take, Complete, shop | Quest rail |
 | Map and its labels | Top row, beside the quest rail |
-| Files, code, Deploy | Editor |
-| Pass and fail | Checks under the editor |
-| Console, API, Charts | One slot under the checks |
+| Files, code, Deploy | Editor header and the code under it |
+| Pass and fail | Checks pane, right of the code |
+| Console, API, Charts | One slot under the code |
 | Live sentence | Status bar |
 | Stock and drone loads | Status bar, after the sentence |

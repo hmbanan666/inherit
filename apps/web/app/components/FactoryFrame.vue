@@ -5,7 +5,7 @@ import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
-  clampMapHeight, creditSuffix, defaultMapHeight, filesStorageKey, fileTreePx, mapHeightKey,
+  checksPanePx, clampMapHeight, creditSuffix, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
   questRailPx, readFilesOpen, readMapHeight, treeRailPx, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
 
@@ -36,6 +36,8 @@ const zone = ref<'quests' | 'shop'>('quests')
 const questRailCss = questRailPx + 'px'
 const worldGapCss = worldGapPx + 'px'
 const worldInsetCss = worldInsetPx + 'px'
+const headerCss = editorHeaderPx + 'px'
+const checksPaneCss = checksPanePx + 'px'
 const filesOpen = ref(false)
 const mapHeight = ref(defaultMapHeight())
 const treeColumnCss = computed(() => (filesOpen.value ? fileTreePx : treeRailPx) + 'px')
@@ -302,14 +304,15 @@ onBeforeUnmount(() => {
         <div class="editor-bay">
           <FileTree id="project-files" v-model:open="filesOpen" v-model:files="files" v-model:active-file="activeFile" />
           <div class="editor-column">
-            <header class="dock-header editor-head">
-              <span class="editor-title">{{ activeFile }}</span>
-              <button v-if="dirty" class="deploy" type="button" aria-label="Deploy" :disabled="pending || !world" @click="deploy">
-                <Play /> Deploy <kbd>Ctrl+Enter</kbd>
-              </button>
-            </header>
-            <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="tool = 'API'" /></div></div>
-            <ChecksPanel v-if="world?.questId" :tried="true" :checks="checks" />
+            <div class="editor-pane"><div class="editor-host">
+              <LazyCodeEditor @reference="tool = 'API'">
+                <template #actions>
+                  <button class="deploy" type="button" aria-label="Deploy" :data-dirty="dirty ? 'true' : 'false'" :disabled="pending || !world" @click="deploy">
+                    <Play /> Deploy <kbd>Ctrl+Enter</kbd>
+                  </button>
+                </template>
+              </LazyCodeEditor>
+            </div></div>
             <div v-if="tool" class="tool-slot">
               <section v-if="tool === 'Console'" aria-label="Console" class="console">
                 <h2>Console · Tick <b data-testid="tick">{{ world?.tick }}</b></h2>
@@ -319,6 +322,10 @@ onBeforeUnmount(() => {
               <MetricsPanel v-else-if="world" :world="world" />
             </div>
           </div>
+          <aside class="checks-pane" aria-label="Quest checks">
+            <div class="checks-head">Checks</div>
+            <ChecksPanel :tried="!!world?.questId" :checks="world?.questId ? checks : []" empty="Take a quest to see checks" />
+          </aside>
         </div>
       </div>
     </template>
@@ -390,7 +397,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: v-bind(treeColumnCss) minmax(0, 1fr);
+  grid-template-columns: v-bind(treeColumnCss) minmax(0, 1fr) v-bind(checksPaneCss);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background: var(--surface-low);
@@ -500,6 +507,7 @@ onBeforeUnmount(() => {
 }
 .xp-bar i { display: block; height: 100%; background: var(--gold) }
 .editor-column {
+  --editor-header: v-bind(headerCss);
   grid-column: 2;
   grid-row: 1;
   height: 100%;
@@ -508,15 +516,65 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
 }
-.editor-head { flex: none; gap: 12px; font: 12px var(--mono); color: var(--soft) }
-.editor-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.editor-head .deploy { border-radius: 5px }
-.editor-head kbd { font: 10px var(--mono); padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px }
-.editor-column :deep(.checks) {
+.editor-column :deep(.project-tabs) {
+  height: v-bind(headerCss);
+  min-height: v-bind(headerCss);
+  align-items: center;
+  padding: 0 6px 0 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex-wrap: nowrap;
+}
+.editor-column :deep(.project-tabs .tab) { min-width: 0 }
+.editor-column :deep(.project-tabs .tab button) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.editor-column :deep(.deploy) {
+  height: 26px;
   flex: none;
-  max-height: 24%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 0 10px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.editor-column :deep(.deploy kbd) {
+  font: 10px var(--mono);
+  padding: 1px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+.editor-column :deep(.finder) { top: v-bind(headerCss) }
+.checks-pane {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+.checks-head {
+  flex: none;
+  height: v-bind(headerCss);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+  font: 700 12px var(--mono);
+  color: var(--text);
+}
+.checks-pane :deep(.checks) {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
-  border-top: 1px solid var(--line);
+  padding: 8px 10px;
 }
 .tool-slot {
   flex: none;
@@ -550,7 +608,7 @@ onBeforeUnmount(() => {
   .map-frame { min-height: 140px; }
   .editor-bay {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) minmax(72px, 28%);
   }
   .editor-bay :deep(.tree) {
     grid-column: 1;
@@ -561,5 +619,11 @@ onBeforeUnmount(() => {
   }
   .editor-bay :deep(.tree.shut) { max-height: none; }
   .editor-column { grid-column: 1; grid-row: 2 }
+  .checks-pane {
+    grid-column: 1;
+    grid-row: 3;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
 }
 </style>
