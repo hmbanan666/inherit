@@ -1,6 +1,6 @@
-const title = 'Inherit · Game packs'
+const title = 'Kettlewick Works · Inherit'
 const description =
-  'Learn TypeScript by waking a village or running a workshop. Pick a game pack and watch your code change its world.'
+  'Program the drones at Kettlewick Works and watch them haul ore.'
 
 export default defineNuxtConfig({
   ssr: false,

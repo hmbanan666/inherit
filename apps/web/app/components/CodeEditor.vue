@@ -10,7 +10,8 @@ import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
 import type { PlainError } from '@inherit/sandbox/pack'
 import type { Starter } from '@inherit/sim/pack'
-import { editorKey } from '../lib/editor'
+import { SuggestAdapter } from 'monaco-editor/esm/vs/language/typescript/tsMode.js'
+import { editorKey, rankApiSuggestions } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
 const game = inject(editorKey)!
@@ -40,6 +41,7 @@ const prefix = '/packs/' + game.id + '/'
 const libraryUri = monaco.Uri.file(prefix + 'api.d.ts')
 let library: monaco.IDisposable
 let settingSource = false
+let rankedSuggestions: monaco.IDisposable
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
 let tickMarks: monaco.editor.IEditorDecorationsCollection | undefined
@@ -263,6 +265,17 @@ onMounted(() => {
       label === 'typescript' || label === 'javascript' ? new TsWorker() : new EditorWorker(),
   }
   const ts = monaco.languages.typescript
+  ts.typescriptDefaults.setModeConfiguration({ ...ts.typescriptDefaults.modeConfiguration, completionItems: false })
+  const adapter = new SuggestAdapter(async (...uris) => (await ts.getTypeScriptWorker())(...uris))
+  rankedSuggestions = monaco.languages.registerCompletionItemProvider('typescript', {
+    triggerCharacters: adapter.triggerCharacters,
+    async provideCompletionItems(...args) {
+      const result = await adapter.provideCompletionItems(...args)
+      if (result) rankApiSuggestions(result.suggestions, game.apiNames.value)
+      return result
+    },
+    resolveCompletionItem: adapter.resolveCompletionItem!.bind(adapter),
+  })
   ts.typescriptDefaults.setCompilerOptions({
     target: ts.ScriptTarget.ES2020,
     module: ts.ModuleKind.ESNext,
@@ -281,6 +294,7 @@ onMounted(() => {
     wordBasedSuggestions: 'off',
     autoClosingBrackets: 'never',
     acceptSuggestionOnEnter: 'on',
+    suggestSelection: 'first',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
@@ -382,6 +396,7 @@ watch(() => props.diagnostic, runtimeMarker, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
   zoneResize?.disconnect()
+  rankedSuggestions?.dispose()
   suggestions?.dispose()
   highlight.reset()
   opener?.dispose()

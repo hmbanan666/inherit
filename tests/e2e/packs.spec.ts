@@ -20,7 +20,7 @@ for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirecto
     page.on('pageerror',error=>errors.push(error.message))
     page.on('console',message=>{if (message.type()==='error') errors.push(message.text())})
     const capture = await chapterCapture(page)
-    await page.goto('/')
+    await page.goto('/?packs')
     const featured = page.getByTestId('pack-beginner')
     await expect(featured).toContainText('Start here')
     if (entry.name==='beginner') await capture('showcase')
@@ -80,7 +80,7 @@ for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirecto
 }
 
 test('switching packs and reloading preserves an unfinished village edit',async({page})=>{
-  await page.goto('/')
+  await page.goto('/?packs')
   await page.getByTestId('pack-beginner').click()
   await pasteProjectFile(page,'// Try my greeting\nsay("Morning!")','Player TypeScript')
   await page.getByTestId('pack-switcher').click()
@@ -94,7 +94,7 @@ test('switching packs and reloading preserves an unfinished village edit',async(
 })
 
 test('an unreadable save stays untouched until the player starts a fresh village',async({page})=>{
-  await page.goto('/')
+  await page.goto('/?packs')
   const raw = '{"formatVersion":9,"packId":"beginner"}'
   await page.evaluate(value=>localStorage.setItem('inherit.pack.beginner',value),raw)
   await page.getByTestId('pack-beginner').click()
@@ -109,7 +109,7 @@ test('an unreadable save stays untouched until the player starts a fresh village
 test('a beginner fills the greeting slot, sees the reaction, then continues',async({page})=>{
   const errors: string[] = []
   page.on('pageerror',e=>errors.push(e.message))
-  await page.goto('/')
+  await page.goto('/?packs')
   await page.getByTestId('pack-beginner').click()
   await expect(page.getByRole('group', { name: 'Clock controls' })).toHaveCount(0)
   const editor = page.getByRole('textbox',{name:'Player TypeScript'})

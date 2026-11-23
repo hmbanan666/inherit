@@ -28,7 +28,7 @@ function replay() {
     <footer>
       <div class="finish-links">
         <button popovertarget="lesson-map">{{ manifest.track === 'course' ? 'Course map' : 'Challenge picker' }}</button>
-        <a href="/">Back to game packs</a>
+        <a href="/?packs">Back to game packs</a>
         <button @click="confirmation?.showModal()">Replay this pack</button>
       </div>
     </footer>

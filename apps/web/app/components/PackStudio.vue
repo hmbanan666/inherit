@@ -166,6 +166,7 @@ function resize(event: PointerEvent) {
   el.addEventListener('lostpointercapture',() => el.removeEventListener('pointermove',move),{once:true})
 }
 provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:lastRun,
+  apiNames: computed(() => new Set(frame.value?.reference.map(method => method.name.split('.').at(-1)!))),
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
   readOnly: computed(() => !!frame.value?.solved || busy.value),
   call:activeCall, tickCalls, watching, navigation,
@@ -291,7 +292,7 @@ onBeforeUnmount(() => {
           <SaveArchive v-if="lesson === undefined" :pack="manifest.id" />
         </aside>
       </div>
-      <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
+      <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/?packs'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
       <button v-else class="deploy primary-run" data-testid="primary-button" :data-ready="!!frame && !busy && currentStep === frame.steps.length - 1" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved" @click="run">
         <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
       </button>
