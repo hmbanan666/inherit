@@ -33,6 +33,8 @@ export interface PackFrame {
   tickCount: number
   noCalls?: boolean
   finishIdeas?: string[]
+  focus?: string
+  effect?: string
   goal: string
   steps: readonly string[]
   starter?: Starter

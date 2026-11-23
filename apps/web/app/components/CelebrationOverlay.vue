@@ -2,6 +2,8 @@
 import { Check } from '@lucide/vue'
 const props = defineProps<{
   solved: { reaction: string; did: string; idea: string; reward?: string }
+  focus?: string
+  effect?: string
   busy: boolean
   noHints?: boolean
   streak?: number
@@ -9,6 +11,27 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ advance: [] }>()
 const button = ref<HTMLButtonElement>()
+const card = ref<HTMLElement>()
+const position = ref<Record<string, string>>({})
+const result = ref('')
+let observer: ResizeObserver | undefined
+function place() {
+  const shell = card.value?.parentElement
+  if (!shell) return
+  const find = (name?: string) => name && shell.querySelector('[data-focus="' + CSS.escape(name) + '"]')
+  const effect = props.effect && shell.querySelector('[data-testid="' + CSS.escape(props.effect) + '"]')
+  result.value = effect ? effect.textContent?.trim() ?? '' : ''
+  const target = find(props.focus) || effect
+  if (!target) return
+  const box = shell.getBoundingClientRect()
+  const focus = target.getBoundingClientRect()
+  const above = focus.top - box.top
+  const below = box.bottom - focus.bottom
+  position.value = {
+    top: above >= below ? '4px' : 'auto', bottom: above >= below ? 'auto' : '4px',
+    transform: 'translateX(-50%)', maxHeight: Math.max(1, Math.max(above, below) - 8) + 'px',
+  }
+}
 function enter(event: KeyboardEvent) {
   if (event.key !== 'Enter' || event.altKey || event.ctrlKey || event.metaKey ||
       (event.target instanceof HTMLElement && event.target.closest('a, dialog, [data-testid="drawer"]'))) return
@@ -17,24 +40,28 @@ function enter(event: KeyboardEvent) {
   if (!event.repeat && !props.busy) emit('advance')
 }
 onMounted(() => {
+  place()
+  observer = new ResizeObserver(place)
+  if (card.value?.parentElement) observer.observe(card.value.parentElement)
   button.value?.focus({ preventScroll: true })
   window.addEventListener('keydown', enter, true)
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', enter, true))
+onBeforeUnmount(() => { observer?.disconnect(); window.removeEventListener('keydown', enter, true) })
 watch(() => props.busy, busy => { if (!busy) button.value?.focus({ preventScroll: true }) })
 </script>
 
 <template>
-  <section class="celebration" data-testid="solved-card" aria-labelledby="celebration-title">
+  <section ref="card" :style="position" class="celebration" data-testid="solved-card" aria-labelledby="celebration-title">
     <div class="confetti" aria-hidden="true"><i v-for="n in 14" :key="n" :style="{ '--n': n }" /></div>
     <small><Check /> Done <span v-if="noHints"> · ★ No hints</span></small>
     <h2 id="celebration-title">{{ solved.reaction }}</h2>
-    <p>{{ solved.did }} {{ solved.idea }}</p>
+    <blockquote v-if="result">“{{ result }}”</blockquote>
+    <p>{{ solved.did }}</p>
     <p v-if="solved.reward">{{ solved.reward }}</p>
     <p v-if="landmark" class="landmark">Unit complete · {{ landmark }}</p>
     <strong v-if="streak && streak >= 3">{{ streak }} in a row on the first try</strong>
     <footer><button ref="button" class="gold" data-testid="continue" :disabled="busy" @click="emit('advance')">Continue</button>
-      <a v-if="landmark" href="/">Stop here</a></footer>
+      </footer>
   </section>
 </template>
 

@@ -33,6 +33,13 @@ const lastRun = shallowRef<Files>({})
 const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
 const solved = computed(() => !busy.value && frame.value?.solved)
+const showCard = ref(false)
+watch(solved, (value, _, cleanup) => {
+  showCard.value = false
+  if (!value) return
+  const delay = setTimeout(() => { showCard.value = true }, 1000)
+  cleanup(() => clearTimeout(delay))
+})
 const checkRows = computed(() => frame.value?.labels.map((label,i) => ({...label, reason: frame.value?.save.reasons?.[label.id], status: statuses.value[i] ?? 'red' as Colour})) ?? [])
 const choice = computed(() => frame.value?.save.predictions[frame.value.save.lessonId!])
 const currentStep = computed(() => {
@@ -304,7 +311,7 @@ onBeforeUnmount(() => {
             </section>
           </template>
         </SideDrawer>
-        <CelebrationOverlay v-if="solved && frame" :solved="solved" :busy="busy" :landmark="landmark"
+        <CelebrationOverlay v-if="showCard && solved && frame" :focus="frame.focus" :effect="frame.effect" :solved="solved" :busy="busy" :landmark="landmark"
           :no-hints="!frame.save.hints[frame.save.lessonId!]"
           :streak="frame.save.attempts[frame.save.lessonId!] === 1 ? frame.save.firstTryStreak + 1 : 0" @advance="advance" />
       </section>
