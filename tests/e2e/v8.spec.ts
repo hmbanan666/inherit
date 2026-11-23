@@ -10,6 +10,7 @@ test('the inherited controller hauls ore and a new deployment keeps the factory'
   await expect(page.getByRole('link', { name: 'Inherit showcase' })).toBeVisible()
   await expect(page.getByLabel('Factory map').locator('canvas')).toBeVisible()
   await expect(page.getByLabel('Factory metrics')).toBeVisible()
+  await expect(page.getByText(/drone-1 · cargo/)).toBeVisible()
   const resizer = page.getByRole('separator', { name: 'Resize editor' })
   const dock = page.locator('.editor-dock')
   const width = (await dock.boundingBox())!.width

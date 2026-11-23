@@ -130,8 +130,10 @@ const orderRows = computed(() => {
     <template #status>
       <template v-if="world">
         <strong v-if="world.bankrupt" role="status">Bankrupt · session ended</strong>
+        <span>Depot ore {{ world.depot.ore }}</span>
         <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
         <span>Ingots {{ world.furnace.output }}</span>
+        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} · cargo {{ drone.cargo }}/{{ drone.capacity }}</span>
         <span>Rent {{ kettlewick.rentPerTick }} cr/tick</span>
         <span>Income {{ world.ledger.income }} cr</span>
       </template>
