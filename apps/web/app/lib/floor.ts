@@ -167,17 +167,20 @@ export class FloorScene {
 
   private paintRoutes(world: FloorWorld) {
     this.paths.clear()
+    let drawn = false
     for (const drone of world.drones) {
       const route = drone.route
       if (!route?.length) continue
+      drawn = true
       const start = center(drone.pos)
-      let pen = this.paths.moveTo(start.x, start.y)
+      this.paths.moveTo(start.x, start.y)
       for (const step of route) {
         const point = center(step)
-        pen = pen.lineTo(point.x, point.y)
+        this.paths.lineTo(point.x, point.y)
       }
-      pen.stroke({ color: 0xf2ead8, width: 2, alpha: 0.28 })
     }
+    if (drawn) this.paths.stroke({ color: 0xe7c56a, width: 8, alpha: 0.55 })
+    this.root.addChild(this.paths)
   }
 
   update(world: FloorWorld) {

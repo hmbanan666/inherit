@@ -3,7 +3,7 @@ export * from './core/bricks'
 export { mining, miningModule } from './modules/mining'
 export { kettlewick } from './sites/kettlewick'
 export { questList, shop, shopTiers, acceptQuest, completeQuest, buyUpgrade, nextQuest, nextUnlock, upcomingQuests, levelFor, levelSpan } from './quests'
-export { readChecks, inspectAt } from './checkFacts'
+export { readChecks, inspectAt, noteCheckReset, stallTicks } from './checkFacts'
 
 import type { Brick } from './core/bricks'
 import { mining, miningModule } from './modules/mining'

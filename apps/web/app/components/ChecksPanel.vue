@@ -66,7 +66,8 @@ li { padding: 2px 0 }
 [data-colour=amber] { color: var(--gold) }
 [data-state=done] { color: var(--mint) }
 [data-mark=passing] { color: var(--mint) }
-[data-mark=pending] { color: var(--sub) }
+[data-mark=pending] { color: var(--text) }
+[data-mark=pending] > span { color: var(--sub) }
 [data-mark=failed] { color: var(--alert) }
 small { display: block; padding-left: 1em; color: var(--soft) }
 </style>

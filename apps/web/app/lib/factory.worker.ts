@@ -1,4 +1,4 @@
-import { kettlewick } from '@inherit/sim/v8'
+import { kettlewick, noteCheckReset } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
@@ -35,6 +35,7 @@ async function act(command: FactoryCommand) {
         publish(command.files)
       } else if (command.kind === 'run') {
         await session!.deploy(command.files)
+        noteCheckReset(session!.world)
         publish(command.files)
       } else if (command.kind === 'accept') {
         session!.accept()

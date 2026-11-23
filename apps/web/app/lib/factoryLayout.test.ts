@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import {
   clampMapHeight,
+  containPlace,
   containScale,
   checksPanePx,
   creditSuffix,
@@ -66,5 +67,10 @@ test('the fit keeps the whole grid inside the frame', () => {
     const touchesWidth = Math.abs(worldW * scale - w) < 0.05
     const touchesHeight = Math.abs(worldH * scale - h) < 0.05
     expect(touchesWidth || touchesHeight).toBe(true)
+    const place = containPlace(w, h, worldW, worldH)
+    expect(place.x).toBeCloseTo((w - worldW * place.scale) / 2)
+    expect(place.y).toBeCloseTo((h - worldH * place.scale) / 2)
+    expect(place.x).toBeGreaterThanOrEqual(-0.01)
+    expect(place.y).toBeGreaterThanOrEqual(-0.01)
   }
 })

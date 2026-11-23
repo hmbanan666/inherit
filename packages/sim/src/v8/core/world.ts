@@ -60,6 +60,10 @@ export interface World {
   oreAfterDry: number
   pathCallsTick: number
   pathWindow: number[]
+  /** Tick of the last deploy, or of taking the quest. */
+  checkSince: number
+  /** Last progress key for each check, and the tick it last changed. */
+  checkMoved: Record<string, { key: string; at: number }>
 }
 export function createWorld(site: Site): World {
   const world: World = {
@@ -72,6 +76,7 @@ export function createWorld(site: Site): World {
     ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0,
     ingotsMade: 0, steelMade: 0, steelMark: 0, oreAfterDry: 0, pathCallsTick: 0, pathWindow: [],
+    checkSince: 0, checkMoved: {},
   }
   if (!site.questList) updateOrders(world, site)
   world.status = site.questList

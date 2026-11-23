@@ -2,7 +2,7 @@
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
-import { containScale } from '../lib/factoryLayout'
+import { containPlace } from '../lib/factoryLayout'
 import { inspectAt } from '@inherit/sim/v8'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
@@ -26,10 +26,11 @@ const worldSize = computed(() => ({
   w: tile * props.world.grid.width,
   h: tile * props.world.grid.height,
 }))
-const scale = computed(() => containScale(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h) * zoom.value)
+const place = computed(() => containPlace(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h, zoom.value))
+const scale = computed(() => place.value.scale)
 const camera = computed(() => ({
-  x: size.value.w / 2 - props.world.grid.width / 2 * tile * scale.value + pan.value.x,
-  y: size.value.h / 2 - props.world.grid.height / 2 * tile * scale.value + pan.value.y,
+  x: place.value.x + pan.value.x,
+  y: place.value.y + pan.value.y,
 }))
 function recenter() {
   pan.value = { x: 0, y: 0 }
@@ -225,5 +226,17 @@ onBeforeUnmount(() => {
   background: transparent;
   border: 0;
   color: var(--sub);
+}
+.pixi-mount {
+  position: absolute;
+  inset: 0;
+}
+.pixi-mount :deep(canvas) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>
