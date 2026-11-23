@@ -11,7 +11,7 @@ export interface Site {
   grid: { width: number; height: number }
   drones: Drone[]
   veins: Vein[]
-  depot: { pos: Cell; ore: number }
+  depot: { pos: Cell; ore: number; coal: number }
   furnace: { pos: Cell; input: number; output: number }
   recipe: { ore: number; ingots: number; ticks: number; fuel: number }
   orderSchedule: ScheduledOrder[]
@@ -26,7 +26,7 @@ export interface Site {
   orePerMine: number
   files: Record<string, string>
 }
-export interface Message { tick: number; file: string; line: number; text: string }
+export interface Message { tick: number; file: string; line: number; text: string; count?: number }
 export interface ConsoleLine {
   seq: number
   tick: number
@@ -34,6 +34,7 @@ export interface ConsoleLine {
   level: 'log' | 'info' | 'warn' | 'error'
   file?: string
   line?: number
+  count?: number
 }
 export interface World {
   tick: number
@@ -87,6 +88,7 @@ export function createWorld(site: Site): World {
     ingotsMade: 0, steelMade: 0, steelMark: 0, oreAfterDry: 0, pathCallsTick: 0, pathWindow: [],
     checkSince: 0, checkMoved: {},
   }
+  world.depot.coal ??= 0
   if (!site.questList) updateOrders(world, site)
   world.status = site.questList
     ? syncQuest(world, site)
@@ -148,16 +150,43 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
     else if (used >= world.cpu.limit) world.status = 'CPU is at its limit. Remember a path in memory instead of calling findPath every tick.'
     else if (questStatus) world.status = questStatus
     else world.status = describeWorks(world, site, before)
-    if (message) world.messages.push({ tick: world.tick, ...message })
+    if (message) noteMessage(world, { ...message, tick: world.tick, count: 1 })
   }
 }
 
 const consoleCap = 80
 
-export function pushConsole(world: World, line: Omit<ConsoleLine, 'seq'>) {
+function sameError(a: { text: string; file?: string; line?: number }, b: { text: string; file?: string; line?: number }) {
+  return a.text === b.text && a.file === b.file && a.line === b.line
+}
+
+/** One line for a repeated error: `x 120` after the text, once it has happened again. */
+export function repeatedLabel(text: string, count?: number) {
+  return count && count > 1 ? `${text} x ${count}` : text
+}
+
+function noteMessage(world: World, message: Message) {
+  const prior = world.messages.find(item => sameError(item, message))
+  if (!prior) {
+    world.messages.push(message)
+    return
+  }
+  prior.count = (prior.count ?? 1) + 1
+  prior.tick = message.tick
+}
+
+export function pushConsole(world: World, line: Omit<ConsoleLine, 'seq' | 'count'>) {
   const list = (world.console ??= [])
+  if (line.level === 'error') {
+    const prior = list.find(item => item.level === 'error' && sameError(item, line))
+    if (prior) {
+      prior.count = (prior.count ?? 1) + 1
+      prior.tick = line.tick
+      return
+    }
+  }
   const seq = (list.at(-1)?.seq ?? 0) + 1
-  list.push({ ...line, seq })
+  list.push({ ...line, seq, count: 1 })
   if (list.length > consoleCap) list.splice(0, list.length - consoleCap)
 }
 

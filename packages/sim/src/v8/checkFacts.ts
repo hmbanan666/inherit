@@ -144,7 +144,7 @@ export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'd
   const drone = world.drones.find(item => item.pos.x === x && item.pos.y === y)
   if (drone) return {
     id: drone.name,
-    fields: [`pos ${drone.pos.x},${drone.pos.y}`, `cargo ${drone.cargo}/${drone.capacity}`],
+    fields: [`pos ${drone.pos.x},${drone.pos.y}`, `cargo ${drone.cargo}/${drone.capacity}`, `cargoKind ${drone.carrying ?? 'null'}`],
   }
   const vein = world.veins.find(item => !item.hidden && item.pos.x === x && item.pos.y === y)
   if (vein) return {
@@ -157,6 +157,6 @@ export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'd
   }
   if (world.depot.pos.x === x && world.depot.pos.y === y) return {
     id: 'depot',
-    fields: [`pos ${world.depot.pos.x},${world.depot.pos.y}`, `ore ${world.depot.ore}`],
+    fields: [`pos ${world.depot.pos.x},${world.depot.pos.y}`, `ore ${world.depot.ore}`, `coal ${world.depot.coal ?? 0}`],
   }
 }

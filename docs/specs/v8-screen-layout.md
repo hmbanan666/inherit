@@ -46,7 +46,7 @@ Under the reward, the card shows the villager's one-line quote, then a Next list
 
 The map fills the top row beside the quest rail. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit and centers that grid in the row, horizontally and vertically. The whole grid stays visible and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
-Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it opens a small popover with the fields that entity has: id, pos, cargo and capacity, furnace input, or ore left.
+Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it opens a small popover with the fields that entity has: id, pos, cargo, cargoKind, and capacity, furnace input, or ore and coal left.
 
 ## Editor
 
@@ -58,15 +58,15 @@ Checks and Console share the 300px pane to the right of the code. The pane's hea
 
 Before a quest is taken the Checks tab says "Take a quest to see checks". Once a quest is open, each check is pending, passing, or failed. Pending is a grey circle and ordinary text. A check turns failed only after its facts have not changed for 20 ticks, about 10 seconds, since Take quest or the last Deploy. A numeric check shows the live count in its own words, such as `Bram receives 4 ingots 0/4`. The first stuck check adds one fact from the works. A full cart that has not moved for that stretch, on or beside a vein, is named before the furnace, such as `drone-1 is full (3/3) at Vein A and not moving`. Later checks say `waits on: Ore reaches the furnace` instead of repeating that fact. The fact names a field. It does not say what to write.
 
-A compact log sits at the top of the Checks tab. It holds runtime errors and sim events, such as `Vein A is empty`. An error that names a file and a line jumps to that line in the editor when clicked.
+A compact log sits at the top of the Checks tab. It holds runtime errors and sim events. An error that names a file and a line jumps to that line in the editor when clicked. The same error does not repeat: the line stays, and a counter such as `x 120` shows how many times it has happened.
 
-The Console tab lists `console.log`, `console.info`, `console.warn`, and `console.error` from the deployed program, and the same runtime errors. Each line shows the tick. A line that names a file and a line jumps to that line. Clear empties the list. While Checks is selected, the Console tab shows how many lines have arrived since it was last open. That count is red when any of those lines is an error.
+The Console tab lists `console.log`, `console.info`, `console.warn`, and `console.error` from the deployed program, and the same runtime errors. Each line shows the tick. A repeated error stays one line, with that counter and the last tick. A line that names a file and a line jumps to that line. Clear empties the list. While Checks is selected, the Console tab shows how many new lines have arrived since it was last open. That count is red when any of those lines is an error. `drone.cargoKind` is `ore`, `coal`, or `null`. Depot and furnace both accept ore and coal. An action that refuses names the drone, where it is, what it carries, and what the target accepts.
 
 API and Charts open one at a time under the code.
 
 ## Status bar
 
-Quantities only: depot ore, furnace ore, furnace coal, ingots, steel, and each drone's load. A check's own sentence stays in the checks. The quest's why stays on the card. Runtime errors and sim events stay in the checks log.
+Quantities only: depot ore, depot coal, furnace ore, furnace coal, ingots, steel, and each drone's load with its cargo kind, such as `drone-1 ore 2/3`. A check's own sentence stays in the checks. The quest's why stays on the card. Runtime errors and sim events stay in the checks log, one line per distinct error.
 
 ## One home each
 

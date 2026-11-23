@@ -155,7 +155,7 @@ test('each quest pays on completion and the previous program does not pass the n
     expect(session.accept()).toBe(true)
     await session.deploy(home)
     session.step(40)
-    expect(session.world.messages.some(message => message.text.includes('empty'))).toBe(true)
+    expect(session.world.messages.some(message => message.text.includes('Vein A (ore) left 0'))).toBe(true)
     expect(session.world.checks.find(check => check.id === 'other')?.status).not.toBe('green')
     expect(session.buy('prospect')).toBe(true)
     await session.deploy({ 'main.ts': prospected })

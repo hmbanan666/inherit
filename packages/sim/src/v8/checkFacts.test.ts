@@ -108,7 +108,7 @@ test('a click reads the fields on that cell', () => {
   const drone = world.drones[0]!
   drone.pos = { x: 6, y: 2 }
   drone.cargo = 3
-  expect(inspectAt(world, 6, 2)).toEqual({ id: 'drone-1', fields: ['pos 6,2', 'cargo 3/3'] })
+  expect(inspectAt(world, 6, 2)).toEqual({ id: 'drone-1', fields: ['pos 6,2', 'cargo 3/3', 'cargoKind null'] })
   expect(inspectAt(world, 2, 1)?.fields).toContain('input 0')
   expect(inspectAt(world, 1, 1)?.id).toBe('depot')
 })

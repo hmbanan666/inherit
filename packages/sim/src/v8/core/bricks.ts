@@ -36,6 +36,9 @@ export function declarations(bricks: Brick[]) {
   export interface Furnace extends Target {
 ${members('furnace.')}
   }
+  export interface Depot extends Target {
+${members('depot.')}
+  }
   export interface Drone extends Target {
     readonly name: string
     readonly cargo: number

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { declarations, kettlewick, factoryBricks, shop, levelSpan, readChecks, nextUnlock, type World } from '@inherit/sim/v8'
+import { declarations, kettlewick, factoryBricks, shop, levelSpan, readChecks, nextUnlock, repeatedLabel, type World } from '@inherit/sim/v8'
 import ChecksPanel from './ChecksPanel.vue'
 import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
@@ -137,8 +137,7 @@ const log = computed(() => {
   const current = world.value
   if (current?.status.startsWith('CPU')) lines.push({ text: current.status, bad: true })
   for (const message of [...(current?.messages ?? [])].reverse()) {
-    if (lines.length >= 4) break
-    lines.push({ text: message.text, file: message.file, line: message.line, bad: true })
+    lines.push({ text: repeatedLabel(message.text, message.count), file: message.file, line: message.line, bad: true })
   }
   return lines
 })
@@ -422,12 +421,12 @@ onBeforeUnmount(() => {
               <template v-for="line in consoleLines" :key="line.seq">
                 <button v-if="line.file && line.line" type="button" class="line" :class="line.level" @click="openLine({ file: line.file, line: line.line })">
                   <span class="when">{{ line.tick }}</span>
-                  <span class="text">{{ line.text }}</span>
+                  <span class="text">{{ repeatedLabel(line.text, line.count) }}</span>
                   <span class="where">{{ line.file }}:{{ line.line }}</span>
                 </button>
                 <p v-else class="line" :class="line.level">
                   <span class="when">{{ line.tick }}</span>
-                  <span class="text">{{ line.text }}</span>
+                  <span class="text">{{ repeatedLabel(line.text, line.count) }}</span>
                 </p>
               </template>
             </section>
@@ -438,11 +437,12 @@ onBeforeUnmount(() => {
     <template #status>
       <span v-if="world" class="meters">
         <span>Depot ore {{ world.depot.ore }}</span>
+        <span>Depot coal {{ world.depot.coal ?? 0 }}</span>
         <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
         <span>Furnace coal {{ world.furnace.coal }}</span>
         <span>Ingots {{ world.furnace.output }}</span>
         <span>Steel {{ world.furnace.steel }}</span>
-        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} {{ drone.cargo }}/{{ drone.capacity }}</span>
+        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} {{ drone.carrying ?? 'empty' }} {{ drone.cargo }}/{{ drone.capacity }}</span>
       </span>
     </template>
   </StudioShell>
@@ -781,7 +781,7 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 .console .line.error, .console .line.warn { color: var(--alert) }
-.console .text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.console .text { min-width: 0; white-space: normal }
 .console .where { color: var(--sub) }
 .notice { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .notice.bad { color: var(--alert) }
