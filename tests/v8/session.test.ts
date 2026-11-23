@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { diagnostics } from '../packs/compiler'
 import { declarations, kettlewick, mining } from '../../packages/sim/src/v8'
-import { runSession } from '../../packages/sandbox/src/v8'
+import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
 test('Uncle spends the budget every tick while only the first drone hauls ore', async () => {
   const world = await runSession(kettlewick, kettlewick.files, 32)
@@ -63,4 +63,20 @@ test('the generated inherit declarations typecheck both controllers and require 
   expect(diagnostics(cached, types)).toEqual([])
   expect(diagnostics({ 'main.ts': 'import { findPath } from "inherit"; findPath(1, 2)' }, types))
     .toHaveLength(1)
+})
+
+test('deploy replaces the controller on the same world and a failed deploy keeps it running', async () => {
+  const session = await createSession(kettlewick, cached)
+  try {
+    session.step(32)
+    const ore = session.world.depot.ore
+    await session.deploy({ 'main.ts': `import { memory } from "inherit"
+      export function onTick() { memory.lastTick++ }` })
+    await expect(session.deploy({ 'main.ts': 'export const broken =' })).rejects.toThrow()
+    session.step(1)
+    expect(session.world.tick).toBe(33)
+    expect(session.world.depot.ore).toBe(ore)
+    expect(session.world.memory.lastTick).toBe(33)
+    expect(session.world.cpu.used).toBe(0)
+  } finally { session.dispose() }
 })
