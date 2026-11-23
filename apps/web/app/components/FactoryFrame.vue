@@ -5,8 +5,8 @@ import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
-  creditSuffix, dockStorageKey, editorDockMax, editorDockMin, editorDockPercent, filesStorageKey,
-  fileTreePx, questRailPx, readFilesOpen, worldGapPx, worldInsetPx,
+  clampMapHeight, creditSuffix, defaultMapHeight, filesStorageKey, fileTreePx, mapHeightKey,
+  questRailPx, readFilesOpen, readMapHeight, treeRailPx, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
@@ -34,15 +34,35 @@ const panels = ['Console', 'API', 'Charts'] as const
 const tool = ref<typeof panels[number]>()
 const zone = ref<'quests' | 'shop'>('quests')
 const questRailCss = questRailPx + 'px'
-const fileTreeCss = fileTreePx + 'px'
 const worldGapCss = worldGapPx + 'px'
 const worldInsetCss = worldInsetPx + 'px'
-const dockDefault = editorDockPercent(1024)
 const filesOpen = ref(false)
-function toggleFiles() {
-  filesOpen.value = !filesOpen.value
-  try { localStorage.setItem(filesStorageKey, filesOpen.value ? 'open' : 'closed') }
+const mapHeight = ref(defaultMapHeight())
+const treeColumnCss = computed(() => (filesOpen.value ? fileTreePx : treeRailPx) + 'px')
+const mapRowCss = computed(() => mapHeight.value + '%')
+let filesReady = false
+watch(filesOpen, (open) => {
+  if (!filesReady) return
+  try { localStorage.setItem(filesStorageKey, open ? 'open' : 'closed') }
   catch { /* Keep the choice for this session. */ }
+})
+function setMapHeight(value: number) {
+  mapHeight.value = clampMapHeight(value)
+  try { localStorage.setItem(mapHeightKey, String(Math.round(mapHeight.value * 10) / 10)) }
+  catch { /* Keep the height for this session. */ }
+}
+function resizeMap(event: PointerEvent) {
+  const stage = (event.currentTarget as HTMLElement).parentElement
+  if (!stage) return
+  const el = event.currentTarget as HTMLElement
+  el.setPointerCapture(event.pointerId)
+  const move = (e: PointerEvent) => {
+    const rect = stage.getBoundingClientRect()
+    if (rect.height < 1) return
+    setMapHeight(((e.clientY - rect.top) / rect.height) * 100)
+  }
+  el.addEventListener('pointermove', move)
+  el.addEventListener('lostpointercapture', () => el.removeEventListener('pointermove', move), { once: true })
 }
 const hintOpen = ref(true)
 const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
@@ -130,8 +150,14 @@ function shortcut(event: KeyboardEvent) {
 
 onMounted(async () => {
   let storedFiles: string | null = null
-  try { storedFiles = localStorage.getItem(filesStorageKey) } catch { /* Use the width default. */ }
+  let storedMap: string | null = null
+  try {
+    storedFiles = localStorage.getItem(filesStorageKey)
+    storedMap = localStorage.getItem(mapHeightKey)
+  } catch { /* Use the defaults. */ }
   filesOpen.value = readFilesOpen(storedFiles, window.innerWidth)
+  mapHeight.value = readMapHeight(storedMap)
+  filesReady = true
   worker = new Worker(new URL('../lib/factory.worker.ts', import.meta.url), { type: 'module' })
   worker.onmessage = ({ data }: MessageEvent<FactoryFrame>) => {
     if ('error' in data) {
@@ -201,7 +227,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <StudioShell class="factory" :class="{ 'files-closed': !filesOpen }" :storage-key="dockStorageKey" :dock="dockDefault" :min="editorDockMin" :max="editorDockMax" :prefer="editorDockPercent">
+  <StudioShell class="factory">
     <template #nav>
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
@@ -268,31 +294,31 @@ onBeforeUnmount(() => {
           <button v-else class="gold" type="button" data-testid="complete-quest" :disabled="!ready" @click="send({ kind: 'complete' })">Complete quest</button>
         </div>
       </section>
-      <div v-if="world" class="map-frame">
-        <LazyFactoryFloor :world="world" :paused="false" :interval="kettlewick.tickMs" @error="floorError = $event" />
-      </div>
-    </template>
-    <template #editor>
-      <FileTree v-show="filesOpen" id="project-files" v-model:files="files" v-model:active-file="activeFile" />
-      <div class="editor-column">
-        <header class="dock-header editor-head">
-          <span class="editor-title">
-            <button type="button" class="files-toggle" :aria-expanded="filesOpen" aria-controls="project-files" @click="toggleFiles">Files</button>
-            <span>{{ activeFile }}</span>
-          </span>
-          <button v-if="dirty" class="deploy" type="button" aria-label="Deploy" :disabled="pending || !world" @click="deploy">
-            <Play /> Deploy <kbd>Ctrl+Enter</kbd>
-          </button>
-        </header>
-        <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="tool = 'API'" /></div></div>
-        <ChecksPanel v-if="world?.questId" :tried="true" :checks="checks" />
-        <div v-if="tool" class="tool-slot">
-          <section v-if="tool === 'Console'" aria-label="Console" class="console">
-            <h2>Console · Tick <b data-testid="tick">{{ world?.tick }}</b></h2>
-            <p v-for="msg in world?.messages.slice().reverse()" :key="msg.tick + msg.text">Tick {{ msg.tick }} · {{ msg.text }}</p>
-          </section>
-          <ApiReference v-else-if="tool === 'API'" :entries="entries" />
-          <MetricsPanel v-else-if="world" :world="world" />
+      <div class="stage">
+        <div class="map-frame">
+          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :interval="kettlewick.tickMs" @error="floorError = $event" />
+        </div>
+        <div class="row-split" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize map" @pointerdown="resizeMap" @keydown.up.prevent="setMapHeight(mapHeight - 2)" @keydown.down.prevent="setMapHeight(mapHeight + 2)" />
+        <div class="editor-bay">
+          <FileTree id="project-files" v-model:open="filesOpen" v-model:files="files" v-model:active-file="activeFile" />
+          <div class="editor-column">
+            <header class="dock-header editor-head">
+              <span class="editor-title">{{ activeFile }}</span>
+              <button v-if="dirty" class="deploy" type="button" aria-label="Deploy" :disabled="pending || !world" @click="deploy">
+                <Play /> Deploy <kbd>Ctrl+Enter</kbd>
+              </button>
+            </header>
+            <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="tool = 'API'" /></div></div>
+            <ChecksPanel v-if="world?.questId" :tried="true" :checks="checks" />
+            <div v-if="tool" class="tool-slot">
+              <section v-if="tool === 'Console'" aria-label="Console" class="console">
+                <h2>Console · Tick <b data-testid="tick">{{ world?.tick }}</b></h2>
+                <p v-for="msg in world?.messages.slice().reverse()" :key="msg.tick + msg.text">Tick {{ msg.tick }} · {{ msg.text }}</p>
+              </section>
+              <ApiReference v-else-if="tool === 'API'" :entries="entries" />
+              <MetricsPanel v-else-if="world" :world="world" />
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -312,19 +338,66 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .factory :deep(.desk) {
-  grid-template-rows: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.factory :deep(.desk > .resizer),
+.factory :deep(.desk > .editor-dock) {
+  display: none;
 }
 .factory :deep(.world-shell) {
   display: flex;
   flex-direction: row;
   align-items: stretch;
+  flex: 1 1 auto;
   gap: v-bind(worldGapCss);
   padding: v-bind(worldInsetCss);
+  width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
+.stage {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.map-frame {
+  position: relative;
+  flex-grow: 0;
+  flex-shrink: 0;
+  flex-basis: v-bind(mapRowCss);
+  min-width: 0;
+  min-height: 0;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.row-split {
+  flex: 0 0 7px;
+  cursor: row-resize;
+  background: var(--base);
+  touch-action: none;
+  border: 1px solid var(--line);
+}
+.row-split:hover { background: var(--accent-line); }
+.editor-bay {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: v-bind(treeColumnCss) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--surface-low);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.editor-bay :deep(.tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
 .quest-zone {
   width: v-bind(questRailCss);
   flex: 0 0 v-bind(questRailCss);
@@ -416,15 +489,6 @@ onBeforeUnmount(() => {
 }
 .shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
 .shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
-.map-frame {
-  position: relative;
-  flex: 1 1 0;
-  align-self: stretch;
-  min-width: 0;
-  min-height: 0;
-  border-radius: 7px;
-  overflow: hidden;
-}
 .balance b { font-variant-numeric: tabular-nums }
 .xp { display: grid; gap: 4px; min-width: 92px }
 .xp-bar {
@@ -435,18 +499,6 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .xp-bar i { display: block; height: 100%; background: var(--gold) }
-.factory :deep(.editor-dock) {
-  display: grid;
-  grid-template-columns: v-bind(fileTreeCss) minmax(0, 1fr);
-  min-height: 0;
-  overflow: hidden;
-}
-.factory.files-closed :deep(.editor-dock) {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-}
-.factory :deep(.editor-dock > .tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
-.factory.files-closed :deep(.editor-dock > .tree) { display: none }
 .editor-column {
   grid-column: 2;
   grid-row: 1;
@@ -456,25 +508,8 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
 }
-.factory.files-closed .editor-column { grid-column: 1; grid-row: 1 }
 .editor-head { flex: none; gap: 12px; font: 12px var(--mono); color: var(--soft) }
-.editor-title { display: flex; align-items: center; gap: 10px; min-width: 0 }
-.editor-title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.files-toggle {
-  flex: none;
-  height: 26px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: transparent;
-  color: var(--soft);
-  font: 11px var(--mono);
-}
-.files-toggle[aria-expanded='true'] {
-  color: var(--accent-soft);
-  border-color: var(--gold);
-  background: var(--accent-shadow);
-}
+.editor-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .editor-head .deploy { border-radius: 5px }
 .editor-head kbd { font: 10px var(--mono); padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px }
 .editor-column :deep(.checks) {
@@ -506,23 +541,25 @@ onBeforeUnmount(() => {
     gap: 8px 12px;
   }
   .factory :deep(.world-shell) {
-    display: flex;
     flex-direction: column;
-    height: clamp(480px, 66dvh, 720px);
+    height: auto;
+    min-height: clamp(480px, 66dvh, 720px);
   }
-  .quest-zone { flex: none; width: auto; height: auto; max-height: 42% }
-  .map-frame { flex: 1 1 auto; width: 100%; height: auto; min-height: 180px }
-  .factory :deep(.editor-dock) {
+  .quest-zone { flex: none; width: auto; max-height: 42% }
+  .stage { width: 100%; min-height: 320px; flex: 1 1 auto; }
+  .map-frame { min-height: 140px; }
+  .editor-bay {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
   }
-  .factory :deep(.editor-dock > .tree) {
+  .editor-bay :deep(.tree) {
     grid-column: 1;
     grid-row: 1;
     max-height: 140px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  .editor-bay :deep(.tree.shut) { max-height: none; }
   .editor-column { grid-column: 1; grid-row: 2 }
 }
 </style>

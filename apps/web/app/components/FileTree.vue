@@ -4,6 +4,7 @@ import { checkPath, treeRows } from '../lib/devtools/tree'
 
 const files = defineModel<Record<string, string>>('files', { required: true })
 const activeFile = defineModel<string>('activeFile', { required: true })
+const open = defineModel<boolean>('open', { default: true })
 const collapsed = ref(new Set<string>())
 const paths = computed(() => Object.keys(files.value))
 const rows = computed(() => {
@@ -64,10 +65,13 @@ function submit() {
 }
 </script>
 <template>
-  <section class="bench tree" aria-label="Project files">
+  <section class="bench tree" :class="{ shut: !open }" aria-label="Project files">
     <div class="bar">
-      <h3>Files</h3>
-      <div class="tools">
+      <button type="button" class="tree-toggle" :aria-expanded="open" aria-label="Files" @click="open = !open">
+        <component :is="open ? ChevronDown : ChevronRight" :size="12" />
+        <span v-if="open">Files</span>
+      </button>
+      <div v-if="open" class="tools">
         <button title="New file" aria-label="New file" @click="begin('file')"><FilePlus :size="13" /></button>
         <button
           title="Rename selected"
@@ -87,7 +91,7 @@ function submit() {
         </button>
       </div>
     </div>
-    <form v-if="action" @submit.prevent="submit">
+    <form v-if="open && action" @submit.prevent="submit">
       <span v-if="action === 'delete'"
         >Delete {{ selected }}?</span
       >
@@ -106,7 +110,7 @@ function submit() {
       </div>
       <p v-if="problem" role="alert" class="bad">{{ problem }}</p>
     </form>
-    <ul class="rows">
+    <ul v-if="open" class="rows">
       <li v-for="row in rows" :key="row.path">
         <button
           :class="{ chosen: selected === row.path }"
@@ -162,5 +166,26 @@ function submit() {
 }
 .tree small {
   color: var(--accent-line);
+}
+.tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 700 12px inherit;
+}
+.tree.shut {
+  padding: 6px 4px;
+}
+.tree.shut .bar {
+  justify-content: center;
+}
+.tree.shut .tree-toggle {
+  width: 100%;
+  justify-content: center;
+  min-height: 28px;
 }
 </style>

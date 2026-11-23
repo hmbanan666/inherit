@@ -2,7 +2,7 @@
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
-import { containScale, fitScale } from '../lib/factoryLayout'
+import { containScale } from '../lib/factoryLayout'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
 const emit = defineEmits<{ error: [message: string] }>()
@@ -22,8 +22,7 @@ const worldSize = computed(() => ({
   w: tile * props.world.grid.width,
   h: tile * props.world.grid.height,
 }))
-const fitted = computed(() => fitScale(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h))
-const scale = computed(() => fitted.value * zoom.value)
+const scale = computed(() => containScale(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h) * zoom.value)
 const camera = computed(() => ({
   x: size.value.w / 2 - props.world.grid.width / 2 * tile * scale.value + pan.value.x,
   y: size.value.h / 2 - props.world.grid.height / 2 * tile * scale.value + pan.value.y,
@@ -35,8 +34,7 @@ function recenter() {
 function zoomBy(ratio: number, px = size.value.w / 2, py = size.value.h / 2) {
   if (size.value.w < 2 || size.value.h < 2) return
   const before = zoom.value
-  const whole = containScale(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h) / fitted.value
-  zoom.value = Math.min(2.8, Math.max(Math.min(0.32, whole), before * ratio))
+  zoom.value = Math.min(2.8, Math.max(0.32, before * ratio))
   const f = zoom.value / before
   pan.value = {
     x: pan.value.x * f + (px - size.value.w / 2) * (1 - f),
