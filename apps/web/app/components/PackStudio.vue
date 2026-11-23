@@ -321,6 +321,9 @@ onBeforeUnmount(() => {
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
           <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :diagnostic="diagnostic" @hint="openDrawer('hints')" :error="error" @reference="openDrawer('api')" /></div></div>
+          <p v-if="manifest.track === 'challenges' && frame.hiddenInputs && frame.save.phase === 'brief'" class="hidden-inputs">
+            Your code also runs on {{ frame.hiddenInputs }} more {{ frame.hiddenInputs === 1 ? 'belt' : 'belts' }} you cannot see.
+          </p>
           <ChecksPanel :key="frame.save.lessonId ?? ''" :tried="frame.save.phase !== 'brief'" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
           <button v-if="frame.logs.length" class="console-count" @click="openDrawer('console')">Console · {{ frame.logs.length }} lines</button>
           <p v-if="frame.prediction && frame.save.phase !== 'brief'" class="prediction-result">Your prediction: {{ frame.save.predictions[frame.save.lessonId!] }} · Result: {{ frame.prediction.answer }}</p>

@@ -31,6 +31,7 @@ const routes = computed(() => {
     default: return ['belt-cart']
   }
 })
+const visibleStations = computed(() => places.filter(place => routes.value.some(route => route.split('-').includes(place))))
 const paths: Record<string, string> = {
   'belt-left': 'M193 213 286 158',
   'belt-right': 'M194 258 283 306',
@@ -61,7 +62,7 @@ const labels = computed(() => places.flatMap(place => props.world.queues[place])
       <g stroke="#c3a46c" stroke-width="4" stroke-dasharray="9 7" fill="none" marker-end="url(#route-tip)">
         <path v-for="route in routes" :key="route" :d="paths[route]" :data-route="route"/>
       </g>
-      <g v-for="place in places" :key="place" :transform="'translate(' + stations[place].x + ' ' + stations[place].y + ')'"
+      <g v-for="place in visibleStations" :key="place" :transform="'translate(' + stations[place].x + ' ' + stations[place].y + ')'"
          :aria-label="place + ', ' + world.queues[place].length + ' parcels'">
         <ellipse cy="15" rx="68" ry="12" fill="#161719" opacity=".55"/>
         <g v-if="place === 'belt'">

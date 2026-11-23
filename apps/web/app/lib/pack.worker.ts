@@ -156,6 +156,7 @@ async function act(command: PackCommand) {
     scene: lesson?.scene, theory: lesson?.theory, task: lesson?.task, prediction: lesson?.prediction,
     noCalls: command.kind === 'run' && lesson?.mode === 'run' && !moments.length && !logs.length && !error,
     mode: lesson?.mode ?? 'run', clockMs: pack.clock?.intervalMs, goal: lesson?.goal ?? '',
+    hiddenInputs: lesson?.variants?.length ?? 0,
     focus: lesson?.focus ?? lesson?.visibleEffect.testId, effect: lesson?.visibleEffect.testId,
     starter, steps: lesson && starter ? lessonSteps(lesson, starter) : [],
     edit: save.edit ?? {file: 'main.ts', line: 1}, hints: lesson?.hints ?? [],

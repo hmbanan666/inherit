@@ -33,6 +33,7 @@ export interface PackFrame {
   tickCount: number
   noCalls?: boolean
   finishIdeas?: string[]
+  hiddenInputs: number
   focus?: string
   effect?: string
   goal: string
