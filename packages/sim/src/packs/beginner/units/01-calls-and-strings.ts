@@ -3,7 +3,11 @@ import { courseUnit, calls, check } from '../course'
 export default courseUnit("calls-and-strings", [
   {
     id: "hello",
-    kind: "write",
+    kind: "fill",
+    steps: ["Type a greeting between the quotes on line 2", "Press Run"],
+    slot: { line: 2, column: 6, placeholder: "type a greeting" },
+    readyPattern: /\bsay\s*\(\s*(?:"\s*[^"\s][^"\n]*"|'\s*[^'\s][^'\n]*')\s*\)/,
+    focus: "mila-greeting",
     goal: "Give Mila a greeting at the gate",
     scene: "village",
     cue: "Visitor at the gate",
@@ -12,34 +16,38 @@ export default courseUnit("calls-and-strings", [
     theory: {
       title: "A call and a string",
       body: [
-        "Code gives the game instructions. Lines beginning with // are comments for you. Write your instruction below the TODO comment.",
+        "Lines beginning with // are notes for you. Mila follows the instruction on the next line.",
         "A function is a job with a name. To call it, write its name followed by parentheses.",
         "Words between matching double quotes make one text value, called a string. Give say some words inside its parentheses.",
       ],
       example: `say("The lantern is lit.")`,
     },
-    starter: `// TODO: Give the visitor a greeting in Mila's voice.
-`,
+    starter: `// Mila says the words between the quotes.
+say("")`,
     hints: [
-      "Which job lets Mila speak?",
-      "Put greeting words of your choice between quotes inside the call.",
+      "Click between the quotes on line 2 and type any greeting.",
+      "Try say(\"Hello!\").",
     ],
     reference: `say("Welcome to the village!")`,
     checks: [
-      check("The player calls say with nonblank words", e =>
-        calls(e, 'say').some(call => typeof call.args[0] === 'string' && call.args[0].trim().length > 0)),
-      check("Mila displays those words and waves", e =>
-        e.world.bubble.length > 0 && e.world.bubble === calls(e, 'say').at(-1)?.args[0]),
+      check("You gave Mila a greeting", e =>
+        calls(e, 'say').some(call => typeof call.args[0] === 'string' && call.args[0].trim().length > 0), undefined, () => "Give Mila some words between the quotes."),
+      check("Mila says it and waves", e =>
+        e.world.bubble.length > 0 && e.world.bubble === calls(e, 'say').at(-1)?.args[0], undefined, () => "Mila is still waiting for her greeting."),
     ],
     solved: {
       reaction: "Mila waves back.",
-      did: "You gave a function a string of your own.",
+      did: "The words you put in quotes are a string.",
     },
     effect: ["speech", "Welcome to the village!"],
   },
   {
     id: "sign-spaces",
-    kind: "fill",
+    kind: "write",
+    steps: ['Copy the ticket name in quotes on line 2', 'Press Run'],
+    slot: { line: 2, column: 11, placeholder: '"name from the ticket"' },
+    readyPattern: /\bpaintSign\s*\(\s*(?:"\s*[^"\s][^"\n]*"|'\s*[^'\s][^'\n]*')\s*\)/,
+    focus: "pier-sign",
     goal: "Print the two-word ferry name on the pier sign",
     scene: "pier",
     cue: "Boat ticket · Moon Ferry",
@@ -54,8 +62,8 @@ export default courseUnit("calls-and-strings", [
       ],
       example: `paintSign("East Gate")`,
     },
-    starter: `// TODO: Letter the sign to match the boat ticket.
-`,
+    starter: `// Put the boat ticket name in quotes.
+paintSign()`,
     hints: [
       "Read both words on the ticket.",
       "Make the space part of the text you send to the sign.",
@@ -63,7 +71,12 @@ export default courseUnit("calls-and-strings", [
     reference: `paintSign("Moon Ferry")`,
     checks: [
       check("The sign matches the ticket", e =>
-        e.world.sign === 'Moon Ferry'),
+        e.world.sign === 'Moon Ferry', undefined, ({ world }) => {
+          if (!world.sign) return 'The pier sign is still blank.'
+          const difference = world.sign.toLowerCase() === 'moon ferry' ? 'match the capital M and F'
+            : world.sign === 'MoonFerry' ? 'add the space between the words' : 'copy “Moon Ferry” from the ticket'
+          return 'The sign says “' + world.sign + '” — ' + difference + '.'
+        }),
     ],
     solved: {
       reaction: "The ferry has its name.",
@@ -74,6 +87,10 @@ export default courseUnit("calls-and-strings", [
   {
     id: "call-order",
     kind: "predict",
+    steps: ["Guess which message comes first", "Add a departure call on line 3", "Press Run"],
+    slot: { line: 3, column: 1, placeholder: 'say("…")' },
+    readyPattern: /\bsay\s*\([^)]*\)[\s\S]*\bsay\s*\(\s*(?:"\s*[^"\s][^"\n]*"|'\s*[^'\s][^'\n]*')\s*\)/,
+    focus: "departures",
     goal: "Show the two station calls in departure order",
     scene: "platform",
     cue: "Departure board · Boarding → Departure",
@@ -89,12 +106,12 @@ export default courseUnit("calls-and-strings", [
 say("Afternoon")`,
     },
     prediction: {
-      question: "After you add the departure call below the boarding call, which message appears first? Choose boarding or departure.",
+      question: "Which message will the board show first?",
       choices: ["Boarding", "Departure"],
       answer: "Boarding",
     },
     starter: `say("All aboard")
-// TODO: Announce departure after boarding.
+// Add the departure message on the next line.
 `,
     hints: [
       "Predict which message appears first if you add a call here.",
@@ -103,14 +120,16 @@ say("Afternoon")`,
     reference: `say("All aboard")
 say("We're departing!")`,
     checks: [
-      check("Boarding appears first", e =>
-        e.world.announcements[0] === 'All aboard'),
-      check("Departure appears second", e =>
-        e.world.announcements.length === 2 && e.world.announcements[1].trim() !== 'All aboard'),
+      check("“All aboard” shows first", e =>
+        e.world.announcements[0] === 'All aboard', undefined, ({ world }) =>
+          world.announcements.length ? '“' + world.announcements[0] + '” came first because its line ran first.' : 'The board is still empty.'),
+      check("Your departure message shows second", e =>
+        e.world.announcements.length === 2 && e.world.announcements[1].trim() !== 'All aboard', undefined, ({ world }) =>
+          world.announcements.length === 2 ? 'Give the second message its own departure words.' : 'The board shows ' + world.announcements.length + ' messages and needs two.'),
     ],
     solved: {
       reaction: "The train can leave.",
-      did: "You placed two announcements in the order passengers needed.",
+      did: "The board shows your messages in order because lines run from top to bottom.",
     },
     effect: ["speech", "We're departing!"],
   },

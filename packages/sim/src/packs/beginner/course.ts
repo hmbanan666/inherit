@@ -2,7 +2,7 @@ import { mainFile, type Check, type Evidence, type Lesson } from '../../framewor
 import { units } from './map'
 import { inputCards } from './inputs'
 import type { PlayerAPI } from './player'
-import { initialWorld, propText, type Fixture, type Prop, type Scene, type Village } from './world'
+import { initialWorld, type Fixture, type Prop, type Scene, type Village } from './world'
 
 type Seen = Evidence<Village>
 
@@ -23,10 +23,11 @@ export function check(
   label: string,
   passes: (e: Seen) => boolean,
   appliesTo: (entry: Readonly<Village>) => boolean = () => true,
+  reason?: Check<Village>['reason'],
 ): Check<Village> {
   return {
     id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, ''),
-    label,
+    label, reason,
     evaluate: evidence => !appliesTo(evidence.before) || passes(evidence) ? 'green' : 'red',
   }
 }
@@ -39,6 +40,10 @@ interface Unit {
 
 interface Page {
   id: string
+  steps?: string[]
+  slot?: { line: number; column: number; placeholder: string }
+  readyPattern?: RegExp
+  focus?: string
   kind: 'write' | 'fill' | 'fix' | 'predict'
   goal: string
   scene: Scene
@@ -69,7 +74,7 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
 
   return {
     id,
-    kind,
+    kind, steps: page.steps, focus: page.focus, readyPattern: page.readyPattern,
     unit: unit.id,
     goal,
     scene,
@@ -83,7 +88,14 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
     inputs: inputCards,
     idea: theory.title,
     mode: 'run' as const,
-    starter: () => mainFile(page.starter, editLine),
+    starter: () => {
+      const starter = mainFile(page.starter, page.slot?.line ?? editLine)
+      if (page.slot) {
+        starter.edit.column = page.slot.column
+        starter.placeholder = page.slot.placeholder
+      }
+      return starter
+    },
     referenceSolution: { 'main.ts': page.reference },
     visibleEffect: { testId: prop, text, description: page.reason },
     solved: {
@@ -91,17 +103,7 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
       idea: theory.title,
     },
     enter(world: Village) {
-      const { album, landmarks } = world
-      if (world.lessonId) {
-        album[world.lessonId] = propText(world, world.prop)
-        if (world.unit.lessonIds.every(id => Object.hasOwn(album, id)) &&
-          !landmarks.some(landmark => landmark.id === world.unit.id)) {
-          landmarks.push({ id: world.unit.id, title: world.unit.landmark })
-        }
-      }
       Object.assign(world, initialWorld(), {
-        album,
-        landmarks,
         unit: { id: unit.id, landmark: unit.landmark, lessonIds },
         lessonId: id,
         scene,

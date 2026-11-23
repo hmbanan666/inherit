@@ -21,7 +21,7 @@ export type PackManifest = (
   featured?: boolean
   showcaseNote?: string
 }
-export interface Starter { files: Files; edit: { file: string; line: number } }
+export interface Starter { files: Files; edit: { file: string; line: number; column?: number }; placeholder?: string }
 export interface Call {
   name: string
   args: unknown[]
@@ -43,6 +43,7 @@ export interface Check<W> {
   id: string
   label: string
   input?: string
+  reason?(e: Evidence<W>): string
   evaluate(e: Evidence<W>): Colour
 }
 export interface Theory {
@@ -60,6 +61,9 @@ export type InputValue = string | number | boolean | null | InputValue[] | { [ke
 
 export interface Lesson<W> {
   id: string
+  readyPattern?: RegExp
+  steps?: readonly string[]
+  focus?: string
   goal: string
   idea: string
   unit?: string
@@ -71,7 +75,7 @@ export interface Lesson<W> {
   variants?: readonly { input: string; enter(world: W): void; maxTicks?: number }[]
   inputs?(world: Readonly<W>): Record<string, { type: string; value: InputValue }>
   mode: 'run' | 'deploy'
-  starter(previous: Files): Starter
+  starter(): Starter
   hints?: readonly string[]
   checks: readonly Check<W>[]
   referenceSolution: Files
@@ -86,6 +90,7 @@ export interface Pack<W, A extends object> {
   manifest: PackManifest
   version: number
   initialWorld(seed: number): W
+  decorateEntry?(previous: Readonly<W>, next: W): void
   decodeWorld(input: unknown): W
   entities: Entity<W>[]
   panels: Panel<W>[]
@@ -102,6 +107,18 @@ export interface Pack<W, A extends object> {
   upgrade?(fromVersion: number, input: unknown): unknown
 }
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }
-export function mainFile(source: string, line = source.split('\n').length): Starter {
-  return { files: { 'main.ts': source }, edit: { file: 'main.ts', line } }
+export function mainFile(source: string, line = source.split('\n').length, placeholder = 'Write your code here'): Starter {
+  return { files: { 'main.ts': source }, edit: { file: 'main.ts', line, column: 1 }, placeholder }
+}
+
+export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter): readonly string[] {
+  if (lesson.steps) return lesson.steps
+  const { line, file } = starter.edit
+  const note = starter.files[file].split('\n')[line - 2]?.trim().match(/^\/\/ TODO:\s*(.+)/)?.[1]
+  const instruction = note ? note.replace(/\.$/, '') + ' (line ' + line + ')' : 'Edit the code at line ' + line
+  return [
+    ...(lesson.prediction ? ['Choose a prediction'] : []),
+    instruction,
+    'Press Run',
+  ]
 }

@@ -4,7 +4,7 @@ import type { PackManifest } from '@inherit/sim/pack'
 import type { SolveStats } from '@inherit/sim/save'
 
 defineProps<{ manifest: PackManifest; ideas: readonly string[]; awards: SolveStats[] }>()
-const emit = defineEmits<{ replay: []; map: [] }>()
+const emit = defineEmits<{ replay: [] }>()
 const confirmation = ref<HTMLDialogElement>()
 function replay() {
   confirmation.value?.close()
@@ -27,7 +27,7 @@ function replay() {
     </ol>
     <footer>
       <div class="finish-links">
-        <button @click="emit('map')">{{ manifest.track === 'course' ? 'Course map' : 'Challenge picker' }}</button>
+        <button popovertarget="lesson-map">{{ manifest.track === 'course' ? 'Course map' : 'Challenge picker' }}</button>
         <a href="/">Back to game packs</a>
         <button @click="confirmation?.showModal()">Replay this pack</button>
       </div>

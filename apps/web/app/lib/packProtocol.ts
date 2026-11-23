@@ -1,4 +1,5 @@
-import type { Call, Colour, Files, Lesson, Row, Task, Theory } from '@inherit/sim/pack'
+import type { PlainError } from '@inherit/sandbox/pack'
+import type { Call, Colour, Files, Lesson, Row, Starter, Task, Theory } from '@inherit/sim/pack'
 import type { ApiMethod } from '@inherit/sim/declarations'
 import type { MapLesson } from '@inherit/sim/course'
 import type { PackSave } from '@inherit/sim/save'
@@ -30,11 +31,16 @@ export interface PackFrame {
   previewWorld?: unknown
   notice?: string
   tickCount: number
-  showLearn: boolean
   noCalls?: boolean
   finishIdeas?: string[]
+  hiddenInputs: number
+  focus?: string
+  effect?: string
   goal: string
-  edit: { file: string; line: number }
+  readyPattern?: RegExp
+  steps: readonly string[]
+  starter?: Starter
+  edit: Starter['edit']
   hints: readonly string[]
   labels: {id: string; text: string; input?: string}[]
   checks: Colour[]
@@ -46,5 +52,6 @@ export interface PackFrame {
   logs: string[]
   start?: unknown
   moments: {world: unknown; call: Call; checks: Colour[]}[]
+  diagnostic?: PlainError
   error: string
 }

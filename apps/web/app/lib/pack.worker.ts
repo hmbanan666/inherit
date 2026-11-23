@@ -1,8 +1,9 @@
+import { lessonSteps } from '@inherit/sim/pack'
 import { getPack, playerSources } from '@inherit/sim/rules'
-import { continueLesson, freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
+import { freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
 import { courseMap } from '@inherit/sim/course'
 import { migrateBeginner } from '@inherit/sim/migrate'
-import { declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
+import { PlayerRunError, declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
 import type { PackCommand, PackFrame } from './packProtocol'
 
 let tickCount = 0
@@ -27,19 +28,7 @@ async function open(command: Extract<PackCommand, { kind: 'open' }>) {
     })
     save = decodeSave(pack, JSON.stringify(save))
   } else {
-    save = command.stored ? decodeSave(pack, command.stored) : freshSave(pack)
-  }
-  if (command.lesson !== undefined) {
-    if (!pack.lessons.some(l => l.id === command.lesson)) throw new Error('Unknown lesson.')
-    if (pack.manifest.track === 'challenges') selectLesson(pack, save, command.lesson)
-    else while (save.lessonId !== command.lesson) {
-      const lesson = current()!
-      await runner.play(save, lesson.referenceSolution, lesson.mode)
-      for (let i = 0; i < 1200 && lesson.mode === 'deploy' && save.phase !== 'solved'; i++)
-        await runner.play(save, lesson.referenceSolution, 'tick')
-      if (save.phase !== 'solved') throw new Error('Unable to open this lesson.')
-      continueLesson(pack, save)
-    }
+    save = command.stored ? decodeSave(pack, command.stored) : freshSave(pack, 1, command.lesson)
   }
   if (pack.manifest.track === 'challenges' && save.project.deployed && save.phase !== 'solved') {
     save.world = structuredClone(save.entryWorld)
@@ -53,6 +42,7 @@ async function open(command: Extract<PackCommand, { kind: 'open' }>) {
 
 async function act(command: PackCommand) {
   let moments: PackFrame['moments'] = [], start: unknown, error = ''
+  let diagnostic: PackFrame['diagnostic']
   let previewWorld: unknown
   let notice: string | undefined
   const previousId = save?.lessonId
@@ -141,6 +131,7 @@ async function act(command: PackCommand) {
       }
     }
   } catch (cause) {
+    if (cause instanceof PlayerRunError) diagnostic = cause.diagnostic
     error = cause instanceof Error ? cause.message : 'Could not open the pack.'
     if (command.kind === 'open') { self.postMessage({ loadError: error }); return }
   }
@@ -148,7 +139,8 @@ async function act(command: PackCommand) {
       (error && (command.kind === 'run' || command.kind === 'tick'))) failedInputs = {}
   if (previousId !== save.lessonId) tickCount = 0
   const lesson = current()
-  if (lesson && !save.edit) save.edit = lesson.starter(save.project.working).edit
+  const starter = lesson?.starter()
+  if (lesson && !save.edit) save.edit = lesson.starter().edit
   const names = lesson ? pack.available(save.world, lesson.id) : []
   const source = playerSources['./' + pack.manifest.id + '/player.ts']
   const schema = playerSchema(source)
@@ -158,15 +150,15 @@ async function act(command: PackCommand) {
   const inputs = lesson?.inputs?.(save.entryWorld) ?? {}
   const api = declarations(source, names, pack.exposure, pack.typeAliases?.(save.world))
   const map = courseMap(pack.manifest, pack.lessons, save.completed)
-  const showLearn = !!lesson && !!(lesson.theory || lesson.task) && save.phase !== 'solved' &&
-    (command.kind === 'open' ? !save.seenTheory.includes(lesson.id) : previousId !== lesson.id)
-  if (showLearn && !save.seenTheory.includes(lesson!.id)) save.seenTheory.push(lesson!.id)
   self.postMessage({
-    previewWorld, notice, showLearn, tickCount, save, map, reference, inputs,
+    previewWorld, notice, tickCount, save, map, reference, inputs,
     types: Object.entries(schema.types).filter(([name]) => reference.some(m => m.signature.includes(name))).map(([,type]) => type),
     scene: lesson?.scene, theory: lesson?.theory, task: lesson?.task, prediction: lesson?.prediction,
     noCalls: command.kind === 'run' && lesson?.mode === 'run' && !moments.length && !logs.length && !error,
     mode: lesson?.mode ?? 'run', clockMs: pack.clock?.intervalMs, goal: lesson?.goal ?? '',
+    hiddenInputs: lesson?.variants?.length ?? 0,
+    focus: lesson?.focus ?? lesson?.visibleEffect.testId, effect: lesson?.visibleEffect.testId,
+    readyPattern: lesson?.readyPattern, starter, steps: lesson && starter ? lessonSteps(lesson, starter) : [],
     edit: save.edit ?? {file: 'main.ts', line: 1}, hints: lesson?.hints ?? [],
     labels: lesson?.checks.map(({ id, label, input }) => ({id, text: label, input: failedInputs[id]?.join(', ') ?? input})) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],
@@ -179,7 +171,7 @@ async function act(command: PackCommand) {
     panels: pack.panels.map(p => ({
       id: p.id, label: p.label, placement: p.placement, rows: p.rows(save.world),
     })).filter(p => p.rows.length),
-    logs, moments, start, error,
+    logs, moments, start, error, diagnostic,
   } satisfies PackFrame)
 }
 let pending = Promise.resolve()

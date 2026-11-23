@@ -6,8 +6,8 @@ import { manifests } from '../../packages/sim/src/packs/registry'
 import { getPack, packs, playerSources } from '../../packages/sim/src/packs/rules'
 import { readPlayerAPI } from '../../packages/sim/src/framework/declarations'
 import { freshSave, continueLesson, decodeSave } from '../../packages/sim/src/framework/save'
-import { declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
-import type { Files } from '../../packages/sim/src/framework/pack'
+import { PlayerRunError, declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
+import { lessonSteps, type Files } from '../../packages/sim/src/framework/pack'
 import { diagnostics } from './compiler'
 
 type Checkpoint = {previous:Files;world:unknown;declarations:string;play(files:Files):Promise<boolean>}
@@ -67,8 +67,22 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
   for (const lesson of pack.lessons) {
     const label = m.id+'/'+lesson.id
     const checkpoint = adapter?.checkpoint(lesson.id)
-    const starter = lesson.starter(checkpoint?.previous ?? save.project.working)
+    const starter = lesson.starter()
+    const steps = lessonSteps(lesson, starter)
+    expect(steps.at(-1), label).toBe('Press Run')
+    steps.forEach(text)
+    const column = starter.edit.column ?? 1
+    expect(Number.isInteger(column) && column >= 1, label).toBe(true)
+    expect(column, label).toBeLessThanOrEqual(starter.files[starter.edit.file].split('\n')[starter.edit.line - 1].length + 1)
+    if (starter.placeholder !== undefined) text(starter.placeholder)
+    if (lesson.focus !== undefined) text(lesson.focus)
     const world = checkpoint?.world ?? save.world
+    const direct = freshSave(pack, 1, lesson.id)
+    expect(direct.lessonId, label).toBe(save.lessonId)
+    expect(direct.project.working, label).toEqual(save.project.working)
+    // The souvenir album and unit landmarks decorate the village after earlier solves.
+    const playableWorld = ({ album: _album, landmarks: _landmarks, ...fixture }: typeof world) => fixture
+    expect(playableWorld(direct.entryWorld), label).toEqual(playableWorld(save.entryWorld))
     const methods = pack.available(world,lesson.id)
     const host = pack.beginAttempt(structuredClone(world),'run').api
     methods.forEach(name=>expect(typeof host[name],label+' '+name).toBe('function'))
@@ -122,7 +136,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       }
     }
     if (m.level === 'Game' || m.level === 'Advanced') {
-      expect(comments.some(line => /\bTODO\b/.test(line)), label).toBe(true)
+      if (!lesson.steps) expect(comments.some(line => /\bTODO\b/.test(line)), label).toBe(true)
       for (const hint of lesson.hints ?? []) {
         for (const line of hint.split('\n')) {
           const words = normalize(line)
@@ -155,7 +169,11 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       expect(files['main.ts'],label).not.toMatch(/\b(import|export|onTick)\b/)
     }
     for (const [files,solves] of [[starter.files,false],[lesson.referenceSolution,true]] as const) {
-      expect(diagnostics(files, [api, ...inputTypes].join('\n')),label+' '+(solves?'solution':'starter')).toEqual([])
+      const slot = !solves && starter.placeholder ? starter.edit : undefined
+      const errors = diagnostics(files, [api, ...inputTypes].join('\n'))
+      if (slot && errors.length) {
+        expect(errors, label).toEqual(['/pack-validation/' + slot.file + ':' + slot.line + ' Expected 1 arguments, but got 0.'])
+      } else expect(errors, label).toEqual([])
       const trial = solves ? save : structuredClone(save)
       let solved: boolean
       if (checkpoint) solved = await checkpoint.play(files)
@@ -163,7 +181,11 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
         const runner = createPackRunner(pack)
         try {
           const mode = !solves && m.track === 'challenges' ? 'run' : lesson.mode
-          await runner.play(trial,files,mode)
+          try { await runner.play(trial, files, mode) }
+          catch (error) {
+            if (!slot || !(error instanceof PlayerRunError)) throw error
+            expect(error.diagnostic, label).toMatchObject({ file: slot.file, line: slot.line, title: 'No words yet' })
+          }
           if (mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
           solved = trial.phase==='solved'
         } finally {runner.dispose()}

@@ -73,8 +73,10 @@ const boundedName = (value:string) => value.length>15 ? value.slice(0,14)+'…' 
       <ellipse v-if="world.lamps.includes(i+1)" rx="25" ry="6" fill="#efc574" opacity=".35"/><path d="M-2 0v-37h4V0z" fill="#655a47"/>
       <circle v-if="world.lamps.includes(i+1)" cy="-39" r="17" fill="#f9d378" opacity=".24"/><path d="m-6-46 12 0-2 14h-8z" :fill="world.lamps.includes(i+1)?'#ffdc86':'#9c9b7b'" stroke="#595948" stroke-width="2"/><path d="m-8-46 8-6 8 6z" fill="#575a4c"/>
     </g>
+    <g data-focus="mila-greeting">
     <g transform="translate(405 389)"><Villager :class="{sniff:last==='plant'}" :key="calls.length" coat="#567b78" :waving="!!world.bubble"/><rect x="-22" y="8" width="44" height="17" rx="8" fill="#36473e"/><text y="20" class="name" text-anchor="middle">Mila</text></g>
     <g v-if="world.bubble" transform="translate(407 306)" data-testid="mila-bubble" role="img" :aria-label="world.bubble"><rect :x="-Math.min(world.bubble.length*4+12,95)" y="-14" :width="Math.min(world.bubble.length*8+24,190)" height="28" rx="8" fill="#f6e8ca"/><path d="m-6 13 5 7 6-7" fill="#f6e8ca"/><text text-anchor="middle" y="5" class="bubble">{{ boundedName(world.bubble) }}</text></g>
+    </g>
     <g data-testid="guests" role="img" :aria-label="world.neighbours.length+' neighbours'"><g v-for="(name,i) in world.neighbours" :key="name" :transform="'translate('+(242+i*116)+' '+(479+i%2*13)+')'"><Villager :coat="coats[i%3]" :hair="['#714d3b','#4a4140','#9b7953'][i%3]"/><text text-anchor="middle" y="16" class="guest-name">{{ boundedName(name) }}</text></g></g>
     <g data-testid="fair" role="img" :aria-label="world.banner?'Fair open':'Village green'"><use v-for="(name,i) in world.stalls" :key="name" href="#stall" :transform="'translate('+(192+i*116)+' '+(513+i%2*9)+')'" :color="coats[i%3]"/>
       <g v-if="world.banner"><path d="m157 446 0-18q137 30 302 0v18q-155 28-302 0z" fill="#ecd298"/><text x="307" y="451" text-anchor="middle" class="sign">Welcome to the fair</text></g></g>

@@ -7,6 +7,9 @@ defineProps<{ world: Village }>()
   <g v-if="world.scene === 'platform'">
     <path d="M0 217h560m-560 12h560" stroke="#675d4f" stroke-width="5"/>
     <path d="M0 238h560v62H0z" fill="#b0a186"/>
+    <g v-if="world.lessonId === 'call-order'" data-focus="departures">
+      <text v-for="n in 2" :key="n" x="120" :y="47 + n * 20">{{ n }} · {{ world.announcements[n - 1] || '…' }}</text>
+    </g>
     <g :transform="`translate(${world.announcements.length >= 2 ? 75 : 0} 0)`">
       <rect x="114" y="146" width="263" height="59" rx="10" fill="#527778"/>
       <path d="M108 150q0-9 12-9h250q12 0 12 9z" fill="#455958"/>

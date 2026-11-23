@@ -5,11 +5,11 @@ import { inputs, type ChallengeId } from './fixtures'
 import { createFloor } from './floor'
 import pack from './pack'
 
-test.each(pack.lessons)('$id starts at a TODO and handles every independent input', async lesson => {
-  const starter = lesson.starter({})
+test.each(pack.lessons)('$id starts at a comment and handles every independent input', async lesson => {
+  const starter = lesson.starter()
   const lines = starter.files['main.ts'].split('\n')
-  expect(lines.every(line => line === '' || line.startsWith('// TODO:'))).toBe(true)
-  expect(lines[starter.edit.line - 2]).toMatch(/^\/\/ TODO:/)
+  expect(lines.every(line => line === '' || line.startsWith('//'))).toBe(true)
+  expect(lines[starter.edit.line - 2]).toMatch(/^\/\/ /)
   const solutionLines = lesson.referenceSolution['main.ts'].split('\n').map(line => line.trim()).filter(line => line.length > 4)
   for (const hint of lesson.hints!) expect(solutionLines.some(line => hint.includes(line))).toBe(false)
   expect(lesson.variants?.map(variant => variant.input)).toEqual(inputs(lesson.id as ChallengeId).slice(1).map(fixture => fixture.name))

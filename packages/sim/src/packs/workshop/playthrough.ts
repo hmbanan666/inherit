@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { chapterCapture } from '../../../../../tests/e2e/chapter-capture'
-import { pasteProjectFile } from '../../../../../tests/e2e/workshop'
+import { openTool, pasteProjectFile } from '../../../../../tests/e2e/workshop'
 import { lessons } from './lessons'
 
 test('Workshop plays twelve parcel challenges from the showcase to the finish', async ({ page }) => {
@@ -15,9 +15,10 @@ test('Workshop plays twelve parcel challenges from the showcase to the finish', 
     const path = 'workshop/' + lesson.id + '/'
     await expect(page.getByTestId('task-card')).toContainText(lesson.goal)
     const learn = page.getByTestId('drawer')
+    await openTool(page, 'learn')
     await expect(learn).toContainText(lesson.task.condition)
     if (lesson.mode === 'deploy') await expect(learn.getByRole('list', { name: 'The floor clock' })).toBeVisible()
-    await expect(page.locator('.view-lines')).toContainText('TODO:')
+    await expect(page.locator('.view-lines')).toContainText(lesson.starter().files['main.ts'].split('\n')[0])
     await capture(path + 'learn')
     await learn.getByRole('button', { name: 'Got it' }).click()
     await capture(path + 'start')
@@ -47,8 +48,11 @@ for (const rate of [1, 2, 4]) test('direct clock entry, pause and parcel deliver
   await page.goto('/?pack=workshop')
   const primary = page.getByTestId('primary-button')
   const drawer = page.getByTestId('drawer')
-  await drawer.getByRole('button', { name: /Dispatch on the clock/ }).click()
-  await expect(primary).toBeDisabled()
+  await page.getByTestId('progress-chip').click()
+  await page.getByRole('navigation', { name: 'Challenge picker' }).getByRole('button', { name: /Dispatch on the clock/ }).click()
+  await expect(page.getByTestId('task-card')).toContainText('Dispatch on the clock')
+  await expect(primary).toBeEnabled()
+  await openTool(page, 'learn')
   await expect(drawer).toContainText('Who calls my function?')
   await drawer.getByTestId('drawer-api').click()
   await expect(drawer).toContainText('onTick(): void')
@@ -82,9 +86,9 @@ for (const rate of [1, 2, 4]) test('direct clock entry, pause and parcel deliver
 
 test('Stop loop retains the floor and Run once inspects a disposable tick', async ({ page }) => {
   await page.goto('/?pack=workshop')
-  const drawer = page.getByTestId('drawer')
-  await drawer.getByRole('button', { name: /Dispatch on the clock/ }).click()
-  await drawer.getByRole('button', { name: 'Got it' }).click()
+  await page.getByTestId('progress-chip').click()
+  await page.getByRole('navigation', { name: 'Challenge picker' }).getByRole('button', { name: /Dispatch on the clock/ }).click()
+  await expect(page.getByTestId('task-card')).toContainText('Dispatch on the clock')
   await pasteProjectFile(page, lessons.find(l => l.id === 'first-clock')!.referenceSolution['main.ts'], 'Player TypeScript')
   const primary = page.getByTestId('primary-button')
   await primary.click()
@@ -126,13 +130,13 @@ test('a v5 save starts fresh and its original files open in Settings', async ({ 
 
 test('challenge selection preserves working drafts and starts each floor fresh', async ({ page }) => {
   await page.goto('/?pack=workshop')
-  const drawer = page.getByTestId('drawer')
-  await drawer.getByRole('button', { name: 'Got it' }).click()
   await pasteProjectFile(page, '// my unfinished batch', 'Player TypeScript')
-  await page.getByTestId('hint').click()
-  await drawer.getByRole('button', { name: /Merge two sorted bins/ }).click()
+  await page.getByTestId('progress-chip').click()
+  const picker = page.getByRole('navigation', { name: 'Challenge picker' })
+  await picker.getByRole('button', { name: /Merge two sorted bins/ }).click()
   await expect(page.getByTestId('result-left')).toHaveText('A C')
-  await drawer.getByRole('button', { name: /Dispatch the waiting batch/ }).click()
+  await page.getByTestId('progress-chip').click()
+  await picker.getByRole('button', { name: /Dispatch the waiting batch/ }).click()
   await expect(page.locator('.view-lines')).toContainText('// my unfinished batch')
   await expect(page.getByTestId('result-belt')).toHaveText('A B C')
   await page.reload()

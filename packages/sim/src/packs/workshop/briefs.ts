@@ -2,6 +2,8 @@ import type { PlayerAPI } from './player'
 import type { ChallengeId } from './fixtures'
 
 interface Brief {
+  steps?: string[]
+  placeholder?: string
   goal: string
   practice: string
   condition: string
@@ -19,6 +21,8 @@ interface Brief {
 export const briefs: Record<ChallengeId, Brief> = {
   'dispatch-batch': {
     goal: "Dispatch the waiting batch",
+    steps: ["Move parcels from belt to cart until the belt is empty", "Press Run"],
+    placeholder: "Write your transfer here",
     practice: "Writing a helper that tells its caller when the belt is empty",
     condition: "Move the whole batch from the belt to the cart in one Run. Keep arrival order. Leave the arm empty and stop on the first empty pickup.",
     examples: [
@@ -33,8 +37,7 @@ export const briefs: Record<ChallengeId, Brief> = {
     ],
     example: "const lifted = take(\"right\")",
     todo: [
-      "Write a helper to lift and deliver one waiting parcel.",
-      "Repeat successful transfers and stop at the end of the belt.",
+      "Keep the parcels in arrival order and stop at the first empty pickup.",
     ],
     hints: [
       "Use the helper's result to decide whether to continue.",

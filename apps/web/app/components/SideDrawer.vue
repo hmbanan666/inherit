@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { X, Check, LockKeyhole } from '@lucide/vue'
-import type { Lesson, PackManifest, Theory, Task } from '@inherit/sim/pack'
-import type { MapLesson } from '@inherit/sim/course'
+import { X } from '@lucide/vue'
+import type { Theory, Task } from '@inherit/sim/pack'
 import type { ApiMethod } from '@inherit/sim/declarations'
 import type { DrawerTab } from '../lib/packProtocol'
 
 const props = defineProps<{
   tab: DrawerTab
-  manifest: PackManifest
-  lessons: MapLesson[]
-  selected?: string | null
   theory?: Theory
   clock?: boolean
   task?: Task
@@ -19,22 +15,15 @@ const props = defineProps<{
   types?: string[]
   logs?: string[]
   busy?: boolean
-  prediction?: Lesson<unknown>['prediction']
-  choice?: string
 }>()
 const emit = defineEmits<{
   close: []
-  select: [id: string]
   tab: [tab: DrawerTab]
   hint: []
-  predict: [choice: string]
   edit: []
 }>()
 const tabs: DrawerTab[] = ['learn', 'hints', 'api', 'console']
 const labels = { learn: 'Learn', hints: 'Hints', api: 'API', console: 'Console' }
-const groups = computed(() => props.manifest.units?.map(unit => ({
-  title: unit.title, lessons: props.lessons.filter(l => l.unit === unit.id),
-})) ?? [{ title: 'Challenges', lessons: props.lessons }])
 function tabKey(event: KeyboardEvent) {
   const index = tabs.indexOf(props.tab)
   const next = event.key === 'ArrowLeft' ? tabs[(index + 3) % 4]
@@ -72,23 +61,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', escape))
         <template v-if="theory"><h2>{{ theory.title }}</h2><p v-for="line in theory.body" :key="line">{{ line }}</p><pre>{{ theory.example }}</pre></template>
         <template v-if="task"><h3>Condition</h3><p>{{ task.condition }}</p><ul><li v-for="example in task.examples" :key="example">{{ example }}</li></ul></template>
         <p v-if="clock">Pause holds the current reach. Choose 1×, 2× or 4× to change speed. Run once tries one tick on a copy.</p>
-        <fieldset v-if="prediction"><legend>{{ prediction.question }}</legend>
-          <button v-for="option in prediction.choices" :key="option" :aria-pressed="choice === option" :disabled="busy || !!choice" @click="emit('predict', option)">{{ option }}</button>
-        </fieldset>
         <button v-if="theory || task" class="got-it" @click="emit('edit')">Got it</button>
         <slot name="learn" />
-        <nav aria-label="Course map">
-          <h3>{{ manifest.track === 'course' ? 'Course map' : 'Challenge picker' }}</h3>
-          <details v-for="group in groups" :key="group.title" :open="groups.length === 1 || group.lessons.some(l => l.id === selected)">
-            <summary>{{ group.title }} <small>{{ group.lessons.filter(l => l.state === 'done').length }}/{{ group.lessons.length }}</small></summary>
-            <button v-for="item in group.lessons" :key="item.id" :data-state="item.state"
-              :aria-current="selected === item.id ? 'step' : undefined" :disabled="busy || item.state === 'locked'"
-              @click="emit('select', item.id)">
-              <Check v-if="item.state === 'done'" /><LockKeyhole v-else-if="item.state === 'locked'" /><span v-else>○</span>
-              {{ item.goal }}<span class="sr-only"> · {{ item.state }}</span>
-            </button>
-          </details>
-        </nav>
+
       </template>
       <template v-else-if="tab === 'hints'">
         <h2>Hints</h2><pre v-for="(hint, i) in hints.slice(0, rung)" :key="i">{{ hint }}</pre>
@@ -116,12 +91,5 @@ p, li { color: var(--soft); margin: 6px 0; line-height: 1.45 }
 :deep(pre) { white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; background: var(--base); border-left: 2px solid var(--accent-line); font: 12px/1.5 var(--mono) }
 .got-it { margin: 3px 0 12px }
 nav { padding-top: 12px; border-top: 1px solid var(--line) }
-summary { cursor: pointer; padding: 7px 0; font-weight: 600 }
-summary small { color: var(--sub); font: 11px var(--mono) }
-details button { display: flex; gap: 8px; align-items: center; text-align: left; width: 100%; background: transparent; padding: 7px; border: 0; font-size: 12px }
-details button svg { width: 13px; height: 13px; flex: none }
-details [aria-current=step] { color: var(--gold); background: var(--surface-raised) }
-details [data-state=done] svg { color: var(--mint) }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%) }
 @media (max-width: 780px) { .side-drawer { inset: auto 0 0; width: 100%; max-height: 75%; border-top: 1px solid var(--line-strong) } }
 </style>

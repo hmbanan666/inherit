@@ -14,7 +14,7 @@ export interface PlayerAPI {
   /**
    * Lift the front parcel into the empty hand.
    * @param place The belt or a bin to unload.
-   * @returns A label snapshot, or undefined for a full hand, an empty or jammed source, or the cart.
+   * @returns The lifted label. Returns undefined when the belt is empty, the hand is full, or the source is empty, jammed or the cart.
    * @example const lifted = take("belt")
    */
   take(place: Place): Parcel | undefined

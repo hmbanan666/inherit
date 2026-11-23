@@ -1,5 +1,5 @@
 import type { Ref, InjectionKey } from 'vue'
-import type { Files } from '@inherit/sim/pack'
+import type { Files, Starter } from '@inherit/sim/pack'
 type Read<T> = Readonly<Ref<T>>
 export interface EditorSession {
   id: string
@@ -10,12 +10,11 @@ export interface EditorSession {
   api: Read<string>
   dirty: Read<boolean>
   multiFile: Read<boolean>
-  navigation: Read<{file: string; line: number}>
+  navigation: Read<Starter['edit']>
   call: Read<{file: string; line: number} | undefined>
   tickCalls: Read<readonly { file: string; line: number }[]>
   readOnly?: Read<boolean>
   watching: Read<boolean>
-  error: Read<string>
   placeFunctions?: readonly string[]
   places?: Read<string[]>
   traces?: Read<Record<string, {file: string; line: number}[]>>

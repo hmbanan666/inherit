@@ -8,18 +8,21 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
+import type { PlainError } from '@inherit/sandbox/pack'
+import type { Starter } from '@inherit/sim/pack'
 import { editorKey } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
 const game = inject(editorKey)!
 const { files, activeFile, deployed, multiFile, api, dirty } = game
 const props = defineProps<{
+  diagnostic?: PlainError
+  starter?: Starter
   ids?: string[]
   selected?: string
-  error?: string
   code?: string
 }>()
-const emit = defineEmits<{ reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
+const emit = defineEmits<{ hint: []; reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
 const host = ref<HTMLElement>()
 const shellTabs = shallowRef<HTMLElement>()
 const input = ref<HTMLInputElement>()
@@ -52,6 +55,24 @@ const highlight = createLineHighlight(line => {
   }])
   if (game.watching.value) editor.revealLineInCenterIfOutsideViewport(line.line)
 })
+
+let placeholder: monaco.editor.IEditorDecorationsCollection | undefined
+function showPlaceholder() {
+  const starter = props.starter
+  const model = editor?.getModel()
+  const isStarter = !!starter?.placeholder && files.value[activeFile.value] === starter.files[activeFile.value]
+  editor?.updateOptions({ renderValidationDecorations: isStarter ? 'off' : 'on' })
+  if (!starter?.placeholder || !model || props.diagnostic || activeFile.value !== starter.edit.file) {
+    placeholder?.clear()
+    return
+  }
+  const { file, line, column = 1 } = starter.edit
+  const untouched = line <= model.getLineCount() && model.getLineContent(line) === starter.files[file].split('\n')[line - 1]
+  placeholder?.set(untouched ? [{
+    range: new monaco.Range(line, column, line, column),
+    options: { showIfCollapsed: true, after: { content: starter.placeholder, inlineClassName: 'edit-placeholder' } },
+  }] : [])
+}
 
 function markTickLines() {
   if (!tickMarks) return
@@ -189,30 +210,43 @@ function keys(e: KeyboardEvent) {
   e.stopPropagation()
   find(key === 'p' ? 'open' : 'search')
 }
+let errorZone: string | undefined
+let errorMarks: monaco.editor.IEditorDecorationsCollection | undefined
+const feedback = ref<HTMLElement>()
+const feedbackTop = ref(0)
+let zoneResize: ResizeObserver | undefined
 function runtimeMarker() {
-  const message = props.error ?? game.error.value
-  const match = /([\w./-]+\.ts):(\d+)/.exec(message)
-  for (const [file, model] of models) {
-    const line = Number(match?.[2])
-    const live = files.value[file] === deployed.value[file]
-    monaco.editor.setModelMarkers(
-      model,
-      'factory-runtime',
-      live && match?.[1] === file && line > 0 && line <= model.getLineCount()
-        ? [
-            {
-              severity: monaco.MarkerSeverity.Error,
-              message,
-              source: 'Factory runtime',
-              startLineNumber: line,
-              endLineNumber: line,
-              startColumn: 1,
-              endColumn: model.getLineMaxColumn(line),
-            },
-          ]
-        : [],
-    )
-  }
+  if (!editor) return
+  zoneResize?.disconnect()
+  errorMarks?.clear()
+  const issue = props.diagnostic
+  if (issue && models.has(issue.file)) open(issue.file)
+  const model = editor.getModel()
+  editor.changeViewZones(access => {
+    if (errorZone) access.removeZone(errorZone)
+    errorZone = undefined
+    if (!issue || !model || !feedback.value) return
+    const from = model.getPositionAt(issue.mark.from)
+    const to = model.getPositionAt(issue.mark.to)
+    errorMarks?.set([
+      { range: monaco.Range.fromPositions(from, to), options: { inlineClassName: 'error-token', hoverMessage: { value: issue.body } } },
+      { range: new monaco.Range(issue.line, 1, issue.line, 1), options: { isWholeLine: true, className: 'error-line' } },
+    ])
+    // Reserve space in Monaco and keep the interactive feedback in the accessible editor shell.
+    const zone = {
+      afterLineNumber: issue.line, heightInPx: feedback.value.offsetHeight,
+      domNode: document.createElement('div'),
+      onDomNodeTop(top: number) { feedbackTop.value = top },
+    }
+    errorZone = access.addZone(zone)
+    zoneResize = new ResizeObserver(() => {
+      if (!errorZone || !feedback.value) return
+      zone.heightInPx = feedback.value.offsetHeight
+      editor?.changeViewZones(update => update.layoutZone(errorZone!))
+    })
+    zoneResize.observe(feedback.value)
+  })
+  if (issue) editor.revealLineInCenter(issue.line)
 }
 function updateLibrary(text: string) {
   library?.dispose()
@@ -269,6 +303,8 @@ onMounted(() => {
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: game.label,
   })
+  errorMarks = editor.createDecorationsCollection()
+  placeholder = editor.createDecorationsCollection()
   lineLight = editor.createDecorationsCollection()
   tickMarks = editor.createDecorationsCollection()
   suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
@@ -310,7 +346,8 @@ onMounted(() => {
   runtimeMarker()
   // Navigation can arrive before the lazy editor mounts.
   const initial = game.navigation.value
-  revealLine(initial.file, initial.line)
+  revealLine(initial.file, initial.line, initial.column)
+  showPlaceholder()
   lightCall()
   markTickLines()
   opener = monaco.editor.registerEditorOpener({
@@ -337,12 +374,14 @@ watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLine
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
-watch(game.navigation, ({ file, line }) => revealLine(file, line), { flush: 'post' })
+watch([files, activeFile, () => props.starter, () => props.diagnostic], showPlaceholder, { flush: 'post' })
+watch(game.navigation, ({ file, line, column }) => revealLine(file, line, column), { flush: 'post' })
 watch(() => game.readOnly?.value, value => editor?.updateOptions({ readOnly: !!value }))
 watch(api, updateLibrary)
-watch([() => props.error ?? game.error.value, files], runtimeMarker)
+watch(() => props.diagnostic, runtimeMarker, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
+  zoneResize?.disconnect()
   suggestions?.dispose()
   highlight.reset()
   opener?.dispose()
@@ -417,7 +456,14 @@ onBeforeUnmount(() => {
       <p v-else-if="query" class="quiet">No matches.</p>
       <small v-if="results.length > 80">First 80 of {{ results.length }} matches</small>
     </div>
-    <div ref="host" class="code-editor" />
+    <div class="code-viewport">
+      <div ref="host" class="code-editor" />
+      <aside v-if="diagnostic" ref="feedback" class="line-feedback" role="alert" :style="{ top: feedbackTop + 'px' }">
+        <strong>{{ diagnostic.title }}</strong><p>{{ diagnostic.body }}</p>
+        <button @click="emit('hint')">Hint</button>
+        <details><summary>Technical details</summary>{{ diagnostic.raw }}</details>
+      </aside>
+    </div>
   </section>
 </template>
 <style scoped src="../lib/devtools/panels.css"></style>
@@ -496,6 +542,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.code-viewport { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden }
+.line-feedback { position: absolute; z-index: 3; left: 0; right: 0 }
 .code-editor {
   position: relative;
   inset: auto;

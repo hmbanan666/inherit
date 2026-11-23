@@ -17,6 +17,7 @@ const files = shallowRef<Files>({})
 const activeFile = ref('main.ts')
 const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(false), saved = ref(true)
 const settings = ref(false), contrast = useContrast(), width = ref(45)
+const diagnostic = shallowRef<PackFrame['diagnostic']>()
 const runMessage = ref('')
 const activeCall = shallowRef<Call>()
 const tickCalls = shallowRef<Call[]>([])
@@ -32,7 +33,29 @@ const lastRun = shallowRef<Files>({})
 const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
 const solved = computed(() => !busy.value && frame.value?.solved)
-const checkRows = computed(() => frame.value?.labels.map((label,i) => ({...label,status:statuses.value[i] ?? 'red' as Colour})) ?? [])
+const showCard = ref(false)
+watch(solved, (value, _, cleanup) => {
+  showCard.value = false
+  if (!value) return
+  const delay = setTimeout(() => { showCard.value = true }, 1000)
+  cleanup(() => clearTimeout(delay))
+})
+const checkRows = computed(() => frame.value?.labels.map((label, index) => ({
+  ...label, status: statuses.value[index] ?? 'red',
+  reason: busy.value ? undefined : frame.value?.save.reasons?.[label.id] ??
+    (diagnostic.value ? 'The code stopped before this check finished.' : 'Still needed: ' + label.text + '.'),
+})) ?? [])
+const choice = computed(() => frame.value?.save.predictions[frame.value.save.lessonId!])
+const currentStep = computed(() => {
+  const data = frame.value
+  if (!data?.starter || (data.prediction && !choice.value)) return 0
+  if (data.solved) return data.steps.length
+  const { file } = data.starter.edit
+  const body = (code: string) => code.split('\n').filter(line => !line.trimStart().startsWith('//')).join('\n').trim()
+  const code = body(files.value[file] ?? '')
+  const edited = data.readyPattern ? data.readyPattern.test(code) : code && code !== body(data.starter.files[file])
+  return data.steps.length - (edited ? 1 : 2)
+})
 const query = new URLSearchParams(location.search)
 const local = import.meta.dev || ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
 const lesson = query.get('lesson') ?? undefined
@@ -99,11 +122,10 @@ watch([paused, speed], scheduleTick)
 function run() {
   if (frame.value?.save.clockActive) { stopLoop(); return }
   runMessage.value = ''
-  if (drawer.value && frame.value?.mode === 'deploy' && !setupTried.value) return
   if (busy.value || blocked.value || complete.value) return
   if (solved.value) return
   if (frame.value?.prediction && !frame.value.save.predictions[frame.value.save.lessonId!]) {
-    openDrawer('learn')
+    runMessage.value = 'Pick a guess first. There is no wrong answer.'
     return
   }
   drawer.value = undefined
@@ -134,7 +156,7 @@ function runOnce() {
 }
 function advance() { if (solved.value && frame.value?.save.lessonId) send({kind:'continue', id: frame.value.save.lessonId}) }
 function shortcut(e:KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run() }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) run() }
 }
 function resize(event: PointerEvent) {
   const el = event.currentTarget as HTMLElement
@@ -146,8 +168,8 @@ function resize(event: PointerEvent) {
 provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:lastRun,
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
   readOnly: computed(() => !!frame.value?.solved || busy.value),
-  call:activeCall, tickCalls, watching, error, navigation,
-  setFile(path,code) {files.value = {...files.value,[path]:code};persist()},
+  call:activeCall, tickCalls, watching, navigation,
+  setFile(path,code) {diagnostic.value = undefined; files.value = {...files.value,[path]:code};persist()},
   openFile(path) {activeFile.value = path; persist()},
 })
 async function receive(data: PackFrame | {loadError:string}) {
@@ -165,7 +187,7 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (changed) {
     setupTried.value = false
     previewingTick.value = false
-    drawer.value = data.showLearn ? 'learn' : undefined
+    drawer.value = undefined
     files.value = data.save.project.working
     activeFile.value = data.save.project.activeFile
     navigation.value = data.edit.file === activeFile.value ? data.edit : {file: activeFile.value, line: 1}
@@ -174,8 +196,9 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (requested === 'trySetup' && !data.error) setupTried.value = true
   if (!data.save.clockActive && requested !== 'tick') paused.value = false
   if (requested !== 'tick') frame.value = data
-  runMessage.value = data.notice ?? (data.noCalls ? 'Your code ran. Check the TODO and try again.' : '')
-  error.value = saved.value ? data.error : 'Could not save progress. Free space and try again.'
+  runMessage.value = data.notice ?? (data.noCalls ? 'Nothing changed yet. Try an edit on line ' + data.edit.line + '.' : '')
+  if (changed || ['run','trySetup','tick','runOnce'].includes(requested)) diagnostic.value = data.diagnostic
+  error.value = saved.value ? (data.diagnostic ? '' : data.error) : 'Could not save progress. Free space and try again.'
 
   calls.value = []
   if (data.moments.length && !(requested === 'runOnce' && paused.value)) {
@@ -260,7 +283,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="workshop pack-studio" :class="{'high-contrast': contrast}" :style="{'--dock-width': width+'%'}">
     <header class="hud">
-      <PackNav :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId" />
+      <PackNav :busy="busy" @select="select" :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId" />
       <div class="settings pack-settings">
         <button aria-label="Settings" @click="settings = !settings"><Settings2 /></button>
         <aside v-if="settings" class="hud-menu">
@@ -269,7 +292,7 @@ onBeforeUnmount(() => {
         </aside>
       </div>
       <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
-      <button v-else class="deploy primary-run" data-testid="primary-button" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved || (!!drawer && frame?.mode === 'deploy' && !setupTried)" @click="run">
+      <button v-else class="deploy primary-run" data-testid="primary-button" :data-ready="!!frame && !busy && currentStep === frame.steps.length - 1" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved" @click="run">
         <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
       </button>
     </header>
@@ -280,11 +303,11 @@ onBeforeUnmount(() => {
           <PlaybackBar v-if="frame.save.clockActive || tickCount" :live="frame.save.clockActive" v-model:paused="paused" v-model:speed="speed" :inert="stoppingLoop" :tick-count="tickCount" @stop="stopLoop" />
           <button v-if="(!frame.save.clockActive || paused || previewingTick) && !solved" :disabled="busy" @click="runOnce">{{ previewingTick ? 'Return to paused floor' : 'Run once' }}</button>
         </div>
-        <SideDrawer v-if="drawer && frame" :tab="drawer" :manifest="manifest" :lessons="frame.map" :selected="frame.save.lessonId"
-          :clock="frame.mode === 'deploy'" :theory="frame.theory" :task="frame.task" :prediction="frame.prediction" :choice="frame.save.predictions[frame.save.lessonId!]"
+        <SideDrawer v-if="drawer && frame" :tab="drawer"
+          :clock="frame.mode === 'deploy'" :theory="frame.theory" :task="frame.task"
           :hints="frame.hints" :rung="frame.save.hints[frame.save.lessonId!] ?? 0" :entries="frame.reference" :types="frame.types"
           :busy="busy" :logs="frame.logs" @tab="drawer = $event" @close="closeDrawer()" @edit="closeDrawer(true)"
-          @predict="send({kind: 'predict', choice: $event})" @hint="send({kind: 'hint'})" @select="select">
+          @hint="send({kind: 'hint'})">
           <template #learn>
             <div v-if="Object.keys(files).length > 1"><button v-for="(_, path) in files" :key="path" @click="activeFile = path; closeDrawer(); persist()">{{ path }}</button></div>
             <section v-for="p in frame.panels" :key="p.id"><h3>{{ p.label }}</h3>
@@ -292,17 +315,20 @@ onBeforeUnmount(() => {
             </section>
           </template>
         </SideDrawer>
-        <CelebrationOverlay v-if="solved && frame" :solved="solved" :busy="busy" :landmark="landmark"
+        <CelebrationOverlay v-if="showCard && solved && frame" :focus="frame.focus" :effect="frame.effect" :solved="solved" :busy="busy" :landmark="landmark"
           :no-hints="!frame.save.hints[frame.save.lessonId!]"
           :streak="frame.save.attempts[frame.save.lessonId!] === 1 ? frame.save.firstTryStreak + 1 : 0" @advance="advance" />
       </section>
       <div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)" />
       <section class="editor-dock">
-        <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @map="openDrawer('learn')" @replay="start(true)" />
+        <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @replay="start(true)" />
         <template v-else-if="frame">
-          <GoalBar :goal="frame.goal" @help="openDrawer('learn')" />
-          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :error="error" @reference="openDrawer('api')" /></div></div>
-          <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
+          <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
+          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :diagnostic="diagnostic" @hint="openDrawer('hints')" @reference="openDrawer('api')" /></div></div>
+          <p v-if="manifest.track === 'challenges' && frame.hiddenInputs && frame.save.phase === 'brief'" class="hidden-inputs">
+            Your code also runs on {{ frame.hiddenInputs }} more {{ frame.hiddenInputs === 1 ? 'belt' : 'belts' }} you cannot see.
+          </p>
+          <ChecksPanel :key="frame.save.lessonId ?? ''" :tried="frame.save.phase !== 'brief'" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
           <button v-if="frame.logs.length" class="console-count" @click="openDrawer('console')">Console · {{ frame.logs.length }} lines</button>
           <p v-if="frame.prediction && frame.save.phase !== 'brief'" class="prediction-result">Your prediction: {{ frame.save.predictions[frame.save.lessonId!] }} · Result: {{ frame.prediction.answer }}</p>
         </template>
