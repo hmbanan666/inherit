@@ -20,33 +20,48 @@ export function noteCheckReset(world: World) {
   world.checkMoved = {}
 }
 
-function veinAt(world: World, pos: { x: number; y: number }) {
-  return world.veins.find(item => !item.hidden && item.pos.x === pos.x && item.pos.y === pos.y)
+function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+}
+
+function rememberPositions(world: World) {
+  const book = (world.checkMoved ??= {})
+  for (const drone of world.drones) {
+    const id = `pos:${drone.name}`
+    const key = `${drone.pos.x},${drone.pos.y}`
+    const row = book[id]
+    if (!row || row.key !== key) book[id] = { key, at: world.tick }
+  }
+}
+
+/** A full cart that has stayed on or beside a vein for the stall window. */
+function fullStillAtVein(world: World, kind?: 'ore' | 'coal') {
+  let best: { name: string; cargo: number; capacity: number; vein: string; dist: number } | undefined
+  for (const drone of world.drones) {
+    if (drone.capacity < 1 || drone.cargo < drone.capacity) continue
+    const here = `${drone.pos.x},${drone.pos.y}`
+    const row = world.checkMoved?.[`pos:${drone.name}`]
+    if (!row || row.key !== here || world.tick - row.at < stallTicks) continue
+    for (const vein of world.veins) {
+      if (vein.hidden || (kind && vein.kind !== kind)) continue
+      const dist = distance(drone.pos, vein.pos)
+      if (dist > 1) continue
+      if (!best || dist < best.dist) best = { name: drone.name, cargo: drone.cargo, capacity: drone.capacity, vein: vein.name, dist }
+    }
+  }
+  if (!best) return
+  return `${best.name} is full (${best.cargo}/${best.capacity}) at Vein ${best.vein} and not moving`
 }
 
 /** The first fact that explains why this one check is not passing. */
 function blockingFact(world: World, quest: QuestDef, id: string) {
   const furnace = world.furnace
-  if (id === 'ore') {
-    for (const drone of world.drones) {
-      if (drone.capacity < 1 || drone.cargo < drone.capacity) continue
-      const vein = veinAt(world, drone.pos)
-      if (vein) return `${drone.name} is full (${drone.cargo}/${drone.capacity}) at Vein ${vein.name} and not moving`
-    }
-    return 'furnace input 0'
-  }
+  if (id === 'ore') return fullStillAtVein(world) ?? 'furnace input 0'
   if (id === 'ingot' || id === 'smelt') {
     if (furnace.output === 0 && world.ingotsMade === 0) return 'furnace output 0'
     return `ingots made ${world.ingotsMade}`
   }
-  if (id === 'coal') {
-    for (const drone of world.drones) {
-      const vein = veinAt(world, drone.pos)
-      if (vein?.kind === 'coal' && drone.cargo >= drone.capacity && drone.capacity > 0)
-        return `${drone.name} is full (${drone.cargo}/${drone.capacity}) at Vein ${vein.name} and not moving`
-    }
-    return 'furnace coal 0'
-  }
+  if (id === 'coal') return fullStillAtVein(world, 'coal') ?? 'furnace coal 0'
   if (id === 'steel' || id === 'both') {
     if (furnace.coal === 0) return 'furnace coal 0'
     if (furnace.input < 2) return `furnace input ${furnace.input}`
@@ -104,6 +119,7 @@ function progress(world: World, quest: QuestDef, test: QuestTest) {
 }
 
 export function readChecks(world: World, quest: QuestDef): CheckReading[] {
+  rememberPositions(world)
   for (const test of quest.tests) motionAt(world, quest, test.id)
   let blocker: { label: string; stuck: boolean } | undefined
   return quest.tests.map(test => {

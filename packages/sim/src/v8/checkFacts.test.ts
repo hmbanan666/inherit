@@ -4,6 +4,7 @@ import { acceptQuest, nextUnlock, questList } from './quests'
 import { createWorld } from './core/world'
 import { mining } from './modules/mining'
 import { inspectAt, noteCheckReset, readChecks, stallTicks } from './checkFacts'
+import { createSession } from '../../../sandbox/src/v8'
 
 const solution = /\b(send|buy|shop|remember|should)\b/i
 
@@ -110,6 +111,27 @@ test('a click reads the fields on that cell', () => {
   expect(inspectAt(world, 6, 2)).toEqual({ id: 'drone-1', fields: ['pos 6,2', 'cargo 3/3'] })
   expect(inspectAt(world, 2, 1)?.fields).toContain('input 0')
   expect(inspectAt(world, 1, 1)?.id).toBe('depot')
+})
+
+test('the starter program leaves a full cart beside Vein A, and that fact wins', async () => {
+  const session = await createSession(kettlewick)
+  try {
+    session.accept()
+    session.step(40)
+    const drone = session.world.drones[0]!
+    const vein = session.world.veins.find(item => item.name === 'A')!
+    const away = Math.abs(drone.pos.x - vein.pos.x) + Math.abs(drone.pos.y - vein.pos.y)
+    expect(drone.cargo).toBe(3)
+    expect(drone.capacity).toBe(3)
+    expect(away).toBe(1)
+    expect(drone.pos).not.toEqual(vein.pos)
+    expect(session.world.furnace.input).toBe(0)
+    const readings = readChecks(session.world, questList[0]!)
+    expect(readings.find(check => check.id === 'ore')?.reason).toBe('drone-1 is full (3/3) at Vein A and not moving')
+    expect(readings.find(check => check.id === 'ingot')?.reason).toBe('waits on: Ore reaches the furnace')
+  } finally {
+    session.dispose()
+  }
 })
 
 test('a step keeps the rest of the route so the map can draw it', () => {
