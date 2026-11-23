@@ -1,4 +1,4 @@
-import type { Call, Colour, Files, Lesson, Row, Task, Theory } from '@inherit/sim/pack'
+import type { Call, Colour, Files, Lesson, Row, Starter, Task, Theory } from '@inherit/sim/pack'
 import type { ApiMethod } from '@inherit/sim/declarations'
 import type { MapLesson } from '@inherit/sim/course'
 import type { PackSave } from '@inherit/sim/save'
@@ -34,7 +34,9 @@ export interface PackFrame {
   noCalls?: boolean
   finishIdeas?: string[]
   goal: string
-  edit: { file: string; line: number }
+  steps: readonly string[]
+  starter?: Starter
+  edit: Starter['edit']
   hints: readonly string[]
   labels: {id: string; text: string; input?: string}[]
   checks: Colour[]

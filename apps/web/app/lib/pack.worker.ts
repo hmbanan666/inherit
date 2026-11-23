@@ -1,3 +1,4 @@
+import { lessonSteps } from '@inherit/sim/pack'
 import { getPack, playerSources } from '@inherit/sim/rules'
 import { continueLesson, freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
 import { courseMap } from '@inherit/sim/course'
@@ -148,6 +149,7 @@ async function act(command: PackCommand) {
       (error && (command.kind === 'run' || command.kind === 'tick'))) failedInputs = {}
   if (previousId !== save.lessonId) tickCount = 0
   const lesson = current()
+  const starter = lesson?.starter({})
   if (lesson && !save.edit) save.edit = lesson.starter(save.project.working).edit
   const names = lesson ? pack.available(save.world, lesson.id) : []
   const source = playerSources['./' + pack.manifest.id + '/player.ts']
@@ -167,6 +169,7 @@ async function act(command: PackCommand) {
     scene: lesson?.scene, theory: lesson?.theory, task: lesson?.task, prediction: lesson?.prediction,
     noCalls: command.kind === 'run' && lesson?.mode === 'run' && !moments.length && !logs.length && !error,
     mode: lesson?.mode ?? 'run', clockMs: pack.clock?.intervalMs, goal: lesson?.goal ?? '',
+    starter, steps: lesson && starter ? lessonSteps(lesson, starter) : [],
     edit: save.edit ?? {file: 'main.ts', line: 1}, hints: lesson?.hints ?? [],
     labels: lesson?.checks.map(({ id, label, input }) => ({id, text: label, input: failedInputs[id]?.join(', ') ?? input})) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],

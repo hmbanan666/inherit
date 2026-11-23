@@ -33,6 +33,17 @@ const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
 const solved = computed(() => !busy.value && frame.value?.solved)
 const checkRows = computed(() => frame.value?.labels.map((label,i) => ({...label,status:statuses.value[i] ?? 'red' as Colour})) ?? [])
+const choice = computed(() => frame.value?.save.predictions[frame.value.save.lessonId!])
+const currentStep = computed(() => {
+  const data = frame.value
+  if (!data?.starter || (data.prediction && !choice.value)) return 0
+  if (data.solved) return data.steps.length
+  const { file } = data.starter.edit
+  const body = (code: string) => code.split('\n').filter(line => !line.trimStart().startsWith('//')).join('\n').trim()
+  const code = body(files.value[file] ?? '')
+  const edited = code && code !== body(data.starter.files[file])
+  return data.steps.length - (edited ? 1 : 2)
+})
 const query = new URLSearchParams(location.search)
 const local = import.meta.dev || ['localhost','127.0.0.1','[::1]'].includes(location.hostname)
 const lesson = query.get('lesson') ?? undefined
@@ -103,7 +114,7 @@ function run() {
   if (busy.value || blocked.value || complete.value) return
   if (solved.value) return
   if (frame.value?.prediction && !frame.value.save.predictions[frame.value.save.lessonId!]) {
-    openDrawer('learn')
+    runMessage.value = 'Pick a guess first. There is no wrong answer.'
     return
   }
   drawer.value = undefined
@@ -300,7 +311,7 @@ onBeforeUnmount(() => {
       <section class="editor-dock">
         <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @map="openDrawer('learn')" @replay="start(true)" />
         <template v-else-if="frame">
-          <GoalBar :goal="frame.goal" @help="openDrawer('learn')" />
+          <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
           <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :error="error" @reference="openDrawer('api')" /></div></div>
           <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
           <button v-if="frame.logs.length" class="console-count" @click="openDrawer('console')">Console · {{ frame.logs.length }} lines</button>
