@@ -2,12 +2,13 @@
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
+import { containScale, fitScale } from '../lib/factoryLayout'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
 const emit = defineEmits<{ error: [message: string] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
-const size = ref({ w: 800, h: 500 }),
+const size = ref({ w: 0, h: 0 }),
   pan = ref({ x: 0, y: 0 }),
   zoom = ref(1)
 const renderError = ref('')
@@ -17,9 +18,12 @@ let app: Application | undefined,
   disposed = false
 
 const pointers = new Map<number, { x: number; y: number }>()
-const scale = computed(
-  () => Math.min(size.value.w / (tile * props.world.grid.width), size.value.h / (tile * props.world.grid.height)) * zoom.value,
-)
+const worldSize = computed(() => ({
+  w: tile * props.world.grid.width,
+  h: tile * props.world.grid.height,
+}))
+const fitted = computed(() => fitScale(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h))
+const scale = computed(() => fitted.value * zoom.value)
 const camera = computed(() => ({
   x: size.value.w / 2 - props.world.grid.width / 2 * tile * scale.value + pan.value.x,
   y: size.value.h / 2 - props.world.grid.height / 2 * tile * scale.value + pan.value.y,
@@ -29,8 +33,10 @@ function recenter() {
   zoom.value = 1
 }
 function zoomBy(ratio: number, px = size.value.w / 2, py = size.value.h / 2) {
+  if (size.value.w < 2 || size.value.h < 2) return
   const before = zoom.value
-  zoom.value = Math.min(2.8, Math.max(0.32, before * ratio))
+  const whole = containScale(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h) / fitted.value
+  zoom.value = Math.min(2.8, Math.max(Math.min(0.32, whole), before * ratio))
   const f = zoom.value / before
   pan.value = {
     x: pan.value.x * f + (px - size.value.w / 2) * (1 - f),
@@ -107,15 +113,22 @@ onMounted(async () => {
     app = renderer
     mount.value!.appendChild(app.canvas)
     function resize() {
-      const w = host.value!.clientWidth,
-        h = host.value!.clientHeight
+      const frame = host.value?.closest<HTMLElement>('.map-frame') ?? host.value
+      if (!frame) return
+      const w = Math.round(frame.clientWidth)
+      const h = Math.round(frame.clientHeight)
+      if (w < 2 || h < 2) return
+      if (w !== size.value.w || h !== size.value.h) {
+        pan.value = { x: 0, y: 0 }
+        zoom.value = 1
+      }
       size.value = { w, h }
       renderer.renderer.resize(w, h, devicePixelRatio)
       sync()
     }
     resize()
     observer = new ResizeObserver(resize)
-    observer.observe(host.value!)
+    observer.observe(host.value!.closest('.map-frame') ?? host.value!)
     renderer.ticker.maxFPS = 40
     renderer.ticker.add(() => scene?.animate(performance.now(), props.interval, props.paused))
   } catch {

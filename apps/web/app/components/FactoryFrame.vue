@@ -4,6 +4,10 @@ import ChecksPanel from './ChecksPanel.vue'
 import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
+import {
+  creditSuffix, dockStorageKey, editorDockMax, editorDockMin, editorDockPercent, filesStorageKey,
+  fileTreePx, questRailPx, readFilesOpen, worldGapPx, worldInsetPx,
+} from '../lib/factoryLayout'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
 const bricks = factoryBricks(kettlewick)
@@ -29,6 +33,17 @@ const pending = ref(true)
 const panels = ['Console', 'API', 'Charts'] as const
 const tool = ref<typeof panels[number]>()
 const zone = ref<'quests' | 'shop'>('quests')
+const questRailCss = questRailPx + 'px'
+const fileTreeCss = fileTreePx + 'px'
+const worldGapCss = worldGapPx + 'px'
+const worldInsetCss = worldInsetPx + 'px'
+const dockDefault = editorDockPercent(1024)
+const filesOpen = ref(false)
+function toggleFiles() {
+  filesOpen.value = !filesOpen.value
+  try { localStorage.setItem(filesStorageKey, filesOpen.value ? 'open' : 'closed') }
+  catch { /* Keep the choice for this session. */ }
+}
 const hintOpen = ref(true)
 const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
 const offers = computed(() => {
@@ -114,6 +129,9 @@ function shortcut(event: KeyboardEvent) {
 }
 
 onMounted(async () => {
+  let storedFiles: string | null = null
+  try { storedFiles = localStorage.getItem(filesStorageKey) } catch { /* Use the width default. */ }
+  filesOpen.value = readFilesOpen(storedFiles, window.innerWidth)
   worker = new Worker(new URL('../lib/factory.worker.ts', import.meta.url), { type: 'module' })
   worker.onmessage = ({ data }: MessageEvent<FactoryFrame>) => {
     if ('error' in data) {
@@ -183,13 +201,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <StudioShell class="factory">
+  <StudioShell class="factory" :class="{ 'files-closed': !filesOpen }" :storage-key="dockStorageKey" :dock="dockDefault" :min="editorDockMin" :max="editorDockMax" :prefer="editorDockPercent">
     <template #nav>
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
         <template #clock>
           <div v-if="world" class="clock">
-            <p class="balance" data-testid="credits"><b>{{ world.credits }}</b><span>credits</span></p>
+            <p class="balance" data-testid="credits"><b>{{ world.credits }}</b>{{ creditSuffix }}</p>
             <div class="xp" data-testid="level">
               <span class="tick">Level <b>{{ world.level }}</b></span>
               <span class="xp-bar" :title="xp.title"><i :style="{ width: xp.width }" /></span>
@@ -255,10 +273,13 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <template #editor>
-      <FileTree v-model:files="files" v-model:active-file="activeFile" />
+      <FileTree v-show="filesOpen" id="project-files" v-model:files="files" v-model:active-file="activeFile" />
       <div class="editor-column">
         <header class="dock-header editor-head">
-          <span>{{ activeFile }}</span>
+          <span class="editor-title">
+            <button type="button" class="files-toggle" :aria-expanded="filesOpen" aria-controls="project-files" @click="toggleFiles">Files</button>
+            <span>{{ activeFile }}</span>
+          </span>
           <button v-if="dirty" class="deploy" type="button" aria-label="Deploy" :disabled="pending || !world" @click="deploy">
             <Play /> Deploy <kbd>Ctrl+Enter</kbd>
           </button>
@@ -290,15 +311,24 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.factory :deep(.world-shell) {
-  display: grid;
-  grid-template-columns: minmax(232px, 300px) minmax(0, 1fr);
+.factory :deep(.desk) {
   grid-template-rows: minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 17px 14px;
+}
+.factory :deep(.world-shell) {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: v-bind(worldGapCss);
+  padding: v-bind(worldInsetCss);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .quest-zone {
-  height: 100%;
+  width: v-bind(questRailCss);
+  flex: 0 0 v-bind(questRailCss);
+  align-self: stretch;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -313,11 +343,11 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 4px;
   flex: none;
-  padding: 15px 17px 0;
+  padding: 12px 12px 0;
 }
 .zone-tabs button {
   flex: 1;
-  min-height: 30px;
+  min-height: 28px;
   background: transparent;
   color: var(--soft);
   border-color: var(--accent-line);
@@ -335,16 +365,16 @@ onBeforeUnmount(() => {
   display: grid;
   align-content: start;
   gap: 12px;
-  padding: 12px 17px;
+  padding: 10px 12px;
 }
 .quest { display: grid; gap: 12px; min-width: 0 }
 .quest-zone h2 {
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.2;
-  letter-spacing: -0.7px;
+  letter-spacing: -0.4px;
   margin: 0;
 }
-.goal { font-size: 14px; line-height: 1.45 }
+.goal { font-size: 13px; line-height: 1.4 }
 .lesson {
   border-top: 1px solid var(--accent-line);
   padding-top: 9px;
@@ -365,7 +395,7 @@ onBeforeUnmount(() => {
 .quest-action {
   flex: none;
   margin-top: auto;
-  padding: 12px 17px 15px;
+  padding: 10px 12px 12px;
   border-top: 1px solid var(--accent-line);
 }
 .quest-action .gold { width: 100%; height: 34px }
@@ -386,7 +416,15 @@ onBeforeUnmount(() => {
 }
 .shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
 .shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
-.map-frame { height: 100%; min-width: 0; min-height: 0; border-radius: 7px }
+.map-frame {
+  position: relative;
+  flex: 1 1 0;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 7px;
+  overflow: hidden;
+}
 .balance b { font-variant-numeric: tabular-nums }
 .xp { display: grid; gap: 4px; min-width: 92px }
 .xp-bar {
@@ -399,11 +437,16 @@ onBeforeUnmount(() => {
 .xp-bar i { display: block; height: 100%; background: var(--gold) }
 .factory :deep(.editor-dock) {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-columns: v-bind(fileTreeCss) minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
 }
+.factory.files-closed :deep(.editor-dock) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
 .factory :deep(.editor-dock > .tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
+.factory.files-closed :deep(.editor-dock > .tree) { display: none }
 .editor-column {
   grid-column: 2;
   grid-row: 1;
@@ -413,7 +456,25 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
 }
+.factory.files-closed .editor-column { grid-column: 1; grid-row: 1 }
 .editor-head { flex: none; gap: 12px; font: 12px var(--mono); color: var(--soft) }
+.editor-title { display: flex; align-items: center; gap: 10px; min-width: 0 }
+.editor-title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.files-toggle {
+  flex: none;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--soft);
+  font: 11px var(--mono);
+}
+.files-toggle[aria-expanded='true'] {
+  color: var(--accent-soft);
+  border-color: var(--gold);
+  background: var(--accent-shadow);
+}
 .editor-head .deploy { border-radius: 5px }
 .editor-head kbd { font: 10px var(--mono); padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px }
 .editor-column :deep(.checks) {
@@ -447,9 +508,10 @@ onBeforeUnmount(() => {
   .factory :deep(.world-shell) {
     display: flex;
     flex-direction: column;
+    height: clamp(480px, 66dvh, 720px);
   }
-  .quest-zone { flex: none; height: auto; max-height: 42% }
-  .map-frame { flex: 1; height: auto; min-height: 160px }
+  .quest-zone { flex: none; width: auto; height: auto; max-height: 42% }
+  .map-frame { flex: 1 1 auto; width: 100%; height: auto; min-height: 180px }
   .factory :deep(.editor-dock) {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);

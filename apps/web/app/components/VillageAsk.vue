@@ -30,17 +30,17 @@ const person = computed<Townsperson>(() => ({
 <style scoped>
 .who {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   min-width: 0;
 }
 .who :deep(canvas) {
-  height: 76px;
+  height: 48px;
   width: auto;
   flex: none;
   border-radius: 4px;
 }
-.who strong { font-size: 15px }
+.who strong { font-size: 14px }
 .who span {
   display: block;
   color: var(--sub);
