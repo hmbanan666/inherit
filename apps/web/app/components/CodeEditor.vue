@@ -8,6 +8,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
+import type { PlainError } from '@inherit/sandbox/pack'
 import type { Starter } from '@inherit/sim/pack'
 import { editorKey } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
@@ -15,13 +16,14 @@ import { FileSearch, FolderSearch, X } from '@lucide/vue'
 const game = inject(editorKey)!
 const { files, activeFile, deployed, multiFile, api, dirty } = game
 const props = defineProps<{
+  diagnostic?: PlainError
   starter?: Starter
   ids?: string[]
   selected?: string
   error?: string
   code?: string
 }>()
-const emit = defineEmits<{ reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
+const emit = defineEmits<{ hint: []; reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
 const host = ref<HTMLElement>()
 const shellTabs = shallowRef<HTMLElement>()
 const input = ref<HTMLInputElement>()
@@ -207,30 +209,41 @@ function keys(e: KeyboardEvent) {
   e.stopPropagation()
   find(key === 'p' ? 'open' : 'search')
 }
+let errorZone: string | undefined
+let errorMarks: monaco.editor.IEditorDecorationsCollection | undefined
+const errorHost = shallowRef<HTMLElement>()
+let zoneResize: ResizeObserver | undefined
 function runtimeMarker() {
-  const message = props.error ?? game.error.value
-  const match = /([\w./-]+\.ts):(\d+)/.exec(message)
-  for (const [file, model] of models) {
-    const line = Number(match?.[2])
-    const live = files.value[file] === deployed.value[file]
-    monaco.editor.setModelMarkers(
-      model,
-      'factory-runtime',
-      live && match?.[1] === file && line > 0 && line <= model.getLineCount()
-        ? [
-            {
-              severity: monaco.MarkerSeverity.Error,
-              message,
-              source: 'Factory runtime',
-              startLineNumber: line,
-              endLineNumber: line,
-              startColumn: 1,
-              endColumn: model.getLineMaxColumn(line),
-            },
-          ]
-        : [],
-    )
-  }
+  if (!editor) return
+  zoneResize?.disconnect()
+  errorMarks?.clear()
+  const issue = props.diagnostic
+  if (issue && models.has(issue.file)) open(issue.file)
+  const model = editor.getModel()
+  editor.changeViewZones(access => {
+    if (errorZone) access.removeZone(errorZone)
+    errorZone = undefined
+    errorHost.value = undefined
+    if (!issue || !model) return
+    const from = model.getPositionAt(issue.mark.from)
+    const to = model.getPositionAt(issue.mark.to)
+    errorMarks?.set([
+      { range: monaco.Range.fromPositions(from, to), options: { inlineClassName: 'error-token', hoverMessage: { value: issue.body } } },
+      { range: new monaco.Range(issue.line, 1, issue.line, 1), options: { isWholeLine: true, className: 'error-line' } },
+    ])
+    const node = document.createElement('div')
+    errorHost.value = document.createElement('div')
+    node.append(errorHost.value)
+    const zone = { afterLineNumber: issue.line, heightInPx: 90, domNode: node }
+    errorZone = access.addZone(zone)
+    zoneResize = new ResizeObserver(() => {
+      if (!errorZone || !errorHost.value) return
+      zone.heightInPx = errorHost.value.offsetHeight
+      editor?.changeViewZones(update => update.layoutZone(errorZone!))
+    })
+    zoneResize.observe(errorHost.value)
+  })
+  if (issue) editor.revealLineInCenter(issue.line)
 }
 function updateLibrary(text: string) {
   library?.dispose()
@@ -287,6 +300,7 @@ onMounted(() => {
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: game.label,
   })
+  errorMarks = editor.createDecorationsCollection()
   placeholder = editor.createDecorationsCollection()
   lineLight = editor.createDecorationsCollection()
   tickMarks = editor.createDecorationsCollection()
@@ -361,9 +375,10 @@ watch([files, activeFile, () => props.starter], showPlaceholder, { flush: 'post'
 watch(game.navigation, ({ file, line, column }) => revealLine(file, line, column), { flush: 'post' })
 watch(() => game.readOnly?.value, value => editor?.updateOptions({ readOnly: !!value }))
 watch(api, updateLibrary)
-watch([() => props.error ?? game.error.value, files], runtimeMarker)
+watch(() => props.diagnostic, runtimeMarker, { flush: 'post' })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', keys, true)
+  zoneResize?.disconnect()
   suggestions?.dispose()
   highlight.reset()
   opener?.dispose()
@@ -438,6 +453,13 @@ onBeforeUnmount(() => {
       <p v-else-if="query" class="quiet">No matches.</p>
       <small v-if="results.length > 80">First 80 of {{ results.length }} matches</small>
     </div>
+    <Teleport v-if="errorHost && diagnostic" :to="errorHost">
+      <aside class="line-feedback" role="alert">
+        <strong>{{ diagnostic.title }}</strong><p>{{ diagnostic.body }}</p>
+        <button @click="emit('hint')">Hint</button>
+        <details><summary>Technical details</summary>{{ diagnostic.raw }}</details>
+      </aside>
+    </Teleport>
     <div ref="host" class="code-editor" />
   </section>
 </template>

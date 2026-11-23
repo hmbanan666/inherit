@@ -1596,3 +1596,9 @@ button.revisions:hover {
   @keyframes invite-run { from { box-shadow: 0 0 0 2px var(--gold) } to { box-shadow: 0 0 0 7px transparent } }
 }
 .monaco-editor .edit-placeholder { color: var(--sub); opacity: .8; pointer-events: none }
+.monaco-editor .error-line { background: color-mix(in srgb, var(--alert) 12%, transparent) }
+.monaco-editor .error-token { text-decoration: wavy underline var(--alert) }
+.line-feedback { white-space: normal; padding: 5px 10px; background: var(--panel); color: var(--soft); font: 13px/1.4 var(--mono) }
+.line-feedback strong { color: var(--alert) }
+.line-feedback p { margin: 2px 0 }
+.line-feedback details { display: inline-block; vertical-align: top; max-width: 90%; overflow-wrap: anywhere; margin-left: 8px }

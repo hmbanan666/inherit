@@ -1,3 +1,4 @@
+import type { PlainError } from '@inherit/sandbox/pack'
 import type { Call, Colour, Files, Lesson, Row, Starter, Task, Theory } from '@inherit/sim/pack'
 import type { ApiMethod } from '@inherit/sim/declarations'
 import type { MapLesson } from '@inherit/sim/course'
@@ -48,5 +49,6 @@ export interface PackFrame {
   logs: string[]
   start?: unknown
   moments: {world: unknown; call: Call; checks: Colour[]}[]
+  diagnostic?: PlainError
   error: string
 }

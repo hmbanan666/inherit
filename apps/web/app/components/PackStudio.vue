@@ -17,6 +17,7 @@ const files = shallowRef<Files>({})
 const activeFile = ref('main.ts')
 const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(false), saved = ref(true)
 const settings = ref(false), contrast = useContrast(), width = ref(45)
+const diagnostic = shallowRef<PackFrame['diagnostic']>()
 const runMessage = ref('')
 const activeCall = shallowRef<Call>()
 const tickCalls = shallowRef<Call[]>([])
@@ -157,7 +158,7 @@ provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, acti
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
   readOnly: computed(() => !!frame.value?.solved || busy.value),
   call:activeCall, tickCalls, watching, error, navigation,
-  setFile(path,code) {files.value = {...files.value,[path]:code};persist()},
+  setFile(path,code) {diagnostic.value = undefined; files.value = {...files.value,[path]:code};persist()},
   openFile(path) {activeFile.value = path; persist()},
 })
 async function receive(data: PackFrame | {loadError:string}) {
@@ -184,8 +185,9 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (requested === 'trySetup' && !data.error) setupTried.value = true
   if (!data.save.clockActive && requested !== 'tick') paused.value = false
   if (requested !== 'tick') frame.value = data
-  runMessage.value = data.notice ?? (data.noCalls ? 'Your code ran. Check the TODO and try again.' : '')
-  error.value = saved.value ? data.error : 'Could not save progress. Free space and try again.'
+  runMessage.value = data.notice ?? (data.noCalls ? 'Nothing changed yet. Try an edit on line ' + data.edit.line + '.' : '')
+  if (changed || ['run','trySetup','tick','runOnce'].includes(requested)) diagnostic.value = data.diagnostic
+  error.value = saved.value ? (data.diagnostic ? '' : data.error) : 'Could not save progress. Free space and try again.'
 
   calls.value = []
   if (data.moments.length && !(requested === 'runOnce' && paused.value)) {
@@ -311,7 +313,7 @@ onBeforeUnmount(() => {
         <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @map="openDrawer('learn')" @replay="start(true)" />
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
-          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :error="error" @reference="openDrawer('api')" /></div></div>
+          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :diagnostic="diagnostic" @hint="openDrawer('hints')" :error="error" @reference="openDrawer('api')" /></div></div>
           <ChecksPanel :key="frame.save.lessonId ?? ''" :tried="frame.save.phase !== 'brief'" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
           <button v-if="frame.logs.length" class="console-count" @click="openDrawer('console')">Console · {{ frame.logs.length }} lines</button>
           <p v-if="frame.prediction && frame.save.phase !== 'brief'" class="prediction-result">Your prediction: {{ frame.save.predictions[frame.save.lessonId!] }} · Result: {{ frame.prediction.answer }}</p>

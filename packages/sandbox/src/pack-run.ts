@@ -1,5 +1,6 @@
 import { readPlayerAPI, playerDeclarations } from '../../sim/src/framework/declarations'
-import { playerError } from './player-error'
+import { PlayerRunError } from './plain-error'
+export { PlayerRunError, type PlainError } from './plain-error'
 import type { Call, Check, Colour, Files, Pack } from '../../sim/src/framework/pack'
 import { continueLesson, type PackSave } from '../../sim/src/framework/save'
 import { createProgram, runOnce, type Program } from './index'
@@ -83,7 +84,7 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
       candidate?.dispose()
       if (mode==='tick') {dispose(); save.clockActive = false}
       if (mode!=='resume') {save.phase='working'; save.passed=[]; delete save.reasons}
-      throw new Error(playerError(error,names))
+      throw new PlayerRunError(error, files, names, lesson.theory?.example)
     }
     if (candidate) { dispose(); program = candidate }
     const inputsByCheck = lesson.checks.map(check => inputsFor(check, true))

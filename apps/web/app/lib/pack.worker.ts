@@ -3,7 +3,7 @@ import { getPack, playerSources } from '@inherit/sim/rules'
 import { continueLesson, freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
 import { courseMap } from '@inherit/sim/course'
 import { migrateBeginner } from '@inherit/sim/migrate'
-import { declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
+import { PlayerRunError, declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
 import type { PackCommand, PackFrame } from './packProtocol'
 
 let tickCount = 0
@@ -54,6 +54,7 @@ async function open(command: Extract<PackCommand, { kind: 'open' }>) {
 
 async function act(command: PackCommand) {
   let moments: PackFrame['moments'] = [], start: unknown, error = ''
+  let diagnostic: PackFrame['diagnostic']
   let previewWorld: unknown
   let notice: string | undefined
   const previousId = save?.lessonId
@@ -142,6 +143,7 @@ async function act(command: PackCommand) {
       }
     }
   } catch (cause) {
+    if (cause instanceof PlayerRunError) diagnostic = cause.diagnostic
     error = cause instanceof Error ? cause.message : 'Could not open the pack.'
     if (command.kind === 'open') { self.postMessage({ loadError: error }); return }
   }
@@ -182,7 +184,7 @@ async function act(command: PackCommand) {
     panels: pack.panels.map(p => ({
       id: p.id, label: p.label, placement: p.placement, rows: p.rows(save.world),
     })).filter(p => p.rows.length),
-    logs, moments, start, error,
+    logs, moments, start, error, diagnostic,
   } satisfies PackFrame)
 }
 let pending = Promise.resolve()
