@@ -35,6 +35,8 @@ export interface World {
   depot: Site['depot']
   orderRoundAt: number
   orders: Order[]
+  /** Sentences the village said when a request was paid. One line each, in order. */
+  growth: string[]
   creditsPerMinute: number
   status: string
   ledger: { income: number; waste: number; payouts: { tick: number; credits: number }[] }
@@ -47,11 +49,28 @@ export function createWorld(site: Site): World {
   const { seed, credits, grid, drones, veins, depot, furnace } = structuredClone(site)
   const world: World = {
     tick: 0, seed, credits, grid, drones, veins, depot, furnace: { ...furnace, readyAt: null },
-    orderRoundAt: 0, orders: [], status: 'Haul ore to the furnace and ship the ingots.', creditsPerMinute: 0,
+    orderRoundAt: 0, orders: [], growth: [], status: '', creditsPerMinute: 0,
     ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [],
   }
   updateOrders(world, site)
+  world.status = describeWorks(world, site, world.drones.map(drone => ({ pos: { ...drone.pos }, cargo: drone.cargo })))
   return world
+}
+
+function describeWorks(world: World, site: Site, before: { pos: Cell; cargo: number }[]) {
+  const ask = world.orders.find(order => order.status === 'open' || order.status === 'overdue')
+  if (!ask) return world.growth.at(-1) ?? 'The village is quiet.'
+  if (ask.status === 'overdue') return `${ask.from} is still waiting, and this request now pays half.`
+  const drone = world.drones[0]
+  const prior = before[0]
+  const wasFull = !!drone && !!prior && prior.cargo >= drone.capacity
+  const stuck = wasFull && drone.cargo >= drone.capacity && prior.pos.x === drone.pos.x && prior.pos.y === drone.pos.y
+  if (stuck) return `${ask.from} is waiting. The cart is full, and the drone never comes back to the furnace. Send it when the cart is full.`
+  if (world.furnace.output > 0) return `${ask.from} is waiting. Ingots are ready. Ship them.`
+  if (world.furnace.readyAt !== null || world.furnace.input >= site.recipe.ore) return `${ask.from} is waiting. The furnace is working.`
+  if (drone && drone.cargo >= drone.capacity) return `${ask.from} is waiting. The cart is full. The drone is heading to the furnace.`
+  if (world.ledger.waste > 0) return `${ask.from} is waiting. Smelting an empty furnace reduces what this request pays. Smelt only when it has ${site.recipe.ore} ore.`
+  return `${ask.from} is waiting. The drone is fetching ore for the furnace.`
 }
 
 interface TickResult { used: number; message?: Omit<Message, 'tick'> }
@@ -59,27 +78,23 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
   if (!Number.isSafeInteger(count) || count < 0) throw new Error('Expected a nonnegative tick count.')
   for (let i = 0; i < count; i++) {
     const balance = world.credits
-    const before = world.drones.map(({ pos, cargo }) => ({ pos, cargo }))
-    world.status = ''
+    const before = world.drones.map(({ pos, cargo }) => ({ pos: { x: pos.x, y: pos.y }, cargo }))
     world.tick++
     updateOrders(world, site)
     finishBatch(world, site)
     world.cpu.used = 0
     const { used, message } = onTick()
     world.cpu.used = used
+    if (world.credits < balance) world.credits = balance
     const earned = world.credits - balance
     const minute = 60_000
     if (earned) world.ledger.payouts.push({ tick: world.tick, credits: earned })
     world.ledger.payouts = world.ledger.payouts.filter(p => (world.tick - p.tick) * site.tickMs < minute)
     const recent = world.ledger.payouts.reduce((total, p) => total + p.credits, 0)
     world.creditsPerMinute = recent * minute / Math.min(minute, world.tick * site.tickMs)
-    const idle = world.drones.find((d, i) => d.pos.x === before[i].pos.x && d.pos.y === before[i].pos.y && d.cargo === before[i].cargo)
-    const late = world.orders.find(o => o.status === 'overdue')
-    if (used >= site.cpuLimit) world.status = 'CPU at its limit. Save paths in memory to spend less per tick.'
-    else if (message) world.status = message.text
-    else if (late) world.status = `${late.from}’s order is late. Ship the remaining ingots to collect the reduced payout.`
-    else if (!world.status && idle) world.status = `${idle.name} is idle. Give it a move, mine or unload action in onTick.`
-    else if (!world.status) world.status = 'The drone is hauling ore. Ship the ingots when they are ready.'
+    if (message) world.status = message.text
+    else if (used >= site.cpuLimit) world.status = 'CPU is at its limit. Keep a path in memory instead of calling findPath every tick.'
+    else world.status = describeWorks(world, site, before)
     if (message) world.messages.push({ tick: world.tick, ...message })
   }
 }

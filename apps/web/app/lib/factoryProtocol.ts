@@ -9,7 +9,7 @@ export type FactoryFrame = { world: World; deployed?: Record<string, string> }
   | { error: string }
 
 export interface FactorySave {
-  version: 1
+  version: 2
   world: World
   files: Record<string, string>
   deployed: Record<string, string>

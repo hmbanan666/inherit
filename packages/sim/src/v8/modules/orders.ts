@@ -4,17 +4,28 @@ import type { Site, World } from '../core/world'
 export interface ScheduledOrder {
   id: string
   at: number
+  /** Open only after the order with this id, in the same round, has been paid. */
+  after?: string
   item: 'ingot'
   qty: number
   due: number
   pay: number
   from: string
+  who: 'bram' | 'odile'
+  role: string
+  title: string
+  text: string
+  building: 'forge' | 'bridge'
+  change: string
 }
 export interface Order extends ScheduledOrder {
   shipped: number
   status: 'open' | 'overdue' | 'on time' | 'late' | 'expired'
 }
 function canShip(order: Order) { return order.status === 'open' || order.status === 'overdue' }
+function roundId(world: World, id: string) {
+  return world.orderRoundAt ? id + '-' + world.orderRoundAt : id
+}
 
 export function updateOrders(world: World, site: Site) {
   if (site.repeatOrders && world.orders.length === site.orderSchedule.length && !world.orders.some(canShip)) {
@@ -23,10 +34,14 @@ export function updateOrders(world: World, site: Site) {
     world.ledger.waste = 0
   }
   for (const scheduled of site.orderSchedule) {
-    const at = world.orderRoundAt + scheduled.at
-    if (at === world.tick) world.orders.push({
-      ...scheduled, at, due: world.orderRoundAt + scheduled.due, shipped: 0, status: 'open',
-      id: world.orderRoundAt ? scheduled.id + '-' + world.orderRoundAt : scheduled.id,
+    const id = roundId(world, scheduled.id)
+    if (world.orders.some(order => order.id === id)) continue
+    if (scheduled.after) {
+      const prev = world.orders.find(order => order.id === roundId(world, scheduled.after!))
+      if (!prev || (prev.status !== 'on time' && prev.status !== 'late')) continue
+    } else if (world.orderRoundAt + scheduled.at !== world.tick) continue
+    world.orders.push({
+      ...scheduled, at: world.tick, due: world.orderRoundAt + scheduled.due, shipped: 0, status: 'open', id,
     })
   }
   for (const order of world.orders) {
@@ -59,6 +74,7 @@ export function orderBricks(site: Site): Brick[] {
         world.ledger.waste = 0
         world.ledger.income += payout
         world.credits += payout
+        if (!world.growth.includes(order.change)) world.growth.push(order.change)
       }),
   ]
 }

@@ -16,21 +16,29 @@ async function settings(page: Page, name: string) {
   await page.getByRole('button', { name, exact: true }).click({ timeout: 5000 })
 }
 
-test('the running works show the order, the first fix and tools on demand', async ({ page }) => {
+test('Bram asks, the cart sticks, and deploying the one-line fix pays him', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: "Fulfil Mayor Hale's order: 20 ingots" })).toBeVisible()
-  await expect(page.getByText('+180 from Mayor Hale: deliver 20 ingots')).toBeVisible()
-  await expect(page.getByLabel('Current order')).toContainText('Smelt only when it has 2 ore')
+  await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
+  await expect(page.getByTestId('ask')).toContainText('I need 4 ingots for horseshoes')
+  await expect(page.getByLabel('Current request')).not.toContainText('Due in')
   await expect(page.getByText('Running', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Inherit showcase' })).toBeVisible()
   await expect(page.getByLabel('Factory map').locator('canvas')).toBeVisible()
+  await expect(page.getByLabel('Village').locator('canvas')).toBeVisible()
   await expect(page.getByLabel('Project files').getByRole('button', { name: 'main.ts' })).toBeVisible()
-  await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
+  await expect(page.locator('.view-lines')).toContainText('const home = false')
   await expect(page.getByRole('button', { name: /^(Deploy|Pause|Resume|[124]x|Start over)$/ })).toHaveCount(0)
   await expect(page.getByLabel('Factory metrics')).toBeHidden()
   await expect(page.getByLabel('Console', { exact: true })).toBeHidden()
   await expect(page.getByLabel('API reference')).toBeHidden()
-  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick.png') })
+  const request = page.getByLabel('Current request')
+  await expect(request).toContainText('never comes back', { timeout: 15_000 })
+  await expect(page.getByTestId('credits')).toHaveText('Credits 300 · 0.0 cr/min')
+  const stuck = request.locator('.next')
+  const stuckText = await stuck.innerText()
+  await page.waitForTimeout(1200)
+  await expect(stuck).toHaveText(stuckText)
+  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick-before.png') })
   const dock = page.locator('.editor-dock')
   const width = (await dock.boundingBox())!.width
   await page.getByRole('separator', { name: 'Resize editor' }).press('ArrowLeft')
@@ -42,6 +50,24 @@ test('the running works show the order, the first fix and tools on demand', asyn
   await settings(page, 'Console')
   await expect(page.getByTestId('tick')).toBeVisible()
   await expect(page.getByLabel('Factory metrics')).toBeHidden()
+  await edit(page, `import { drones, veins, furnace, orders, ship, findPath } from "inherit"
+export function onTick() {
+  const drone = drones()[0]
+  const vein = veins()[0]
+  const home = drone.cargo >= drone.capacity
+  const target = home ? furnace : vein
+  if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
+  else if (home) drone.unload(furnace)
+  else drone.mine(vein)
+  if (furnace.input >= 2) furnace.smelt()
+  for (const order of orders()) ship(order)
+}`)
+  await page.keyboard.press('Control+Enter')
+  await expect(page.getByRole('button', { name: 'Deploy' })).toBeHidden()
+  await expect(page.getByTestId('credits')).toContainText('380', { timeout: 45_000 })
+  await expect(page.getByRole('heading', { name: 'Metal for the bridge' })).toBeVisible()
+  await expect(page.getByTestId('ask')).toContainText('footbridge')
+  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick-after.png') })
 })
 
 test('helpers deploy onto the live world and reload preserves drafts and the deployed controller', async ({ page }) => {

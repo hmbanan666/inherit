@@ -27,7 +27,6 @@ export function smelting(site: Site): Brick[] {
         const furnace = world.furnace
         if (furnace.input < site.recipe.ore) {
           world.ledger.waste += site.recipe.fuel
-          world.status = `The furnace burns fuel while empty: you lose ${site.recipe.fuel} credit of output per call. Smelt only when it has ${site.recipe.ore} ore.`
           return
         }
         if (furnace.readyAt !== null) return

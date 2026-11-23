@@ -3,30 +3,43 @@ import { diagnostics } from '../packs/compiler'
 import { declarations, kettlewick, factoryBricks } from '../../packages/sim/src/v8'
 import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
-test('one drone runs comfortably under budget while Uncle burns fuel on an empty furnace', async () => {
-  const world = await runSession(kettlewick, kettlewick.files, 1)
-  expect(world.drones).toHaveLength(1)
-  expect(world.drones[0].pos).not.toEqual(kettlewick.depot.pos)
-  expect(world.cpu.used).toBeLessThan(world.cpu.limit / 2)
-  expect(world.status).toContain('burns fuel while empty')
-  expect(world.ledger.waste).toBe(kettlewick.recipe.fuel)
-  expect(world.furnace.input).toBe(0)
-  expect(world.credits).toBe(kettlewick.credits)
+test('uncle fills the cart and the village pays nothing until that line changes', async () => {
+  const session = await createSession(kettlewick, kettlewick.files)
+  try {
+    expect(session.world.drones).toHaveLength(1)
+    expect(session.world.orders.map(order => order.from)).toEqual(['Bram'])
+    session.step(1)
+    expect(session.world.drones[0].pos).not.toEqual(kettlewick.depot.pos)
+    expect(session.world.cpu.used).toBeLessThan(session.world.cpu.limit / 2)
+    while (!session.world.status.includes('never comes back') && session.world.tick < 40) session.step(1)
+    const status = session.world.status
+    expect(status).toContain('Send it when the cart is full')
+    const cargo = session.world.drones[0].cargo
+    session.step(6)
+    expect(session.world.status).toBe(status)
+    expect(session.world.drones[0].cargo).toBe(cargo)
+    expect(session.world.credits).toBe(kettlewick.credits)
+    expect(session.world.orders[0].shipped).toBe(0)
+    expect(session.world.furnace.output).toBe(0)
+  } finally { session.dispose() }
 })
 
-test('guarding smelt fills the first order and earns more credits per minute than Uncle', async () => {
+test('sending the full cart home pays Bram and then the mayor asks', async () => {
   const fixed = { 'main.ts': kettlewick.files['main.ts'].replace(
-    '  furnace.smelt()', '  if (furnace.input >= 2) furnace.smelt()',
+    'const home = false // change to: drone.cargo >= drone.capacity',
+    'const home = drone.cargo >= drone.capacity',
   ) }
-  const ticks = kettlewick.orderSchedule[0].due
-  const uncle = await runSession(kettlewick, kettlewick.files, ticks)
-  const world = await runSession(kettlewick, fixed, ticks)
-  expect(world.orders[0].status).toBe('on time')
-  expect(world.credits).toBe(kettlewick.credits + kettlewick.orderSchedule[0].pay)
-  expect(world.ledger.waste).toBe(0)
-  expect(uncle.credits).toBeGreaterThan(kettlewick.credits)
-  expect(world.creditsPerMinute).toBeGreaterThan(uncle.creditsPerMinute)
-  expect(world.messages).toEqual([])
+  const session = await createSession(kettlewick, fixed)
+  try {
+    while (session.world.ledger.income < kettlewick.orderSchedule[0].pay && session.world.tick < 400) session.step(1)
+    session.step(1)
+    expect(session.world.orders[0].status).toBe('on time')
+    expect(session.world.orders[1]).toMatchObject({ from: 'Mayor Odile', status: 'open' })
+    expect(session.world.credits).toBe(kettlewick.credits + kettlewick.orderSchedule[0].pay)
+    expect(session.world.growth[0]).toContain('forge is lit')
+    expect(session.world.creditsPerMinute).toBeGreaterThan(0)
+    expect(session.world.messages).toEqual([])
+  } finally { session.dispose() }
 })
 
 const cached = {
