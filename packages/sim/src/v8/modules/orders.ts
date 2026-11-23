@@ -16,6 +16,10 @@ export interface Order extends ScheduledOrder {
 }
 function canShip(order: Order) { return order.status === 'open' || order.status === 'overdue' }
 
+export function awaitingFirstDelivery(world: World) {
+  return !world.orders.some(o => o.status === 'on time' || o.status === 'late')
+}
+
 export function updateOrders(world: World, site: Site) {
   for (const scheduled of site.orderSchedule) {
     if (scheduled.at === world.tick) world.orders.push({ ...scheduled, shipped: 0, status: 'open' })
@@ -23,7 +27,8 @@ export function updateOrders(world: World, site: Site) {
   for (const order of world.orders) {
     if (!canShip(order) || order.due >= world.tick) continue
     if (order.status === 'open') order.pay *= site.latePayFraction
-    order.status = world.tick <= order.due + site.graceTicks ? 'overdue' : 'expired'
+    const openingOrder = order === world.orders[0] && awaitingFirstDelivery(world)
+    order.status = openingOrder || world.tick <= order.due + site.graceTicks ? 'overdue' : 'expired'
   }
 }
 

@@ -16,11 +16,12 @@ export const kettlewick: Site = {
   recipe: { ore: 2, ingots: 1, ticks: 4, fuel: 1 },
   orderSchedule: [
     { id: 'hale', at: 0, from: 'Mayor Hale', item: 'ingot', qty: 4, due: 60, pay: 60 },
-    { id: 'smithy', at: 61, from: 'Smithy', item: 'ingot', qty: 10, due: 180, pay: 100 },
+    { id: 'smithy', at: 1, from: 'Smithy', item: 'ingot', qty: 10, due: 180, pay: 100 },
   ],
   graceTicks: 160,
   latePayFraction: 0.5,
   rentPerTick: 0.5,
+  loanAdvance: 60,
   bankruptcyTicks: 50,
   credits: 300,
   tickMs: 500,
