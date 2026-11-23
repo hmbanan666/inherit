@@ -3,7 +3,7 @@ import type { World } from '@inherit/sim/v8'
 export type FactoryCommand =
   | { kind: 'restart'; files: Record<string, string>; saved?: World }
   | { kind: 'run'; files: Record<string, string> }
-  | { kind: 'clock'; paused: boolean; speed: number }
+  | { kind: 'visibility'; visible: boolean }
 
 export type FactoryFrame = { world: World; deployed?: Record<string, string> }
   | { error: string }

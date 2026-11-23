@@ -22,7 +22,6 @@ export const kettlewick: Site = {
   latePayFraction: 0.5,
   credits: 300,
   tickMs: 500,
-  speeds: [1, 2, 4],
   cpuLimit: 30,
   costs: { read: 0, action: 1, findPath: 3 },
   orePerMine: 1,

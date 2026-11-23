@@ -18,7 +18,6 @@ export interface Site {
   latePayFraction: number
   credits: number
   tickMs: number
-  speeds: readonly number[]
   cpuLimit: number
   costs: { read: 0; action: number; findPath: number }
   orePerMine: number
