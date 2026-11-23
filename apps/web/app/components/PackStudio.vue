@@ -16,7 +16,7 @@ const statuses = ref<Colour[]>([])
 const files = shallowRef<Files>({})
 const activeFile = ref('main.ts')
 const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(false), saved = ref(true)
-const settings = ref(false), contrast = useContrast(), width = ref(45)
+const settings = ref(false), contrast = useContrast()
 const diagnostic = shallowRef<PackFrame['diagnostic']>()
 const runMessage = ref('')
 const activeCall = shallowRef<Call>()
@@ -158,13 +158,6 @@ function advance() { if (solved.value && frame.value?.save.lessonId) send({kind:
 function shortcut(e:KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) run() }
 }
-function resize(event: PointerEvent) {
-  const el = event.currentTarget as HTMLElement
-  el.setPointerCapture(event.pointerId)
-  const move = (e:PointerEvent) => width.value = Math.min(62,Math.max(30,100 - e.clientX / innerWidth * 100))
-  el.addEventListener('pointermove',move)
-  el.addEventListener('lostpointercapture',() => el.removeEventListener('pointermove',move),{once:true})
-}
 provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:lastRun,
   apiNames: computed(() => new Set(frame.value?.reference.map(method => method.name.split('.').at(-1)!))),
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
@@ -282,8 +275,8 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <div class="workshop pack-studio" :class="{'high-contrast': contrast}" :style="{'--dock-width': width+'%'}">
-    <header class="hud">
+  <StudioShell :class="{'high-contrast': contrast}">
+    <template #nav>
       <PackNav :busy="busy" @select="select" :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId" />
       <div class="settings pack-settings">
         <button aria-label="Settings" @click="settings = !settings"><Settings2 /></button>
@@ -296,9 +289,8 @@ onBeforeUnmount(() => {
       <button v-else class="deploy primary-run" data-testid="primary-button" :data-ready="!!frame && !busy && currentStep === frame.steps.length - 1" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved" @click="run">
         <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
       </button>
-    </header>
-    <main class="desk">
-      <section class="world-shell pack-world" data-testid="world">
+    </template>
+    <template #floor>
         <component :is="view" v-if="displayWorld" :world="displayWorld" :scene="frame?.scene" :inputs="frame?.inputs" :calls="calls" :next-call="nextCall" :reach="reach" />
         <div v-if="frame?.mode === 'deploy' && setupTried" class="world-controls">
           <PlaybackBar v-if="frame.save.clockActive || tickCount" :live="frame.save.clockActive" v-model:paused="paused" v-model:speed="speed" :inert="stoppingLoop" :tick-count="tickCount" @stop="stopLoop" />
@@ -319,9 +311,8 @@ onBeforeUnmount(() => {
         <CelebrationOverlay v-if="showCard && solved && frame" :focus="frame.focus" :effect="frame.effect" :solved="solved" :busy="busy" :landmark="landmark"
           :no-hints="!frame.save.hints[frame.save.lessonId!]"
           :streak="frame.save.attempts[frame.save.lessonId!] === 1 ? frame.save.firstTryStreak + 1 : 0" @advance="advance" />
-      </section>
-      <div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)" />
-      <section class="editor-dock">
+    </template>
+    <template #editor>
         <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @replay="start(true)" />
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
@@ -335,8 +326,7 @@ onBeforeUnmount(() => {
         </template>
         <p v-if="error" class="pack-error" role="alert">{{ error }}</p>
         <template v-if="blocked"><SaveArchive v-if="lesson === undefined" :pack="manifest.id" recovery /><button v-if="lesson === undefined" @click="start(true)">Start a fresh pack</button></template>
-      </section>
-    </main>
-    <footer class="statusbar"><span>{{ lesson !== undefined ? 'Preview' : saved ? 'Saved on this device' : 'Save unavailable' }}</span></footer>
-  </div>
+    </template>
+    <template #status><span>{{ lesson !== undefined ? 'Preview' : saved ? 'Saved on this device' : 'Save unavailable' }}</span></template>
+  </StudioShell>
 </template>
