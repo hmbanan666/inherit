@@ -7,7 +7,7 @@ import { getPack, packs, playerSources } from '../../packages/sim/src/packs/rule
 import { readPlayerAPI } from '../../packages/sim/src/framework/declarations'
 import { freshSave, continueLesson, decodeSave } from '../../packages/sim/src/framework/save'
 import { declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
-import type { Files } from '../../packages/sim/src/framework/pack'
+import { lessonSteps, type Files } from '../../packages/sim/src/framework/pack'
 import { diagnostics } from './compiler'
 
 type Checkpoint = {previous:Files;world:unknown;declarations:string;play(files:Files):Promise<boolean>}
@@ -68,6 +68,14 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     const label = m.id+'/'+lesson.id
     const checkpoint = adapter?.checkpoint(lesson.id)
     const starter = lesson.starter(checkpoint?.previous ?? save.project.working)
+    const steps = lessonSteps(lesson, starter)
+    expect(steps.at(-1), label).toBe('Press Run')
+    steps.forEach(text)
+    const column = starter.edit.column ?? 1
+    expect(Number.isInteger(column) && column >= 1, label).toBe(true)
+    expect(column, label).toBeLessThanOrEqual(starter.files[starter.edit.file].split('\n')[starter.edit.line - 1].length + 1)
+    if (starter.placeholder !== undefined) text(starter.placeholder)
+    if (lesson.focus !== undefined) text(lesson.focus)
     const world = checkpoint?.world ?? save.world
     const methods = pack.available(world,lesson.id)
     const host = pack.beginAttempt(structuredClone(world),'run').api

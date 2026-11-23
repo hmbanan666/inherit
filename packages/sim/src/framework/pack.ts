@@ -21,7 +21,7 @@ export type PackManifest = (
   featured?: boolean
   showcaseNote?: string
 }
-export interface Starter { files: Files; edit: { file: string; line: number } }
+export interface Starter { files: Files; edit: { file: string; line: number; column?: number }; placeholder?: string }
 export interface Call {
   name: string
   args: unknown[]
@@ -43,6 +43,7 @@ export interface Check<W> {
   id: string
   label: string
   input?: string
+  reason?(e: Evidence<W>): string
   evaluate(e: Evidence<W>): Colour
 }
 export interface Theory {
@@ -60,6 +61,8 @@ export type InputValue = string | number | boolean | null | InputValue[] | { [ke
 
 export interface Lesson<W> {
   id: string
+  steps?: readonly string[]
+  focus?: string
   goal: string
   idea: string
   unit?: string
@@ -104,4 +107,14 @@ export interface Pack<W, A extends object> {
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }
 export function mainFile(source: string, line = source.split('\n').length): Starter {
   return { files: { 'main.ts': source }, edit: { file: 'main.ts', line } }
+}
+
+export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter): readonly string[] {
+  if (lesson.steps) return lesson.steps
+  const line = starter.edit.line
+  return [
+    ...(lesson.prediction ? ['Choose a prediction'] : []),
+    (lesson.kind === 'fix' ? 'Fix the code on line ' : 'Edit the code at line ') + line,
+    'Press Run',
+  ]
 }
