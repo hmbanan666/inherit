@@ -34,6 +34,10 @@ Omit `Co-authored-by` trailers and AI tool or model names from commit messages, 
 
 ## Agent skills
 
+### v8
+
+v8 replaces packs with one game (ADR 0021). Read [the v8 concept](docs/concept/v8.md) and [the first playable spec](docs/specs/v8-first-playable.md) before v8 work. New code lives in `packages/sim/src/v8/`.
+
 ### Author a pack
 
 When adding a pack or designing a lesson, use [.agents/skills/author-pack/SKILL.md](.agents/skills/author-pack/SKILL.md) and [the authoring guide](docs/packs/AUTHORING.md). Use [ADR 0019](docs/adr/0019-one-screen-two-tracks.md) and the [v6 spec](docs/specs/v6-course-and-challenges.md) for course and challenge decisions. ADR 0018 governs the shared pack foundation.

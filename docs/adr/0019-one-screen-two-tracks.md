@@ -27,3 +27,5 @@ Centre the celebration over the game, with a little confetti, the idea learned a
 ## Consequences
 
 The runner can validate a course frontier or an independent fixture with the same lesson evidence. The studio must distinguish a selected lesson from earned progress, and tick simulation from presentation of that tick. Old Workshop code needs a recovery path outside the play screen. Use the [curriculum](../specs/v6-beginner-curriculum.md) and [challenge briefs](../specs/v6-workshop-challenges.md) as the content contracts.
+
+> Superseded by ADR 0021 (v8: inherit a factory, play on ticks).
