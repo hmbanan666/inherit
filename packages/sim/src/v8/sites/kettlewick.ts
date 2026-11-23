@@ -14,6 +14,7 @@ export const kettlewick: Site = {
   ],
   furnace: { pos: { x: 2, y: 1 }, input: 0, output: 0 },
   recipe: { ore: 2, ingots: 1, ticks: 4, fuel: 1 },
+  repeatOrders: true,
   orderSchedule: [
     { id: 'hale', at: 0, from: 'Mayor Hale', item: 'ingot', qty: 20, due: 160, pay: 180 },
     { id: 'smithy', at: 1, from: 'Smithy', item: 'ingot', qty: 10, due: 300, pay: 100 },

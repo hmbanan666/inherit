@@ -14,6 +14,7 @@ export interface Site {
   furnace: { pos: Cell; input: number; output: number }
   recipe: { ore: number; ingots: number; ticks: number; fuel: number }
   orderSchedule: ScheduledOrder[]
+  repeatOrders?: boolean
   graceTicks: number
   latePayFraction: number
   credits: number
@@ -32,6 +33,7 @@ export interface World {
   drones: Drone[]
   veins: Vein[]
   depot: Site['depot']
+  orderRoundAt: number
   orders: Order[]
   creditsPerMinute: number
   status: string
@@ -45,7 +47,7 @@ export function createWorld(site: Site): World {
   const { seed, credits, grid, drones, veins, depot, furnace } = structuredClone(site)
   const world: World = {
     tick: 0, seed, credits, grid, drones, veins, depot, furnace: { ...furnace, readyAt: null },
-    orders: [], status: 'Haul ore to the furnace and ship the ingots.', creditsPerMinute: 0,
+    orderRoundAt: 0, orders: [], status: 'Haul ore to the furnace and ship the ingots.', creditsPerMinute: 0,
     ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [],
   }
   updateOrders(world, site)

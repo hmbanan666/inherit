@@ -24,6 +24,7 @@ const pending = ref(true)
 const panels = ['Console', 'API', 'Charts'] as const
 const panel = ref<typeof panels[number]>()
 const order = computed(() => world.value?.orders.find(o => o.status === 'open' || o.status === 'overdue'))
+const lastOrder = computed(() => world.value?.orders.at(-1))
 const saveKey = 'inherit.v8.' + kettlewick.id
 let worker: Worker | undefined
 let resetting = false
@@ -134,7 +135,7 @@ onBeforeUnmount(() => {
           <div v-if="world" class="clock">
             <div>
               <span class="tick">Credits <b>{{ world.credits }}</b> · {{ world.creditsPerMinute.toFixed(1) }} cr/min</span>
-              <p v-if="order" class="next">+{{ order.pay }} from {{ order.from }}: deliver {{ order.qty }} ingots</p>
+              <p v-if="order" class="next">+{{ order.pay }} from {{ order.from }}: deliver {{ order.qty }} ingots<template v-if="world.ledger.waste"> · {{ world.ledger.waste }} cr in wasted fuel</template></p>
             </div>
             <span class="tick" data-testid="cpu">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
           </div>
@@ -150,6 +151,7 @@ onBeforeUnmount(() => {
       <section class="objective" aria-label="Current order">
         <div class="goal-body">
           <h2 v-if="order">Fulfil {{ order.from }}'s order: {{ order.qty }} ingots</h2>
+          <h2 v-else-if="lastOrder">{{ lastOrder.from }}'s order: {{ lastOrder.status }}</h2>
           <h2 v-else>{{ world ? 'No open orders' : 'Kettlewick Works' }}</h2>
           <p class="next" :class="{ bad: error || saveError }">{{ error || saveError || world?.status || 'Uncle Ambrose left you Kettlewick Works. The code runs. Mostly.' }}</p>
         </div>

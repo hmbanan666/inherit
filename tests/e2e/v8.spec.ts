@@ -87,3 +87,23 @@ test('helpers deploy onto the live world and reload preserves drafts and the dep
   await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
   expect((await saved(page)).world.memory).toEqual({})
 })
+
+test('visibility suspends the worker clock and resumes the same works', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('Running', { exact: true })).toBeVisible()
+  await expect.poll(async () => (await saved(page)).world.tick).toBeGreaterThan(0)
+  async function hidden(value: boolean) {
+    await page.evaluate(flag => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: flag })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }, value)
+  }
+  await hidden(true)
+  // Allow an in-flight snapshot to arrive, then observe two site tick intervals.
+  await page.waitForTimeout(550)
+  const frozen = (await saved(page)).world
+  await page.waitForTimeout(1050)
+  expect((await saved(page)).world).toEqual(frozen)
+  await hidden(false)
+  await expect.poll(async () => (await saved(page)).world.tick).toBeGreaterThan(frozen.tick)
+})

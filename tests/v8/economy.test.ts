@@ -21,7 +21,7 @@ test('a nearby drone supplies the furnace and one batch finishes four ticks afte
 
 test('ship draws only available ingots, pays on completion and closes expired orders', async () => {
   const order = { id: 'hale', from: 'Hale', item: 'ingot' as const, qty: 3, due: 2, pay: 40, at: 1 }
-  const site = { ...kettlewick, graceTicks: 2, furnace: { ...kettlewick.furnace, output: 8 },
+  const site = { ...kettlewick, repeatOrders: false, graceTicks: 2, furnace: { ...kettlewick.furnace, output: 8 },
     orderSchedule: [order, { ...order, id: 'late', at: 2 }, { ...order, id: 'expires', at: 2 }] }
   const session = await createSession(site, { 'main.ts': `import { orders, ship, tick, memory, credits } from "inherit"
     export function onTick() {
@@ -50,6 +50,8 @@ test('running an empty furnace at zero credits never ends the session or spends 
   try {
     session.step(500)
     expect(session.world.tick).toBe(500)
+    expect(session.world.orders[0].status).toBe('open')
+    expect(session.world.orders[0].due).toBeGreaterThan(500)
     expect(session.world.credits).toBe(0)
     expect(session.world.creditsPerMinute).toBe(0)
   } finally { session.dispose() }
@@ -60,7 +62,7 @@ test('running an empty furnace at zero credits never ends the session or spends 
 // action can also start a batch between those production ticks.
 test('first-come shipping delivers both orders late; prioritizing the earlier deadline delivers both on time', async () => {
   const [hale, smithy] = kettlewick.orderSchedule
-  const site = { ...kettlewick, cpuLimit: 2,
+  const site = { ...kettlewick, repeatOrders: false, cpuLimit: 2,
     orderSchedule: [{ ...hale, qty: 20, due: 180 }, { ...smithy, at: 1, due: 98 }], furnace: { ...kettlewick.furnace, input: 60 } }
   async function deliver(sort: string) {
     const session = await createSession(site, { 'main.ts': `import { furnace, orders, ship, tick } from "inherit"
@@ -93,7 +95,7 @@ test('a direct haul route and earliest-due shipping fill the actual Kettlewick o
       for (const order of orders().sort((a, b) => a.due - b.due)) ship(order)
     }` })
   try {
-    session.step(kettlewick.orderSchedule[1].due)
+    while (session.world.ledger.income < 280 && session.world.tick < kettlewick.orderSchedule[1].due) session.step(1)
     expect(session.world.messages).toEqual([])
     expect(session.world.orders.map(o => o.status)).toEqual(['on time', 'on time'])
     expect(session.world.ledger.income).toBe(280)
