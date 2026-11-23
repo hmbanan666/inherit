@@ -4,9 +4,10 @@ export { mining, miningModule } from './modules/mining'
 export { kettlewick } from './sites/kettlewick'
 
 import { mining } from './modules/mining'
+import { orderBricks } from './modules/orders'
 import { smelting } from './modules/smelting'
 import type { Site } from './core/world'
 
 export function factoryBricks(site: Site) {
-  return [...mining(site), ...smelting(site)]
+  return [...mining(site), ...smelting(site), ...orderBricks(site)]
 }

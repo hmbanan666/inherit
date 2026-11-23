@@ -32,6 +32,7 @@ export function declarations(bricks: Brick[]) {
   export interface Cell { x: number; y: number }
   export interface Target { readonly pos: Cell }
   export interface Vein extends Target { readonly name: string; readonly left: number }
+  export interface Order { readonly id: string; readonly item: 'ingot'; readonly qty: number; readonly shipped: number; readonly due: number; readonly pay: number; readonly from: string }
   export interface Furnace extends Target {
 ${members('furnace.')}
   }
