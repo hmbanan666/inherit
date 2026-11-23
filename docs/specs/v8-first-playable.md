@@ -39,6 +39,7 @@ Out: art, market, drill and slag, build and stations, AI agent, rivals, side con
 - Worker runs core and sandbox at 2 ticks per second, 2x and 4x, Pause, auto-pause when the tab is hidden.
 - Layout of the standing frame: grid map left, Monaco right with Uncle's `main.ts`, wide Run top right, nav meters (tick, credits, CPU used/limit, red at the limit), Console under the editor with the CPU-limit line, API cards from the registry with CPU cost.
 - Run deploys the edited code onto the running world without resetting it. Restart resets the site.
+- Editor suggestions rank game API bricks above TypeScript keywords and globals (typing `sa` must offer `say` before `satisfies`, since Enter accepts the top item after PR #66). Unit test on the ranking.
 - Browser test: open, Run, ore count rises, CPU meter reads 30/30.
 
 ### M3. Economy: furnace, orders, rent
