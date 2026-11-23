@@ -32,6 +32,18 @@ v7 is a prototype of the frame and the game loop. It does not add content or vis
 
 **Standing frame.** Top nav, palette, IDE beside the game area, wide Run top right, compact coloured checks, no timers, solved card with one Continue.
 
+## Exercise format, after Exercism
+
+Lessons and challenges follow the format of the Exercism TypeScript track (https://github.com/exercism/typescript, MIT licence, Copyright (c) 2021 Exercism): each exercise stands alone, with short instructions, one goal, explicit visible tests and optional hints. In our terms:
+
+- **Self-contained.** An exercise ships its own starter, fixture and checks. Nothing depends on an earlier exercise, so any exercise can be opened directly.
+- **Short instructions.** The goal line and the step card are the instructions. Longer explanation lives in Learn, opened on request.
+- **One goal per exercise.** One new idea or one skill to sharpen.
+- **Visible tests.** Every check the code is graded on is listed under the editor in plain words, including the hidden-input runs in Workshop, which are named and counted even when their data is not shown.
+- **Optional hints.** Hints are progressive and only open on request.
+
+We borrow the format, not text. If exercise text or tests are ever adapted from that repository, the file keeps the MIT notice and names the source exercise.
+
 ## Replaces in ADR 0019
 
 Learn opening by itself once per idea; the course map inside Learn; the goal bar; checks shown red before a Run; the solved card placed at once over the world; lessons that build on the previous lesson's code or state.
