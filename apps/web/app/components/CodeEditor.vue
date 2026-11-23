@@ -212,7 +212,8 @@ function keys(e: KeyboardEvent) {
 }
 let errorZone: string | undefined
 let errorMarks: monaco.editor.IEditorDecorationsCollection | undefined
-const errorHost = shallowRef<HTMLElement>()
+const feedback = ref<HTMLElement>()
+const feedbackTop = ref(0)
 let zoneResize: ResizeObserver | undefined
 function runtimeMarker() {
   if (!editor) return
@@ -224,25 +225,26 @@ function runtimeMarker() {
   editor.changeViewZones(access => {
     if (errorZone) access.removeZone(errorZone)
     errorZone = undefined
-    errorHost.value = undefined
-    if (!issue || !model) return
+    if (!issue || !model || !feedback.value) return
     const from = model.getPositionAt(issue.mark.from)
     const to = model.getPositionAt(issue.mark.to)
     errorMarks?.set([
       { range: monaco.Range.fromPositions(from, to), options: { inlineClassName: 'error-token', hoverMessage: { value: issue.body } } },
       { range: new monaco.Range(issue.line, 1, issue.line, 1), options: { isWholeLine: true, className: 'error-line' } },
     ])
-    const node = document.createElement('div')
-    errorHost.value = document.createElement('div')
-    node.append(errorHost.value)
-    const zone = { afterLineNumber: issue.line, heightInPx: 90, domNode: node }
+    // Reserve space in Monaco and keep the interactive feedback in the accessible editor shell.
+    const zone = {
+      afterLineNumber: issue.line, heightInPx: feedback.value.offsetHeight,
+      domNode: document.createElement('div'),
+      onDomNodeTop(top: number) { feedbackTop.value = top },
+    }
     errorZone = access.addZone(zone)
     zoneResize = new ResizeObserver(() => {
-      if (!errorZone || !errorHost.value) return
-      zone.heightInPx = errorHost.value.offsetHeight
+      if (!errorZone || !feedback.value) return
+      zone.heightInPx = feedback.value.offsetHeight
       editor?.changeViewZones(update => update.layoutZone(errorZone!))
     })
-    zoneResize.observe(errorHost.value)
+    zoneResize.observe(feedback.value)
   })
   if (issue) editor.revealLineInCenter(issue.line)
 }
@@ -454,14 +456,14 @@ onBeforeUnmount(() => {
       <p v-else-if="query" class="quiet">No matches.</p>
       <small v-if="results.length > 80">First 80 of {{ results.length }} matches</small>
     </div>
-    <Teleport v-if="errorHost && diagnostic" :to="errorHost">
-      <aside class="line-feedback" role="alert">
+    <div class="code-viewport">
+      <div ref="host" class="code-editor" />
+      <aside v-if="diagnostic" ref="feedback" class="line-feedback" role="alert" :style="{ top: feedbackTop + 'px' }">
         <strong>{{ diagnostic.title }}</strong><p>{{ diagnostic.body }}</p>
         <button @click="emit('hint')">Hint</button>
         <details><summary>Technical details</summary>{{ diagnostic.raw }}</details>
       </aside>
-    </Teleport>
-    <div ref="host" class="code-editor" />
+    </div>
   </section>
 </template>
 <style scoped src="../lib/devtools/panels.css"></style>
@@ -540,6 +542,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.code-viewport { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden }
+.line-feedback { position: absolute; z-index: 3; left: 0; right: 0 }
 .code-editor {
   position: relative;
   inset: auto;

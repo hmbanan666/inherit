@@ -185,7 +185,7 @@ test('an empty greeting explains the error under its line and offers a hint', as
   await page.goto('/?pack=beginner&lesson=hello')
   await expect(page.getByRole('textbox', { name: 'Player TypeScript' })).toBeFocused()
   await page.keyboard.press('Control+Enter')
-  const error = page.getByRole('alert')
+  const error = page.getByRole('alert').filter({ hasText: 'No words yet' })
   await expect(error).toContainText('No words yet')
   await expect(page.locator('.error-token')).toHaveText('""')
   await expect(error.locator('details')).not.toHaveAttribute('open')

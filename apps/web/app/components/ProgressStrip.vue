@@ -38,9 +38,9 @@ function select(id: string) {
 </template>
 <style scoped>
 .progress-strip { display: grid; align-content: center; gap: 5px; padding-inline: 10px; color: var(--soft); font: 12px var(--mono); white-space: nowrap }
-progress { height: 3px; width: 100%; border: 0; background: var(--line); accent-color: var(--gold) }
+progress { height: 3px; width: 100%; border: 0; background: var(--line); accent-color: var(--mint) }
 progress::-webkit-progress-bar { background: var(--line) }
-progress::-webkit-progress-value { background: var(--gold) }
+progress::-webkit-progress-value { background: var(--mint) }
 @media (max-width: 600px) { .progress-strip { order: 5; padding: 2px; width: 100% } }
 #lesson-map { inset: 62px auto auto 10px; margin: 0; width: min(340px, 90vw); max-height: 65vh; overflow: auto; background: var(--panel); color: var(--text); padding: 12px; border: 1px solid var(--line) }
 summary { cursor: pointer; padding: 7px 0; font-weight: 600 }

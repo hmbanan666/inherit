@@ -113,10 +113,12 @@ export function mainFile(source: string, line = source.split('\n').length): Star
 
 export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter): readonly string[] {
   if (lesson.steps) return lesson.steps
-  const line = starter.edit.line
+  const { line, file } = starter.edit
+  const note = starter.files[file].split('\n')[line - 2]?.trim().match(/^\/\/ TODO:\s*(.+)/)?.[1]
+  const instruction = note ? note.replace(/\.$/, '') + ' (line ' + line + ')' : 'Edit the code at line ' + line
   return [
     ...(lesson.prediction ? ['Choose a prediction'] : []),
-    (lesson.kind === 'fix' ? 'Fix the code on line ' : 'Edit the code at line ') + line,
+    instruction,
     'Press Run',
   ]
 }

@@ -40,7 +40,11 @@ watch(solved, (value, _, cleanup) => {
   const delay = setTimeout(() => { showCard.value = true }, 1000)
   cleanup(() => clearTimeout(delay))
 })
-const checkRows = computed(() => frame.value?.labels.map((label,i) => ({...label, reason: frame.value?.save.reasons?.[label.id], status: statuses.value[i] ?? 'red' as Colour})) ?? [])
+const checkRows = computed(() => frame.value?.labels.map((label, index) => ({
+  ...label, status: statuses.value[index] ?? 'red',
+  reason: busy.value ? undefined : frame.value?.save.reasons?.[label.id] ??
+    (diagnostic.value ? 'The code stopped before this check finished.' : 'Still needed: ' + label.text + '.'),
+})) ?? [])
 const choice = computed(() => frame.value?.save.predictions[frame.value.save.lessonId!])
 const currentStep = computed(() => {
   const data = frame.value
