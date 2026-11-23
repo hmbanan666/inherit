@@ -1,8 +1,8 @@
 # v8 quest screen
 
-Governs the arrangement of Kettlewick Works. The rules are [ADR 0022](../adr/0022-quest-loop-no-loss.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), and [the first playable slice](v8-first-playable.md).
+Governs the arrangement of Kettlewick Works. The rules are [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
 
-The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The quest rail is a fixed 280px column on the left. To its right, the map is the top row and the editor is the bottom row. One splitter component divides the map from the editor, the file tree from the code, and the code from Checks. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px hint, a 34px gold button, and a 48px portrait.
+The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The quest rail is a fixed 280px column on the left. To its right, the map is the top row and the editor is the bottom row. One splitter component divides the map from the editor, the file tree from the code, and the code from Checks. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px ask, a 34px gold button, and a 48px portrait.
 
 ## Proportions
 
@@ -16,11 +16,11 @@ The editor and the checks fill the rest of the bottom row. The file tree is the 
 
 ## Reading order
 
-1. Nav. Where you are, what you hold, whether the clock is running.
+1. Nav. Where you are, and the credits and level you hold.
 2. Quest rail. Who is asking, the goals, the reward, the one button.
 3. Works. The map.
-4. Editor. The open file tab, the code, Deploy, and the checks beside the code.
-5. Status bar. The quantities.
+4. Editor. The open file tab, the code, Deploy, and the log beside the code.
+5. Status bar. The script, problems, caret, tick, and CPU when it is worth showing.
 
 On a narrow window the rail stacks above the map, and the map stacks above the editor. The same five stops stay in that order.
 

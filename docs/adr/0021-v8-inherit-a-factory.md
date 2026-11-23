@@ -1,6 +1,8 @@
 # v8: inherit a factory, play on ticks
 
-Accepted 23 November 2026. Amended 23 November 2026 by [ADR 0022](0022-quest-loop-no-loss.md). Supersedes ADR 0015, 0016, 0018, 0019 and 0020, and ADR 0008.
+Accepted 23 November 2026. Amended 23 November 2026 by [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0023](0023-quest-unlocks-functions.md), and [ADR 0026](0026-quantity-quests-one-world.md). Supersedes ADR 0015, 0016, 0018, 0019 and 0020, and ADR 0008.
+
+> ADR 0023 withdraws "the shop is how a locked brick becomes available" and the example that a vein runs out. A function is granted by taking the quest. Veins do not run out. ADR 0026 withdraws any reading of this file as a rate or a deadline.
 
 [ADR 0022](0022-quest-loop-no-loss.md) replaces the clauses that specified deadlines, rent, bankruptcy, pause, speed buttons, a ban on the quest card and on visible checks, and the removal of packs. Those sentences are withdrawn. The decisions below that ADR 0022 does not replace still stand.
 

@@ -121,9 +121,8 @@ export interface World {
   orders: Order[]
   /** Sentences the village said when a request was paid. One line each, in order. */
   growth: string[]
-  creditsPerMinute: number
   status: string
-  ledger: { income: number; waste: number; payouts: { tick: number; credits: number }[] }
+  ledger: { income: number; waste: number }
   furnace: Site['furnace'] & { readyAt: number | null; coal: number; steel: number; oreAt: number | null; coalAt: number | null; batch: 'ingot' | 'steel' | null }
   cpu: { used: number; limit: number }
   memory: Record<string, unknown>
@@ -142,7 +141,6 @@ export interface World {
   ingotsMade: number
   steelMade: number
   steelMark: number
-  oreAfterDry: number
   pathCallsTick: number
   pathWindow: number[]
   /** Tick of the last deploy, or of taking the quest. */
@@ -171,14 +169,14 @@ export function createWorld(site: Site): World {
     veins: site.veins.map(vein => settleVein(vein)),
     depot: structuredClone(site.depot),
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, oreAt: null, coalAt: null, batch: null },
-    orderRoundAt: 0, orders: [], growth: [], status: '', creditsPerMinute: 0,
-    ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
+    orderRoundAt: 0, orders: [], growth: [], status: '',
+    ledger: { income: 0, waste: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0, coalHold: 8,
     automation: { run: false, events: false, tick: false },
     manualRuns: 0, pendingRuns: [], jobs: {}, inbox: { smelt: false, alloy: false, collect: false, clear: false, drones: {} },
     collectAt: null, collectSpan: 0,
     signals: { output: 0, ingotsMade: 0, steelMade: 0, drones: {} },
-    ingotsMade: 0, steelMade: 0, steelMark: 0, oreAfterDry: 0, pathCallsTick: 0, pathWindow: [],
+    ingotsMade: 0, steelMade: 0, steelMark: 0, pathCallsTick: 0, pathWindow: [],
     checkSince: 0, checkMoved: {},
   }
   world.depot.coal ??= 0
@@ -239,12 +237,6 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
     const { used, message } = onTick()
     world.cpu.used = used
     if (world.credits < balance) world.credits = balance
-    const earned = world.credits - balance
-    const minute = 60_000
-    if (earned) world.ledger.payouts.push({ tick: world.tick, credits: earned })
-    world.ledger.payouts = world.ledger.payouts.filter(p => (world.tick - p.tick) * site.tickMs < minute)
-    const recent = world.ledger.payouts.reduce((total, p) => total + p.credits, 0)
-    world.creditsPerMinute = recent * minute / Math.min(minute, world.tick * site.tickMs)
     world.pathWindow.push(world.pathCallsTick)
     if (world.pathWindow.length > 8) world.pathWindow.shift()
     world.pathCallsTick = 0

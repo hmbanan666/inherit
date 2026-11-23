@@ -220,24 +220,6 @@ export const shop: ShopItem[] = [
   { id: 'cpu', name: 'CPU +10', price: 80, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
 
-/** Conveniences and limits. A function is granted by the quest that needs it, not sold. */
-export const shopTiers: { level: number; items: string[] }[] = [
-  { level: 1, items: ['Bigger cart', 'Hotter furnace'] },
-  { level: 2, items: ['Bigger hopper'] },
-  { level: 3, items: ['Second drone'] },
-  { level: 6, items: ['CPU +10'] },
-]
-
-export function nextUnlock(level: number) {
-  return shopTiers.find(tier => tier.level > level)
-}
-
-export function upcomingQuests(id: string, count = 3) {
-  const index = questList.findIndex(quest => quest.id === id)
-  if (index < 0) return []
-  return questList.slice(index + 1, index + 1 + count).map(quest => quest.title)
-}
-
 export function nextQuest(world: World, site: Site) {
   const quest = site.questList?.find(item => !world.cleared.includes(item.id) && world.level >= item.needLevel)
   return quest

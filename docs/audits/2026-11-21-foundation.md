@@ -1,5 +1,7 @@
 # Foundation audit: is Inherit a game yet? (2026-11-21)
 
+> Historical snapshot of `77cd39c`. Not the current game. [ADR 0026](../adr/0026-quantity-quests-one-world.md) is the vision.
+
 Scope: an audit only. No product code was changed. Inputs were ADR 0001–0013, `CONTEXT.md`, spec #32, ticket #43, PR #44, the code on `main` at `77cd39c`, and a scripted headless walk through the live build at https://inherit.kosarev.space (1440×900 and 1280×720, today). The screenshots are attached to the PR that adds this file.
 
 ## Verdict

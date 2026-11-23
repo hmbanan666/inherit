@@ -53,7 +53,7 @@ export function recoverFactorySave(raw: string | null): SaveRecovery {
   const deployed = projectFiles(save.deployed)
   const world = save.world
   const usable = save.version === 3 && !!files && !!deployed && !!world && Number.isSafeInteger(world.tick) &&
-    Array.isArray(world.ledger?.payouts) && Array.isArray(world.growth) &&
+    typeof world.ledger?.income === 'number' && Array.isArray(world.growth) &&
     Array.isArray(world.bought) && Array.isArray(world.cleared) && Array.isArray(world.checks)
   if (usable && typeof save.activeFile === 'string') return { kind: 'resume', save: { ...save, files, deployed, world } as FactorySave }
   if (files) {

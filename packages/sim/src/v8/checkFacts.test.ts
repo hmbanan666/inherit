@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { kettlewick, uncleMain } from './sites/kettlewick'
-import { acceptQuest, nextUnlock, questList } from './quests'
+import { acceptQuest, questList } from './quests'
 import { createWorld } from './core/world'
 import { mining } from './modules/mining'
 import { inspectAt, noteCheckReset, readChecks, stallTicks } from './checkFacts'
@@ -95,12 +95,6 @@ test('a route check stays pending until the window is full and the count has sat
   expect(late?.state).toBe('failed')
   expect(late?.reason).toBe('path calls 8')
   expect(readChecks(lateWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'done')?.reason).toBe('waits on: The route is remembered')
-})
-
-test('the next shop tier is the one above this level', () => {
-  expect(nextUnlock(1)?.level).toBe(2)
-  expect(nextUnlock(1)?.items).toEqual(['Bigger hopper'])
-  expect(nextUnlock(6)).toBeUndefined()
 })
 
 test('a full hopper is named when it blocks the ingot', () => {
