@@ -14,6 +14,7 @@ export interface PackSave<W> {
   edit?: Starter['edit']
   phase: 'brief' | 'working' | 'solved'
   completed: string[]
+  reasons?: Record<string, string>
   passed: string[]
   drafts: Record<string, Draft<W>>
   attempts: Record<string, number>
@@ -104,6 +105,7 @@ function enter<W, A extends object>(pack: Pack<W, A>, save: PackSave<W>, lesson?
   save.lessonId = lesson?.id ?? null
   save.clockActive = false
   save.project.deployed = null
+  delete save.reasons
   save.passed = []
   save.phase = 'brief'
   if (!lesson) {

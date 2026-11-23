@@ -18,6 +18,7 @@ type RunMode = 'run' | 'deploy' | 'tick' | 'resume'
 
 interface InputResult {
   input: string
+  reason?: string
   colour: Colour
 }
 
@@ -44,10 +45,12 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
     let site: Pick<Call,'file'|'line'|'within'> = { file: 'main.ts', line: 1 }
     const host = { tick: ++ticks, traceSite(next: typeof site) { site = next } }
     const evidence = { before: save.entryWorld, world, calls, files, console: [] as string[] }
-    function inputsFor(check: Check<W>): InputResult[] {
+    function inputsFor(check: Check<W>, explain = false): InputResult[] {
       const alternates = variantResults.get(check.id) ?? []
       if (check.input && alternates.length) return alternates
-      return [{ input: check.input ?? 'Scene input', colour: check.evaluate(evidence) }, ...alternates]
+      const colour = check.evaluate(evidence)
+      const reason = explain && colour !== 'green' ? check.reason?.(evidence) : undefined
+      return [{ input: check.input ?? 'Scene input', colour, reason }, ...alternates]
     }
     for (const name of names) {
       const method = api[name]
@@ -79,17 +82,19 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
     } catch (error) {
       candidate?.dispose()
       if (mode==='tick') {dispose(); save.clockActive = false}
-      if (mode!=='resume') {save.phase='working'; save.passed=[]}
+      if (mode!=='resume') {save.phase='working'; save.passed=[]; delete save.reasons}
       throw new Error(playerError(error,names))
     }
     if (candidate) { dispose(); program = candidate }
-    const inputsByCheck = lesson.checks.map(inputsFor)
+    const inputsByCheck = lesson.checks.map(check => inputsFor(check, true))
     const statuses = inputsByCheck.map(combinedColour)
+    const reasons: Record<string, string> = {}
     const failedInputs: Record<string, string[]> = {}
     lesson.checks.forEach((check, index) => {
-      if (!variantResults.has(check.id)) return
       const failed = inputsByCheck[index].filter(result => result.colour !== 'green')
-      if (failed.length) failedInputs[check.id] = failed.map(result => result.input)
+      if (!failed.length) return
+      reasons[check.id] = failed[0].reason ?? 'Still needed: ' + check.label + '.'
+      if (variantResults.has(check.id)) failedInputs[check.id] = failed.map(result => result.input)
     })
     if (mode !== 'resume') {
       if (mode !== 'tick') save.project.working = {...files}
@@ -99,12 +104,13 @@ function fixtureRunner<W, A extends object>(pack: Pack<W, A>, variantResults: Ma
         const id = save.project.nextRevision++
         save.project.history = [...save.project.history.slice(-31),{id,tick:ticks,name:'Deploy '+id,files:{...files}}]
       }
+      save.reasons = reasons
       save.world = world
       save.passed = lesson.checks.filter((check,i) => statuses[i]==='green' || mode==='tick' && save.passed.includes(check.id)).map(c=>c.id)
       save.phase = save.passed.length === lesson.checks.length ? 'solved' : 'working'
       if (save.phase === 'solved') save.clockActive = false
     }
-    return {start, moments, logs:evidence.console, checks:statuses, failedInputs}
+    return {start, moments, logs:evidence.console, checks:statuses, reasons, failedInputs}
   }
   return {play,dispose}
 }
@@ -124,11 +130,13 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
         trial.entryWorld = structuredClone(trial.world)
         const runner = fixtureRunner({ ...pack, lessons: [{ ...lesson, checks }] }, new Map())
         let statuses: Colour[]
+        let reasons: Record<string, string> = {}
         try {
-          const result = await runner.play(trial, files, lesson.mode)
-          statuses = result.checks
+          let result = await runner.play(trial, files, lesson.mode)
           for (let tick = 0; lesson.mode === 'deploy' && trial.phase !== 'solved' && tick < (variant.maxTicks ?? 120); tick++)
-            statuses = (await runner.play(trial, files, 'tick')).checks
+            result = await runner.play(trial, files, 'tick')
+          statuses = result.checks
+          reasons = result.reasons
           statuses = checks.map((check, i) => trial.passed.includes(check.id) ? 'green' : statuses[i])
         } catch {
           // A player error on one input leaves its rows outstanding.
@@ -136,7 +144,7 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
         } finally { runner.dispose() }
         checks.forEach((check, index) => {
           const cases = results.get(check.id) ?? []
-          cases.push({ input: variant.input, colour: statuses[index] })
+          cases.push({ input: variant.input, colour: statuses[index], reason: reasons[check.id] })
           results.set(check.id, cases)
         })
       }
@@ -165,6 +173,7 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
         if (!solved()) throw new Error('Could not restore the earned scene for ' + earned.goal)
         world = trial.world
       }
+      save.reasons = reasons
       save.world = world
     }
     continueLesson(pack, save)

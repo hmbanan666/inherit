@@ -32,7 +32,7 @@ const lastRun = shallowRef<Files>({})
 const declarations = computed(() => frame.value?.declarations ?? '')
 const complete = computed(() => frame.value?.save.lessonId === null)
 const solved = computed(() => !busy.value && frame.value?.solved)
-const checkRows = computed(() => frame.value?.labels.map((label,i) => ({...label,status:statuses.value[i] ?? 'red' as Colour})) ?? [])
+const checkRows = computed(() => frame.value?.labels.map((label,i) => ({...label, reason: frame.value?.save.reasons?.[label.id], status: statuses.value[i] ?? 'red' as Colour})) ?? [])
 const choice = computed(() => frame.value?.save.predictions[frame.value.save.lessonId!])
 const currentStep = computed(() => {
   const data = frame.value
@@ -312,7 +312,7 @@ onBeforeUnmount(() => {
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
           <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :error="error" @reference="openDrawer('api')" /></div></div>
-          <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
+          <ChecksPanel :key="frame.save.lessonId ?? ''" :tried="frame.save.phase !== 'brief'" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
           <button v-if="frame.logs.length" class="console-count" @click="openDrawer('console')">Console · {{ frame.logs.length }} lines</button>
           <p v-if="frame.prediction && frame.save.phase !== 'brief'" class="prediction-result">Your prediction: {{ frame.save.predictions[frame.save.lessonId!] }} · Result: {{ frame.prediction.answer }}</p>
         </template>
