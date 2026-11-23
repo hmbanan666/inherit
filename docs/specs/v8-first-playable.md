@@ -56,7 +56,8 @@ Out: art, market, drill and slag, build and stations, AI agent, rivals, side con
 - Start small: one drone, CPU well under the limit at start. More drones are an unlock.
 - Uncle's starter is the short version in the concept (about 10 lines) with one obvious problem first (smelting an empty furnace burns credits).
 - The current order is the goal line at the top, with one plain status line under it: what is wrong now and what to do.
-- Run is labelled and explained as applying the code to the running works (deploy), with a tooltip.
+- Top right: a small running indicator (pulse) while the deployed code matches the editor. As soon as the editor differs, a Deploy button (Ctrl+Enter) replaces it and deploys the new code onto the running works; then the indicator returns. No version numbers yet.
+- Restart leaves the toolbar and becomes "Start over" in a menu, with a confirm.
 - Console, API and the charts are collapsed by default and open on demand.
 - Reuse the earlier components and styles (icon playback buttons, the API reference panel, existing styles); remove invented replacements.
 
