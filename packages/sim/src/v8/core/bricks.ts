@@ -49,6 +49,9 @@ ${members('drone.')}
 ${members('cpu.')}
   }
 ${bricks.filter(b => !b.name.includes('.')).map(b => declaration(b, 'export ')).join('\n')}
+  export type WorksEvent = 'furnace.full' | 'furnace.ready' | 'drone.idle' | 'drone.full'
+  /** Call fn once when the event happens. A quest unlocks on(). CPU: 0. */
+  export function on(event: WorksEvent, fn: () => void): void
 }
 declare interface InheritConsole {
   log(...args: unknown[]): void

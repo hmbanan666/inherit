@@ -12,6 +12,7 @@ import type { PlainError } from '@inherit/sandbox/pack'
 import type { Starter } from '@inherit/sim/pack'
 import { SuggestAdapter } from 'monaco-editor/esm/vs/language/typescript/tsMode.js'
 import { editorKey, rankApiSuggestions } from '../lib/editor'
+import { runnableExports } from '../lib/runGlyph'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
 const game = inject(editorKey)!
@@ -45,6 +46,7 @@ let rankedSuggestions: monaco.IDisposable
 let suggestions: monaco.IDisposable
 let lineLight: monaco.editor.IEditorDecorationsCollection | undefined
 let tickMarks: monaco.editor.IEditorDecorationsCollection | undefined
+let runMarks: monaco.editor.IEditorDecorationsCollection | undefined
 const highlight = createLineHighlight(line => {
   if (!line || !editor) {
     lineLight?.clear()
@@ -74,6 +76,21 @@ function showPlaceholder() {
     range: new monaco.Range(line, column, line, column),
     options: { showIfCollapsed: true, after: { content: starter.placeholder, inlineClassName: 'edit-placeholder' } },
   }] : [])
+}
+
+function markRuns() {
+  if (!editor || !runMarks) return
+  const on = !!game.canRun?.value
+  editor.updateOptions({ glyphMargin: on })
+  if (!on) {
+    runMarks.clear()
+    return
+  }
+  const source = files.value[activeFile.value] ?? ''
+  runMarks.set(runnableExports(source).map(item => ({
+    range: new monaco.Range(item.line, 1, item.line, 1),
+    options: { glyphMarginClassName: 'run-glyph', glyphMarginHoverMessage: { value: `Run ${item.name}` } },
+  })))
 }
 
 function markTickLines() {
@@ -308,7 +325,7 @@ onMounted(() => {
     scrollBeyondLastLine: false,
     lineNumbersMinChars: 3,
     folding: false,
-    glyphMargin: false,
+    glyphMargin: !!game.canRun?.value,
     overviewRulerLanes: 0,
     hideCursorInOverviewRuler: true,
     renderLineHighlight: 'line',
@@ -321,6 +338,7 @@ onMounted(() => {
   placeholder = editor.createDecorationsCollection()
   lineLight = editor.createDecorationsCollection()
   tickMarks = editor.createDecorationsCollection()
+  runMarks = editor.createDecorationsCollection()
   suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, pos) {
@@ -344,6 +362,12 @@ onMounted(() => {
   })
   editor.onMouseLeave(() => emit('focusIds', []))
   editor.onMouseDown(({ target }) => {
+    if (target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN && target.position && game.canRun?.value) {
+      const line = target.position.lineNumber
+      const hit = runnableExports(files.value[activeFile.value] ?? '').find(item => item.line === line)
+      if (hit) game.runAt?.(hit.name, activeFile.value, line)
+      return
+    }
     if (!target.position || target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return
     const file = activeFile.value
     if (files.value[file] !== deployed.value[file]) return
@@ -370,6 +394,7 @@ onMounted(() => {
   showPlaceholder()
   lightCall()
   markTickLines()
+  markRuns()
   opener = monaco.editor.registerEditorOpener({
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
@@ -391,6 +416,7 @@ onMounted(() => {
   emit('ready')
 })
 watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLines, { flush: 'post' })
+watch([() => game.canRun?.value, activeFile, files], markRuns, { flush: 'post' })
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
@@ -572,5 +598,18 @@ onBeforeUnmount(() => {
   height: auto;
   min-height: 0;
   flex: 1;
+}
+</style>
+<style>
+.run-glyph { cursor: pointer }
+.run-glyph::before {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  margin: 6px 0 0 4px;
+  border-style: solid;
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent #e7c56a;
 }
 </style>

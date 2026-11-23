@@ -15,6 +15,8 @@ export interface ProjectOptions {
   inputs?: Record<string, JsonValue>
   /** Trusted code for the built-in module, installed before player files. */
   inheritSource?: string
+  /** v8 allows a file with no onTick. Packs still require one. */
+  clock?: 'required' | 'optional'
   costs?: Readonly<Record<string, number>>
   operations?: readonly string[]
 }

@@ -7,7 +7,7 @@ export const kettlewick: Site = {
   id: 'kettlewick',
   seed: 1,
   grid: { width: 16, height: 6 },
-  depot: { pos: depot, ore: 0, coal: 0 },
+  depot: { pos: depot, ore: 0, coal: 0, ingots: 0, steel: 0 },
   drones: [{ name: 'drone-1', pos: { ...depot }, cargo: 0, capacity: 3, carrying: null, source: '' }],
   veins: [
     { name: 'A', pos: { x: 6, y: 2 }, kind: 'ore', purity: 'poor', ticksPerUnit: 5, yield: 1 },
@@ -35,7 +35,17 @@ export const kettlewick: Site = {
   costs: { read: 0, action: 1, findPath: 3 },
   orePerMine: 1,
   files: {
-    'main.ts': `// Kettlewick Works. It works. Don't touch it. - Uncle Ambrose
+    'main.ts': `import { furnace } from "inherit"
+
+export function smeltOnce() {
+  // The furnace can smelt when it holds 2 ore.
+}
+`,
+  },
+}
+
+/** Uncle's loop. Old saves still run it. A fresh world does not. */
+export const uncleMain = `// Kettlewick Works. It works. Don't touch it. - Uncle Ambrose
 import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 
 export function onTick() {
@@ -48,6 +58,5 @@ export function onTick() {
   else drone.mine(vein)
   if (furnace.input >= 2) furnace.smelt()
   for (const order of orders()) ship(order)
-}`,
-  },
 }
+`

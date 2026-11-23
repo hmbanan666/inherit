@@ -11,7 +11,7 @@ export interface ScheduledOrder {
   due: number
   pay: number
   from: string
-  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen' | 'harrow'
+  who: 'bram' | 'ines' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen' | 'harrow'
   role: string
   title: string
   text: string
@@ -52,6 +52,20 @@ export function updateOrders(world: World, site: Site) {
   }
 }
 
+/** Villagers take the open quest's goods from the depot. */
+export function takeFromDepot(world: World, site: Site) {
+  if (!site.questList || !world.questId) return
+  const order = world.orders.find(item => item.id === world.questId && (item.status === 'open' || item.status === 'overdue'))
+  if (!order) return
+  const stock = order.item === 'steel' ? world.depot.steel : world.depot.ingots
+  const amount = Math.min(order.qty - order.shipped, stock)
+  if (amount <= 0) return
+  if (order.item === 'steel') world.depot.steel -= amount
+  else world.depot.ingots -= amount
+  order.shipped += amount
+  if (order.shipped >= order.qty) order.status = 'ready'
+}
+
 export function orderBricks(site: Site): Brick[] {
   return [
     brick('credits', 'function credits(): number', 'Read the balance.', 'credits()', site.costs.read,
@@ -66,9 +80,15 @@ export function orderBricks(site: Site): Brick[] {
         if (qty !== undefined && (typeof qty !== 'number' || !Number.isSafeInteger(qty) || qty < 0))
           throw new Error(`ship qty ${String(qty)} is not a whole nonnegative number. ${order.id} wants ${order.item}. furnace ${order.item === 'steel' ? 'steel ' + world.furnace.steel : 'output ' + world.furnace.output}.`)
         const remaining = order.qty - order.shipped
-        const stock = order.item === 'steel' ? world.furnace.steel : world.furnace.output
+        const fromDepot = !!site.questList
+        const stock = order.item === 'steel'
+          ? (fromDepot ? world.depot.steel : world.furnace.steel)
+          : (fromDepot ? world.depot.ingots : world.furnace.output)
         const amount = Math.min(qty ?? remaining, remaining, stock)
-        if (order.item === 'steel') world.furnace.steel -= amount
+        if (order.item === 'steel') {
+          if (fromDepot) world.depot.steel -= amount
+          else world.furnace.steel -= amount
+        } else if (fromDepot) world.depot.ingots -= amount
         else world.furnace.output -= amount
         order.shipped += amount
         if (order.shipped !== order.qty) return

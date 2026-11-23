@@ -34,7 +34,7 @@ test('Odile haul: mixed cargo is refused, ore and coal both unload, and the same
   try {
     session.world.level = 2
     session.world.xp = 20
-    session.world.cleared = ['bram']
+    session.world.cleared = ['bram', 'ines']
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('odile')
 

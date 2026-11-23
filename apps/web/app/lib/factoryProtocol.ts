@@ -1,13 +1,15 @@
 import type { World } from '@inherit/sim/v8'
 
 export type FactoryCommand =
-  | { kind: 'restart'; files: Record<string, string>; saved?: World }
+  | { kind: 'restart'; files: Record<string, string>; saved?: World; fresh?: boolean }
   | { kind: 'run'; files: Record<string, string> }
   | { kind: 'visibility'; visible: boolean }
   | { kind: 'accept'; id?: string }
   | { kind: 'complete' }
   | { kind: 'buy'; id: string }
   | { kind: 'dump'; name: string }
+  | { kind: 'manual'; action: 'smelt' | 'alloy' | 'collect' | 'clear' | 'mine' | 'unload' | 'dump'; drone?: string }
+  | { kind: 'run-fn'; name: string; file: string; line: number }
   | { kind: 'clear-console' }
 
 export type FactoryFrame = { world: World; deployed?: Record<string, string> }

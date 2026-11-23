@@ -59,6 +59,23 @@ export function migrateWorld(world: World) {
   world.furnace.coalMax ??= 3
   for (const drone of world.drones) if (drone.dig === undefined) drone.dig = null
   world.coalHold ??= 8
+  world.depot.ingots ??= 0
+  world.depot.steel ??= 0
+  world.manualRuns ??= 0
+  world.pendingRuns ??= []
+  world.jobs ??= {}
+  world.inbox ??= { smelt: false, alloy: false, collect: false, clear: false, drones: {} }
+  world.collectAt ??= null
+  world.collectSpan ??= 0
+  if (!world.automation) world.automation = { run: true, events: true, tick: true }
+  if (!world.signals) world.signals = {
+    output: world.furnace.output,
+    ingotsMade: world.ingotsMade,
+    steelMade: world.steelMade,
+    drones: Object.fromEntries(world.drones.map(drone => [drone.name, {
+      cargo: drone.cargo, capacity: drone.capacity, idle: drone.cargo === 0 && !drone.route?.length,
+    }])),
+  }
   return world
 }
 export interface Site {
@@ -67,7 +84,7 @@ export interface Site {
   grid: { width: number; height: number }
   drones: Drone[]
   veins: Vein[]
-  depot: { pos: Cell; ore: number; coal: number }
+  depot: { pos: Cell; ore: number; coal: number; ingots: number; steel: number }
   furnace: { pos: Cell; input: number; output: number; oreMax: number; coalMax: number }
   recipe: { ore: number; ingots: number; ticks: number; fuel: number }
   orderSchedule: ScheduledOrder[]
@@ -132,6 +149,20 @@ export interface World {
   checkSince: number
   /** Last progress key for each check, and the tick it last changed. */
   checkMoved: Record<string, { key: string; at: number }>
+  /** Legacy saves set every flag. A fresh world starts with all of them off. */
+  automation: { run: boolean; events: boolean; tick: boolean }
+  manualRuns: number
+  pendingRuns: { name: string; file: string; line: number }[]
+  jobs: Record<string, { kind: 'mine' | 'unload'; vein?: string; left: number; total: number }>
+  inbox: { smelt: boolean; alloy: boolean; collect: boolean; clear: boolean; drones: Record<string, 'mine' | 'unload' | 'dump'> }
+  collectAt: number | null
+  collectSpan: number
+  signals: {
+    output: number
+    ingotsMade: number
+    steelMade: number
+    drones: Record<string, { cargo: number; capacity: number; idle: boolean }>
+  }
 }
 export function createWorld(site: Site): World {
   const world: World = {
@@ -143,10 +174,24 @@ export function createWorld(site: Site): World {
     orderRoundAt: 0, orders: [], growth: [], status: '', creditsPerMinute: 0,
     ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0, coalHold: 8,
+    automation: { run: false, events: false, tick: false },
+    manualRuns: 0, pendingRuns: [], jobs: {}, inbox: { smelt: false, alloy: false, collect: false, clear: false, drones: {} },
+    collectAt: null, collectSpan: 0,
+    signals: { output: 0, ingotsMade: 0, steelMade: 0, drones: {} },
     ingotsMade: 0, steelMade: 0, steelMark: 0, oreAfterDry: 0, pathCallsTick: 0, pathWindow: [],
     checkSince: 0, checkMoved: {},
   }
   world.depot.coal ??= 0
+  world.depot.ingots ??= 0
+  world.depot.steel ??= 0
+  world.signals = {
+    output: world.furnace.output,
+    ingotsMade: world.ingotsMade,
+    steelMade: world.steelMade,
+    drones: Object.fromEntries(world.drones.map(drone => [drone.name, {
+      cargo: drone.cargo, capacity: drone.capacity, idle: true,
+    }])),
+  }
   if (!site.questList) updateOrders(world, site)
   world.status = site.questList
     ? syncQuest(world, site)

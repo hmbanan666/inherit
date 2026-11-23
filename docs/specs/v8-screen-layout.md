@@ -46,7 +46,7 @@ Taking a quest inserts one comment at the top of the open file, in the villager'
 
 The map fills the top row beside the quest rail. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit and centers that grid in the row, horizontally and vertically. The whole grid stays visible and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
-Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it opens a small popover with the fields that entity has: id, pos, cargo, cargoKind, and capacity, furnace input and hopper caps, or a vein's purity and its rate (ticks per unit, units per action). A drone card has a Dump button. `dump()` empties ore or coal. It does not drop ingots or steel. A vein is labeled poor, normal, or rich, and a bar shows mining progress on the drone and on the vein.
+Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it, or a row under Machines, opens that object on the rail: what it is, what it holds, its recipes, and its buttons. Each button names the call, and Dump calls `drone.dump()`. The drone's hit target follows the sprite. A vein is labeled poor, normal, or rich, and a bar shows mining progress on the drone and on the vein. A play mark in the gutter runs one exported function on the next tick once Run is unlocked.
 
 ## Editor
 
@@ -66,7 +66,7 @@ API and Charts open one at a time under the code.
 
 ## Status bar
 
-A quiet strip, every item the same height, an icon and a short label, each with a tooltip. From the left: one lamp for the script, running, error, or stopped; then the error count and the warning count, which open the Console filtered to those lines. On the right: the caret as `Ln 12, Col 4`, the tick, and CPU only when the tick has spent at least half its budget or has already hit the limit. Depot, furnace, and drone quantities stay on the map and the popover.
+A quiet strip, every item the same height, an icon and a short label, each with a tooltip. From the left: one lamp for the script, running, error, or stopped; then the error count and the warning count, which open the Console filtered to those lines. On the right: the caret as `Ln 12, Col 4`, the tick, and CPU only when the tick has spent at least half its budget or has already hit the limit. Depot, furnace, and drone quantities stay on the map and the machine inspector.
 
 ## One home each
 
@@ -81,4 +81,4 @@ A quiet strip, every item the same height, an icon and a short label, each with 
 | Script, problems, caret, tick, CPU | Status bar |
 | Player console.log | Console tab, beside Checks |
 | API, Charts | One slot under the code |
-| Stock and drone loads | Map labels and the popover |
+| Stock and drone loads | Map labels and the machine inspector |

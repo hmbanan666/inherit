@@ -90,6 +90,8 @@ function bindings(site: Site): Brick[] {
       pos: Object.freeze(${JSON.stringify(site.depot.pos)}),
       get ore() { return api.depot_ore() },
       get coal() { return api.depot_coal() },
+      get ingots() { return api.depot_ingots() },
+      get steel() { return api.depot_steel() },
     })`),
   ]
 }
@@ -131,6 +133,8 @@ export function mining(site: Site): Brick[] {
     }),
     brick('depot.ore', 'readonly ore: number', 'Ore sitting at the depot.', 'depot.ore', read, ({ world }) => world.depot.ore),
     brick('depot.coal', 'readonly coal: number', 'Coal sitting at the depot.', 'depot.coal', read, ({ world }) => world.depot.coal ?? 0),
+    brick('depot.ingots', 'readonly ingots: number', 'Ingots waiting for a villager.', 'depot.ingots', read, ({ world }) => world.depot.ingots ?? 0),
+    brick('depot.steel', 'readonly steel: number', 'Steel waiting for a villager.', 'depot.steel', read, ({ world }) => world.depot.steel ?? 0),
     brick('drone.mine', 'mine(vein: Vein): void', 'Work this vein. A poor vein takes several ticks per rock. The cart holds one kind.', 'drone.mine(veins()[0])', action,
       (ctx, name, veinName) => {
         const d = drone(ctx.world, name)
@@ -175,8 +179,16 @@ export function mining(site: Site): Brick[] {
         if (!d.cargo)
           throw new Error(`${station} accepts ore and coal; ${d.name} at (${d.pos.x},${d.pos.y}) carries nothing`)
         const held = heldKind(d)
-        if (!rawCargo(held))
-          throw new Error(`${who(d)}; cart holds ${held}. Depot and furnace take ore and coal.`)
+        if (!rawCargo(held)) {
+          if (station !== 'Depot')
+            throw new Error(`${who(d)}; cart holds ${held}. Unload ingots and steel at the depot.`)
+          if (held === 'steel') depot.steel += d.cargo
+          else depot.ingots += d.cargo
+          d.cargo = 0
+          d.carrying = null
+          d.source = ''
+          return
+        }
         const kind = held === 'coal' ? 'coal' : 'ore'
         let moved = d.cargo
         if (station === 'Furnace') {
@@ -201,6 +213,30 @@ export function mining(site: Site): Brick[] {
           d.source = ''
         } else if (!d.carrying) d.carrying = 'ore'
       }),
+    brick('drone.pickup', 'pickup(station: Target): void', 'Take ingots or steel from a nearby furnace. The cart holds one kind.', 'drone.pickup(furnace)', action,
+      (ctx, name, target) => {
+        const d = drone(ctx.world, name)
+        const pos = cell(ctx.world, target)
+        if (distance(pos, ctx.world.furnace.pos) !== 0)
+          throw new Error(`${who(d)}; pickup takes ingots or steel from the furnace.`)
+        if (distance(d.pos, pos) > 1)
+          throw new Error(`${who(d)}; not next to the furnace.`)
+        const kind = heldKind(d)
+        const furnace = ctx.world.furnace
+        const want = furnace.output > 0 ? 'ingot' : furnace.steel > 0 ? 'steel' : null
+        if (!want) throw new Error(`${who(d)}; the furnace has no ingots or steel.`)
+        if (kind && kind !== want)
+          throw new Error(`${who(d)}; unload ${kind} first`)
+        if (d.cargo >= d.capacity)
+          throw new Error(`${who(d)}; cart is full (${d.cargo}/${d.capacity}).`)
+        const room = d.capacity - d.cargo
+        const moved = Math.min(room, want === 'ingot' ? furnace.output : furnace.steel)
+        if (want === 'ingot') furnace.output -= moved
+        else furnace.steel -= moved
+        d.cargo += moved
+        d.carrying = want
+        d.source = 'furnace'
+      }),
   ]
 }
 
@@ -221,6 +257,7 @@ export function miningModule(bricks: Brick[]) {
           mine: vein => api.drone_mine(name, vein.name),
           dump: () => api.drone_dump(name),
           unload: target => api.drone_unload(name, target.pos),
+          pickup: target => api.drone_pickup(name, target.pos),
         })
       })
     }`].join('\n')

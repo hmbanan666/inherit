@@ -97,6 +97,7 @@ export class FloorScene {
   private arrivals = 0
   private lastTick = -1
   private hover = ''
+  private selected = ''
   private latest: FloorWorld
 
   constructor(world: FloorWorld) {
@@ -157,16 +158,40 @@ export class FloorScene {
     this.paintRing(this.latest)
   }
 
+  select(id = '') {
+    if (id === this.selected) return
+    this.selected = id
+    this.paintRing(this.latest)
+  }
+
+  /** World pixels. A moving drone keeps a wide target on its sprite. */
+  pickDrone(x: number, y: number) {
+    const radius = 56
+    for (let i = this.haulers.length - 1; i >= 0; i--) {
+      const art = this.haulers[i]!.art
+      const dx = x - art.x
+      const dy = y - art.y
+      if (dx * dx + dy * dy <= radius * radius) return this.latest.drones[i]?.name
+    }
+  }
+
   private paintRing(world: FloorWorld) {
     this.ring.clear()
-    if (!this.hover) return
+    const id = this.hover || this.selected
+    if (!id) return
+    const drone = world.drones.findIndex(item => item.name === id)
+    if (drone >= 0) {
+      const art = this.haulers[drone]?.art
+      if (!art) return
+      this.ring.circle(art.x, art.y, 40).stroke({ color: 0xeabe50, width: 2, alpha: 0.85 })
+      return
+    }
     const spots = [
-      ...world.drones.map(drone => ({ id: drone.name, pos: drone.pos })),
       ...world.veins.filter(vein => !vein.hidden).map(vein => ({ id: `Vein ${vein.name}`, pos: vein.pos })),
       { id: 'furnace', pos: world.furnace.pos },
       { id: 'depot', pos: world.depot.pos },
     ]
-    const spot = spots.find(item => item.id === this.hover)
+    const spot = spots.find(item => item.id === id)
     if (!spot) return
     const point = center(spot.pos)
     this.ring.circle(point.x, point.y, 38).stroke({ color: 0xeabe50, width: 2, alpha: 0.85 })
@@ -241,6 +266,7 @@ export class FloorScene {
     const t = paused ? 1 : Math.min(1, (now - this.arrivals) / interval)
     for (const item of this.haulers)
       item.art.position.set(item.fromX + (item.x - item.fromX) * t, item.fromY + (item.y - item.fromY) * t)
+    if (this.hover || this.selected) this.paintRing(this.latest)
     if (this.fire.visible) this.fire.alpha = paused ? 0.85 : 0.8 + Math.sin(now / 100) * 0.18
   }
 }

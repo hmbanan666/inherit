@@ -15,6 +15,8 @@ export interface EditorSession {
   call: Read<{file: string; line: number} | undefined>
   tickCalls: Read<readonly { file: string; line: number }[]>
   readOnly?: Read<boolean>
+  canRun?: Read<boolean>
+  runAt?(name: string, file: string, line: number): void
   watching: Read<boolean>
   placeFunctions?: readonly string[]
   places?: Read<string[]>
