@@ -8,6 +8,7 @@ export interface EditorSession {
   deployed: Read<Files>
   activeFile: Ref<string>
   api: Read<string>
+  apiNames: Read<ReadonlySet<string>>
   dirty: Read<boolean>
   multiFile: Read<boolean>
   navigation: Read<Starter['edit']>
@@ -22,3 +23,11 @@ export interface EditorSession {
   openFile(file: string): void
 }
 export const editorKey: InjectionKey<EditorSession> = Symbol('editor')
+
+/** Keep the language service's candidates and resolution data, boosting in-scope game names. */
+export function rankApiSuggestions(items: {label: string | {label: string}; sortText?: string}[], names: ReadonlySet<string>) {
+  for (const item of items) {
+    const label = typeof item.label === 'string' ? item.label : item.label.label
+    if (names.has(label)) item.sortText = '0' + (item.sortText ?? label)
+  }
+}

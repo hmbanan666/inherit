@@ -8,10 +8,10 @@ defineEmits<{ select: [id: string] }>()
 const open = ref(false)
 </script>
 <template>
-  <a class="pack-brand brand" href="/" aria-label="Inherit showcase"><img src="/mark.svg" alt="" />Inherit<span>.</span></a>
+  <a class="pack-brand brand" href="/?packs" aria-label="Inherit showcase"><img src="/mark.svg" alt="" />Inherit<span>.</span></a>
   <div class="pack-switch" @keydown.esc="open = false">
     <button data-testid="pack-switcher" :aria-expanded="open" @click="open = !open">{{ manifest.title }} <ChevronDown /></button>
-    <nav v-if="open" class="hud-menu" aria-label="Switch pack"><a v-for="p in manifests" :key="p.id" :href="'?pack=' + p.id">{{ p.title }}</a><a href="/">All game packs</a></nav>
+    <nav v-if="open" class="hud-menu" aria-label="Switch pack"><a v-for="p in manifests" :key="p.id" :href="'?pack=' + p.id">{{ p.title }}</a><a href="/?packs">All game packs</a></nav>
   </div>
   <ProgressStrip picker :busy="busy" @select="$emit('select', $event)" :manifest="manifest" :lessons="lessons" :selected="selected" />
 </template>

@@ -206,3 +206,13 @@ test('an empty greeting explains the error under its line and offers a hint', as
   await error.getByRole('button', {name: 'Hint'}).click()
   await expect(page.getByRole('tab', { name: 'Hints' })).toHaveAttribute('aria-selected', 'true')
 })
+
+test('Enter accepts the game API suggestion for sa', async ({ page }) => {
+  await page.goto('/?pack=beginner&lesson=hello')
+  await expect(page.getByRole('textbox', {name: 'Player TypeScript'})).toBeFocused()
+  await page.keyboard.press('Control+a')
+  await page.keyboard.type('sa')
+  await expect(page.locator('.suggest-widget .monaco-list-row.focused .label-name')).toHaveText('say')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.view-lines')).toHaveText('say')
+})

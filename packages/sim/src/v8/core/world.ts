@@ -8,6 +8,9 @@ export interface Site {
   drones: Drone[]
   veins: Vein[]
   depot: { pos: Cell; ore: number }
+  credits: number
+  tickMs: number
+  speeds: readonly number[]
   cpuLimit: number
   costs: { read: 0; action: number; findPath: number }
   orePerMine: number
@@ -17,6 +20,7 @@ export interface Message { tick: number; file: string; line: number; text: strin
 export interface World {
   tick: number
   seed: number
+  credits: number
   grid: Site['grid']
   drones: Drone[]
   veins: Vein[]
@@ -26,8 +30,8 @@ export interface World {
   messages: Message[]
 }
 export function createWorld(site: Site): World {
-  const { seed, grid, drones, veins, depot } = structuredClone(site)
-  return { tick: 0, seed, grid, drones, veins, depot, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [] }
+  const { seed, credits, grid, drones, veins, depot } = structuredClone(site)
+  return { tick: 0, seed, credits, grid, drones, veins, depot, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [] }
 }
 
 interface TickResult { used: number; message?: Omit<Message, 'tick'> }
