@@ -67,6 +67,15 @@ export function containScale(viewW: number, viewH: number, worldW: number, world
   return Math.min(viewW / worldW, viewH / worldH)
 }
 
+/** Where the contain-fit grid sits. The leftover space is split evenly on both axes. */
+export function containPlace(viewW: number, viewH: number, worldW: number, worldH: number, zoom = 1) {
+  const fit = containScale(viewW, viewH, worldW, worldH)
+  const scale = fit * (Number.isFinite(zoom) && zoom > 0 ? zoom : 1)
+  const drawnW = worldW * scale
+  const drawnH = worldH * scale
+  return { scale, x: (viewW - drawnW) / 2, y: (viewH - drawnH) / 2 }
+}
+
 /** The map fit is contain. The frame never crops the grid on load or resize. */
 export function fitScale(viewW: number, viewH: number, worldW: number, worldH: number) {
   return containScale(viewW, viewH, worldW, worldH)

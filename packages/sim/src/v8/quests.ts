@@ -1,4 +1,5 @@
 import type { Site, World } from './core/world'
+import { noteCheckReset, readChecks } from './checkFacts'
 
 export interface QuestTest {
   id: string
@@ -201,6 +202,7 @@ export function syncQuest(world: World, site: Site) {
     return offer ? offer.why : 'More is coming.'
   }
   world.checks = quest.tests.map(test => ({ id: test.id, text: test.text, status: test.pass(world) ? 'green' as const : 'open' as const }))
+  readChecks(world, quest)
   return world.checks.find(check => check.status !== 'green')?.text ?? 'Every test passes. Complete the quest.'
 }
 
@@ -210,6 +212,7 @@ export function acceptQuest(world: World, site: Site) {
   if (!quest) return false
   world.questId = quest.id
   quest.prepare?.(world)
+  noteCheckReset(world)
   world.orders.push({
     id: quest.id, at: world.tick, item: quest.item, qty: quest.qty, due: world.tick + 100000, pay: quest.pay,
     from: quest.from, who: quest.who, role: quest.role, title: quest.title, text: quest.goal,

@@ -44,9 +44,9 @@ Under the reward, the card shows the villager's one-line quote, then a Next list
 
 ## Works
 
-The map fills the top row beside the quest rail. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit: the whole grid stays visible, centered, and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
+The map fills the top row beside the quest rail. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit and centers that grid in the row, horizontally and vertically. The whole grid stays visible and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
-Each drone carries a cargo badge, such as `3/5`, and a faint line along the route it is walking. Hovering an entity highlights it. Clicking it opens a small popover with the fields that entity has: id, pos, cargo and capacity, furnace input, or ore left.
+Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it opens a small popover with the fields that entity has: id, pos, cargo and capacity, furnace input, or ore left.
 
 ## Editor
 
@@ -54,7 +54,7 @@ The file tree is the left column of the editor row. Its Files toggle and the new
 
 The editor side of the row is the open file tabs, then Deploy, then quick open and search. Deploy is always on that row. There is no second title for the open file. Ctrl+Enter still deploys.
 
-Checks are the 300px pane to the right of the code. Before a quest is taken the pane says "Take a quest to see checks". Once a quest is open, each check is pending, passing, or failed. A numeric check shows the live count in its own words, such as `Bram receives 4 ingots 0/4`. A stuck check adds a short fact from the works, such as `drone-1 is full at Vein A` or `furnace input 0`. That fact names a field. It does not say what to write. The pane's header is the same 36px row. Borders on this row are 1px.
+Checks are the 300px pane to the right of the code. Before a quest is taken the pane says "Take a quest to see checks". Once a quest is open, each check is pending, passing, or failed. Pending is a grey circle and ordinary text. A check turns failed only after its facts have not changed for 20 ticks, about 10 seconds, since Take quest or the last Deploy. A numeric check shows the live count in its own words, such as `Bram receives 4 ingots 0/4`. The first stuck check adds one fact from the works, such as `drone-1 is full (3/3) at Vein A and not moving`. Later checks say `waits on: Ore reaches the furnace` instead of repeating that fact. The fact names a field. It does not say what to write. The pane's header is the same 36px row. Borders on this row are 1px.
 
 A compact log sits at the top of the checks pane. It holds runtime errors and sim events, such as `Vein A is empty`. An error that names a file and a line jumps to that line in the editor when clicked.
 

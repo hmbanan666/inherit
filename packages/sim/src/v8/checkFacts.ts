@@ -10,47 +10,92 @@ export interface CheckReading {
   reason?: string
 }
 
+/** The sim tick is 0.5s, so this is about 10s after the last deploy or Take. */
+export const stallTicks = 20
+
 const shipped = (world: World, id: string) => world.orders.find(order => order.id === id)?.shipped ?? 0
 
-function fullAtVein(world: World) {
-  for (const drone of world.drones) {
-    if (drone.capacity < 1 || drone.cargo < drone.capacity) continue
-    const vein = world.veins.find(item => !item.hidden && item.pos.x === drone.pos.x && item.pos.y === drone.pos.y)
-    if (vein) return `${drone.name} is full at Vein ${vein.name}`
-  }
+export function noteCheckReset(world: World) {
+  world.checkSince = world.tick
+  world.checkMoved = {}
 }
 
-/** A fact from the world. It names a field. It does not say what to do. */
-function reasonFor(world: World, quest: QuestDef, id: string) {
-  const stuck = fullAtVein(world)
+function veinAt(world: World, pos: { x: number; y: number }) {
+  return world.veins.find(item => !item.hidden && item.pos.x === pos.x && item.pos.y === pos.y)
+}
+
+/** The first fact that explains why this one check is not passing. */
+function blockingFact(world: World, quest: QuestDef, id: string) {
   const furnace = world.furnace
-  if (id === 'ore' || id === 'ingot' || (id === 'done' && quest.item === 'ingot')) {
-    if (stuck) return stuck
-    if (furnace.input === 0 && furnace.output === 0 && world.ingotsMade === 0) return 'furnace input 0'
-    return
+  if (id === 'ore') {
+    for (const drone of world.drones) {
+      if (drone.capacity < 1 || drone.cargo < drone.capacity) continue
+      const vein = veinAt(world, drone.pos)
+      if (vein) return `${drone.name} is full (${drone.cargo}/${drone.capacity}) at Vein ${vein.name} and not moving`
+    }
+    return 'furnace input 0'
   }
-  if (id === 'coal' || id === 'steel' || id === 'both' || (id === 'done' && quest.item === 'steel')) {
-    if (stuck && (id === 'coal' || id === 'both')) return stuck
-    if (furnace.coal === 0 && world.steelMade === world.steelMark) return 'furnace coal 0'
-    if (furnace.input === 0) return 'furnace input 0'
-    if (id === 'both' && furnace.input < 2) return `furnace input ${furnace.input}`
-    return
+  if (id === 'ingot' || id === 'smelt') {
+    if (furnace.output === 0 && world.ingotsMade === 0) return 'furnace output 0'
+    return `ingots made ${world.ingotsMade}`
   }
+  if (id === 'coal') {
+    for (const drone of world.drones) {
+      const vein = veinAt(world, drone.pos)
+      if (vein?.kind === 'coal' && drone.cargo >= drone.capacity && drone.capacity > 0)
+        return `${drone.name} is full (${drone.cargo}/${drone.capacity}) at Vein ${vein.name} and not moving`
+    }
+    return 'furnace coal 0'
+  }
+  if (id === 'steel' || id === 'both') {
+    if (furnace.coal === 0) return 'furnace coal 0'
+    if (furnace.input < 2) return `furnace input ${furnace.input}`
+    return 'furnace steel 0'
+  }
+  if (id === 'done') return `shipped ${shipped(world, quest.id)}/${quest.qty}`
   if (id === 'drone') {
     const drone = world.drones.find(item => item.name === 'drone-2')
-    if (drone && drone.pos.x === world.depot.pos.x && drone.pos.y === world.depot.pos.y) return 'drone-2 is at the depot'
-    return
+    if (!drone) return `drones ${world.drones.length}`
+    if (drone.pos.x === world.depot.pos.x && drone.pos.y === world.depot.pos.y) return 'drone-2 is at the depot'
+    return `drone-2 pos ${drone.pos.x},${drone.pos.y}`
   }
-  if (id === 'other') {
+  if (id === 'dry' || id === 'other') {
     const vein = world.veins.find(item => item.name === 'A')
-    if (vein && vein.left === 0 && world.oreAfterDry === 0) return 'ore after dry 0'
-    return
+    if (id === 'dry') return `Vein A left ${vein?.left ?? 0}`
+    return `ore after dry ${world.oreAfterDry}`
   }
-  if (id === 'smelt' && world.ingotsMade === 0) return 'ingots made 0'
-  if (id === 'memory' && world.pathWindow.length >= 8) {
+  if (id === 'memory') {
     const calls = world.pathWindow.reduce((sum, count) => sum + count, 0)
-    if (calls > 4) return `path calls ${calls}`
+    return `path calls ${calls}`
   }
+  return 'furnace input 0'
+}
+
+function motionKey(world: World, quest: QuestDef, id: string) {
+  const drones = world.drones.map(drone => `${drone.name}:${drone.pos.x},${drone.pos.y}:${drone.cargo}`).join(';')
+  const furnace = world.furnace
+  if (id === 'ingot' || id === 'smelt' || id === 'steel')
+    return `${furnace.input}|${furnace.output}|${furnace.steel}|${furnace.readyAt}|${world.ingotsMade}|${world.steelMade}`
+  if (id === 'done') return `${shipped(world, quest.id)}|${furnace.output}|${furnace.steel}|${drones}`
+  if (id === 'dry' || id === 'other')
+    return world.veins.map(vein => `${vein.name}:${vein.left}`).join(';') + `|${world.oreAfterDry}`
+  if (id === 'memory') return world.pathWindow.join(',')
+  return `${drones}|${furnace.input}|${furnace.coal}|${furnace.output}`
+}
+
+function motionAt(world: World, quest: QuestDef, id: string) {
+  if (world.checkSince === undefined) world.checkSince = world.tick
+  const book = (world.checkMoved ??= {})
+  const key = motionKey(world, quest, id)
+  const row = book[id]
+  if (!row) book[id] = { key, at: world.checkSince }
+  else if (row.key !== key) book[id] = { key, at: world.tick }
+  return book[id]!.at
+}
+
+function stalled(world: World, quest: QuestDef, id: string) {
+  const since = Math.max(world.checkSince ?? world.tick, motionAt(world, quest, id))
+  return world.tick - since >= stallTicks
 }
 
 function progress(world: World, quest: QuestDef, test: QuestTest) {
@@ -59,15 +104,22 @@ function progress(world: World, quest: QuestDef, test: QuestTest) {
 }
 
 export function readChecks(world: World, quest: QuestDef): CheckReading[] {
+  for (const test of quest.tests) motionAt(world, quest, test.id)
+  let blocker: { label: string; stuck: boolean } | undefined
   return quest.tests.map(test => {
-    const passing = test.pass(world)
     const count = progress(world, quest, test)
-    const reason = passing ? undefined : reasonFor(world, quest, test.id)
+    const text = count ? `${test.text} ${count}` : test.text
+    if (test.pass(world)) return { id: test.id, text, state: 'passing' as const }
+    if (!blocker) {
+      const stuck = stalled(world, quest, test.id)
+      blocker = { label: test.text, stuck }
+      return { id: test.id, text, state: stuck ? 'failed' as const : 'pending' as const, reason: stuck ? blockingFact(world, quest, test.id) : undefined }
+    }
     return {
       id: test.id,
-      text: count ? `${test.text} ${count}` : test.text,
-      state: passing ? 'passing' : reason ? 'failed' : 'pending',
-      reason,
+      text,
+      state: blocker.stuck ? 'failed' as const : 'pending' as const,
+      reason: blocker.stuck ? `waits on: ${blocker.label}` : undefined,
     }
   })
 }
