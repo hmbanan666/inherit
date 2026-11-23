@@ -1,18 +1,16 @@
 import { expect, test } from 'vitest'
 import { diagnostics } from '../packs/compiler'
-import { declarations, kettlewick, mining } from '../../packages/sim/src/v8'
+import { declarations, kettlewick, factoryBricks } from '../../packages/sim/src/v8'
 import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
-test('Uncle spends the budget every tick while only the first drone hauls ore', async () => {
-  const world = await runSession(kettlewick, kettlewick.files, 32)
+test('Uncle exhausts the budget hauling to the furnace and loses credits while both orders go overdue', async () => {
+  const world = await runSession(kettlewick, kettlewick.files, 181)
   expect(world.cpu).toEqual({ used: 30, limit: 30 })
-  expect(world.messages).toHaveLength(32)
-  for (const message of world.messages) {
-    expect(message.text).toContain('CPU limit')
-    expect(kettlewick.files[message.file].split('\n')[message.line - 1]).toContain('findPath')
-  }
-  expect(world.depot.ore).toBeGreaterThan(0)
-  expect(world.drones.slice(1)).toEqual(kettlewick.drones.slice(1))
+  expect(world.messages.at(-1)?.text).toContain('CPU limit')
+  expect(world.furnace.input).toBeGreaterThan(0)
+  expect(world.credits).toBeLessThan(kettlewick.credits)
+  expect(world.orders.map(o => o.status)).toEqual(['overdue', 'overdue'])
+  expect(world.drones.at(-1)).toEqual(kettlewick.drones.at(-1))
 })
 
 const cached = {
@@ -58,7 +56,7 @@ test('a fresh session replays the same site seed and files to the same world', a
 })
 
 test('the generated inherit declarations typecheck both controllers and require path endpoints to be cells', () => {
-  const types = declarations(mining(kettlewick))
+  const types = declarations(factoryBricks(kettlewick))
   expect(diagnostics(kettlewick.files, types)).toEqual([])
   expect(diagnostics(cached, types)).toEqual([])
   expect(diagnostics({ 'main.ts': 'import { findPath } from "inherit"; findPath(1, 2)' }, types))

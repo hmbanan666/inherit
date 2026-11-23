@@ -1,4 +1,4 @@
-import type { Brick, HostHandler, TickContext } from '../core/bricks'
+import { brick, type Brick, type TickContext } from '../core/bricks'
 import type { Cell, Site, World } from '../core/world'
 
 function cell(world: World, input: unknown): Cell {
@@ -44,10 +44,6 @@ function bindings(site: Site): Brick[] {
 
 export function mining(site: Site): Brick[] {
   const { read, action } = site.costs
-  function brick(name: string, signature: string, doc: string, example: string, cost: number,
-    handler: HostHandler): Brick {
-    return { name, signature, doc, example, cost, since: '1.0', handler }
-  }
   return [
     ...bindings(site),
     brick('cpu.used', 'used(): number', 'CPU spent this tick.', 'cpu.used()', read, ctx => ctx.cpuUsed()),
@@ -78,12 +74,14 @@ export function mining(site: Site): Brick[] {
         vein.left -= amount
         d.cargo += amount
       }),
-    brick('drone.unload', 'unload(depot: Target): void', 'Leave cargo at the nearby depot.', 'drone.unload(depot)', action,
+    brick('drone.unload', 'unload(station: Target): void', 'Leave cargo at a nearby depot or furnace.', 'drone.unload(depot)', action,
       (ctx, name, target) => {
-        const d = drone(ctx.world, name), { depot } = ctx.world
-        if (distance(cell(ctx.world, target), depot.pos) !== 0 || distance(d.pos, depot.pos) > 1)
-          throw new Error('Move next to the depot to unload.')
-        depot.ore += d.cargo
+        const d = drone(ctx.world, name), { depot, furnace } = ctx.world
+        const pos = cell(ctx.world, target)
+        if (distance(d.pos, pos) > 1) throw new Error('Move next to the station to unload.')
+        if (distance(pos, furnace.pos) === 0) furnace.input += d.cargo
+        else if (distance(pos, depot.pos) === 0) depot.ore += d.cargo
+        else throw new Error('Choose the furnace or depot to unload.')
         d.cargo = 0
       }),
   ]

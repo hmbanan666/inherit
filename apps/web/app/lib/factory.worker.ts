@@ -16,9 +16,10 @@ function publish(deployed?: Record<string, string>) {
 
 function schedule() {
   clearInterval(timer)
-  if (session && !paused) {
+  if (session && !session.world.bankrupt && !paused) {
     timer = setInterval(() => {
       session!.step(1)
+      if (session!.world.bankrupt) clearInterval(timer)
       publish()
     }, kettlewick.tickMs / speed)
   }

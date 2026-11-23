@@ -14,6 +14,16 @@ export const kettlewick: Site = {
     { name: 'A', pos: { x: 6, y: 2 }, left: 800 },
     { name: 'B', pos: { x: 14, y: 2 }, left: 1200 },
   ],
+  furnace: { pos: { x: 2, y: 1 }, input: 0, output: 0 },
+  recipe: { ore: 2, ingots: 1, ticks: 4, fuel: 1 },
+  orderSchedule: [
+    { id: 'hale', at: 0, from: 'Mayor Hale', item: 'ingot', qty: 20, due: 180, pay: 180 },
+    { id: 'smithy', at: 1, from: 'Smithy', item: 'ingot', qty: 10, due: 98, pay: 100 },
+  ],
+  graceTicks: 160,
+  latePayFraction: 0.5,
+  rentPerTick: 0.5,
+  bankruptcyTicks: 50,
   credits: 300,
   tickMs: 500,
   speeds: [1, 2, 4],
@@ -22,20 +32,25 @@ export const kettlewick: Site = {
   orePerMine: 1,
   files: {
     'main.ts': `// Kettlewick Works. It works. Don't touch it. - Uncle Ambrose
-import { drones, veins, depot, findPath } from "inherit"
+import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 
 export function onTick() {
   for (const drone of drones()) {
+    // find the nearest vein. Every tick, for every drone.
     let best = veins()[0]
-    for (const vein of veins()) {
-      if (findPath(drone.pos, vein.pos).length < findPath(drone.pos, best.pos).length) best = vein
+    for (const v of veins()) {
+      if (findPath(drone.pos, v.pos).length < findPath(drone.pos, best.pos).length) best = v
     }
-    const target = drone.cargo < drone.capacity ? best : depot
-    const path = findPath(drone.pos, target.pos)
-    if (!drone.isNear(target)) drone.moveAlong(path)
-    else if (target === best) drone.mine(best)
-    else drone.unload(depot)
+    if (drone.cargo < drone.capacity) {
+      if (drone.isNear(best)) drone.mine(best)
+      else drone.moveAlong(findPath(drone.pos, best.pos))
+    } else {
+      if (drone.isNear(furnace)) drone.unload(furnace)
+      else drone.moveAlong(findPath(drone.pos, furnace.pos))
+    }
   }
+  furnace.smelt()                      // even when empty
+  for (const o of orders()) ship(o)    // first come, first served
 }`,
   },
 }

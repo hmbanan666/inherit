@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { declarations, kettlewick, mining, type Cell, type Message } from '@inherit/sim/v8'
+import { declarations, kettlewick, factoryBricks, type Message } from '@inherit/sim/v8'
+import type { Colour } from '@inherit/sim/pack'
+import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import type { FactoryCommand, FactoryFrame } from '../lib/factoryProtocol'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
-const bricks = mining(kettlewick)
+const bricks = factoryBricks(kettlewick)
 const api = ref(declarations(bricks))
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
@@ -44,7 +46,7 @@ function deploy(kind: 'run' | 'restart') {
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
-    if (!pending.value && !event.repeat) deploy('run')
+    if (!pending.value && !world.value?.bankrupt && !event.repeat) deploy('run')
   }
 }
 
@@ -75,83 +77,78 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', shortcut)
 })
 
-const cells = computed(() => {
-  const site = world.value
-  if (!site) return []
-  const cells = Array.from({ length: site.grid.width * site.grid.height }, () => [] as string[])
-  const at = (pos: Cell) => cells[pos.y * site.grid.width + pos.x]
-  at(site.depot.pos).push('Depot')
-  for (const vein of site.veins) at(vein.pos).push(vein.name)
-  for (const drone of site.drones) at(drone.pos).push(drone.name.replace('drone-', ''))
-  return cells
+const orderRows = computed(() => {
+  const frame = world.value
+  if (!frame) return []
+  return frame.orders.map(order => {
+    const status: Colour = order.status === 'open' ? 'amber' : order.status === 'on time' ? 'green' : 'red'
+    const deadline = order.status === 'open' ? 'due in ' + (order.due - frame.tick) + ' ticks' : order.status
+    return { id: order.id, status, text: order.from + ' · ' + order.shipped + '/' + order.qty + ' ingots · ' + order.pay + ' cr · ' + deadline }
+  })
 })
 </script>
 
 <template>
-  <main class="factory">
-    <header class="hud">
-      <h1>Kettlewick Works</h1>
+  <StudioShell class="factory">
+    <template #nav>
+      <PackNav><strong class="pack-switch">Kettlewick Works</strong></PackNav>
+      <div v-if="world" class="clock">
+        <span class="tick" data-testid="tick">Tick <b>{{ world.tick }}</b></span>
+        <span class="tick">Credits <b>{{ world.credits }}</b></span>
+        <span class="tick" data-testid="cpu" :class="{ limit: world.cpu.used >= world.cpu.limit }">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
+      </div>
+      <button class="deploy primary-run" aria-label="Run" :disabled="pending || world?.bankrupt" @click="deploy('run')"><Play /> Run <kbd>Ctrl+Enter</kbd></button>
+    </template>
+    <template #floor>
+      <nav class="factory-clock" aria-label="Factory clock">
+        <button :disabled="world?.bankrupt" @click="paused = !paused">{{ paused ? 'Resume' : 'Pause' }}</button>
+        <div class="speeds"><button v-for="rate in kettlewick.speeds" :key="rate" :disabled="world?.bankrupt" :aria-pressed="speed === rate" @click="speed = rate">{{ rate }}x</button></div>
+        <button :disabled="pending" @click="deploy('restart')">Restart</button>
+      </nav>
       <template v-if="world">
-        <span data-testid="tick">Tick {{ world.tick }}</span>
-        <span>Credits {{ world.credits }}</span>
-        <span data-testid="cpu" :class="{ limit: world.cpu.used >= world.cpu.limit }">CPU {{ world.cpu.used }}/{{ world.cpu.limit }}</span>
+        <div class="map-frame"><LazyFactoryFloor :world="world" :paused="paused || world.bankrupt" :interval="kettlewick.tickMs / speed" /></div>
+        <MetricsPanel :world="world" />
       </template>
-      <button class="deploy primary-run" :disabled="pending" @click="deploy('run')">Run</button>
-    </header>
-    <div class="benches">
-      <section aria-label="Factory floor">
-        <nav aria-label="Factory clock">
-          <button @click="paused = !paused">{{ paused ? 'Resume' : 'Pause' }}</button>
-          <button v-for="rate in kettlewick.speeds" :key="rate" :aria-pressed="speed === rate" @click="speed = rate">{{ rate }}x</button>
-          <button :disabled="pending" @click="deploy('restart')">Restart</button>
-        </nav>
-        <template v-if="world">
-          <div class="grid" :style="{ gridTemplateColumns: 'repeat(' + world.grid.width + ', 1fr)' }" aria-label="Factory map">
-            <div v-for="(labels, i) in cells" :key="i" class="cell" :class="{ occupied: labels.length }">{{ labels.join(' ') }}</div>
-          </div>
-          <p data-testid="ore">Depot ore {{ world.depot.ore }}</p>
-          <p v-for="drone in world.drones" :key="drone.name">{{ drone.name }} · cargo {{ drone.cargo }}/{{ drone.capacity }}</p>
-        </template>
+    </template>
+    <template #editor>
+      <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="reference && (reference.open = true)" /></div></div>
+      <ChecksPanel v-if="orderRows.length" label="Orders" :checks="orderRows" tried />
+      <section aria-label="Console" class="console">
+        <h2>Console</h2>
+        <p v-if="error" role="alert">{{ error }}</p>
+        <p v-for="msg in [...messages].reverse()" :key="msg.tick">Tick {{ msg.tick }} · {{ msg.text }}</p>
       </section>
-      <section class="controller" aria-label="Controller">
-        <h2>main.ts</h2>
-        <div class="editor"><LazyCodeEditor @reference="reference && (reference.open = true)" /></div>
-        <section aria-label="Console" class="console">
-          <h2>Console</h2>
-          <p v-if="error" role="alert">{{ error }}</p>
-          <p v-for="msg in [...messages].reverse()" :key="msg.tick">Tick {{ msg.tick }} · {{ msg.text }}</p>
-        </section>
-        <details ref="reference" class="reference">
-          <summary>API</summary>
-          <article v-for="brick in bricks" :key="brick.name">
-            <strong>{{ brick.name }}</strong> · {{ brick.cost }} CPU
-            <p><code>{{ brick.signature }}</code></p>
-            <p>{{ brick.doc }}</p><code>{{ brick.example }}</code>
-          </article>
-        </details>
-      </section>
-    </div>
-  </main>
+      <details ref="reference" class="reference">
+        <summary>API</summary>
+        <article v-for="brick in bricks" :key="brick.name">
+          <strong>{{ brick.name }}</strong> · {{ brick.cost }} CPU
+          <p><code>{{ brick.signature }}</code></p>
+          <p>{{ brick.doc }}</p><code>{{ brick.example }}</code>
+        </article>
+      </details>
+    </template>
+    <template #status>
+      <template v-if="world">
+        <strong v-if="world.bankrupt" role="status">Bankrupt · session ended</strong>
+        <span>Depot ore {{ world.depot.ore }}</span>
+        <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
+        <span>Ingots {{ world.furnace.output }}</span>
+        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} · cargo {{ drone.cargo }}/{{ drone.capacity }}</span>
+        <span>Rent {{ kettlewick.rentPerTick }} cr/tick</span>
+        <span>Income {{ world.ledger.income }} cr</span>
+      </template>
+    </template>
+  </StudioShell>
 </template>
 
 <style scoped>
-.factory .hud { display: flex; height: auto; min-height: 64px; flex-wrap: wrap; padding: 10px 16px }
-h1 { font-size: 1.2rem }
-h2 { font-size: 1rem }
-.primary-run { margin-left: auto }
-.limit, [role=alert] { color: #ff8888 }
-.benches { display: grid; grid-template-columns: 1fr 1fr }
-.benches > section { min-width: 0; padding: 12px }
-nav { display: flex; flex-wrap: wrap; gap: 4px }
-[aria-pressed=true] { border-color: var(--gold); color: var(--gold) }
-.grid { display: grid; margin: 1rem 0 }
-.cell { min-width: 0; min-height: 34px; padding: 2px; border: 1px solid var(--line); font: 11px var(--mono); overflow-wrap: anywhere }
-.occupied { background: var(--accent-surface); color: var(--accent-soft) }
-.controller { background: var(--panel) }
-.editor { height: 58vh; margin-top: 8px }
-.console, .reference { border-top: 1px solid var(--line); padding: 8px 0 }
-.console { max-height: 7rem; overflow: auto; font: 12px var(--mono) }
-summary { cursor: pointer }
-article { padding: 6px 0 }
-@media (max-width: 720px) { .benches { grid-template-columns: 1fr } }
+.factory-clock { display: flex; gap: 6px; margin-bottom: 8px }
+.map-frame { flex: 1; min-height: 150px; position: relative }
+.limit b, [role=alert] { color: var(--alert) }
+.console, .reference { border-top: 1px solid var(--line); padding: 6px 12px; overflow: auto }
+.console { max-height: 7rem; font: 12px var(--mono) }
+.console h2 { font-size: 13px }
+.reference { max-height: 30% }
+.factory :deep(.editor-dock > .editor-pane) { flex: 1 }
+@media(max-width:800px) { .clock { grid-column: 1 / -1; grid-row: 3 } }
 </style>
