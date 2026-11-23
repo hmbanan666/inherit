@@ -17,3 +17,5 @@ Nick played chapter one and missed the change from calling a function to handing
 **Earlier decisions.** This replaces the single-town premise of ADR 0001. Kettlewick still gives Workshop requests their meaning. ADR 0003's debt subject and ADR 0013's coins, orders and factory progression belong to Workshop alone. ADR 0008 already removed deadlines and interest. ADR 0005 and ADR 0011 now disclose tools per pack. This replaces the footer button in ADR 0011 and ADR 0014, and the multi-line task above the editor in ADR 0015. The sim still owns lesson flow. ADR 0016 is a direction a village pack may take. ADR 0017 still governs the Workshop clock. ADR 0004's archive policy covers older incompatible saves. A valid v4 chapter resumes.
 
 The [implementation spec](../specs/v5-game-packs.md) gives the pack contract, full lesson sequence, Workshop port and validation rules.
+
+> Superseded by ADR 0021 (v8: inherit a factory, play on ticks).

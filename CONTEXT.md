@@ -1,6 +1,28 @@
 # Inherit
 
-A showcase of games played by writing TypeScript.
+One game played by writing TypeScript: you inherit a factory and its code ([ADR 0021](docs/adr/0021-v8-inherit-a-factory.md), [v8 concept](docs/concept/v8.md)).
+
+## v8 terms
+
+| Term | Meaning during play |
+| --- | --- |
+| Works | The inherited factory. The first site is Kettlewick Works. |
+| Site | A map with starting entities, inherited code, modules, unlocks, orders, crises and an audit tick. Pure data. |
+| Inherited code | Uncle's working but wasteful `main.ts`, running from the first tick. |
+| Tick | One step of the world, 0.5 s at 1x. `onTick` runs once per tick. |
+| CPU | The cost of API calls in one tick. Over the limit, the rest of the tick is skipped. |
+| Brick | One API call from `"inherit"` with a signature, doc line, CPU cost and the API version that added it. |
+| API version | A release of the bricks with a changelog. Bought with credits; may deprecate or remove bricks. |
+| Module | Content that extends the core: entities, bricks, orders and crises. |
+| Crisis | A world change that breaks or strains the current code, such as a vein running dry. |
+| Credits | Money from orders. Pays rent and unlocks. |
+| Rent | Credits charged every tick for drones, stations and CPU. |
+| Order | A request for items with a deadline in ticks and a pay. Late orders pay half. |
+| Audit | The end of a session, with a result screen. |
+| Session | One play of a site, 20 to 40 minutes, from inheritance to audit or bankruptcy. |
+| lib | The player's own files, kept across sessions. |
+
+## Pack terms (v5 to v7, removed after the first v8 slice)
 
 | Term | Meaning during play |
 | --- | --- |

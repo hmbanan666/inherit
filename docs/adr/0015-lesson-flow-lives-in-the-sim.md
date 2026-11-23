@@ -10,3 +10,5 @@ From now on:
 - The sandbox records every primitive call of a run in order (file, line, function, arguments, result, the player function it ran inside, and a message for a failed call) and sends it to the UI, which plays it back on the floor and in the editor.
 - The place type is a string literal union generated from the machines on the floor, refreshed when the player buys a machine. Unknown places fail with a plain message at run time.
 - Dev and test hooks: `?step=<id>&speed=<n>` jumps to a lesson and speeds up the clock in development and tests, and the request card, checks, primary button and navigation carry `data-testid`s.
+
+> Superseded by ADR 0021 (v8: inherit a factory, play on ticks).
