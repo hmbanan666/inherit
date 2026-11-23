@@ -22,6 +22,8 @@ v5 to v7 made Inherit a course: packs, 52 lessons, step cards, solved cards. Nic
 
 **Fixed core, content as modules.** A deterministic core (ticks, CPU meter, ledger, orders, events, saves) changes rarely. Stations, resources, bricks, orders and crises are modules; a site is data. New features extend the same game. Saves carry schema and module versions and migrate; the player's `lib/` files are never lost.
 
+**Build on what exists.** Every version builds on the existing code and visuals. No screen is rebuilt from scratch: the frame, components, palette and the v2 and v3 factory visuals (floor rendering, item art, tick animation, metrics) are reused and adapted from the code or from git history. A redesign needs its own ADR.
+
 **Kept.** The frame: top nav, charcoal palette, game area beside Monaco, wide Run at the top right, compact coloured status under the editor, no wall-clock timers. The QuickJS sandbox, the worker, plain-word errors, the API registry of ADR 0009 and the archive policy of ADR 0004.
 
 ## Replaces
