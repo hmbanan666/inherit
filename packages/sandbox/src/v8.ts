@@ -1,9 +1,9 @@
-import { createWorld, factoryBricks, factoryModule, operationName, runTicks, type Site, type TickContext } from '@inherit/sim/v8'
+import { createWorld, factoryBricks, factoryModule, operationName, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
-export async function createSession(site: Site, files = site.files) {
-  const world = { ...createWorld(site), memory: {} as JsonObject }
+export async function createSession(site: Site, files = site.files, saved?: World) {
+  const world = saved ? structuredClone(saved) : createWorld(site)
   const bricks = factoryBricks(site)
   const operations = bricks.flatMap(b => typeof b.handler === 'function'
     ? [{ key: operationName(b), handler: b.handler, cost: b.cost }] : [])
@@ -13,7 +13,7 @@ export async function createSession(site: Site, files = site.files) {
     let next: Program
     try {
       next = await createProgram({
-        files: nextFiles, memory: world.memory, budget: site.cpuLimit, inheritSource: factoryModule(bricks),
+        files: nextFiles, memory: world.memory as JsonObject, budget: site.cpuLimit, inheritSource: factoryModule(bricks),
         operations: operations.map(op => op.key),
         costs: Object.fromEntries(operations.map(op => [op.key, op.cost])),
       })

@@ -1,4 +1,4 @@
-import { kettlewick } from '@inherit/sim/v8'
+import { continueWithLoan, kettlewick } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
@@ -9,9 +9,9 @@ let speed = kettlewick.speeds[0]
 
 function publish(deployed?: Record<string, string>) {
   if (!session) return
-  const { memory, ...world } = session.world
+  const world = session.world
+  if (world.messages.length > 20) world.messages.splice(0, world.messages.length - 20)
   self.postMessage({ world, deployed } satisfies FactoryFrame)
-  world.messages.length = 0
 }
 
 function schedule() {
@@ -29,11 +29,14 @@ async function act(command: FactoryCommand) {
   if (command.kind === 'clock') {
     paused = command.paused
     speed = command.speed
+  } else if (command.kind === 'continue') {
+    if (session) continueWithLoan(session.world, kettlewick)
+    publish()
   } else {
     clearInterval(timer)
     try {
       if (command.kind === 'restart') {
-        const fresh = await createSession(kettlewick, command.files)
+        const fresh = await createSession(kettlewick, command.files, command.saved)
         session?.dispose()
         session = fresh
       } else {

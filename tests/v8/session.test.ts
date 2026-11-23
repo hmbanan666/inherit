@@ -103,3 +103,15 @@ test('deploy replaces the controller on the same world and a failed deploy keeps
     expect(session.world.cpu.used).toBe(0)
   } finally { session.dispose() }
 })
+
+test('restoring the world and deployed helpers resumes the same tick and guest memory', async () => {
+  const files = { 'main.ts': 'import { tally } from "./lib/helpers"; export function onTick() { tally() }',
+    'lib/helpers.ts': 'import { memory } from "inherit"; export function tally() { memory.n = (memory.n ?? 0) + 1 }' }
+  const saved = await runSession(kettlewick, files, 7)
+  const session = await createSession(kettlewick, files, JSON.parse(JSON.stringify(saved)))
+  try {
+    expect(session.world).toEqual(saved)
+    session.step(1)
+    expect(session.world).toEqual(await runSession(kettlewick, files, 8))
+  } finally { session.dispose() }
+})

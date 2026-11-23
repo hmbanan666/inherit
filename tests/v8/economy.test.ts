@@ -126,10 +126,10 @@ test('a direct haul route and earliest-due shipping fill the actual Kettlewick o
       for (const order of orders().sort((a, b) => a.due - b.due)) ship(order)
     }` })
   try {
-    session.step(180)
+    session.step(kettlewick.orderSchedule[1].due)
     expect(session.world.messages).toEqual([])
     expect(session.world.orders.map(o => o.status)).toEqual(['on time', 'on time'])
-    expect(session.world.ledger.income).toBe(160)
+    expect(session.world.ledger.income).toBe(280)
     expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
   } finally { session.dispose() }
 })
