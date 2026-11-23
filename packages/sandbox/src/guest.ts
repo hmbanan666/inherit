@@ -86,13 +86,16 @@ export const guestSetup = String.raw`
     const method = (...args) => {
       if (args.length > 4) throw new Fault("Use at most four arguments.");
       const at = i => args[i] === undefined || typeof args[i] === "number" ? args[i] : snapshot(args[i]);
-      return result(call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096)));
+      const reply = call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096));
+      // A null handle requests a VM interrupt. Yield to its instruction poll so
+      // a guest catch block cannot resume the remainder of an exhausted tick.
+      if (reply === null) { for (;;) {} }
+      return result(reply);
     };
     api[name] = freeze(method);
     if (ambient) global(name, method);
   }
   freeze(api);
-  define(globalThis, "__inherit", { value: api, configurable: true });
 
   function errorText(e) {
     if (typeof e === "string") return "[" + stringify(cut(e, 0, 1024)) + ',""]';
@@ -107,12 +110,19 @@ export const guestSetup = String.raw`
     const property = own(namespace, name);
     return property && has(property, "value") ? property.value : undefined;
   }
-  return { snapshot, errorText, exported };
+  let updateClock;
+  define(globalThis, "__inherit", { configurable: true, value: {
+    api, memory, clock: update => { updateClock = update }
+  } });
+  return { snapshot, errorText, exported, startTick: value => updateClock?.(value) };
 })
 `
 
 // Install the built-in module before any player module runs. Only its exports survive.
-export function inheritModule(names: readonly string[]) {
-  return names.map(name => 'export const ' + name + ' = globalThis.__inherit.' + name).join('\n') +
+export function inheritModule(names: readonly string[], source?: string) {
+  if (source !== undefined) return `const state = globalThis.__inherit, api = state.api;
+delete globalThis.__inherit;
+${source}`
+  return names.map(name => 'export const ' + name + ' = globalThis.__inherit.api.' + name).join('\n') +
     '\ndelete globalThis.__inherit'
 }

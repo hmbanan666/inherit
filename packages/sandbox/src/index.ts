@@ -14,7 +14,7 @@ export interface Program {
 export async function createProgram(source: string | ProjectOptions, initialFactory?: FactoryContext): Promise<Program> {
   const options = projectOptions(source)
   const project = compileProject(options)
-  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, options.operations ?? [], initialFactory, options.exposure, options.inputs)
+  const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, options, initialFactory)
   try {
     const tick = session.handler('onTick')
     if (!tick) throw new Error(`${project.entry} · Export a function named onTick.`)
@@ -36,7 +36,7 @@ export async function createProgram(source: string | ProjectOptions, initialFact
 /** Evaluate the entry module once on the floor without requiring a clock handler. */
 export async function runOnce(options: ProjectOptions, api: FactoryContext) {
   const project = compileProject(options)
-  const session = await openRuntime(project, {}, options.budget ?? 1024, options.operations ?? [], api, options.exposure, options.inputs)
+  const session = await openRuntime(project, {}, options.budget ?? 1024, options, api)
   try {
     return session.drainLogs()
   } finally {

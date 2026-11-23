@@ -114,3 +114,32 @@ test('reports the source line inside an imported module', async () => {
   try { expect(() => program.onTick(ctx)).toThrow(/tools.ts:2.*stopped/) }
   finally { program.dispose() }
 })
+
+test('weighted calls stop on the mapped line, including inside a guest catch', async () => {
+  const calls: string[] = []
+  const program = await createProgram({
+    budget: 3,
+    operations: ['read', 'act'],
+    costs: { read: 0, act: 3 },
+    files: {
+      'main.ts': 'export { work as onTick } from "./work"',
+      'work.ts': [
+        'import { read, act } from "inherit"',
+        'export function work() {',
+        '  read()',
+        '  try { act() } catch { console.log("caught") }',
+        '  console.log("after")',
+        '}',
+      ].join('\n'),
+    },
+  })
+  try {
+    for (const tick of [1, 2]) {
+      expect(() => program.onTick({ tick, read() {}, act() { calls.push('act') } }))
+        .toThrow(/work.ts:4 · CPU limit/)
+      expect(program.stats.used).toBe(3)
+      expect(program.drainLogs()).toEqual([])
+    }
+    expect(calls).toEqual(['act', 'act'])
+  } finally { program.dispose() }
+})
