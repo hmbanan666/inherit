@@ -32,10 +32,20 @@ async function act(command: FactoryCommand) {
         const fresh = await createSession(kettlewick, command.files, command.saved)
         session?.dispose()
         session = fresh
-      } else {
+        publish(command.files)
+      } else if (command.kind === 'run') {
         await session!.deploy(command.files)
+        publish(command.files)
+      } else if (command.kind === 'accept') {
+        session!.accept()
+        publish()
+      } else if (command.kind === 'complete') {
+        session!.complete()
+        publish()
+      } else if (command.kind === 'buy') {
+        session!.buy(command.id)
+        publish()
       }
-      publish(command.files)
     } catch (error) {
       self.postMessage({ error: error instanceof Error ? error.message : String(error) } satisfies FactoryFrame)
     }

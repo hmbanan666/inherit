@@ -3,48 +3,17 @@ import { diagnostics } from '../packs/compiler'
 import { declarations, kettlewick, factoryBricks } from '../../packages/sim/src/v8'
 import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
-test('uncle fills the cart and the village pays nothing until that line changes', async () => {
+test('uncle fills the cart and nothing is paid until a quest is taken', async () => {
   const session = await createSession(kettlewick, kettlewick.files)
   try {
     expect(session.world.drones).toHaveLength(1)
-    expect(session.world.orders.map(order => order.from)).toEqual(['Bram'])
-    session.step(1)
-    expect(session.world.drones[0].pos).not.toEqual(kettlewick.depot.pos)
-    expect(session.world.cpu.used).toBeLessThan(session.world.cpu.limit / 2)
-    while (!session.world.status.includes('never comes back') && session.world.tick < 40) session.step(1)
-    const status = session.world.status
-    expect(status).toContain('Send it when the cart is full')
-    const cargo = session.world.drones[0].cargo
-    session.step(6)
-    expect(session.world.status).toBe(status)
-    expect(session.world.drones[0].cargo).toBe(cargo)
+    expect(session.world.orders).toEqual([])
+    expect(session.world.status).toContain('cart fills')
+    session.step(30)
+    expect(session.world.drones[0]!.cargo).toBe(session.world.drones[0]!.capacity)
     expect(session.world.credits).toBe(kettlewick.credits)
-    expect(session.world.orders[0].shipped).toBe(0)
     expect(session.world.furnace.output).toBe(0)
-  } finally { session.dispose() }
-})
-
-test('sending the full cart home pays Bram and then the mayor asks', async () => {
-  const fixed = { 'main.ts': kettlewick.files['main.ts'].replace(
-    'const home = false // change to: drone.cargo >= drone.capacity',
-    'const home = drone.cargo >= drone.capacity',
-  ) }
-  const session = await createSession(kettlewick, fixed)
-  try {
-    while (session.world.ledger.income < kettlewick.orderSchedule[0].pay && session.world.tick < 400) session.step(1)
-    session.step(1)
-    expect(session.world.orders[0].status).toBe('on time')
-    expect(session.world.orders[1]).toMatchObject({ from: 'Mayor Odile', status: 'open' })
-    expect(session.world.credits).toBe(kettlewick.credits + kettlewick.orderSchedule[0].pay)
-    expect(session.world.growth[0]).toContain('forge is lit')
-    expect(session.world.creditsPerMinute).toBeGreaterThan(0)
-    expect(session.world.messages).toEqual([])
-    const pay = kettlewick.orderSchedule.reduce((total, order) => total + order.pay, 0)
-    while (session.world.ledger.income < pay && session.world.tick < 800) session.step(1)
-    expect(session.world.ledger.income).toBe(pay)
-    expect(session.world.orders.map(order => order.from)).toEqual(['Bram', 'Mayor Odile', 'Elsie'])
-    expect(session.world.credits).toBe(kettlewick.credits + pay)
-    expect(session.world.tick).toBeLessThan(500)
+    expect(session.world.orders).toEqual([])
   } finally { session.dispose() }
 })
 

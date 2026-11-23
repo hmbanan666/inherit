@@ -21,6 +21,7 @@ export interface CpuStats {
 export interface FactoryContext {
   traceSite?(site: { file: string; line: number; within?: string }): void
   readonly tick: number
+  readonly cpuLimit?: number
 }
 
 // QuickJSHandle.consume only disposes after a successful callback. A player
@@ -145,11 +146,12 @@ export async function openRuntime(
       vm.newFunction('factory', (name, length, ...args) => {
         if (!current) throw new Error('Factory calls require an active handler.')
         const key = vm.getString(name)
-        const charge = costs && chargeCpu(meter.used, budget, costs[key])
+        const limit = current.cpuLimit ?? budget
+        const charge = costs && chargeCpu(meter.used, limit, costs[key])
         meter.calls++
         meter.used = charge?.used ?? meter.used + 1
         function stopAtLimit() {
-          stopped = `CPU limit (${budget}) hit.`
+          stopped = `CPU limit (${limit}) hit.`
           stopLocation = project.location(vm.getString(args[4]))
           return vm.null
         }

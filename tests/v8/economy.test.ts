@@ -21,7 +21,7 @@ test('a nearby drone supplies the furnace and one batch finishes four ticks afte
 
 test('ship draws only available ingots, pays on completion and closes expired orders', async () => {
   const order = { ...kettlewick.orderSchedule[0], id: 'hale', from: 'Hale', qty: 3, due: 2, pay: 40, at: 1, after: undefined }
-  const site = { ...kettlewick, repeatOrders: false, graceTicks: 2, furnace: { ...kettlewick.furnace, output: 8 },
+  const site = { ...kettlewick, questList: undefined, repeatOrders: false, graceTicks: 2, furnace: { ...kettlewick.furnace, output: 8 },
     orderSchedule: [order, { ...order, id: 'late', at: 2 }, { ...order, id: 'expires', at: 2 }] }
   const session = await createSession(site, { 'main.ts': `import { orders, ship, tick, memory, credits } from "inherit"
     export function onTick() {
@@ -45,7 +45,7 @@ test('ship draws only available ingots, pays on completion and closes expired or
 })
 
 test('running an empty furnace at zero credits never ends the session or spends savings', async () => {
-  const site = { ...kettlewick, credits: 0 }
+  const site = { ...kettlewick, questList: undefined, credits: 0 }
   const session = await createSession(site, { 'main.ts': 'import { furnace } from "inherit"; export function onTick() { furnace.smelt() }' })
   try {
     session.step(500)
@@ -61,8 +61,9 @@ test('running an empty furnace at zero credits never ends the session or spends 
 // reserves every ninth tick for production. Once one order closes, the spare
 // action can also start a batch between those production ticks.
 test('first-come shipping delivers both orders late; prioritizing the earlier deadline delivers both on time', async () => {
-  const [bram, odile] = kettlewick.orderSchedule
-  const site = { ...kettlewick, repeatOrders: false, cpuLimit: 2,
+  const bram = kettlewick.orderSchedule[0]!
+  const odile = { ...bram, id: 'odile', from: 'Mayor Odile', who: 'odile' as const, building: 'bridge' as const }
+  const site = { ...kettlewick, questList: undefined, repeatOrders: false, cpuLimit: 2,
     orderSchedule: [{ ...bram, qty: 20, due: 180, after: undefined }, { ...odile, at: 1, qty: 10, due: 98, after: undefined }],
     furnace: { ...kettlewick.furnace, input: 60 } }
   async function deliver(sort: string) {
@@ -81,8 +82,10 @@ test('first-come shipping delivers both orders late; prioritizing the earlier de
   expect(await deliver('.sort((a, b) => a.due - b.due)')).toEqual(['on time', 'on time'])
 })
 
-test('a direct haul route and earliest-due shipping fill the actual Kettlewick orders at full pay', async () => {
-  const session = await createSession(kettlewick, { 'main.ts': `import { drones, veins, furnace, findPath, orders, ship } from "inherit"
+test('a direct haul route and earliest-due shipping fill a scheduled pair at full pay', async () => {
+  const second = { ...kettlewick.orderSchedule[0]!, id: 'odile', from: 'Mayor Odile', qty: 4, due: 2400, pay: 80 }
+  const site = { ...kettlewick, questList: undefined, repeatOrders: false, orderSchedule: [kettlewick.orderSchedule[0]!, second] }
+  const session = await createSession(site, { 'main.ts': `import { drones, veins, furnace, findPath, orders, ship } from "inherit"
     export function onTick() {
       const vein = veins()[0]
       for (const drone of drones()) {
@@ -96,10 +99,10 @@ test('a direct haul route and earliest-due shipping fill the actual Kettlewick o
       for (const order of orders().sort((a, b) => a.due - b.due)) ship(order)
     }` })
   try {
-    const pay = kettlewick.orderSchedule.reduce((total, order) => total + order.pay, 0)
-    while (session.world.ledger.income < pay && session.world.tick < kettlewick.orderSchedule[1].due) session.step(1)
+    const pay = site.orderSchedule.reduce((total, order) => total + order.pay, 0)
+    while (session.world.ledger.income < pay && session.world.tick < site.orderSchedule[1]!.due) session.step(1)
     expect(session.world.messages).toEqual([])
-    expect(session.world.orders.map(o => o.status)).toEqual(kettlewick.orderSchedule.map(() => 'on time'))
+    expect(session.world.orders.map(o => o.status)).toEqual(site.orderSchedule.map(() => 'on time'))
     expect(session.world.ledger.income).toBe(pay)
     expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
   } finally { session.dispose() }

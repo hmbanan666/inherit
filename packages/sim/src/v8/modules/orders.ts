@@ -6,21 +6,21 @@ export interface ScheduledOrder {
   at: number
   /** Open only after the order with this id, in the same round, has been paid. */
   after?: string
-  item: 'ingot'
+  item: 'ingot' | 'steel'
   qty: number
   due: number
   pay: number
   from: string
-  who: 'bram' | 'odile' | 'elsie'
+  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen'
   role: string
   title: string
   text: string
-  building: 'forge' | 'bridge' | 'bakery'
+  building: 'forge' | 'bridge' | 'bakery' | 'mill' | 'riverside' | 'lamp-street'
   change: string
 }
 export interface Order extends ScheduledOrder {
   shipped: number
-  status: 'open' | 'overdue' | 'on time' | 'late' | 'expired'
+  status: 'open' | 'overdue' | 'on time' | 'late' | 'expired' | 'ready'
 }
 function canShip(order: Order) { return order.status === 'open' || order.status === 'overdue' }
 function roundId(world: World, id: string) {
@@ -28,6 +28,7 @@ function roundId(world: World, id: string) {
 }
 
 export function updateOrders(world: World, site: Site) {
+  if (site.questList) return
   if (site.repeatOrders && world.orders.length === site.orderSchedule.length && !world.orders.some(canShip)) {
     world.orderRoundAt = world.tick
     world.orders = []
@@ -57,17 +58,23 @@ export function orderBricks(site: Site): Brick[] {
       ({ world }) => world.credits),
     brick('orders', 'function orders(): Order[]', 'Read orders still accepting shipments.', 'orders()[0]', site.costs.read,
       ({ world }) => world.orders.filter(canShip)),
-    brick('ship', 'function ship(order: Order, qty?: number): void', 'Send available ingots. A completed order pays once.',
+    brick('ship', 'function ship(order: Order, qty?: number): void', 'Send the order its own item. A quest pays when you complete it.',
       'for (const order of orders()) ship(order)', site.costs.action, ({ world }, ref, qty) => {
         const order = world.orders.find(o => o.id === (ref as Partial<Order> | null)?.id)
         if (!order || !canShip(order)) throw new Error('Choose an open order from orders().')
         if (qty !== undefined && (typeof qty !== 'number' || !Number.isSafeInteger(qty) || qty < 0))
-          throw new Error('Ship a whole, nonnegative number of ingots.')
+          throw new Error('Ship a whole, nonnegative number.')
         const remaining = order.qty - order.shipped
-        const amount = Math.min(qty ?? remaining, remaining, world.furnace.output)
-        world.furnace.output -= amount
+        const stock = order.item === 'steel' ? world.furnace.steel : world.furnace.output
+        const amount = Math.min(qty ?? remaining, remaining, stock)
+        if (order.item === 'steel') world.furnace.steel -= amount
+        else world.furnace.output -= amount
         order.shipped += amount
         if (order.shipped !== order.qty) return
+        if (site.questList) {
+          order.status = 'ready'
+          return
+        }
         const onTime = world.tick <= order.due
         order.status = onTime ? 'on time' : 'late'
         const payout = Math.max(0, order.pay - world.ledger.waste)
