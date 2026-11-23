@@ -64,3 +64,47 @@ test('bankruptcy counts consecutive closing balances, including ticks interrupte
     expect(session.world.ledger.rent).toBe(50)
   } finally { session.dispose() }
 })
+
+// Isolate shipping priority from Uncle's pathfinding. The low-CPU controller
+// reserves every ninth tick for production. Once one order closes, the spare
+// action can also start a batch between those production ticks.
+test('first-come shipping delivers both orders late; prioritizing the earlier deadline delivers both on time', async () => {
+  const site = { ...kettlewick, cpuLimit: 2, furnace: { ...kettlewick.furnace, input: 60 } }
+  async function deliver(sort: string) {
+    const session = await createSession(site, { 'main.ts': `import { furnace, orders, ship, tick } from "inherit"
+      export function onTick() {
+        if (tick % 9 === 0) furnace.smelt()
+        for (const order of orders()${sort}) ship(order)
+        if (tick % 9 !== 0 && furnace.input) furnace.smelt()
+      }` })
+    try {
+      session.step(250)
+      return session.world.orders.map(o => o.status)
+    } finally { session.dispose() }
+  }
+  expect(await deliver('')).toEqual(['late', 'late'])
+  expect(await deliver('.sort((a, b) => a.due - b.due)')).toEqual(['on time', 'on time'])
+})
+
+test('a direct haul route and earliest-due shipping fill the actual Kettlewick orders at full pay', async () => {
+  const session = await createSession(kettlewick, { 'main.ts': `import { drones, veins, furnace, findPath, orders, ship } from "inherit"
+    export function onTick() {
+      const vein = veins()[0]
+      for (const drone of drones()) {
+        if (drone.cargo < drone.capacity) {
+          if (drone.isNear(vein)) drone.mine(vein)
+          else drone.moveAlong(findPath(drone.pos, vein.pos))
+        } else if (drone.isNear(furnace)) drone.unload(furnace)
+        else drone.moveAlong(findPath(drone.pos, furnace.pos))
+      }
+      if (furnace.input >= 2) furnace.smelt()
+      for (const order of orders().sort((a, b) => a.due - b.due)) ship(order)
+    }` })
+  try {
+    session.step(180)
+    expect(session.world.messages).toEqual([])
+    expect(session.world.orders.map(o => o.status)).toEqual(['on time', 'on time'])
+    expect(session.world.ledger.income).toBe(280)
+    expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
+  } finally { session.dispose() }
+})

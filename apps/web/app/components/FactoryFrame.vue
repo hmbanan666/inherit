@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { declarations, kettlewick, factoryBricks, type Message } from '@inherit/sim/v8'
+import type { Colour } from '@inherit/sim/pack'
 import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import type { FactoryCommand, FactoryFrame } from '../lib/factoryProtocol'
@@ -45,7 +46,7 @@ function deploy(kind: 'run' | 'restart') {
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
-    if (!pending.value && !event.repeat) deploy('run')
+    if (!pending.value && !world.value?.bankrupt && !event.repeat) deploy('run')
   }
 }
 
@@ -76,6 +77,15 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', shortcut)
 })
 
+const orderRows = computed(() => {
+  const frame = world.value
+  if (!frame) return []
+  return frame.orders.map(order => {
+    const status: Colour = order.status === 'open' ? 'amber' : order.status === 'on time' ? 'green' : 'red'
+    const deadline = order.status === 'open' ? 'due in ' + (order.due - frame.tick) + ' ticks' : order.status
+    return { id: order.id, status, text: order.from + ' · ' + order.shipped + '/' + order.qty + ' ingots · ' + order.pay + ' cr · ' + deadline }
+  })
+})
 </script>
 
 <template>
@@ -87,36 +97,45 @@ onBeforeUnmount(() => {
         <span class="tick">Credits <b>{{ world.credits }}</b></span>
         <span class="tick" data-testid="cpu" :class="{ limit: world.cpu.used >= world.cpu.limit }">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
       </div>
-      <button class="deploy primary-run" aria-label="Run" :disabled="pending" @click="deploy('run')"><Play /> Run <kbd>Ctrl+Enter</kbd></button>
+      <button class="deploy primary-run" aria-label="Run" :disabled="pending || world?.bankrupt" @click="deploy('run')"><Play /> Run <kbd>Ctrl+Enter</kbd></button>
     </template>
     <template #floor>
       <nav class="factory-clock" aria-label="Factory clock">
-        <button @click="paused = !paused">{{ paused ? 'Resume' : 'Pause' }}</button>
-        <div class="speeds"><button v-for="rate in kettlewick.speeds" :key="rate" :aria-pressed="speed === rate" @click="speed = rate">{{ rate }}x</button></div>
+        <button :disabled="world?.bankrupt" @click="paused = !paused">{{ paused ? 'Resume' : 'Pause' }}</button>
+        <div class="speeds"><button v-for="rate in kettlewick.speeds" :key="rate" :disabled="world?.bankrupt" :aria-pressed="speed === rate" @click="speed = rate">{{ rate }}x</button></div>
         <button :disabled="pending" @click="deploy('restart')">Restart</button>
       </nav>
       <template v-if="world">
-        <div class="map-frame"><LazyFactoryFloor :world="world" :paused="paused" :interval="kettlewick.tickMs / speed" /></div>
+        <div class="map-frame"><LazyFactoryFloor :world="world" :paused="paused || world.bankrupt" :interval="kettlewick.tickMs / speed" /></div>
         <MetricsPanel :world="world" />
       </template>
     </template>
     <template #editor>
       <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="reference && (reference.open = true)" /></div></div>
-        <section aria-label="Console" class="console">
-          <h2>Console</h2>
-          <p v-if="error" role="alert">{{ error }}</p>
-          <p v-for="msg in [...messages].reverse()" :key="msg.tick">Tick {{ msg.tick }} · {{ msg.text }}</p>
-        </section>
-        <details ref="reference" class="reference">
-          <summary>API</summary>
-          <article v-for="brick in bricks" :key="brick.name">
-            <strong>{{ brick.name }}</strong> · {{ brick.cost }} CPU
-            <p><code>{{ brick.signature }}</code></p>
-            <p>{{ brick.doc }}</p><code>{{ brick.example }}</code>
-          </article>
-        </details>
+      <ChecksPanel v-if="orderRows.length" label="Orders" :checks="orderRows" tried />
+      <section aria-label="Console" class="console">
+        <h2>Console</h2>
+        <p v-if="error" role="alert">{{ error }}</p>
+        <p v-for="msg in [...messages].reverse()" :key="msg.tick">Tick {{ msg.tick }} · {{ msg.text }}</p>
+      </section>
+      <details ref="reference" class="reference">
+        <summary>API</summary>
+        <article v-for="brick in bricks" :key="brick.name">
+          <strong>{{ brick.name }}</strong> · {{ brick.cost }} CPU
+          <p><code>{{ brick.signature }}</code></p>
+          <p>{{ brick.doc }}</p><code>{{ brick.example }}</code>
+        </article>
+      </details>
     </template>
-    <template #status><span v-if="world" data-testid="ore">Furnace ore {{ world.furnace.input }}</span></template>
+    <template #status>
+      <template v-if="world">
+        <strong v-if="world.bankrupt" role="status">Bankrupt · session ended</strong>
+        <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
+        <span>Ingots {{ world.furnace.output }}</span>
+        <span>Rent {{ kettlewick.rentPerTick }} cr/tick</span>
+        <span>Income {{ world.ledger.income }} cr</span>
+      </template>
+    </template>
   </StudioShell>
 </template>
 

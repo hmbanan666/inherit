@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 
 test('the inherited controller hauls ore and a new deployment keeps the factory', async ({ page }) => {
@@ -6,15 +7,25 @@ test('the inherited controller hauls ore and a new deployment keeps the factory'
   const editor = page.getByRole('textbox', { name: 'Player TypeScript' })
   await expect(editor).toBeVisible()
   await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
+  await expect(page.getByRole('link', { name: 'Inherit showcase' })).toBeVisible()
+  await expect(page.getByLabel('Factory map').locator('canvas')).toBeVisible()
+  await expect(page.getByLabel('Factory metrics')).toBeVisible()
+  const resizer = page.getByRole('separator', { name: 'Resize editor' })
+  const dock = page.locator('.editor-dock')
+  const width = (await dock.boundingBox())!.width
+  await resizer.press('ArrowLeft')
+  expect((await dock.boundingBox())!.width).toBeGreaterThan(width)
+  await expect(page.getByLabel('Orders')).toContainText(/Mayor Hale.*due in \d+ ticks/)
   await run.click()
   await page.getByRole('button', { name: '4x' }).click()
   await expect(page.getByTestId('cpu')).toHaveText('CPU 30/30')
   await expect(page.getByLabel('Console')).toContainText(/main\.ts:\d+ · CPU limit/)
   const ore = page.getByTestId('ore')
-  await expect(ore).not.toHaveText('Depot ore 0')
+  await expect(ore).not.toHaveText('Furnace ore 0')
   await page.getByRole('button', { name: 'Pause' }).click()
   const tick = await page.getByTestId('tick').innerText()
   const stored = await ore.innerText()
+  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick.png') })
   await editor.focus()
   await page.keyboard.press('Control+a')
   await page.keyboard.insertText('export function onTick() {}')
@@ -25,6 +36,6 @@ test('the inherited controller hauls ore and a new deployment keeps the factory'
   await expect(page.getByTestId('cpu')).toHaveText('CPU 0/30')
   await expect(ore).toHaveText(stored)
   await page.getByRole('button', { name: 'Restart' }).click()
-  await expect(ore).toHaveText('Depot ore 0')
+  await expect(ore).toHaveText('Furnace ore 0')
   await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
 })

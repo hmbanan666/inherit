@@ -92,7 +92,6 @@ export function mining(site: Site): Brick[] {
 export function miningModule(bricks: Brick[]) {
   const source = bricks.flatMap(b => typeof b.handler === 'object' ? [b.handler.guest] : [])
   return [...source, `
-    export const { orders, ship, credits } = api
     export const cpu = Object.freeze({ used: api.cpu_used, limit: cpuLimit })
     export const veins = api.veins, findPath = api.findPath
     export function drones() {

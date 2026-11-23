@@ -22,6 +22,7 @@ export function updateOrders(world: World, site: Site) {
   }
   for (const order of world.orders) {
     if (!canShip(order) || order.due >= world.tick) continue
+    if (order.status === 'open') order.pay *= site.latePayFraction
     order.status = world.tick <= order.due + site.graceTicks ? 'overdue' : 'expired'
   }
 }
@@ -45,9 +46,8 @@ export function orderBricks(site: Site): Brick[] {
         if (order.shipped !== order.qty) return
         const onTime = world.tick <= order.due
         order.status = onTime ? 'on time' : 'late'
-        const pay = onTime ? order.pay : order.pay * site.latePayFraction
-        world.ledger.income += pay
-        world.credits += pay
+        world.ledger.income += order.pay
+        world.credits += order.pay
       }),
   ]
 }

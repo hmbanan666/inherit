@@ -1,5 +1,4 @@
-import { type Drawing, copper, copperLight, edge, gold, ink, light, shade, steel } from './shared'
-import { enamelLight, enamel, enamelShade } from "./shared"
+import { type Drawing, edge, enamel, enamelLight, enamelShade, gold, ink, light, shade, steel } from './shared'
 
 function crate({ box, line, rect, poly }: Drawing, x: number, y: number, w: number, h: number) {
   box(x, y, w, 9, h, 0xc6ae7a, 0xab9063, 0x806e4e)

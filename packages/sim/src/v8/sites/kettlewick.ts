@@ -32,20 +32,25 @@ export const kettlewick: Site = {
   orePerMine: 1,
   files: {
     'main.ts': `// Kettlewick Works. It works. Don't touch it. - Uncle Ambrose
-import { drones, veins, depot, findPath } from "inherit"
+import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 
 export function onTick() {
   for (const drone of drones()) {
+    // find the nearest vein. Every tick, for every drone.
     let best = veins()[0]
-    for (const vein of veins()) {
-      if (findPath(drone.pos, vein.pos).length < findPath(drone.pos, best.pos).length) best = vein
+    for (const v of veins()) {
+      if (findPath(drone.pos, v.pos).length < findPath(drone.pos, best.pos).length) best = v
     }
-    const target = drone.cargo < drone.capacity ? best : depot
-    const path = findPath(drone.pos, target.pos)
-    if (!drone.isNear(target)) drone.moveAlong(path)
-    else if (target === best) drone.mine(best)
-    else drone.unload(depot)
+    if (drone.cargo < drone.capacity) {
+      if (drone.isNear(best)) drone.mine(best)
+      else drone.moveAlong(findPath(drone.pos, best.pos))
+    } else {
+      if (drone.isNear(furnace)) drone.unload(furnace)
+      else drone.moveAlong(findPath(drone.pos, furnace.pos))
+    }
   }
+  furnace.smelt()                      // even when empty
+  for (const o of orders()) ship(o)    // first come, first served
 }`,
   },
 }

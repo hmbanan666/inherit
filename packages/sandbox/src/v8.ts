@@ -1,4 +1,4 @@
-import { createWorld, factoryBricks, miningModule, operationName, runTicks, type Site, type TickContext } from '@inherit/sim/v8'
+import { createWorld, factoryBricks, factoryModule, operationName, runTicks, type Site, type TickContext } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
@@ -13,7 +13,7 @@ export async function createSession(site: Site, files = site.files) {
     let next: Program
     try {
       next = await createProgram({
-        files: nextFiles, memory: world.memory, budget: site.cpuLimit, inheritSource: miningModule(bricks),
+        files: nextFiles, memory: world.memory, budget: site.cpuLimit, inheritSource: factoryModule(bricks),
         operations: operations.map(op => op.key),
         costs: Object.fromEntries(operations.map(op => [op.key, op.cost])),
       })
