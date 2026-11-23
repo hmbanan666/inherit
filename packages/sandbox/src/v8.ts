@@ -1,4 +1,4 @@
-import { acceptQuest, buyUpgrade, completeQuest, createWorld, factoryBricks, factoryModule, operationName, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
+import { acceptQuest, buyUpgrade, completeQuest, createWorld, factoryBricks, factoryModule, operationName, pushConsole, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
@@ -31,6 +31,7 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
   }
   function step(ticks: number) {
     runTicks(world, site, ticks, () => {
+      let message: { file: string; line: number; text: string } | undefined
       try {
         try { program.onTick(host) }
         finally { world.memory = program.exportMemory() }
@@ -38,9 +39,15 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
       catch (error) {
         const plain = new PlayerRunError(error, files, names)
         const { file, line } = plain.diagnostic
-        return { used: program.stats.used, message: { file, line, text: plain.message } }
+        message = { file, line, text: plain.message }
+        pushConsole(world, { tick: world.tick, text: plain.message, level: 'error', file, line })
       }
-      return { used: program.stats.used }
+      finally {
+        for (const entry of program.takeLogs()) {
+          pushConsole(world, { tick: world.tick, text: entry.text, level: entry.level, file: entry.file, line: entry.line })
+        }
+      }
+      return { used: program.stats.used, message }
     })
   }
   return {

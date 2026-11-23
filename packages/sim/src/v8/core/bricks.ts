@@ -46,7 +46,15 @@ ${members('drone.')}
 ${members('cpu.')}
   }
 ${bricks.filter(b => !b.name.includes('.')).map(b => declaration(b, 'export ')).join('\n')}
-}`
+}
+declare interface InheritConsole {
+  log(...args: unknown[]): void
+  info(...args: unknown[]): void
+  warn(...args: unknown[]): void
+  error(...args: unknown[]): void
+}
+declare const console: InheritConsole
+`
 }
 
 export function operationName(brick: Brick) { return brick.name.replace('.', '_') }

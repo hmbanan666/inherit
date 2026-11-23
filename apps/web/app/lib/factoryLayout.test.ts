@@ -15,6 +15,7 @@ import {
   questRailPx,
   readFilesOpen,
   readMapHeight,
+  readSideTab,
   worksWidth,
 } from './factoryLayout'
 
@@ -40,6 +41,13 @@ test('the map row defaults to 45% of the works column and a saved height stays i
   expect(readMapHeight('90')).toBe(mapHeightMax)
   expect(readMapHeight('nope')).toBe(45)
   expect(clampMapHeight(45)).toBe(45)
+})
+
+test('the checks pane remembers whether Checks or Console is selected', () => {
+  expect(readSideTab(null)).toBe('checks')
+  expect(readSideTab('checks')).toBe('checks')
+  expect(readSideTab('console')).toBe('console')
+  expect(readSideTab('api')).toBe('checks')
 })
 
 test('the checks pane is a fixed column beside the editor', () => {

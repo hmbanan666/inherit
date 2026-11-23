@@ -64,12 +64,18 @@ export const guestSetup = String.raw`
       return string(value);
     return "[" + typeof value + "]";
   }
-  global("console", freeze({ log(...values) {
+  global("console", freeze({
+    log(...values) { write("log", values) },
+    info(...values) { write("info", values) },
+    warn(...values) { write("warn", values) },
+    error(...values) { write("error", values) },
+  }));
+  function write(level, values) {
     let line = "";
     for (let i = 0; i < values.length && i < 8 && line.length < 512; i++)
       line += (i ? " " : "") + label(values[i]);
-    log(stringify(cut(line, 0, 512)));
-  } }));
+    log(stringify(cut(line, 0, 512)), level, cut(new Fault().stack, 0, 4096));
+  }
 
   function readonly(value) {
     if (value && typeof value === "object") {

@@ -23,6 +23,13 @@ export const filesNarrowPx = 1280
 
 export const mapHeightKey = 'inherit.v8.map-height'
 export const filesStorageKey = 'inherit.v8.tree'
+export const sideTabKey = 'inherit.v8.side'
+
+export type SideTab = 'checks' | 'console'
+
+export function readSideTab(stored: string | null): SideTab {
+  return stored === 'console' ? 'console' : 'checks'
+}
 
 /** A space, then the word. The nav reads "300 credits". */
 export const creditSuffix = ' credits'

@@ -50,10 +50,10 @@ test('Bram offers a quest, the checks sit beside the editor, and credits stay pu
   await expect(page.getByLabel('Factory metrics')).toBeVisible()
   await settings(page, 'API')
   await expect(page.getByLabel('API reference')).toContainText('furnace.smelt()')
-  await settings(page, 'Console')
+  await page.getByRole('tab', { name: 'Console' }).click()
   await expect(page.getByTestId('tick')).toBeVisible()
-  await expect(page.getByLabel('Factory metrics')).toBeHidden()
-  await settings(page, 'Console')
+  await expect(page.getByLabel('API reference')).toBeHidden()
+  await page.getByRole('tab', { name: 'Checks' }).click()
   await expect(page.getByLabel('Console', { exact: true })).toBeHidden()
 })
 

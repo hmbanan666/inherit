@@ -91,7 +91,7 @@ export async function openRuntime(
   let stopLocation = project.entry
   let current: FactoryContext | undefined
   let formatError: QuickJSHandle | undefined
-  const logs: string[] = []
+  const logs: { text: string; level: 'log' | 'info' | 'warn' | 'error'; file?: string; line?: number }[] = []
 
   function begin(stats: CpuStats) {
     if (disposed) throw new Error('Program has been disposed.')
@@ -175,9 +175,19 @@ export async function openRuntime(
       }),
     )
     const log = keep(
-      vm.newFunction('log', (line) => {
+      vm.newFunction('log', (line, level, stack) => {
         if (logs.length === 64) logs.shift()
-        logs.push(JSON.parse(vm.getString(line)))
+        const text = JSON.parse(vm.getString(line))
+        const name = level && vm.typeof(level) === 'string' ? vm.getString(level) : 'log'
+        const kind = name === 'info' || name === 'warn' || name === 'error' ? name : 'log'
+        let file: string | undefined
+        let lineNo: number | undefined
+        if (stack && vm.typeof(stack) === 'string') {
+          const site = project.callSite(vm.getString(stack))
+          file = site.file
+          lineNo = site.line
+        }
+        logs.push({ text, level: kind, file, line: lineNo })
       }),
     )
     for (const name of Object.keys(inputs)) {
@@ -218,7 +228,8 @@ export async function openRuntime(
     return {
       dispose,
       stats: () => ({ ...frame }),
-      drainLogs: () => logs.splice(0),
+      drainLogs: () => logs.splice(0).map(entry => entry.text),
+      takeLogs: () => logs.splice(0),
       handler(name: string) {
         const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
         if (vm.typeof(fn) === 'function') return fn
