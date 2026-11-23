@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Application } from 'pixi.js'
-import { Minus, Plus, Maximize, MapPin } from '@lucide/vue'
+import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
+const emit = defineEmits<{ error: [message: string] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 800, h: 500 }),
@@ -119,6 +120,7 @@ onMounted(async () => {
     renderer.ticker.add(() => scene?.animate(performance.now(), props.interval, props.paused))
   } catch {
     renderError.value = 'Could not open the floor renderer. Reload to retry.'
+    emit('error', renderError.value)
   }
 })
 onBeforeUnmount(() => {
@@ -140,12 +142,10 @@ onBeforeUnmount(() => {
     @pointerdown="down"
   >
     <div ref="mount" class="pixi-mount"></div>
-    <div class="map-location"><MapPin :size="13" /> Shed floor</div>
     <div class="map-controls">
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
       ><button aria-label="Center map" @click="recenter()"><Maximize /></button
       ><button aria-label="Zoom in" @click="zoomBy(1.25)"><Plus /></button>
     </div>
-    <div v-if="renderError" class="floor-help">{{ renderError }}</div>
   </div>
 </template>

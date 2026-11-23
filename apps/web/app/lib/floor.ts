@@ -127,7 +127,7 @@ export class FloorScene {
     art.addChild(d.g).scale.set(0.54)
     const cargo = art.addChild(materialArt(drone.carrying === 'coal' ? 'coal' : 'iron-ore'))
     cargo.position.set(-7, -12)
-    caption(art, drone.name.slice(-1), 0, 9)
+    caption(art, drone.name, 0, 9)
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
     this.haulers.push({ art, cargo, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })

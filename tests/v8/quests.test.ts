@@ -1,6 +1,14 @@
 import { expect, test } from 'vitest'
 import { kettlewick } from '../../packages/sim/src/v8'
+import { levelSpan } from '../../packages/sim/src/v8/quests'
 import { createSession } from '../../packages/sandbox/src/v8'
+
+test('level span uses the same steps as the quest chain', () => {
+  expect(levelSpan(0)).toEqual({ level: 1, start: 0, next: 20 })
+  expect(levelSpan(20)).toEqual({ level: 2, start: 20, next: 40 })
+  expect(levelSpan(144)).toEqual({ level: 6, start: 115, next: 145 })
+  expect(levelSpan(145)).toEqual({ level: 7, start: 145, next: null })
+})
 
 const home = {
   'main.ts': kettlewick.files['main.ts'].replace(

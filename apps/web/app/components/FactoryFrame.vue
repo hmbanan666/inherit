@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { declarations, kettlewick, factoryBricks, shop, type World } from '@inherit/sim/v8'
+import { declarations, kettlewick, factoryBricks, shop, levelSpan, type World } from '@inherit/sim/v8'
 import ChecksPanel from './ChecksPanel.vue'
 import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
@@ -24,21 +24,47 @@ const world = shallowRef<World>()
 watch(visibleBricks, list => { api.value = declarations(list) })
 const error = ref('')
 const saveError = ref('')
+const floorError = ref('')
 const pending = ref(true)
 const panels = ['Console', 'API', 'Charts'] as const
-const panel = ref<typeof panels[number] | 'Shop'>()
+const tool = ref<typeof panels[number]>()
+const zone = ref<'quests' | 'shop'>('quests')
+const hintOpen = ref(true)
 const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
-const offer = computed(() => world.value && !world.value.questId
-  ? kettlewick.questList?.find(quest => !world.value!.cleared.includes(quest.id) && world.value!.level >= quest.needLevel)
-  : undefined)
-const card = computed(() => activeQuest.value ?? offer.value)
+const offers = computed(() => {
+  const current = world.value
+  if (!current || current.questId) return []
+  return (kettlewick.questList ?? []).filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel)
+})
+const shown = computed(() => activeQuest.value ? [activeQuest.value] : offers.value)
 const order = computed(() => world.value?.orders.find(item => item.id === world.value?.questId))
 const ready = computed(() => !!activeQuest.value && !!world.value?.checks.length && world.value.checks.every(check => check.status === 'green'))
 const checks = computed(() => (world.value?.checks ?? []).map(check => ({ ...check, status: check.status === 'green' ? 'green' as const : 'red' as const })))
-const speaker = computed(() => card.value)
-const headline = computed(() => card.value?.title ?? (world.value?.cleared.length ? 'More is coming' : 'Kettlewick Works'))
-const bubble = computed(() => card.value?.goal ?? world.value?.growth.at(-1) ?? '')
-const earlier = computed(() => world.value?.growth.filter(line => line !== bubble.value).at(-1))
+const xp = computed(() => {
+  const value = world.value?.xp ?? 0
+  const span = levelSpan(value)
+  if (span.next === null) return { width: '100%', title: `Level ${span.level}` }
+  const into = value - span.start
+  const size = span.next - span.start
+  return { width: `${Math.min(100, (into / size) * 100)}%`, title: `${into} / ${size} XP` }
+})
+const notice = computed(() => {
+  if (error.value) return { text: error.value, bad: true }
+  if (saveError.value) return { text: saveError.value, bad: true }
+  if (floorError.value) return { text: floorError.value, bad: true }
+  const current = world.value
+  if (!current) return undefined
+  const status = current.status
+  const echoed = current.checks.some(check => check.text === status)
+    || shown.value.some(quest => status === quest.why || status === quest.goal)
+    || status === 'More is coming.'
+  if (status && !echoed) return { text: status, bad: false }
+  const line = !current.questId ? current.growth.at(-1) : undefined
+  return line ? { text: line, bad: false } : undefined
+})
+function hintSteps(why: string) {
+  return why.split(/(?<=\.)\s+/).map(step => step.trim()).filter(Boolean)
+}
 const saveKey = 'inherit.v8.' + kettlewick.id
 let worker: Worker | undefined
 let resetting = false
@@ -101,7 +127,8 @@ onMounted(async () => {
       if (resetting) {
         files.value = { ...data.deployed }
         activeFile.value = 'main.ts'
-        panel.value = undefined
+        tool.value = undefined
+        zone.value = 'quests'
         resetting = false
       }
       pending.value = false
@@ -156,114 +183,277 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <StudioShell class="factory" :dock="58">
+  <StudioShell class="factory">
     <template #nav>
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
         <template #clock>
           <div v-if="world" class="clock">
             <p class="balance" data-testid="credits"><b>{{ world.credits }}</b><span>credits</span></p>
-            <span class="tick">{{ Math.round(world.creditsPerMinute) }} / min</span>
-            <span class="tick" data-testid="level">Level <b>{{ world.level }}</b></span>
+            <div class="xp" data-testid="level">
+              <span class="tick">Level <b>{{ world.level }}</b></span>
+              <span class="xp-bar" :title="xp.title"><i :style="{ width: xp.width }" /></span>
+            </div>
             <span class="tick" data-testid="cpu">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
+            <span class="live"><i />Running</span>
           </div>
+          <span v-else class="live off"><i />{{ error ? 'Offline' : 'Starting' }}</span>
         </template>
         <template #settings="{ close }">
-          <button v-for="name in panels" :key="name" :aria-pressed="panel === name"
-            @click="panel = panel === name ? undefined : name; close()">{{ name }}</button>
+          <button v-for="name in panels" :key="name" :aria-pressed="tool === name"
+            @click="tool = tool === name ? undefined : name; close()">{{ name }}</button>
           <button :disabled="pending" @click="close(); startOver()">Start over</button>
         </template>
       </PackNav>
-      <button class="shop-open" type="button" :aria-pressed="panel === 'Shop'" @click="panel = panel === 'Shop' ? undefined : 'Shop'">Shop</button>
-      <button v-if="dirty" class="deploy primary-run" aria-label="Deploy" :disabled="pending || !world" @click="deploy"><Play /> Deploy <kbd>Ctrl+Enter</kbd></button>
-      <span v-else class="live" :class="{ off: !world }"><i />{{ world ? 'Running' : error ? 'Offline' : 'Starting' }}</span>
     </template>
     <template #floor>
-      <section class="objective" aria-label="Current request">
-        <div class="goal-body">
-          <h2>{{ headline }}</h2>
-          <p v-if="card" class="goal">{{ card.goal }}</p>
-          <p v-if="saveError" class="next bad">{{ saveError }}</p>
-          <p class="next" :class="{ bad: !!error }">{{ error || card?.why || world?.status || 'Uncle Ambrose left you the works.' }}</p>
+      <section class="quest-zone" aria-label="Current request">
+        <nav class="zone-tabs" aria-label="Quest and shop">
+          <button type="button" :aria-pressed="zone === 'quests'" @click="zone = 'quests'">Quests</button>
+          <button type="button" :aria-pressed="zone === 'shop'" @click="zone = 'shop'">Shop</button>
+        </nav>
+        <div class="quest-scroll">
+          <template v-if="zone === 'quests'">
+            <article v-for="quest in shown" :key="quest.id" class="quest">
+              <VillageAsk :who="quest.who" :name="quest.from" :role="quest.role" :building-id="quest.building" />
+              <div class="goal-body">
+                <h2>{{ quest.title }}</h2>
+                <p class="goal">{{ quest.goal }}</p>
+              </div>
+              <div class="lesson">
+                <button class="hint" type="button" :aria-expanded="hintOpen" @click="hintOpen = !hintOpen">Hint</button>
+                <ol v-if="hintOpen">
+                  <li v-for="step in hintSteps(quest.why)" :key="step">{{ step }}</li>
+                </ol>
+              </div>
+              <p class="reward"><b>{{ quest.pay }}</b> credits · <b>{{ quest.xp }}</b> XP</p>
+              <p v-if="order && quest.id === world?.questId" class="progress"><b>{{ order.shipped }}/{{ order.qty }}</b> {{ order.item }}</p>
+            </article>
+            <div v-if="!shown.length" class="quest">
+              <h2>{{ world?.cleared.length ? 'More is coming' : 'Kettlewick Works' }}</h2>
+              <p v-if="!world" class="goal">Uncle Ambrose left you the works.</p>
+            </div>
+          </template>
+          <ul v-else class="shop-list">
+            <li v-for="item in shop" :key="item.id">
+              <button type="button" :disabled="!world || world.bought.includes(item.id) || world.credits < item.price"
+                @click="send({ kind: 'buy', id: item.id })">
+                <b>{{ item.name }}</b>
+                <span>{{ world?.bought.includes(item.id) ? 'Owned' : item.price + ' credits' }}</span>
+                <small>{{ item.detail }}</small>
+              </button>
+            </li>
+          </ul>
         </div>
-        <div class="goal-aside">
-          <template v-if="order"><b>{{ order.shipped }}/{{ order.qty }}</b><span>{{ order.item }}s</span></template>
-          <button v-if="offer" class="gold" type="button" data-testid="take-quest" @click="send({ kind: 'accept' })">Take quest</button>
-          <button v-if="ready" class="gold" type="button" data-testid="complete-quest" @click="send({ kind: 'complete' })">Complete quest</button>
+        <div v-if="zone === 'quests' && (activeQuest || offers.length)" class="quest-action">
+          <button v-if="offers.length" class="gold" type="button" data-testid="take-quest" @click="send({ kind: 'accept' })">Take quest</button>
+          <button v-else class="gold" type="button" data-testid="complete-quest" :disabled="!ready" @click="send({ kind: 'complete' })">Complete quest</button>
         </div>
       </section>
-      <VillageAsk v-if="speaker" :who="speaker.who" :name="speaker.from" :role="speaker.role" :building-id="speaker.building" :text="bubble" :done="earlier" />
-      <template v-if="world">
-        <div class="map-frame"><LazyFactoryFloor :world="world" :paused="false" :interval="kettlewick.tickMs" /></div>
-        <MetricsPanel v-show="panel === 'Charts'" :world="world" />
-      </template>
+      <div v-if="world" class="map-frame">
+        <LazyFactoryFloor :world="world" :paused="false" :interval="kettlewick.tickMs" @error="floorError = $event" />
+      </div>
     </template>
     <template #editor>
       <FileTree v-model:files="files" v-model:active-file="activeFile" />
-      <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="panel = 'API'" /></div></div>
-      <ChecksPanel v-if="world?.questId" :tried="true" :checks="checks" />
-      <section v-if="panel === 'Console'" aria-label="Console" class="console">
-        <h2>Console · Tick <b data-testid="tick">{{ world?.tick }}</b></h2>
-        <p v-if="error" role="alert">{{ error }}</p>
-        <p v-for="msg in world?.messages.slice().reverse()" :key="msg.tick">Tick {{ msg.tick }} · {{ msg.text }}</p>
-      </section>
-      <ApiReference v-if="panel === 'API'" :entries="entries" />
-      <section v-if="panel === 'Shop'" aria-label="Shop" class="shop">
-        <h2>Shop</h2>
-        <button v-for="item in shop" :key="item.id" type="button" :disabled="world?.bought.includes(item.id) || (world?.credits ?? 0) < item.price"
-          @click="send({ kind: 'buy', id: item.id })">
-          <b>{{ item.name }}</b> · {{ item.price }} cr
-          <span>{{ world?.bought.includes(item.id) ? 'Owned' : item.detail }}</span>
-        </button>
-      </section>
+      <div class="editor-column">
+        <header class="dock-header editor-head">
+          <span>{{ activeFile }}</span>
+          <button v-if="dirty" class="deploy" type="button" aria-label="Deploy" :disabled="pending || !world" @click="deploy">
+            <Play /> Deploy <kbd>Ctrl+Enter</kbd>
+          </button>
+        </header>
+        <div class="editor-pane"><div class="editor-host"><LazyCodeEditor @reference="tool = 'API'" /></div></div>
+        <ChecksPanel v-if="world?.questId" :tried="true" :checks="checks" />
+        <div v-if="tool" class="tool-slot">
+          <section v-if="tool === 'Console'" aria-label="Console" class="console">
+            <h2>Console · Tick <b data-testid="tick">{{ world?.tick }}</b></h2>
+            <p v-for="msg in world?.messages.slice().reverse()" :key="msg.tick + msg.text">Tick {{ msg.tick }} · {{ msg.text }}</p>
+          </section>
+          <ApiReference v-else-if="tool === 'API'" :entries="entries" />
+          <MetricsPanel v-else-if="world" :world="world" />
+        </div>
+      </div>
     </template>
     <template #status>
-      <template v-if="world">
+      <span class="notice" :class="{ bad: notice?.bad }" :role="notice ? 'status' : undefined">{{ notice?.text }}</span>
+      <span v-if="world" class="meters">
         <span>Depot ore {{ world.depot.ore }}</span>
         <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
+        <span>Furnace coal {{ world.furnace.coal }}</span>
         <span>Ingots {{ world.furnace.output }}</span>
-        <span>Coal {{ world.furnace.coal }}</span>
         <span>Steel {{ world.furnace.steel }}</span>
-        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} · cargo {{ drone.cargo }}/{{ drone.capacity }}</span>
-        <span>Income {{ world.ledger.income }} cr</span>
-      </template>
+        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} {{ drone.cargo }}/{{ drone.capacity }}</span>
+      </span>
     </template>
   </StudioShell>
 </template>
 
 <style scoped>
-.map-frame { flex: 1; min-height: 150px; position: relative }
-.factory :deep(.pack-settings) { z-index: 1 }
+.factory :deep(.world-shell) {
+  display: grid;
+  grid-template-columns: minmax(232px, 300px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 17px 14px;
+}
+.quest-zone {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(102deg, var(--accent-surface), var(--accent-surface) 70%);
+  border: 1px solid var(--accent-line);
+  border-radius: 7px;
+  box-shadow: 0 3px 7px var(--shadow-light);
+}
+.zone-tabs {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  padding: 15px 17px 0;
+}
+.zone-tabs button {
+  flex: 1;
+  min-height: 30px;
+  background: transparent;
+  color: var(--soft);
+  border-color: var(--accent-line);
+  font: 12px var(--mono);
+}
+.zone-tabs button[aria-pressed='true'] {
+  background: var(--accent-shadow);
+  color: var(--accent-soft);
+  border-color: var(--gold);
+}
+.quest-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 12px 17px;
+}
+.quest { display: grid; gap: 12px; min-width: 0 }
+.quest-zone h2 {
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: -0.7px;
+  margin: 0;
+}
+.goal { font-size: 14px; line-height: 1.45 }
+.lesson {
+  border-top: 1px solid var(--accent-line);
+  padding-top: 9px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.lesson ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.reward, .progress { margin: 0; font: 13px var(--mono); color: var(--accent-soft) }
+.reward b, .progress b { color: var(--text); letter-spacing: 0.5px }
+.quest-action {
+  flex: none;
+  margin-top: auto;
+  padding: 12px 17px 15px;
+  border-top: 1px solid var(--accent-line);
+}
+.quest-action .gold { width: 100%; height: 34px }
+.shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
+.shop-list button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  justify-content: stretch;
+  justify-items: start;
+  gap: 2px 8px;
+  text-align: left;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
+.shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
+.map-frame { height: 100%; min-width: 0; min-height: 0; border-radius: 7px }
+.balance b { font-variant-numeric: tabular-nums }
+.xp { display: grid; gap: 4px; min-width: 92px }
+.xp-bar {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--accent-shadow);
+  overflow: hidden;
+}
+.xp-bar i { display: block; height: 100%; background: var(--gold) }
 .factory :deep(.editor-dock) {
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
 }
-.factory :deep(.editor-dock > .tree) { grid-column: 1; grid-row: 1 / -1 }
-.factory :deep(.editor-dock > .editor-pane) { grid-column: 2; grid-row: 1; height: 100%; min-height: 0 }
-.factory :deep(.editor-dock > .checks) { grid-column: 2; grid-row: 2; border-top: 1px solid var(--line) }
-.factory :deep(.editor-dock > .console),
-.factory :deep(.editor-dock > .reference),
-.factory :deep(.editor-dock > .shop) { grid-column: 2; grid-row: 3 }
-.shop { border-top: 1px solid var(--line); padding: 8px 12px; display: grid; gap: 6px }
-.shop button { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px }
-.shop button span { display: block; color: var(--soft); font-size: 12px }
-.shop button:disabled { opacity: 0.55 }
-.shop-open { background: transparent; color: var(--text); border: 1px solid var(--line); border-radius: 5px; height: 34px; padding: 0 12px }
-.goal { margin: 2px 0 4px; color: var(--text) }
-.objective { margin-bottom: 8px }
-.balance { display: flex; align-items: baseline; gap: 6px; color: var(--text) }
-.balance b { font-size: 22px; letter-spacing: -0.6px; line-height: 1 }
-.balance span { font: 12px var(--mono); color: var(--soft) }
-.bad { color: var(--alert) }
-.console, .reference { border-top: 1px solid var(--line); padding: 6px 12px; overflow: auto; max-height: 30% }
+.factory :deep(.editor-dock > .tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
+.editor-column {
+  grid-column: 2;
+  grid-row: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.editor-head { flex: none; gap: 12px; font: 12px var(--mono); color: var(--soft) }
+.editor-head .deploy { border-radius: 5px }
+.editor-head kbd { font: 10px var(--mono); padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px }
+.editor-column :deep(.checks) {
+  flex: none;
+  max-height: 24%;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+}
+.tool-slot {
+  flex: none;
+  max-height: 30%;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  background: var(--surface-low);
+  padding: 6px 12px;
+}
+.tool-slot :deep(.bench) { padding: 0; max-height: none }
 .console { font: 12px var(--mono) }
 .console h2 { font-size: 13px }
-.factory :deep(.editor-dock > .editor-pane) { flex: 1 }
-@media (prefers-reduced-motion: no-preference) { .live:not(.off) i { animation: guide 1.5s ease-in-out infinite } }
-@media(max-width:800px) {
-  .live { grid-column: 3; grid-row: 1; justify-self: end }
-  .factory :deep(.editor-dock) { grid-template-columns: minmax(0, 1fr) }
+.console p { margin: 0 }
+.notice { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.notice.bad { color: var(--alert) }
+.meters { margin-left: auto }
+@media (max-width: 800px) {
+  .factory :deep(.hud) {
+    display: flex;
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px 12px;
+  }
+  .factory :deep(.world-shell) {
+    display: flex;
+    flex-direction: column;
+  }
+  .quest-zone { flex: none; height: auto; max-height: 42% }
+  .map-frame { flex: 1; height: auto; min-height: 160px }
+  .factory :deep(.editor-dock) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
   .factory :deep(.editor-dock > .tree) {
     grid-column: 1;
     grid-row: 1;
@@ -271,6 +461,6 @@ onBeforeUnmount(() => {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .factory :deep(.editor-dock > .editor-pane) { grid-row: 2 }
+  .editor-column { grid-column: 1; grid-row: 2 }
 }
 </style>
