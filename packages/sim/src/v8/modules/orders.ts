@@ -11,11 +11,11 @@ export interface ScheduledOrder {
   due: number
   pay: number
   from: string
-  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen'
+  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen' | 'harrow'
   role: string
   title: string
   text: string
-  building: 'forge' | 'bridge' | 'bakery' | 'mill' | 'riverside' | 'lamp-street'
+  building: 'forge' | 'bridge' | 'bakery' | 'mill' | 'riverside' | 'lamp-street' | 'town-hall'
   change: string
 }
 export interface Order extends ScheduledOrder {

@@ -24,6 +24,14 @@ export const filesNarrowPx = 1280
 export const mapHeightKey = 'inherit.v8.map-height'
 export const filesStorageKey = 'inherit.v8.tree'
 export const sideTabKey = 'inherit.v8.side'
+export const treeWidthKey = 'inherit.v8.tree-width'
+export const sideWidthKey = 'inherit.v8.side-width'
+
+/** Open file tree and checks pane, in pixels. Double-click returns to the defaults. */
+export const treeWidthMin = 96
+export const treeWidthMax = 420
+export const sideWidthMin = 220
+export const sideWidthMax = 560
 
 export type SideTab = 'checks' | 'console'
 
@@ -55,6 +63,18 @@ export function clampMapHeight(percent: number) {
 export function readMapHeight(stored: string | null) {
   if (stored === null || stored === '') return defaultMapHeight()
   return clampMapHeight(Number(stored))
+}
+
+export function readPaneWidth(stored: string | null, min: number, max: number, fallback: number) {
+  if (stored === null || stored === '') return fallback
+  const value = Number(stored)
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
+/** Drop a leading `main.ts:18 · ` the console already shows in its own column. */
+export function consoleBody(text: string) {
+  return text.replace(/^[\w./-]+\.ts:\d+ · /, '')
 }
 
 /** Width of the map and editor column after the fixed rail and the frame padding. */

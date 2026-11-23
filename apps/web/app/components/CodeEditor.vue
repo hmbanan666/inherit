@@ -354,6 +354,12 @@ onMounted(() => {
   })
   const dock = host.value?.closest<HTMLElement>('.editor-dock')
   const fitContent = () => dock?.style.setProperty('--source-height', Math.max(115, editor!.getContentHeight()) + 'px')
+  editor.onDidChangeCursorPosition(event => {
+    if (!game.cursor) return
+    game.cursor.value = { line: event.position.lineNumber, column: event.position.column }
+  })
+  const caret = editor.getPosition()
+  if (game.cursor && caret) game.cursor.value = { line: caret.lineNumber, column: caret.column }
   editor.onDidContentSizeChange(fitContent)
   fitContent()
   syncFiles()

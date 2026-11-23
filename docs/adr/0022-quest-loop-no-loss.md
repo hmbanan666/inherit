@@ -2,6 +2,8 @@
 
 Accepted 23 November 2026. Amends [ADR 0021](0021-v8-inherit-a-factory.md). Supersedes ADR 0002, 0003, 0005, 0007, 0010, 0011, 0013, 0014 and 0017.
 
+[ADR 0023](0023-quest-unlocks-functions.md) amends the shop clause and the vein clause: a function is granted by taking the quest that needs it, veins do not run out, and quests stay quantities with no rate and no deadline. [ADR 0024](0024-quest-rail-and-status.md) moves the hint into the editor and the goals onto the rail.
+
 ## Context
 
 PR #77 shipped one quest at a time at Kettlewick Works. ADR 0021 still specified deadlines, rent, bankruptcy, pause, speed buttons, a ban on the quest card and on visible checks, and the deletion of packs. The code and Nick's decisions of 23 November 2026 disagree with those clauses. This ADR is the loop.

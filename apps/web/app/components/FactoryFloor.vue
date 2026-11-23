@@ -6,7 +6,7 @@ import { containPlace } from '../lib/factoryLayout'
 import { inspectAt } from '@inherit/sim/v8'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
-const emit = defineEmits<{ error: [message: string] }>()
+const emit = defineEmits<{ error: [message: string]; dump: [name: string] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 0, h: 0 }),
@@ -19,7 +19,7 @@ let app: Application | undefined,
   disposed = false
 
 const pointers = new Map<number, { x: number; y: number }>()
-const card = ref<{ id: string; fields: string[]; x: number; y: number }>()
+const card = ref<{ id: string; fields: string[]; x: number; y: number; dump?: string }>()
 let armed = false
 let origin = { x: 0, y: 0 }
 const worldSize = computed(() => ({
@@ -115,8 +115,9 @@ function up(e: PointerEvent) {
   card.value = {
     id: hit.id,
     fields: hit.fields,
+    dump: hit.dump,
     x: Math.min(Math.max(8, rect.width - 168), Math.max(8, e.clientX - rect.left + 10)),
-    y: Math.min(Math.max(8, rect.height - 96), Math.max(8, e.clientY - rect.top + 10)),
+    y: Math.min(Math.max(8, rect.height - 140), Math.max(8, e.clientY - rect.top + 10)),
   }
 }
 function cancel() {
@@ -191,7 +192,8 @@ onBeforeUnmount(() => {
     <aside v-if="card" class="inspect" :style="{ left: card.x + 'px', top: card.y + 'px' }">
       <b>{{ card.id }}</b>
       <p v-for="field in card.fields" :key="field">{{ field }}</p>
-      <button type="button" aria-label="Close" @click="card = undefined">×</button>
+      <button v-if="card.dump" type="button" class="dump" @click="emit('dump', card.dump!)">Dump</button>
+      <button type="button" class="close" aria-label="Close" @click="card = undefined">×</button>
     </aside>
     <div class="map-controls">
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
@@ -216,7 +218,7 @@ onBeforeUnmount(() => {
 }
 .inspect b { font-size: 12px }
 .inspect p { margin: 0; color: var(--soft) }
-.inspect button {
+.inspect .close {
   position: absolute;
   top: 2px;
   right: 2px;
@@ -226,6 +228,15 @@ onBeforeUnmount(() => {
   background: transparent;
   border: 0;
   color: var(--sub);
+}
+.inspect .dump {
+  margin-top: 4px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: 11px var(--mono);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 .pixi-mount {
   position: absolute;

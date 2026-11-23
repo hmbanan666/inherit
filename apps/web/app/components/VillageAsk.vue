@@ -7,6 +7,7 @@ const props = defineProps<{
   name: string
   role: string
   buildingId: Townsperson['buildingId']
+  line?: string
 }>()
 const person = computed<Townsperson>(() => ({
   id: props.who,
@@ -22,7 +23,8 @@ const person = computed<Townsperson>(() => ({
     <TownPortrait :person="person" />
     <div>
       <strong>{{ name }}</strong>
-      <span>{{ role }}</span>
+      <span v-if="line" class="ask">{{ line }}</span>
+      <span v-else>{{ role }}</span>
     </div>
   </section>
 </template>
@@ -47,5 +49,11 @@ const person = computed<Townsperson>(() => ({
   font: 10px var(--mono);
   letter-spacing: 1px;
   text-transform: uppercase;
+}
+.who span.ask {
+  color: var(--soft);
+  font: 13px/1.35 inherit;
+  letter-spacing: 0;
+  text-transform: none;
 }
 </style>

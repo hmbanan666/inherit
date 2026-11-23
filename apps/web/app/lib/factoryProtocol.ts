@@ -4,9 +4,10 @@ export type FactoryCommand =
   | { kind: 'restart'; files: Record<string, string>; saved?: World }
   | { kind: 'run'; files: Record<string, string> }
   | { kind: 'visibility'; visible: boolean }
-  | { kind: 'accept' }
+  | { kind: 'accept'; id?: string }
   | { kind: 'complete' }
   | { kind: 'buy'; id: string }
+  | { kind: 'dump'; name: string }
   | { kind: 'clear-console' }
 
 export type FactoryFrame = { world: World; deployed?: Record<string, string> }
@@ -18,6 +19,8 @@ export interface FactorySave {
   files: Record<string, string>
   deployed: Record<string, string>
   activeFile: string
+  /** Quest ids whose editor note was already offered. Deleting the line does not offer it again. */
+  notes?: string[]
 }
 
 export type SaveRecovery =

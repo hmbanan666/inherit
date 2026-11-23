@@ -40,13 +40,16 @@ async function act(command: FactoryCommand) {
         noteCheckReset(session!.world)
         publish(command.files)
       } else if (command.kind === 'accept') {
-        session!.accept()
+        session!.accept(command.id)
         publish()
       } else if (command.kind === 'complete') {
         session!.complete()
         publish()
       } else if (command.kind === 'buy') {
         session!.buy(command.id)
+        publish()
+      } else if (command.kind === 'dump') {
+        session!.dump(command.name)
         publish()
       } else if (command.kind === 'clear-console') {
         clearConsole(session!.world)

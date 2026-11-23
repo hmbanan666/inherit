@@ -14,8 +14,14 @@ import {
   mapHeightMin,
   questRailPx,
   readFilesOpen,
+  consoleBody,
   readMapHeight,
+  readPaneWidth,
   readSideTab,
+  sideWidthMax,
+  sideWidthMin,
+  treeWidthMax,
+  treeWidthMin,
   worksWidth,
 } from './factoryLayout'
 
@@ -50,10 +56,16 @@ test('the checks pane remembers whether Checks or Console is selected', () => {
   expect(readSideTab('api')).toBe('checks')
 })
 
-test('the checks pane is a fixed column beside the editor', () => {
+test('the checks pane and the file tree remember a width inside a sane range', () => {
   expect(checksPanePx).toBeGreaterThanOrEqual(280)
   expect(checksPanePx).toBeLessThanOrEqual(320)
   expect(editorHeaderPx).toBeGreaterThan(0)
+  expect(readPaneWidth(null, treeWidthMin, treeWidthMax, 140)).toBe(140)
+  expect(readPaneWidth('10', treeWidthMin, treeWidthMax, 140)).toBe(treeWidthMin)
+  expect(readPaneWidth('900', sideWidthMin, sideWidthMax, 300)).toBe(sideWidthMax)
+  expect(readPaneWidth('nope', sideWidthMin, sideWidthMax, 300)).toBe(300)
+  expect(consoleBody('main.ts:18 · drone-1 keeps 2 ore')).toBe('drone-1 keeps 2 ore')
+  expect(consoleBody('smelt() makes ingots.')).toBe('smelt() makes ingots.')
 })
 
 test('the file tree starts collapsed on a narrow window and open on a wide one', () => {

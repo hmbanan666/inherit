@@ -1,9 +1,9 @@
-import { acceptQuest, buyUpgrade, completeQuest, createWorld, factoryBricks, factoryModule, operationName, pushConsole, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
+import { acceptQuest, buyUpgrade, completeQuest, createWorld, dumpCargo, factoryBricks, factoryModule, migrateWorld, operationName, pushConsole, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
 export async function createSession(site: Site, files = site.files, saved?: World) {
-  const world = saved ? structuredClone(saved) : createWorld(site)
+  const world = migrateWorld(saved ? structuredClone(saved) : createWorld(site))
   const bricks = factoryBricks(site)
   const operations = bricks.flatMap(b => typeof b.handler === 'function'
     ? [{ key: operationName(b), handler: b.handler, cost: b.cost }] : [])
@@ -52,7 +52,8 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
   }
   return {
     world, deploy, step, dispose: () => program.dispose(),
-    accept: () => acceptQuest(world, site),
+    dump: (name: string) => dumpCargo(world, name),
+    accept: (id?: string) => acceptQuest(world, site, id),
     complete: () => completeQuest(world, site),
     buy: (id: string) => buyUpgrade(world, id),
   }

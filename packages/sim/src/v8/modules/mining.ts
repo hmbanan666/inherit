@@ -1,5 +1,16 @@
 import { brick, type Brick, type TickContext } from '../core/bricks'
-import type { Cell, Site, World } from '../core/world'
+import { pushConsole, type Cell, type Drone, type Site, type World } from '../core/world'
+import { functionUnlocked, unlockError } from '../quests'
+
+/** A cart with no kind recorded is ore, which is what older saves stored. */
+function heldKind(drone: { cargo: number; carrying: Drone['carrying'] }): Drone['carrying'] {
+  if (drone.carrying) return drone.carrying
+  return drone.cargo > 0 ? 'ore' : null
+}
+
+function rawCargo(kind: Drone['carrying']) {
+  return kind === 'ore' || kind === 'coal'
+}
 
 function cell(world: World, input: unknown): Cell {
   const value = input as Partial<Cell> | null
@@ -12,12 +23,12 @@ function cell(world: World, input: unknown): Cell {
 
 function distance(a: Cell, b: Cell) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) }
 
-function loadOf(drone: { cargo: number; capacity: number; carrying: 'ore' | 'coal' | null }) {
+function loadOf(drone: { cargo: number; capacity: number; carrying: Drone['carrying'] }) {
   if (!drone.cargo || !drone.carrying) return 'carries nothing'
   return `carries ${drone.carrying} ${drone.cargo}/${drone.capacity}`
 }
 
-function who(drone: { name: string; pos: Cell; cargo: number; capacity: number; carrying: 'ore' | 'coal' | null }) {
+function who(drone: { name: string; pos: Cell; cargo: number; capacity: number; carrying: Drone['carrying'] }) {
   return `${drone.name} at (${drone.pos.x},${drone.pos.y}) ${loadOf(drone)}`
 }
 
@@ -29,6 +40,19 @@ function nearestName(world: World, pos: Cell) {
   ]
   spots.sort((a, b) => distance(pos, a.pos) - distance(pos, b.pos) || a.rank - b.rank || a.name.localeCompare(b.name))
   return spots[0]?.name ?? 'nowhere'
+}
+
+/** Drop ore or coal. Ingots and steel stay, and the call throws. */
+export function dumpCargo(world: World, name: string) {
+  const d = drone(world, name)
+  if (!d.cargo) return
+  const held = heldKind(d)
+  if (!rawCargo(held))
+    throw new Error(`${d.name} carries ${held} ${d.cargo}/${d.capacity}. Only ore and coal can be dumped.`)
+  d.cargo = 0
+  d.carrying = null
+  d.source = ''
+  d.dig = null
 }
 
 function stationAt(world: World, pos: Cell) {
@@ -77,9 +101,9 @@ export function mining(site: Site): Brick[] {
     brick('cpu.used', 'used(): number', 'CPU spent this tick.', 'cpu.used()', read, ctx => ctx.cpuUsed()),
     brick('cpu.limit', 'readonly limit: number', 'CPU available per tick.', 'cpu.limit', read, ({ world }) => world.cpu.limit),
     brick('drones', 'function drones(): Drone[]', 'Read your drones.', 'drones()[0]', read, ctx => ctx.world.drones),
-    brick('veins', 'function veins(): Vein[]', 'Read the known veins.', 'veins()[0]', read, ctx => ctx.world.veins.filter(vein => !vein.hidden)),
-    brick('prospect', 'function prospect(): void', 'Reveal the next hidden vein. Sold in the shop.', 'prospect()', action, ({ world }) => {
-      if (!world.bought.includes('prospect')) throw new Error('prospect is not bought. Prospect is in the shop.')
+    brick('veins', 'function veins(): Vein[]', 'Read the known veins. purity is poor, normal, or rich. A vein does not run out.', 'veins()[0]', read, ctx => ctx.world.veins.filter(vein => !vein.hidden)),
+    brick('prospect', 'function prospect(): void', 'Reveal the next hidden vein.', 'prospect()', action, ({ world }) => {
+      if (!functionUnlocked(world, 'prospect')) throw new Error(unlockError('prospect'))
       const vein = world.veins.find(item => item.hidden)
       if (vein) vein.hidden = false
     }),
@@ -101,28 +125,45 @@ export function mining(site: Site): Brick[] {
         d.pos = pos
         d.route = cells.slice(index + 1)
       }),
-    brick('drone.cargoKind', "readonly cargoKind: 'ore' | 'coal' | null", 'The rock in the cart. ore, coal, or null when cargo is 0.', 'drone.cargoKind', read, { guest: '' }),
+    brick('drone.cargoKind', "readonly cargoKind: 'ore' | 'coal' | 'ingot' | 'steel' | null", 'What the cart holds. ore, coal, ingot, steel, or null when cargo is 0.', 'drone.cargoKind', read, { guest: '' }),
+    brick('drone.dump', 'dump(): void', 'Empty ore or coal onto the ground. Ingots and steel stay in the cart.', 'drone.dump()', action, ({ world }, name) => {
+      dumpCargo(world, String(name))
+    }),
     brick('depot.ore', 'readonly ore: number', 'Ore sitting at the depot.', 'depot.ore', read, ({ world }) => world.depot.ore),
     brick('depot.coal', 'readonly coal: number', 'Coal sitting at the depot.', 'depot.coal', read, ({ world }) => world.depot.coal ?? 0),
-    brick('drone.mine', 'mine(vein: Vein): void', 'Take one of this vein\'s kind into the cart. The cart holds one kind.', 'drone.mine(veins()[0])', action,
+    brick('drone.mine', 'mine(vein: Vein): void', 'Work this vein. A poor vein takes several ticks per rock. The cart holds one kind.', 'drone.mine(veins()[0])', action,
       (ctx, name, veinName) => {
         const d = drone(ctx.world, name)
         const vein = ctx.world.veins.find(v => v.name === veinName)
         if (!vein) throw new Error(`${who(d)}; no vein with that name.`)
         if (distance(d.pos, vein.pos) > 1)
           throw new Error(`${d.name} at (${d.pos.x},${d.pos.y}) ${loadOf(d)}; not next to Vein ${vein.name} (${vein.kind}); nearest: ${nearestName(ctx.world, d.pos)}`)
-        if (!vein.left) throw new Error(`${who(d)}; Vein ${vein.name} (${vein.kind}) left 0.`)
-        if (d.cargo > 0 && d.carrying && d.carrying !== vein.kind)
-          throw new Error(`${who(d)}; Vein ${vein.name} gives ${vein.kind}; unload ${d.carrying} first (depot or furnace accept ${d.carrying})`)
-        const amount = Math.min(site.orePerMine, vein.left, d.capacity - d.cargo)
-        vein.left -= amount
-        d.cargo += amount
-        if (amount > 0) {
-          d.carrying = vein.kind
-          d.source = vein.name
+        const held = heldKind(d)
+        if (d.cargo > 0 && held && held !== vein.kind) {
+          if (!rawCargo(held))
+            throw new Error(`${who(d)}; cart holds ${held}. Only ore and coal can be dumped.`)
+          pushConsole(ctx.world, {
+            tick: ctx.world.tick,
+            text: `${d.name} dumped ${d.cargo} ${held} to mine ${vein.kind} at Vein ${vein.name}`,
+            level: 'info',
+          })
+          d.cargo = 0
+          d.carrying = null
+          d.source = ''
+          d.dig = null
         }
+        if (d.cargo >= d.capacity)
+          throw new Error(`${who(d)}; cart is full (${d.cargo}/${d.capacity}).`)
+        if (!d.dig || d.dig.vein !== vein.name) d.dig = { vein: vein.name, ticks: 0 }
+        d.dig.ticks += 1
+        if (d.dig.ticks < vein.ticksPerUnit) return
+        const amount = Math.min(vein.yield, d.capacity - d.cargo)
+        d.cargo += amount
+        d.carrying = vein.kind
+        d.source = vein.name
+        d.dig = null
       }),
-    brick('drone.unload', 'unload(station: Target): void', 'Leave cargo at a nearby depot or furnace. Both accept ore and coal.', 'drone.unload(depot)', action,
+    brick('drone.unload', 'unload(station: Target): void', 'Leave cargo at a nearby depot or furnace. The furnace hopper is limited. The depot is not.', 'drone.unload(depot)', action,
       (ctx, name, target) => {
         const d = drone(ctx.world, name), { depot, furnace } = ctx.world
         const pos = cell(ctx.world, target)
@@ -133,21 +174,32 @@ export function mining(site: Site): Brick[] {
           throw new Error(`${who(d)}; not next to ${station} (${pos.x},${pos.y}); ${station} accepts ore and coal; nearest: ${nearestName(ctx.world, d.pos)}`)
         if (!d.cargo)
           throw new Error(`${station} accepts ore and coal; ${d.name} at (${d.pos.x},${d.pos.y}) carries nothing`)
+        const held = heldKind(d)
+        if (!rawCargo(held))
+          throw new Error(`${who(d)}; cart holds ${held}. Depot and furnace take ore and coal.`)
+        const kind = held === 'coal' ? 'coal' : 'ore'
+        let moved = d.cargo
         if (station === 'Furnace') {
-          if (d.carrying === 'coal') {
-            furnace.coal += d.cargo
+          const cap = kind === 'coal' ? (furnace.coalMax ?? 3) : (furnace.oreMax ?? 6)
+          const held = kind === 'coal' ? furnace.coal : furnace.input
+          const room = Math.max(0, cap - held)
+          if (room <= 0)
+            throw new Error(`${d.name} keeps ${d.cargo} ${kind}; Furnace is full (${held}/${cap} ${kind}). Wait for smelt() or unload at the depot.`)
+          moved = Math.min(d.cargo, room)
+          if (kind === 'coal') {
+            furnace.coal += moved
             furnace.coalAt = ctx.world.tick
           } else {
-            furnace.input += d.cargo
+            furnace.input += moved
             furnace.oreAt = ctx.world.tick
-            const dry = ctx.world.veins.find(vein => vein.name === 'A')
-            if (d.source && d.source !== 'A' && dry && dry.left === 0) ctx.world.oreAfterDry += d.cargo
           }
-        } else if (d.carrying === 'coal') depot.coal = (depot.coal ?? 0) + d.cargo
-        else depot.ore += d.cargo
-        d.cargo = 0
-        d.carrying = null
-        d.source = ''
+        } else if (kind === 'coal') depot.coal = (depot.coal ?? 0) + moved
+        else depot.ore += moved
+        d.cargo -= moved
+        if (d.cargo === 0) {
+          d.carrying = null
+          d.source = ''
+        } else if (!d.carrying) d.carrying = 'ore'
       }),
   ]
 }
@@ -167,6 +219,7 @@ export function miningModule(bricks: Brick[]) {
           moveAlong: path => api.drone_moveAlong(name, path),
           isNear: target => api.drone_isNear(name, target.pos),
           mine: vein => api.drone_mine(name, vein.name),
+          dump: () => api.drone_dump(name),
           unload: target => api.drone_unload(name, target.pos),
         })
       })

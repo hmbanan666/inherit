@@ -142,7 +142,7 @@ function submit() {
   overflow: hidden;
   padding: 0;
   gap: 0;
-  border-right: 1px solid var(--line);
+  border-right: 0;
   background: var(--panel);
 }
 .tree .bar {
