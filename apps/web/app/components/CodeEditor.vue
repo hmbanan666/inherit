@@ -280,7 +280,7 @@ onMounted(() => {
     readOnly: game.readOnly?.value ?? false,
     wordBasedSuggestions: 'off',
     autoClosingBrackets: 'never',
-    acceptSuggestionOnEnter: 'off',
+    acceptSuggestionOnEnter: 'on',
     theme: 'foundry',
     gotoLocation: { multipleReferences: 'peek' },
     automaticLayout: true,
