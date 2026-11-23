@@ -8,12 +8,14 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
+import type { Starter } from '@inherit/sim/pack'
 import { editorKey } from '../lib/editor'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
 const game = inject(editorKey)!
 const { files, activeFile, deployed, multiFile, api, dirty } = game
 const props = defineProps<{
+  starter?: Starter
   ids?: string[]
   selected?: string
   error?: string
@@ -52,6 +54,22 @@ const highlight = createLineHighlight(line => {
   }])
   if (game.watching.value) editor.revealLineInCenterIfOutsideViewport(line.line)
 })
+
+let placeholder: monaco.editor.IEditorDecorationsCollection | undefined
+function showPlaceholder() {
+  const starter = props.starter
+  const model = editor?.getModel()
+  if (!starter?.placeholder || !model || activeFile.value !== starter.edit.file) {
+    placeholder?.clear()
+    return
+  }
+  const { file, line, column = 1 } = starter.edit
+  const untouched = line <= model.getLineCount() && model.getLineContent(line) === starter.files[file].split('\n')[line - 1]
+  placeholder?.set(untouched ? [{
+    range: new monaco.Range(line, column, line, column),
+    options: { showIfCollapsed: true, after: { content: starter.placeholder, inlineClassName: 'edit-placeholder' } },
+  }] : [])
+}
 
 function markTickLines() {
   if (!tickMarks) return
@@ -269,6 +287,7 @@ onMounted(() => {
     scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
     ariaLabel: game.label,
   })
+  placeholder = editor.createDecorationsCollection()
   lineLight = editor.createDecorationsCollection()
   tickMarks = editor.createDecorationsCollection()
   suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
@@ -310,7 +329,8 @@ onMounted(() => {
   runtimeMarker()
   // Navigation can arrive before the lazy editor mounts.
   const initial = game.navigation.value
-  revealLine(initial.file, initial.line)
+  revealLine(initial.file, initial.line, initial.column)
+  showPlaceholder()
   lightCall()
   markTickLines()
   opener = monaco.editor.registerEditorOpener({
@@ -337,7 +357,8 @@ watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLine
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
-watch(game.navigation, ({ file, line }) => revealLine(file, line), { flush: 'post' })
+watch([files, activeFile, () => props.starter], showPlaceholder, { flush: 'post' })
+watch(game.navigation, ({ file, line, column }) => revealLine(file, line, column), { flush: 'post' })
 watch(() => game.readOnly?.value, value => editor?.updateOptions({ readOnly: !!value }))
 watch(api, updateLibrary)
 watch([() => props.error ?? game.error.value, files], runtimeMarker)

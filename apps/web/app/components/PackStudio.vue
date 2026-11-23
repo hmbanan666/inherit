@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
         <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @map="openDrawer('learn')" @replay="start(true)" />
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
-          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :error="error" @reference="openDrawer('api')" /></div></div>
+          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :error="error" @reference="openDrawer('api')" /></div></div>
           <ChecksPanel :key="frame.save.lessonId ?? ''" :checks="checkRows" :messages="runMessage ? [runMessage] : []" />
           <button v-if="frame.logs.length" class="console-count" @click="openDrawer('console')">Console · {{ frame.logs.length }} lines</button>
           <p v-if="frame.prediction && frame.save.phase !== 'brief'" class="prediction-result">Your prediction: {{ frame.save.predictions[frame.save.lessonId!] }} · Result: {{ frame.prediction.answer }}</p>

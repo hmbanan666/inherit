@@ -1595,3 +1595,4 @@ button.revisions:hover {
   .primary-run[data-ready=true] { animation: invite-run .65s ease-out 3 }
   @keyframes invite-run { from { box-shadow: 0 0 0 2px var(--gold) } to { box-shadow: 0 0 0 7px transparent } }
 }
+.monaco-editor .edit-placeholder { color: var(--sub); opacity: .8; pointer-events: none }
