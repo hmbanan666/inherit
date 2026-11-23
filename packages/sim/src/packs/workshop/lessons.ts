@@ -38,7 +38,7 @@ export const lessons = (Object.keys(briefs) as ChallengeId[]).map(id => {
     })),
     referenceSolution: { 'main.ts': solutions[id] },
     visibleEffect: { description: brief.goal, testId: 'result-' + station, text },
-    solved: { reaction: 'Batch checked', did: brief.goal, idea: brief.practice + '.' },
+    solved: { reaction: 'Batch checked', did: id === 'dispatch-batch' ? 'Your loop kept delivering parcels until the belt was empty.' : brief.goal, idea: brief.practice + '.' },
     enter(world: Floor) { Object.assign(world, createFloor(id, shown)) },
     variants: hidden.map(fixture => ({
       input: fixture.name,

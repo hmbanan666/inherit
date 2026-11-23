@@ -164,7 +164,7 @@ function resize(event: PointerEvent) {
 provide(editorKey, {id:props.manifest.id, label:'Player TypeScript', files, activeFile, deployed:lastRun,
   api:declarations, dirty:computed(()=>false), multiFile:computed(()=>Object.keys(files.value).length>1),
   readOnly: computed(() => !!frame.value?.solved || busy.value),
-  call:activeCall, tickCalls, watching, error, navigation,
+  call:activeCall, tickCalls, watching, navigation,
   setFile(path,code) {diagnostic.value = undefined; files.value = {...files.value,[path]:code};persist()},
   openFile(path) {activeFile.value = path; persist()},
 })
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
         <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @replay="start(true)" />
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
-          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :diagnostic="diagnostic" @hint="openDrawer('hints')" :error="error" @reference="openDrawer('api')" /></div></div>
+          <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :diagnostic="diagnostic" @hint="openDrawer('hints')" @reference="openDrawer('api')" /></div></div>
           <p v-if="manifest.track === 'challenges' && frame.hiddenInputs && frame.save.phase === 'brief'" class="hidden-inputs">
             Your code also runs on {{ frame.hiddenInputs }} more {{ frame.hiddenInputs === 1 ? 'belt' : 'belts' }} you cannot see.
           </p>

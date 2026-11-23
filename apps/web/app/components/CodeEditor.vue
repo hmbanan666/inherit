@@ -20,7 +20,6 @@ const props = defineProps<{
   starter?: Starter
   ids?: string[]
   selected?: string
-  error?: string
   code?: string
 }>()
 const emit = defineEmits<{ hint: []; reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
@@ -61,7 +60,9 @@ let placeholder: monaco.editor.IEditorDecorationsCollection | undefined
 function showPlaceholder() {
   const starter = props.starter
   const model = editor?.getModel()
-  if (!starter?.placeholder || !model || activeFile.value !== starter.edit.file) {
+  const isStarter = !!starter?.placeholder && files.value[activeFile.value] === starter.files[activeFile.value]
+  editor?.updateOptions({ renderValidationDecorations: isStarter ? 'off' : 'on' })
+  if (!starter?.placeholder || !model || props.diagnostic || activeFile.value !== starter.edit.file) {
     placeholder?.clear()
     return
   }
@@ -371,7 +372,7 @@ watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLine
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
-watch([files, activeFile, () => props.starter], showPlaceholder, { flush: 'post' })
+watch([files, activeFile, () => props.starter, () => props.diagnostic], showPlaceholder, { flush: 'post' })
 watch(game.navigation, ({ file, line, column }) => revealLine(file, line, column), { flush: 'post' })
 watch(() => game.readOnly?.value, value => editor?.updateOptions({ readOnly: !!value }))
 watch(api, updateLibrary)

@@ -18,10 +18,10 @@ let observer: ResizeObserver | undefined
 function place() {
   const shell = card.value?.parentElement
   if (!shell) return
-  const find = (name?: string) => name && shell.querySelector('[data-focus="' + CSS.escape(name) + '"]')
+  const focusElement = props.focus && shell.querySelector('[data-focus="' + CSS.escape(props.focus) + '"]')
   const effect = props.effect && shell.querySelector('[data-testid="' + CSS.escape(props.effect) + '"]')
   result.value = effect ? effect.textContent?.trim() ?? '' : ''
-  const target = find(props.focus) || effect
+  const target = focusElement || effect
   if (!target) return
   const box = shell.getBoundingClientRect()
   const focus = target.getBoundingClientRect()
@@ -61,7 +61,7 @@ watch(() => props.busy, busy => { if (!busy) button.value?.focus({ preventScroll
     <p v-if="landmark" class="landmark">Unit complete · {{ landmark }}</p>
     <strong v-if="streak && streak >= 3">{{ streak }} in a row on the first try</strong>
     <footer><button ref="button" class="gold" data-testid="continue" :disabled="busy" @click="emit('advance')">Continue</button>
-      </footer>
+    </footer>
   </section>
 </template>
 
@@ -73,7 +73,6 @@ h2 { margin: 9px 0; font-size: 22px }
 p { margin: 6px 0; font-size: 14px; color: var(--soft) }
 .landmark, strong { color: var(--gold) }
 footer { display: flex; align-items: center; gap: 18px; margin-top: 18px }
-a { color: var(--soft) }
 .confetti { position: absolute; top: 24%; left: 50%; pointer-events: none }
 .confetti i { position: absolute; width: 5px; height: 8px; opacity: 0; background: var(--gold); animation: burst 1s ease-out }
 .confetti i:nth-child(even) { background: var(--mint) }

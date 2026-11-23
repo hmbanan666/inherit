@@ -13,5 +13,5 @@ const open = ref(false)
     <button data-testid="pack-switcher" :aria-expanded="open" @click="open = !open">{{ manifest.title }} <ChevronDown /></button>
     <nav v-if="open" class="hud-menu" aria-label="Switch pack"><a v-for="p in manifests" :key="p.id" :href="'?pack=' + p.id">{{ p.title }}</a><a href="/">All game packs</a></nav>
   </div>
-  <ProgressStrip :busy="busy" @select="$emit('select', $event)" :manifest="manifest" :lessons="lessons" :selected="selected" />
+  <ProgressStrip picker :busy="busy" @select="$emit('select', $event)" :manifest="manifest" :lessons="lessons" :selected="selected" />
 </template>
