@@ -51,6 +51,15 @@ Out: art, market, drill and slag, build and stations, AI agent, rivals, side con
 - Orders strip under the editor: compact coloured rows (amber open with "due in N ticks", green on time, red late).
 - Tests: Uncle's first-come shipping makes both first orders late; sorting by `due` makes them on time; Uncle's code alone loses credits.
 
+### M3.5. Onboarding and consistency (after Nick's playtest)
+
+- Start small: one drone, CPU well under the limit at start. More drones are an unlock.
+- Uncle's starter is the short version in the concept (about 10 lines) with one obvious problem first (smelting an empty furnace burns credits).
+- The current order is the goal line at the top, with one plain status line under it: what is wrong now and what to do.
+- Run is labelled and explained as applying the code to the running works (deploy), with a tooltip.
+- Console, API and the charts are collapsed by default and open on demand.
+- Reuse the earlier components and styles (icon playback buttons, the API reference panel, existing styles); remove invented replacements.
+
 ### M4. Vein runs dry: crises and plain runtime errors
 
 - `defineCrisis({ id, when, apply, message })` in core; crisis `vein-dry` from the site schedule.
