@@ -1,14 +1,18 @@
 import { expect, test } from 'vitest'
 import {
-  columnWidths,
+  clampMapHeight,
   containScale,
   creditSuffix,
-  editorDockPercent,
+  defaultMapHeight,
   filesNarrowPx,
   fitScale,
   formatCredits,
+  mapHeightMax,
+  mapHeightMin,
   questRailPx,
   readFilesOpen,
+  readMapHeight,
+  worksWidth,
 } from './factoryLayout'
 
 test('credits are written with a space', () => {
@@ -16,28 +20,23 @@ test('credits are written with a space', () => {
   expect(formatCredits(300)).toBe('300 credits')
 })
 
-test('at 1024px the map is at least 45% of the window and the largest column', () => {
-  const width = 1024
-  const columns = columnWidths(width)
-  expect(columns.quest).toBe(questRailPx)
-  expect(columns.quest).toBeGreaterThanOrEqual(260)
-  expect(columns.quest).toBeLessThanOrEqual(300)
-  expect(columns.map / width).toBeGreaterThanOrEqual(0.45)
-  expect(columns.map).toBeGreaterThan(columns.editor)
-  expect(columns.map).toBeGreaterThan(columns.quest)
-  expect(editorDockPercent(width)).toBeLessThanOrEqual(40)
+test('the quest rail stays 280px and the map uses the width beside it', () => {
+  expect(questRailPx).toBe(280)
+  expect(questRailPx).toBeGreaterThanOrEqual(260)
+  expect(questRailPx).toBeLessThanOrEqual(300)
+  const width = worksWidth(1024)
+  expect(width).toBeGreaterThan(1024 * 0.6)
+  expect(width).toBe(1024 - questRailPx - 8 * 2 - 8)
 })
 
-test('wide windows put the editor in the 35–40% band and give further width to the map', () => {
-  for (const width of [1600, 1800, 1920, 2560]) {
-    const dock = editorDockPercent(width)
-    const columns = columnWidths(width, dock)
-    expect(dock).toBeGreaterThanOrEqual(35)
-    expect(dock).toBeLessThanOrEqual(38.01)
-    expect(columns.map / width).toBeGreaterThanOrEqual(0.45)
-  }
-  expect(columnWidths(1920).map / 1920).toBeGreaterThan(columnWidths(1024).map / 1024)
-  expect(columnWidths(2560).map / 2560).toBeGreaterThan(columnWidths(1920).map / 1920)
+test('the map row defaults to 45% of the works column and a saved height stays in range', () => {
+  expect(defaultMapHeight()).toBe(45)
+  expect(readMapHeight(null)).toBe(45)
+  expect(readMapHeight('45')).toBe(45)
+  expect(readMapHeight('10')).toBe(mapHeightMin)
+  expect(readMapHeight('90')).toBe(mapHeightMax)
+  expect(readMapHeight('nope')).toBe(45)
+  expect(clampMapHeight(45)).toBe(45)
 })
 
 test('the file tree starts collapsed on a narrow window and open on a wide one', () => {
@@ -48,17 +47,16 @@ test('the file tree starts collapsed on a narrow window and open on a wide one',
   expect(readFilesOpen('closed', 1920)).toBe(false)
 })
 
-test('a tall map frame is covered so the grid is not a short band, and a short frame shows the whole grid', () => {
+test('the fit keeps the whole grid inside the frame', () => {
   const worldW = 16 * 96
   const worldH = 6 * 96
-  const tall = fitScale(461, 662, worldW, worldH)
-  expect(tall).toBeCloseTo(662 / worldH)
-  expect(worldW * tall).toBeGreaterThan(461)
-  expect(worldH * tall).toBeCloseTo(662)
-  expect(tall).toBeGreaterThan(containScale(461, 662, worldW, worldH))
-
-  const short = fitScale(900, 220, worldW, worldH)
-  expect(short).toBeCloseTo(containScale(900, 220, worldW, worldH))
-  expect(worldW * short).toBeLessThanOrEqual(900 + 0.01)
-  expect(worldH * short).toBeCloseTo(220)
+  for (const [w, h] of [[461, 662], [720, 280], [900, 220], [1200, 400]] as const) {
+    const scale = fitScale(w, h, worldW, worldH)
+    expect(scale).toBeCloseTo(containScale(w, h, worldW, worldH))
+    expect(worldW * scale).toBeLessThanOrEqual(w + 0.01)
+    expect(worldH * scale).toBeLessThanOrEqual(h + 0.01)
+    const touchesWidth = Math.abs(worldW * scale - w) < 0.05
+    const touchesHeight = Math.abs(worldH * scale - h) < 0.05
+    expect(touchesWidth || touchesHeight).toBe(true)
+  }
 })

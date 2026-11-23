@@ -2,17 +2,17 @@
 
 Governs the arrangement of Kettlewick Works. The rules are [ADR 0022](../adr/0022-quest-loop-no-loss.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), and [the first playable slice](v8-first-playable.md).
 
-The shell is the workshop frame already on screen: charcoal palette, 65px nav, 7px resizer, 25px status bar. The map is the main area. The quest rail is a fixed 280px column. The editor dock, checks included, sits on the right. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px hint, a 34px gold button, and a 48px portrait.
+The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The quest rail is a fixed 280px column on the left. To its right, the map is the top row and the editor is the bottom row, split by a 7px horizontal bar. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px hint, a 34px gold button, and a 48px portrait.
 
 ## Proportions
 
-The map is `flex: 1`. It is the largest share of the width. At 1024px it is at least 45% of the window. Wider windows give the extra width to the map.
+The grid is 16 cells wide and 6 tall, so the map is a wide row, not a tall column. It spans the full width beside the quest rail. A horizontal splitter under the map sets the row's height. The default is 45% of that column. The splitter can move it between 22% and 75%, and the height is saved in this browser.
 
-The quest rail does not grow. It stays 280px, inside the 260–300px band. Shop stays a tab on that rail. The portrait and the quest text are compact so the column can stay narrow.
+The quest rail does not grow. It stays 280px, inside the 260–300px band, and it runs the full height of the desk. Shop stays a tab on that rail. The portrait and the quest text are compact so the column can stay narrow.
 
-The file tree is 140px. A Files toggle opens and closes it. Under 1280px it starts closed. The choice is saved in this browser.
+The file tree is one 140px column inside the editor row, with one Files toggle on its own bar. Under 1280px it starts closed, as a narrow rail with that same toggle. The choice is saved in this browser.
 
-The editor dock prefers 38% of the window, and the splitter can move it between 16% and 40%. That preference applies only while the map still has 45% and the rail still has 280px. At 1024px those two come first, so the dock is about a quarter of the window. From about 1560px the dock sits in the 35–40% band. Past the 38% cap, further width goes to the map. Dragging the splitter, or the arrow keys on it, saves the width in this browser. Until then, resizing the window keeps the map's share.
+The editor and the checks fill the rest of the bottom row. Checks sit under the code.
 
 ## Reading order
 
@@ -40,11 +40,11 @@ Take quest and Complete quest share the footer of the rail. Take shows when a qu
 
 ## Works
 
-The map fills the center column. On load, and whenever that column changes size, a resize observer scales the tiles to the column and keeps the grid centered. The whole grid is shown when that already fills the column. When the whole grid would sit as a short band in a tall column, the scale covers the column instead, so the tiles fill the frame. Zooming out from that view reaches the whole grid again. The center control returns to the fit. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name. Zoom stays on the map.
+The map fills the top row beside the quest rail. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit: the whole grid stays visible, centered, and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
 ## Editor
 
-The file tree is the left column of the dock when it is open. The editor header carries the Files toggle, the open file name, and Deploy. Deploy is on that header only while the editor differs from the deployed files. Ctrl+Enter still deploys. Checks for the open quest sit under the editor, pass or fail, in the check's own words. Console, API, and Charts open one at a time in the slot under the checks. The console is the log of tick messages.
+The file tree is the left column of the editor row when it is open. Its bar is the only Files toggle. The editor header carries the open file name and Deploy. Deploy is on that header only while the editor differs from the deployed files. Ctrl+Enter still deploys. Checks for the open quest sit under the editor, pass or fail, in the check's own words. Console, API, and Charts open one at a time in the slot under the checks. The console is the log of tick messages.
 
 ## Status bar
 
@@ -56,7 +56,7 @@ One sentence on the left. A runtime error, a save problem, the floor renderer, t
 | --- | --- |
 | Credits, level, CPU, Running | Nav |
 | Portrait, goal, hint, reward, Take, Complete, shop | Quest rail |
-| Map and its labels | Center |
+| Map and its labels | Top row, beside the quest rail |
 | Files, code, Deploy | Editor |
 | Pass and fail | Checks under the editor |
 | Console, API, Charts | One slot under the checks |
