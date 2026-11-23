@@ -60,6 +60,38 @@ test('a fresh session replays the same site seed and files to the same world', a
   expect(await runSession(site, cached, 32)).toEqual(first)
 })
 
+test('the editor types declare console and the sandbox stores each console line', async () => {
+  const types = declarations(factoryBricks(kettlewick))
+  expect(types).toContain('declare const console')
+  expect(types).toContain('log(...args: unknown[]): void')
+  expect(types).toContain('info(...args: unknown[]): void')
+  expect(types).toContain('warn(...args: unknown[]): void')
+  expect(types).toContain('error(...args: unknown[]): void')
+  expect(diagnostics({
+    'main.ts': `import { drones } from "inherit"
+export function onTick() { console.log(drones()[0].capacity) }`,
+  }, types)).toEqual([])
+  const session = await createSession(kettlewick, {
+    'main.ts': `export function onTick() {
+      console.log("cart", 3)
+      console.info("note")
+      console.warn("careful")
+      console.error("bad")
+    }`,
+  })
+  try {
+    session.step(1)
+    expect(session.world.console.map(line => line.text)).toEqual(['cart 3', 'note', 'careful', 'bad'])
+    expect(session.world.console.map(line => line.level)).toEqual(['log', 'info', 'warn', 'error'])
+    expect(session.world.console[0]).toMatchObject({ file: 'main.ts' })
+    await session.deploy({ 'main.ts': 'export function onTick() { throw new Error("boom") }' })
+    session.step(1)
+    const fault = session.world.messages.at(-1)
+    expect(fault?.text).toBeTruthy()
+    expect(session.world.console.at(-1)).toMatchObject({ level: 'error', text: fault?.text, file: fault?.file, line: fault?.line })
+  } finally { session.dispose() }
+})
+
 test('the generated inherit declarations typecheck both controllers and require path endpoints to be cells', () => {
   const types = declarations(factoryBricks(kettlewick))
   expect(diagnostics(kettlewick.files, types)).toEqual([])

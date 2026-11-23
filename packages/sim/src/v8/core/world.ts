@@ -27,6 +27,14 @@ export interface Site {
   files: Record<string, string>
 }
 export interface Message { tick: number; file: string; line: number; text: string }
+export interface ConsoleLine {
+  seq: number
+  tick: number
+  text: string
+  level: 'log' | 'info' | 'warn' | 'error'
+  file?: string
+  line?: number
+}
 export interface World {
   tick: number
   seed: number
@@ -46,6 +54,7 @@ export interface World {
   cpu: { used: number; limit: number }
   memory: Record<string, unknown>
   messages: Message[]
+  console: ConsoleLine[]
   xp: number
   level: number
   questId?: string
@@ -73,7 +82,7 @@ export function createWorld(site: Site): World {
     depot: structuredClone(site.depot),
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, oreAt: null, coalAt: null, batch: null },
     orderRoundAt: 0, orders: [], growth: [], status: '', creditsPerMinute: 0,
-    ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [],
+    ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0,
     ingotsMade: 0, steelMade: 0, steelMark: 0, oreAfterDry: 0, pathCallsTick: 0, pathWindow: [],
     checkSince: 0, checkMoved: {},
@@ -141,4 +150,17 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
     else world.status = describeWorks(world, site, before)
     if (message) world.messages.push({ tick: world.tick, ...message })
   }
+}
+
+const consoleCap = 80
+
+export function pushConsole(world: World, line: Omit<ConsoleLine, 'seq'>) {
+  const list = (world.console ??= [])
+  const seq = (list.at(-1)?.seq ?? 0) + 1
+  list.push({ ...line, seq })
+  if (list.length > consoleCap) list.splice(0, list.length - consoleCap)
+}
+
+export function clearConsole(world: World) {
+  world.console = []
 }

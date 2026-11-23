@@ -38,7 +38,7 @@ Complete pays `pay` and `xp` in full, then clears the quest id. Waste on the led
 
 Shop items and prices are the concept's list. `buyUpgrade` refuses an owned item and an item the player cannot afford, and it does not change the balance when it refuses.
 
-The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). The quest card and portrait are on the left, the works are in the center, and Monaco and the file tree are on the right. Checks sit under the editor while a quest is open. Deploy sits on the editor when the code differs. The nav says Running. Console, API, and Charts open from the menu into one panel under the checks. The CPU line is `used/limit`. A call that would pass the limit does not run, and the guest stops the rest of `onTick`. The sim tick still finishes.
+The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). The quest card and portrait are on the left, the works are in the center, and Monaco and the file tree are on the right. Checks and Console share the pane to the right of the code. Deploy sits on the editor when the code differs. The nav says Running. Settings open API and Charts. The CPU line is `used/limit`. A call that would pass the limit does not run, and the guest stops the rest of `onTick`. The sim tick still finishes.
 
 The save is version 3 under `inherit.v8.kettlewick`. It stores the world, the deployed files, and the editor files. An unreadable slot is archived. Project files are kept when the world cannot be trusted. Unknown saves follow [ADR 0004](../adr/0004-v3-save-reset.md).
 

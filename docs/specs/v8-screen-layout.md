@@ -26,7 +26,7 @@ On a narrow window the rail stacks above the map, and the map stacks above the e
 
 ## Nav
 
-Logo, then the place name Kettlewick Works. Credits are the large figure, with a space: `300 credits`. Beside them, Level, the XP bar, and the count already inside this level: `XP 12/20`. CPU is `used/limit`. A Running pill shows that the clock is going. Settings opens Console, API, Charts, and Start over.
+Logo, then the place name Kettlewick Works. Credits are the large figure, with a space: `300 credits`. Beside them, Level, the XP bar, and the count already inside this level: `XP 12/20`. CPU is `used/limit`. A Running pill shows that the clock is going. Settings opens API, Charts, and Start over.
 
 When a quest is completed, `+80 credits` and `+20 XP` float up beside those counters for a moment. The motion is skipped when the player prefers reduced motion.
 
@@ -54,11 +54,15 @@ The file tree is the left column of the editor row. Its Files toggle and the new
 
 The editor side of the row is the open file tabs, then Deploy, then quick open and search. Deploy is always on that row. There is no second title for the open file. Ctrl+Enter still deploys.
 
-Checks are the 300px pane to the right of the code. Before a quest is taken the pane says "Take a quest to see checks". Once a quest is open, each check is pending, passing, or failed. Pending is a grey circle and ordinary text. A check turns failed only after its facts have not changed for 20 ticks, about 10 seconds, since Take quest or the last Deploy. A numeric check shows the live count in its own words, such as `Bram receives 4 ingots 0/4`. The first stuck check adds one fact from the works. A full cart that has not moved for that stretch, on or beside a vein, is named before the furnace, such as `drone-1 is full (3/3) at Vein A and not moving`. Later checks say `waits on: Ore reaches the furnace` instead of repeating that fact. The fact names a field. It does not say what to write. The pane's header is the same 36px row. Borders on this row are 1px.
+Checks and Console share the 300px pane to the right of the code. The pane's header is the same 36px row, with two tabs: Checks and Console. The selected tab is remembered in the browser. Borders on this row are 1px.
 
-A compact log sits at the top of the checks pane. It holds runtime errors and sim events, such as `Vein A is empty`. An error that names a file and a line jumps to that line in the editor when clicked.
+Before a quest is taken the Checks tab says "Take a quest to see checks". Once a quest is open, each check is pending, passing, or failed. Pending is a grey circle and ordinary text. A check turns failed only after its facts have not changed for 20 ticks, about 10 seconds, since Take quest or the last Deploy. A numeric check shows the live count in its own words, such as `Bram receives 4 ingots 0/4`. The first stuck check adds one fact from the works. A full cart that has not moved for that stretch, on or beside a vein, is named before the furnace, such as `drone-1 is full (3/3) at Vein A and not moving`. Later checks say `waits on: Ore reaches the furnace` instead of repeating that fact. The fact names a field. It does not say what to write.
 
-Console, API, and Charts open one at a time under the code. The console is the log of tick messages.
+A compact log sits at the top of the Checks tab. It holds runtime errors and sim events, such as `Vein A is empty`. An error that names a file and a line jumps to that line in the editor when clicked.
+
+The Console tab lists `console.log`, `console.info`, `console.warn`, and `console.error` from the deployed program, and the same runtime errors. Each line shows the tick. A line that names a file and a line jumps to that line. Clear empties the list. While Checks is selected, the Console tab shows how many lines have arrived since it was last open. That count is red when any of those lines is an error.
+
+API and Charts open one at a time under the code.
 
 ## Status bar
 
@@ -72,8 +76,9 @@ Quantities only: depot ore, furnace ore, furnace coal, ingots, steel, and each d
 | Portrait, goal, hint, reward, Take, Complete, shop | Quest rail |
 | Map and its labels | Top row, beside the quest rail |
 | Files, code, Deploy | Editor header and the code under it |
-| Pass and fail | Checks pane, right of the code |
-| Errors and sim events | Log at the top of the checks pane |
-| Console, API, Charts | One slot under the code |
+| Pass and fail | Checks tab, right of the code |
+| Errors and sim events | Log at the top of the Checks tab, and the Console tab |
+| Player console.log | Console tab, beside Checks |
+| API, Charts | One slot under the code |
 | Live sentence | Status bar |
 | Stock and drone loads | Status bar, after the sentence |

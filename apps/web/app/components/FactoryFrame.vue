@@ -6,7 +6,7 @@ import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
   checksPanePx, clampMapHeight, creditSuffix, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
-  questRailPx, readFilesOpen, readMapHeight, treeRailPx, worldGapPx, worldInsetPx,
+  questRailPx, readFilesOpen, readMapHeight, readSideTab, sideTabKey, treeRailPx, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
@@ -30,8 +30,11 @@ const error = ref('')
 const saveError = ref('')
 const floorError = ref('')
 const pending = ref(true)
-const panels = ['Console', 'API', 'Charts'] as const
+const panels = ['API', 'Charts'] as const
 const tool = ref<typeof panels[number]>()
+const side = ref<'checks' | 'console'>('checks')
+const seenSeq = ref(0)
+const blankConsole = ref(false)
 const zone = ref<'quests' | 'shop'>('quests')
 const questRailCss = questRailPx + 'px'
 const worldGapCss = worldGapPx + 'px'
@@ -43,9 +46,15 @@ const mapHeight = ref(defaultMapHeight())
 const treeColumnCss = computed(() => (filesOpen.value ? fileTreePx : treeRailPx) + 'px')
 const mapRowCss = computed(() => mapHeight.value + '%')
 let filesReady = false
+let sideReady = false
 watch(filesOpen, (open) => {
   if (!filesReady) return
   try { localStorage.setItem(filesStorageKey, open ? 'open' : 'closed') }
+  catch { /* Keep the choice for this session. */ }
+})
+watch(side, (tab) => {
+  if (!sideReady) return
+  try { localStorage.setItem(sideTabKey, tab) }
   catch { /* Keep the choice for this session. */ }
 })
 function setMapHeight(value: number) {
@@ -133,6 +142,23 @@ const log = computed(() => {
   }
   return lines
 })
+const consoleLines = computed(() => blankConsole.value ? [] : (world.value?.console ?? []))
+const unseen = computed(() => {
+  if (side.value === 'console') return { count: 0, error: false }
+  const fresh = (world.value?.console ?? []).filter(line => line.seq > seenSeq.value)
+  return { count: fresh.length, error: fresh.some(line => line.level === 'error') }
+})
+watch([side, world], () => {
+  if (blankConsole.value && (world.value?.console.length ?? 0) === 0) blankConsole.value = false
+  if (side.value !== 'console') return
+  const last = world.value?.console?.at(-1)?.seq ?? 0
+  if (last > seenSeq.value) seenSeq.value = last
+})
+function clearLog() {
+  blankConsole.value = true
+  seenSeq.value = 0
+  send({ kind: 'clear-console' })
+}
 function openLine(entry: { file: string; line: number }) {
   activeFile.value = entry.file
   navigation.value = { file: entry.file, line: entry.line }
@@ -199,13 +225,17 @@ function shortcut(event: KeyboardEvent) {
 onMounted(async () => {
   let storedFiles: string | null = null
   let storedMap: string | null = null
+  let storedSide: string | null = null
   try {
     storedFiles = localStorage.getItem(filesStorageKey)
     storedMap = localStorage.getItem(mapHeightKey)
+    storedSide = localStorage.getItem(sideTabKey)
   } catch { /* Use the defaults. */ }
   filesOpen.value = readFilesOpen(storedFiles, window.innerWidth)
   mapHeight.value = readMapHeight(storedMap)
+  side.value = readSideTab(storedSide)
   filesReady = true
+  sideReady = true
   worker = new Worker(new URL('../lib/factory.worker.ts', import.meta.url), { type: 'module' })
   worker.onmessage = ({ data }: MessageEvent<FactoryFrame>) => {
     if ('error' in data) {
@@ -370,17 +400,37 @@ onBeforeUnmount(() => {
               </LazyCodeEditor>
             </div></div>
             <div v-if="tool" class="tool-slot">
-              <section v-if="tool === 'Console'" aria-label="Console" class="console">
-                <h2>Console · Tick <b data-testid="tick">{{ world?.tick }}</b></h2>
-                <p v-for="msg in world?.messages.slice().reverse()" :key="msg.tick + msg.text">Tick {{ msg.tick }} · {{ msg.text }}</p>
-              </section>
-              <ApiReference v-else-if="tool === 'API'" :entries="entries" />
+              <ApiReference v-if="tool === 'API'" :entries="entries" />
               <MetricsPanel v-else-if="world" :world="world" />
             </div>
           </div>
-          <aside class="checks-pane" aria-label="Quest checks">
-            <div class="checks-head">Checks</div>
-            <ChecksPanel :tried="!!world?.questId" :checks="world?.questId ? checks : []" :log="log" empty="Take a quest to see checks" @open="openLine" />
+          <aside class="checks-pane" :aria-label="side === 'checks' ? 'Quest checks' : 'Console'">
+            <div class="checks-head" role="tablist" aria-label="Checks and console">
+              <button type="button" role="tab" :aria-selected="side === 'checks'" @click="side = 'checks'">Checks</button>
+              <button type="button" role="tab" :aria-selected="side === 'console'" @click="side = 'console'">
+                Console
+                <span v-if="unseen.count" class="badge" :class="{ bad: unseen.error }">{{ unseen.count }}</span>
+              </button>
+              <template v-if="side === 'console'">
+                <button type="button" class="clear" @click="clearLog">Clear</button>
+                <span class="tick-now">Tick <b data-testid="tick">{{ world?.tick ?? 0 }}</b></span>
+              </template>
+            </div>
+            <ChecksPanel v-if="side === 'checks'" :tried="!!world?.questId" :checks="world?.questId ? checks : []" :log="log" empty="Take a quest to see checks" @open="openLine" />
+            <section v-else class="console" aria-label="Console">
+              <p v-if="!consoleLines.length" class="empty">Nothing logged yet.</p>
+              <template v-for="line in consoleLines" :key="line.seq">
+                <button v-if="line.file && line.line" type="button" class="line" :class="line.level" @click="openLine({ file: line.file, line: line.line })">
+                  <span class="when">{{ line.tick }}</span>
+                  <span class="text">{{ line.text }}</span>
+                  <span class="where">{{ line.file }}:{{ line.line }}</span>
+                </button>
+                <p v-else class="line" :class="line.level">
+                  <span class="when">{{ line.tick }}</span>
+                  <span class="text">{{ line.text }}</span>
+                </p>
+              </template>
+            </section>
           </aside>
         </div>
       </div>
@@ -651,11 +701,48 @@ onBeforeUnmount(() => {
   flex: none;
   height: v-bind(headerCss);
   display: flex;
-  align-items: center;
-  padding: 0 10px;
+  align-items: stretch;
   border-bottom: 1px solid var(--line);
   font: 700 12px var(--mono);
   color: var(--text);
+}
+.checks-head button[role="tab"] {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--sub);
+  font: inherit;
+  padding: 0 10px;
+}
+.checks-head button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--gold);
+}
+.checks-head .badge {
+  margin-left: 4px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--sub);
+  color: var(--panel);
+  font: 700 10px var(--mono);
+}
+.checks-head .badge.bad { background: var(--alert); color: #fff }
+.checks-head .clear {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--sub);
+  font: 11px var(--mono);
+  padding: 0 8px;
+}
+.checks-head .tick-now {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+  color: var(--sub);
+  font: 11px var(--mono);
+  font-weight: 500;
 }
 .checks-pane :deep(.checks) {
   flex: 1;
@@ -672,9 +759,30 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
 }
 .tool-slot :deep(.bench) { padding: 0; max-height: none }
-.console { font: 12px var(--mono) }
-.console h2 { font-size: 13px }
-.console p { margin: 0 }
+.console {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 8px;
+  font: 12px var(--mono);
+}
+.console .empty { margin: 0; color: var(--sub) }
+.console .line {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr) auto;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.console .line.error, .console .line.warn { color: var(--alert) }
+.console .text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.console .where { color: var(--sub) }
 .notice { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .notice.bad { color: var(--alert) }
 .meters { margin-left: auto }

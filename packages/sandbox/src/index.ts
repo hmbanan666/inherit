@@ -8,6 +8,7 @@ export interface Program {
   onTick<C extends FactoryContext>(ctx: C): void
   exportMemory(): JsonObject
   drainLogs(): string[]
+  takeLogs(): { text: string; level: 'log' | 'info' | 'warn' | 'error'; file?: string; line?: number }[]
   readonly stats: CpuStats
   dispose(): void
 }
@@ -21,7 +22,8 @@ export async function createProgram(source: string | ProjectOptions, initialFact
     return {
       onTick: (ctx) => session.dispatch(tick, ctx),
       exportMemory: session.exportMemory,
-      drainLogs: session.drainLogs,
+      drainLogs: () => session.takeLogs().map(entry => entry.text),
+      takeLogs: session.takeLogs,
       get stats() {
         return session.stats()
       },

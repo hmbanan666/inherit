@@ -7,6 +7,7 @@ export type FactoryCommand =
   | { kind: 'accept' }
   | { kind: 'complete' }
   | { kind: 'buy'; id: string }
+  | { kind: 'clear-console' }
 
 export type FactoryFrame = { world: World; deployed?: Record<string, string> }
   | { error: string }

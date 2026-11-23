@@ -1,4 +1,4 @@
-import { kettlewick, noteCheckReset } from '@inherit/sim/v8'
+import { clearConsole, kettlewick, noteCheckReset } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
@@ -8,6 +8,7 @@ let timer: ReturnType<typeof setInterval> | undefined
 function publish(deployed?: Record<string, string>) {
   if (!session) return
   const world = session.world
+  world.console ??= []
   if (world.messages.length > 20) world.messages.splice(0, world.messages.length - 20)
   self.postMessage({ world, deployed } satisfies FactoryFrame)
 }
@@ -45,6 +46,9 @@ async function act(command: FactoryCommand) {
         publish()
       } else if (command.kind === 'buy') {
         session!.buy(command.id)
+        publish()
+      } else if (command.kind === 'clear-console') {
+        clearConsole(session!.world)
         publish()
       }
     } catch (error) {
