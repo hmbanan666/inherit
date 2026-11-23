@@ -2,7 +2,7 @@ export * from './core/world'
 export * from './core/bricks'
 export { mining, miningModule } from './modules/mining'
 export { kettlewick } from './sites/kettlewick'
-export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, levelFor } from './quests'
+export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, levelFor, levelSpan } from './quests'
 
 import type { Brick } from './core/bricks'
 import { mining, miningModule } from './modules/mining'

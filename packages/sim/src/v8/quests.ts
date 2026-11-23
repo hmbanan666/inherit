@@ -38,6 +38,13 @@ export function levelFor(xp: number) {
   return 1 + steps.filter(step => xp >= step).length
 }
 
+export function levelSpan(xp: number) {
+  const level = levelFor(xp)
+  const start = steps[level - 2] ?? 0
+  const next = steps[level - 1]
+  return { level, start, next: next ?? null }
+}
+
 const shipped = (world: World, id: string) => world.orders.find(order => order.id === id)?.shipped ?? 0
 
 export const questList: QuestDef[] = [
