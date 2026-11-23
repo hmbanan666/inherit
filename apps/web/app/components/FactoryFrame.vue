@@ -191,6 +191,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .map-frame { flex: 1; min-height: 150px; position: relative }
 .factory :deep(.hud) { flex-wrap: wrap; height: auto; padding-block: 6px; row-gap: 5px }
+.factory :deep(.pack-settings) { z-index: 1 }
 .objective { width: 100%; margin: 0; padding: 6px 12px }
 .goal-aside span { font: 11px var(--mono); color: var(--soft) }
 .bad { color: var(--alert) }

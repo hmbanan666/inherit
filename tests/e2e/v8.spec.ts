@@ -13,7 +13,7 @@ async function edit(page: Page, source: string) {
 }
 async function settings(page: Page, name: string) {
   await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('button', { name, exact: true }).click()
+  await page.getByRole('button', { name, exact: true }).click({ timeout: 5000 })
 }
 
 test('the running works show the order, the first fix and tools on demand', async ({ page }) => {
