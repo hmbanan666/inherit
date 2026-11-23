@@ -5,8 +5,8 @@ import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
 import { inspectAt } from '@inherit/sim/v8'
 
-const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
-const emit = defineEmits<{ error: [message: string]; dump: [name: string] }>()
+const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean; selected?: string }>()
+const emit = defineEmits<{ error: [message: string]; select: [id: string] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 0, h: 0 }),
@@ -19,7 +19,6 @@ let app: Application | undefined,
   disposed = false
 
 const pointers = new Map<number, { x: number; y: number }>()
-const card = ref<{ id: string; fields: string[]; x: number; y: number; dump?: string }>()
 let armed = false
 let origin = { x: 0, y: 0 }
 const worldSize = computed(() => ({
@@ -59,14 +58,19 @@ function sync() {
   scene.root.scale.set(scale.value)
   scene.root.position.set(camera.value.x, camera.value.y)
   scene.update(props.world)
+  scene.select(props.selected ?? '')
 }
-watch([() => props.world, camera, scale], sync)
+watch([() => props.world, camera, scale, () => props.selected], sync)
 function pick(clientX: number, clientY: number) {
   const rect = host.value?.getBoundingClientRect()
   if (!rect || scale.value === 0) return
-  const x = Math.floor((clientX - rect.left - camera.value.x) / scale.value / tile)
-  const y = Math.floor((clientY - rect.top - camera.value.y) / scale.value / tile)
-  return inspectAt(props.world, x, y)
+  const px = (clientX - rect.left - camera.value.x) / scale.value
+  const py = (clientY - rect.top - camera.value.y) / scale.value
+  const drone = scene?.pickDrone(px, py)
+  if (drone) return drone
+  const x = Math.floor(px / tile)
+  const y = Math.floor(py / tile)
+  return inspectAt(props.world, x, y)?.id
 }
 function down(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('button,aside') || e.button !== 0) return
@@ -78,7 +82,7 @@ function down(e: PointerEvent) {
 }
 function hover(e: PointerEvent) {
   if (pointers.size) return
-  scene?.highlight(pick(e.clientX, e.clientY)?.id ?? '')
+  scene?.highlight(pick(e.clientX, e.clientY) ?? '')
 }
 function move(e: PointerEvent) {
   const old = pointers.get(e.pointerId)
@@ -107,18 +111,7 @@ function up(e: PointerEvent) {
   armed = false
   if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) return
   const hit = pick(e.clientX, e.clientY)
-  const rect = host.value?.getBoundingClientRect()
-  if (!hit || !rect) {
-    card.value = undefined
-    return
-  }
-  card.value = {
-    id: hit.id,
-    fields: hit.fields,
-    dump: hit.dump,
-    x: Math.min(Math.max(8, rect.width - 168), Math.max(8, e.clientX - rect.left + 10)),
-    y: Math.min(Math.max(8, rect.height - 140), Math.max(8, e.clientY - rect.top + 10)),
-  }
+  if (hit) emit('select', hit)
 }
 function cancel() {
   pointers.clear()
@@ -189,12 +182,6 @@ onBeforeUnmount(() => {
     @pointermove="hover"
   >
     <div ref="mount" class="pixi-mount"></div>
-    <aside v-if="card" class="inspect" :style="{ left: card.x + 'px', top: card.y + 'px' }">
-      <b>{{ card.id }}</b>
-      <p v-for="field in card.fields" :key="field">{{ field }}</p>
-      <button v-if="card.dump" type="button" class="dump" @click="emit('dump', card.dump!)">Dump</button>
-      <button type="button" class="close" aria-label="Close" @click="card = undefined">×</button>
-    </aside>
     <div class="map-controls">
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
       ><button aria-label="Center map" @click="recenter()"><Maximize /></button

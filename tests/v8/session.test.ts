@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest'
 import { diagnostics } from '../packs/compiler'
-import { declarations, kettlewick, factoryBricks } from '../../packages/sim/src/v8'
+import { declarations, kettlewick, factoryBricks, uncleMain } from '../../packages/sim/src/v8'
 import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
 test('uncle fills the cart and nothing is paid until a quest is taken', async () => {
-  const session = await createSession(kettlewick, kettlewick.files)
+  const session = await createSession(kettlewick, { 'main.ts': uncleMain })
   try {
     expect(session.world.drones).toHaveLength(1)
     expect(session.world.orders).toEqual([])
@@ -95,6 +95,7 @@ export function onTick() { console.log(drones()[0].capacity) }`,
 test('the generated inherit declarations typecheck both controllers and require path endpoints to be cells', () => {
   const types = declarations(factoryBricks(kettlewick))
   expect(diagnostics(kettlewick.files, types)).toEqual([])
+  expect(diagnostics({ 'main.ts': uncleMain }, types)).toEqual([])
   expect(diagnostics(cached, types)).toEqual([])
   expect(diagnostics({ 'main.ts': 'import { findPath } from "inherit"; findPath(1, 2)' }, types))
     .toHaveLength(1)

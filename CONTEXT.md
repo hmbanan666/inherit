@@ -8,7 +8,9 @@ One game played by writing TypeScript. You inherit Kettlewick Works and Uncle's 
 | --- | --- |
 | Works | The inherited factory. The first site is Kettlewick Works, Uncle's workshop in a village. |
 | Site | A map with a depot, drones, veins, a furnace, a quest list and starting files. Pure data. |
-| Inherited code | Uncle's `main.ts`. It mines and never comes home (`const home = false`). |
+| Inherited code | Uncle's `main.ts`. It mines and never comes home (`const home = false`). A fresh world starts from a function stub instead. |
+| Run | The gutter mark that queues one exported function for the next tick. Taking Ines's quest grants it. |
+| Depot delivery | Villagers take ingots and steel from the depot. The furnace holds them until a drone carries them there. |
 | Tick | One step of the world, 0.5 s. `onTick` runs once per tick. The clock does not pause and has no speed control. |
 | CPU | A budget per tick. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it when the tick is spending half the budget or more. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. |

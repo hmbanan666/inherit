@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { declarations, kettlewick, factoryBricks, shop, levelSpan, readChecks, repeatedLabel, functionUnlocked, freshBrick, type World } from '@inherit/sim/v8'
+import { declarations, inspectMachine, kettlewick, factoryBricks, machineList, onApi, shop, levelSpan, readChecks, repeatedLabel, functionUnlocked, freshBrick, triggerUnlocked, type World } from '@inherit/sim/v8'
 import ChecksPanel from './ChecksPanel.vue'
 import PaneSplit from './PaneSplit.vue'
 import { CircleAlert, Coins, Cpu, Play, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
@@ -18,11 +18,14 @@ const lockedWorld = { questId: undefined, cleared: [] as string[], bought: [] as
 const visibleBricks = computed(() => bricks.filter(brick => functionUnlocked(world.value ?? lockedWorld, brick.name)))
 const freshNames = computed(() => new Set(bricks.filter(brick => freshBrick(world.value, brick.name)).map(brick => brick.name)))
 const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name))))
-const entries = computed(() => visibleBricks.value.map(brick => ({
-  name: brick.name, signature: brick.name.includes('.') ? brick.name.split('.')[0] + '.' + brick.signature.replace(/^readonly /, '') : brick.signature,
-  description: brick.doc + ' CPU: ' + brick.cost + '.', params: [], returns: '', example: brick.example,
-  fresh: freshNames.value.has(brick.name),
-})))
+const entries = computed(() => [
+  ...visibleBricks.value.map(brick => ({
+    name: brick.name, signature: brick.name.includes('.') ? brick.name.split('.')[0] + '.' + brick.signature.replace(/^readonly /, '') : brick.signature,
+    description: brick.doc + ' CPU: ' + brick.cost + '.', params: [], returns: '', example: brick.example,
+    fresh: freshNames.value.has(brick.name),
+  })),
+  { name: onApi.name, signature: onApi.signature, description: onApi.doc + ' CPU: ' + onApi.cost + '.', params: [], returns: '', example: onApi.example, fresh: world.value?.questId === 'odile' },
+])
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
 const dirty = computed(() => Object.keys(files.value).length !== Object.keys(deployed.value).length ||
@@ -44,7 +47,22 @@ const side = ref<'checks' | 'console'>('checks')
 const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
 const blankConsole = ref(false)
-const zone = ref<'quests' | 'shop'>('quests')
+const zone = ref<'quests' | 'shop' | 'machines'>('quests')
+const selectedId = ref('')
+const machines = computed(() => world.value ? machineList(world.value) : [])
+const inspected = computed(() => {
+  const current = world.value
+  return current && selectedId.value ? inspectMachine(current, kettlewick, selectedId.value) : undefined
+})
+function openMachine(id: string) {
+  selectedId.value = id
+  zone.value = 'machines'
+}
+const triggerLabel: Record<string, string> = {
+  run: 'Run',
+  events: 'on(event, fn)',
+  tick: 'onTick()',
+}
 const questRailCss = questRailPx + 'px'
 const worldGapCss = worldGapPx + 'px'
 const worldInsetCss = worldInsetPx + 'px'
@@ -264,6 +282,8 @@ provide(editorKey, {
   id: kettlewick.id, label: 'Player TypeScript', files, deployed, activeFile, api,
   apiNames: shallowRef(new Set(bricks.map(b => b.name.split('.').at(-1)!))),
   dirty, multiFile: ref(true), navigation, watching: ref(false), call: ref(), tickCalls: ref([]),
+  canRun: computed(() => !!world.value && triggerUnlocked(world.value, 'run')),
+  runAt(name, file, line) { send({ kind: 'run-fn', name, file, line }) },
   setFile(file, code) { files.value = { ...files.value, [file]: code } },
   openFile(file) { activeFile.value = file },
   cursor,
@@ -296,7 +316,7 @@ function startOver() {
   resetting = true
   pending.value = true
   error.value = ''
-  send({ kind: 'restart', files: kettlewick.files })
+  send({ kind: 'restart', files: kettlewick.files, fresh: true })
 }
 function shortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -360,7 +380,7 @@ onMounted(async () => {
       activeFile.value = Object.hasOwn(recovery.save.files, recovery.save.activeFile) ? recovery.save.activeFile : 'main.ts'
       navigation.value = { file: activeFile.value, line: 1 }
       send({ kind: 'restart', files: recovery.save.deployed, saved: recovery.save.world })
-    } else if (recovery.kind === 'missing') send({ kind: 'restart', files: kettlewick.files })
+    } else if (recovery.kind === 'missing') send({ kind: 'restart', files: kettlewick.files, fresh: true })
     else {
       await archiveFactorySave(localStorage, stored!)
       if (recovery.kind === 'files') {
@@ -423,9 +443,10 @@ onBeforeUnmount(() => {
     </template>
     <template #floor>
       <section class="quest-zone" aria-label="Current request">
-        <nav class="zone-tabs" aria-label="Quest and shop">
+        <nav class="zone-tabs" aria-label="Quest, shop, and machines">
           <button type="button" :aria-pressed="zone === 'quests'" @click="zone = 'quests'">Quests</button>
           <button type="button" :aria-pressed="zone === 'shop'" @click="zone = 'shop'">Shop</button>
+          <button type="button" :aria-pressed="zone === 'machines'" @click="zone = 'machines'">Machines</button>
         </nav>
         <div class="quest-scroll">
           <template v-if="zone === 'quests'">
@@ -453,6 +474,7 @@ onBeforeUnmount(() => {
                 <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
                 <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
                 <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}</li>
+                <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}</li>
               </ul>
             </article>
             <div v-else class="quest">
@@ -460,7 +482,7 @@ onBeforeUnmount(() => {
               <p v-if="!world" class="goal">Uncle Ambrose left you the works.</p>
             </div>
           </template>
-          <ul v-else class="shop-list">
+          <ul v-else-if="zone === 'shop'" class="shop-list">
             <li v-for="item in shop" :key="item.id">
               <button type="button" :disabled="!world || world.bought.includes(item.id) || world.credits < item.price"
                 @click="send({ kind: 'buy', id: item.id })">
@@ -470,6 +492,45 @@ onBeforeUnmount(() => {
               </button>
             </li>
           </ul>
+          <div v-else>
+            <article v-if="inspected" class="quest">
+              <button type="button" class="hint" @click="selectedId = ''">My machines</button>
+              <h2>{{ inspected.name }}</h2>
+              <p>{{ inspected.description }}</p>
+              <ul class="facts">
+                <li v-for="line in inspected.lines" :key="line.label"><b>{{ line.label }}</b> {{ line.value }}</li>
+              </ul>
+              <div v-if="inspected.progress" class="xp">
+                <span>{{ inspected.progress.label }}</span>
+                <span class="bar"><i :style="{ width: inspected.progress.pct + '%' }" /></span>
+              </div>
+              <ul v-if="inspected.recipes.length" class="shop-list">
+                <li v-for="recipe in inspected.recipes" :key="recipe.id">
+                  <button type="button" disabled :class="{ locked: !!recipe.locked }">
+                    <b>{{ recipe.input }} → {{ recipe.output }}</b>
+                    <small v-if="recipe.locked">{{ recipe.locked }}</small>
+                  </button>
+                </li>
+              </ul>
+              <ul v-if="inspected.actions.length" class="shop-list">
+                <li v-for="action in inspected.actions" :key="action.id">
+                  <button type="button" :disabled="!action.enabled" @click="send({ kind: 'manual', action: action.id, drone: action.drone })">
+                    <b>{{ action.label }}</b>
+                    <span v-if="action.api">{{ action.api }}</span>
+                    <small v-if="action.reason">{{ action.reason }}</small>
+                  </button>
+                </li>
+              </ul>
+            </article>
+            <ul v-else class="shop-list">
+              <li v-for="row in machines" :key="row.id">
+                <button type="button" @click="openMachine(row.id)">
+                  <b>{{ row.name }}</b>
+                  <small>{{ row.detail }}</small>
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
         <div v-if="zone === 'quests' && (activeQuest || reading)" class="quest-action">
           <button v-if="reading" class="gold" type="button" data-testid="take-quest" @click="take(reading.id)">Take quest</button>
@@ -479,7 +540,7 @@ onBeforeUnmount(() => {
       </section>
       <div class="stage">
         <div class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :interval="kettlewick.tickMs" @error="floorError = $event" @dump="send({ kind: 'dump', name: $event })" />
+          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorError = $event" @select="openMachine" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
         <div ref="editorBay" class="editor-bay">
@@ -822,6 +883,11 @@ onBeforeUnmount(() => {
 }
 .shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
 .shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
+.shop-list button:disabled, .shop-list button.locked { opacity: 0.45 }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font: 12px var(--mono); color: var(--soft) }
+.facts b { color: var(--text); font-weight: 600 }
+.quest .bar { display: block; height: 5px; border-radius: 3px; background: var(--accent-shadow); overflow: hidden }
+.quest .bar i { display: block; height: 100%; background: var(--gold) }
 .balance b { font-variant-numeric: tabular-nums }
 .xp { display: grid; gap: 4px; min-width: 92px }
 .xp-bar {

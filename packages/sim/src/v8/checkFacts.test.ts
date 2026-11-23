@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { kettlewick } from './sites/kettlewick'
+import { kettlewick, uncleMain } from './sites/kettlewick'
 import { acceptQuest, nextUnlock, questList } from './quests'
 import { createWorld } from './core/world'
 import { mining } from './modules/mining'
@@ -76,7 +76,7 @@ test('counts advance and a passing check has no reason', () => {
   const midway = afterStill(world).find(check => check.id === 'done')
   expect(midway?.text).toBe('Bram receives 4 ingots 2/4')
   expect(midway?.state).toBe('failed')
-  expect(midway?.reason).toBe('shipped 2/4')
+  expect(midway?.reason).toBe('1 ingot in the furnace, 0 at the depot; carry them to the depot')
   order.shipped = 4
   const done = readChecks(world, questList[0]!)
   expect(done.every(check => check.state === 'passing')).toBe(true)
@@ -121,8 +121,8 @@ test('a click reads the fields on that cell', () => {
   expect(inspectAt(world, 1, 1)?.id).toBe('depot')
 })
 
-test('the starter program leaves a full cart beside Vein A, and that fact wins', async () => {
-  const session = await createSession(kettlewick)
+test('uncle leaves a full cart beside Vein A, and that fact wins', async () => {
+  const session = await createSession(kettlewick, { 'main.ts': uncleMain })
   try {
     session.accept()
     session.step(40)

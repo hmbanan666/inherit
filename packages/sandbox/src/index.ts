@@ -6,6 +6,9 @@ export type { CpuStats, FactoryContext } from './runtime'
 
 export interface Program {
   onTick<C extends FactoryContext>(ctx: C): void
+  call<C extends FactoryContext>(name: string, ctx: C): boolean
+  emit<C extends FactoryContext>(event: string, ctx: C): void
+  prime(used: number, tick: number): void
   exportMemory(): JsonObject
   drainLogs(): string[]
   takeLogs(): { text: string; level: 'log' | 'info' | 'warn' | 'error'; file?: string; line?: number }[]
@@ -18,9 +21,17 @@ export async function createProgram(source: string | ProjectOptions, initialFact
   const session = await openRuntime(project, options.memory ?? {}, options.budget ?? 128, options, initialFactory)
   try {
     const tick = session.handler('onTick')
-    if (!tick) throw new Error(`${project.entry} · Export a function named onTick.`)
+    if (!tick && options.clock !== 'optional') throw new Error(`${project.entry} · Export a function named onTick.`)
     return {
-      onTick: (ctx) => session.dispatch(tick, ctx),
+      onTick: (ctx) => { if (tick) session.dispatch(tick, ctx) },
+      call: (name, ctx) => {
+        const fn = session.handler(name)
+        if (!fn) return false
+        session.dispatch(fn, ctx)
+        return true
+      },
+      emit: (event, ctx) => session.emit(event, ctx),
+      prime: (used, tickNo) => session.prime(used, tickNo),
       exportMemory: session.exportMemory,
       drainLogs: () => session.takeLogs().map(entry => entry.text),
       takeLogs: session.takeLogs,

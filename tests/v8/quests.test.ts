@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { kettlewick } from '../../packages/sim/src/v8'
+import { kettlewick, uncleMain } from '../../packages/sim/src/v8'
 import { levelSpan } from '../../packages/sim/src/v8/quests'
 import { createSession } from '../../packages/sandbox/src/v8'
 
@@ -10,16 +10,59 @@ test('level span uses the same steps as the quest chain', () => {
   expect(levelSpan(145)).toEqual({ level: 7, start: 145, next: null })
 })
 
-const home = {
-  'main.ts': kettlewick.files['main.ts'].replace(
-    'const home = false',
-    'const home = drone.cargo >= drone.capacity',
-  ),
+const haul = `import { drones, veins, furnace, depot, orders, ship, findPath } from "inherit"
+function bringHome(drone) {
+  const kind = drone.cargoKind
+  if (kind === "ingot" || kind === "steel") {
+    if (drone.isNear(depot)) drone.unload(depot)
+    else drone.moveAlong(findPath(drone.pos, depot.pos))
+    return true
+  }
+  if (!kind && (furnace.output > 0 || furnace.steel > 0)) {
+    if (drone.isNear(furnace)) drone.pickup(furnace)
+    else drone.moveAlong(findPath(drone.pos, furnace.pos))
+    return true
+  }
+  return false
 }
-
-const steel = `import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 export function onTick() {
   const drone = drones()[0]
+  if (bringHome(drone)) return
+  const order = orders()[0]
+  if (order && order.shipped >= 4) return
+  const vein = veins().find(item => item.kind === "ore")
+  if (!vein) return
+  const home = drone.cargo >= drone.capacity
+  const target = home ? furnace : vein
+  if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
+  else if (home) drone.unload(furnace)
+  else drone.mine(vein)
+  if (furnace.output < 6 && furnace.input >= 2) furnace.smelt()
+  for (const order of orders()) ship(order)
+}`
+
+const ingots = haul.replace('if (order && order.shipped >= 4) return', '')
+
+const bring = `function bringHome(drone) {
+  const kind = drone.cargoKind
+  if (kind === "ingot" || kind === "steel") {
+    if (drone.isNear(depot)) drone.unload(depot)
+    else drone.moveAlong(findPath(drone.pos, depot.pos))
+    return true
+  }
+  if (!kind && (furnace.output > 0 || furnace.steel > 0)) {
+    if (drone.isNear(furnace)) drone.pickup(furnace)
+    else drone.moveAlong(findPath(drone.pos, furnace.pos))
+    return true
+  }
+  return false
+}
+`
+
+const steel = `import { drones, veins, furnace, depot, orders, ship, findPath } from "inherit"
+${bring}export function onTick() {
+  const drone = drones()[0]
+  if (bringHome(drone)) return
   const ore = veins().find(vein => vein.kind === "ore")
   const coal = veins().find(vein => vein.kind === "coal")
   const fetchingCoal = drone.carrying === "coal" || (furnace.coal < 1 && furnace.input >= 2 && drone.cargo === 0)
@@ -30,15 +73,16 @@ export function onTick() {
   if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
   else if (home) drone.unload(furnace)
   else drone.mine(vein)
-  if (furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
+  if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
   for (const order of orders()) ship(order)
 }`
 
-const pair = `import { drones, veins, furnace, orders, ship, findPath } from "inherit"
-export function onTick() {
+const pair = `import { drones, veins, furnace, depot, orders, ship, findPath } from "inherit"
+${bring}export function onTick() {
   const ore = veins().find(vein => vein.kind === "ore")
   const coal = veins().find(vein => vein.kind === "coal")
   for (const drone of drones()) {
+    if (bringHome(drone)) continue
     const vein = drone.name === "drone-2" ? coal : ore
     if (!vein) continue
     if (drone.cargo > 0 && drone.carrying && drone.carrying !== vein.kind) {
@@ -52,11 +96,11 @@ export function onTick() {
     else if (home) drone.unload(furnace)
     else drone.mine(vein)
   }
-  if (furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
+  if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
   for (const order of orders()) ship(order)
 }`
 
-const remembered = `import { drones, veins, furnace, orders, ship, findPath, memory } from "inherit"
+const remembered = `import { drones, veins, furnace, depot, orders, ship, findPath, memory } from "inherit"
 function walk(drone, target) {
   const key = drone.name + ">" + target.pos.x + "," + target.pos.y
   let path = memory[key]
@@ -65,10 +109,25 @@ function walk(drone, target) {
   if (!onPath && !startsHere) path = memory[key] = findPath(drone.pos, target.pos)
   drone.moveAlong(path)
 }
+function carry(drone) {
+  const kind = drone.cargoKind
+  if (kind === "ingot" || kind === "steel") {
+    if (drone.isNear(depot)) drone.unload(depot)
+    else walk(drone, depot)
+    return true
+  }
+  if (!kind && (furnace.output > 0 || furnace.steel > 0)) {
+    if (drone.isNear(furnace)) drone.pickup(furnace)
+    else walk(drone, furnace)
+    return true
+  }
+  return false
+}
 export function onTick() {
   const ore = veins().find(vein => vein.kind === "ore")
   const coal = veins().find(vein => vein.kind === "coal")
   for (const drone of drones()) {
+    if (carry(drone)) continue
     const vein = drone.name === "drone-2" ? coal : ore
     if (!vein) continue
     if (drone.cargo > 0 && drone.carrying && drone.carrying !== vein.kind) {
@@ -82,37 +141,39 @@ export function onTick() {
     else if (home) drone.unload(furnace)
     else drone.mine(vein)
   }
-  if (furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
+  if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
   for (const order of orders()) ship(order)
 }`
 
-const richHaul = `import { drones, veins, furnace, orders, ship, findPath, prospect, memory } from "inherit"
-export function onTick() {
+const richHaul = `import { drones, veins, furnace, depot, orders, ship, findPath, prospect, memory } from "inherit"
+${bring}export function onTick() {
   if (!memory.opened) { prospect(); memory.opened = true }
   const vein = veins().find(item => item.name === "C") || veins().find(item => item.kind === "ore")
   const drone = drones()[0]
+  if (bringHome(drone)) return
   if (!vein) return
   const home = drone.cargo >= drone.capacity
   const target = home ? furnace : vein
   if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
   else if (home) drone.unload(furnace)
   else drone.mine(vein)
-  if (furnace.input >= 2) furnace.smelt()
+  if (furnace.output < 6 && furnace.input >= 2) furnace.smelt()
   for (const order of orders()) ship(order)
 }`
 
-const prospected = `import { drones, veins, furnace, orders, ship, findPath, prospect, memory } from "inherit"
-export function onTick() {
+const prospected = `import { drones, veins, furnace, depot, orders, ship, findPath, prospect, memory } from "inherit"
+${bring}export function onTick() {
   if (!memory.opened) { prospect(); memory.opened = true }
   const vein = veins().find(item => item.kind === "ore")
   const drone = drones()[0]
+  if (bringHome(drone)) return
   if (!vein) return
   const home = drone.cargo >= drone.capacity
   const target = home ? furnace : vein
   if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
   else if (home) drone.unload(furnace)
   else drone.mine(vein)
-  if (furnace.input >= 2) furnace.smelt()
+  if (furnace.output < 6 && furnace.input >= 2) furnace.smelt()
   for (const order of orders()) ship(order)
 }`
 
@@ -136,8 +197,8 @@ test('each quest pays on completion and the previous program does not pass the n
     expect(session.world.credits).toBe(300)
     expect(session.complete()).toBe(false)
 
-    await session.deploy(home)
-    await reach(session, 300)
+    await session.deploy({ 'main.ts': haul })
+    await reach(session, 1200)
     expect(open(session.world)).toBe(false)
     expect(session.world.credits).toBe(300)
     expect(session.complete()).toBe(true)
@@ -145,6 +206,17 @@ test('each quest pays on completion and the previous program does not pass the n
     expect(session.world.questId).toBeUndefined()
 
     expect(session.accept()).toBe(true)
+    expect(session.world.questId).toBe('ines')
+    session.step(200)
+    expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
+    await session.deploy({ 'main.ts': ingots })
+    await reach(session, session.world.tick + 6000)
+    expect(open(session.world)).toBe(false)
+    expect(session.complete()).toBe(true)
+    expect(session.world.credits).toBe(470)
+
+    expect(session.accept()).toBe(true)
+    expect(session.world.questId).toBe('odile')
     session.step(80)
     expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
     expect(session.buy('alloy')).toBe(false)

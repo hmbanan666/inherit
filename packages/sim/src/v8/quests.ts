@@ -10,7 +10,7 @@ export interface QuestTest {
 export interface QuestDef {
   id: string
   from: string
-  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen' | 'harrow'
+  who: 'bram' | 'ines' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen' | 'harrow'
   role: string
   building: 'forge' | 'bridge' | 'bakery' | 'mill' | 'riverside' | 'lamp-street' | 'town-hall'
   title: string
@@ -30,6 +30,8 @@ export interface QuestDef {
   needLevel: number
   /** A function this quest grants on Take. The signature is a recipe, not a solution. */
   unlock?: { brick: string; signature: string; legacy?: string }
+  /** Run, on(), or onTick. Granted on Take, by the same rule as unlock. */
+  trigger?: 'run' | 'events' | 'tick'
   prepare?(world: World): void
   tests: QuestTest[]
 }
@@ -61,7 +63,7 @@ export const questList: QuestDef[] = [
     id: 'bram', from: 'Bram', who: 'bram', role: 'Blacksmith', building: 'forge',
     title: 'Horseshoes for the mail horse',
     goal: 'Bring Bram 4 ingots.',
-    why: 'The cart fills at the vein and stays there, so the furnace never receives ore.',
+    why: 'The cart fills at the vein and stays there, so the furnace never receives ore. The furnace and the drone have buttons. Bram takes ingots from the depot.',
     quote: 'The mail horse throws a shoe on every hill.',
     ask: 'The mail horse throws a shoe on every hill. I need four ingots.',
     nudge: 'the cart sits full at the vein, and the furnace is still cold.',
@@ -74,11 +76,29 @@ export const questList: QuestDef[] = [
     ],
   },
   {
+    id: 'ines', from: 'Ines', who: 'ines', role: 'Warden', building: 'town-hall',
+    title: 'Ingots for the storehouse',
+    goal: 'Bring Ines 16 ingots.',
+    why: 'Sixteen ingots is a long time on the Smelt button. A function can call furnace.smelt. Run, beside the function, plays it once.',
+    quote: 'The storehouse shelves have been bare all winter.',
+    ask: 'The storehouse shelves have been bare all winter. I need sixteen ingots.',
+    nudge: 'a function can call furnace.smelt. Run, beside it, plays that function once.',
+    change: 'The storehouse has iron again.',
+    item: 'ingot', qty: 16, pay: 90, xp: 20, needLevel: 2,
+    trigger: 'run',
+    tests: [
+      { id: 'ore', text: 'Ore reaches the furnace', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
+      { id: 'ingot', text: 'The furnace makes an ingot', pass: world => world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
+      { id: 'done', text: 'Ines receives 16 ingots', pass: world => shipped(world, 'ines') >= 16 },
+    ],
+  },
+  {
     id: 'odile', from: 'Mayor Odile', who: 'odile', role: 'Mayor', building: 'bridge',
     title: 'Steel for the bridge',
     goal: 'Bring Odile 4 steel.',
     why: 'Steel is 2 ore and 1 coal alloyed together. Vein B is coal. furnace.alloy() makes steel.',
     unlock: { brick: 'furnace.alloy', signature: 'furnace.alloy(): 2 ore + 1 coal -> 1 steel', legacy: 'alloy' },
+    trigger: 'events',
     quote: 'Two banks, and no way across.',
     ask: 'Two banks, and no way across. I need steel for the bridge.',
     nudge: 'steel is ore and coal together. Where would they meet?',
@@ -100,6 +120,7 @@ export const questList: QuestDef[] = [
     nudge: 'ore cools if the coal is late. One cart cannot be in two places.',
     change: 'The bakery is warm again.',
     item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
+    trigger: 'tick',
     prepare: world => {
       // Poor veins are slow. Ore lasts 48 ticks and coal 24, long enough for two drones
       // working at once, and shorter than one drone fetching both.
@@ -128,6 +149,7 @@ export const questList: QuestDef[] = [
     item: 'ingot', qty: 60, pay: 80, xp: 0, needLevel: 4,
     unlock: { brick: 'prospect', signature: 'prospect(): reveals the next hidden vein', legacy: 'prospect' },
     tests: [
+      { id: 'hands', text: 'Done with no manual runs', pass: world => world.manualRuns === 0 && shipped(world, 'harrow') >= 60 },
       { id: 'done', text: 'Harrow receives 60 ingots', pass: world => shipped(world, 'harrow') >= 60 },
     ],
   },
@@ -240,6 +262,7 @@ export function acceptQuest(world: World, site: Site, id?: string) {
     : nextQuest(world, site)
   if (!quest) return false
   world.questId = quest.id
+  world.manualRuns = 0
   quest.prepare?.(world)
   noteCheckReset(world)
   world.orders.push({
@@ -290,6 +313,18 @@ export function functionUnlocked(world: Pick<World, 'questId' | 'cleared' | 'bou
 export function freshBrick(world: Pick<World, 'questId'> | undefined, brick: string) {
   if (!world?.questId) return false
   return questList.find(item => item.id === world.questId)?.unlock?.brick === brick
+}
+
+export type WorksTrigger = 'run' | 'events' | 'tick'
+
+/** True when a save already had the trigger, or the player has reached the quest that grants it. */
+export function triggerUnlocked(world: Pick<World, 'questId' | 'cleared' | 'automation'>, name: WorksTrigger) {
+  if (world.automation?.[name]) return true
+  const quest = questList.find(item => item.trigger === name)
+  if (!quest) return false
+  if (world.questId === quest.id || world.cleared.includes(quest.id)) return true
+  const index = questList.findIndex(item => item.id === quest.id)
+  return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
 }
 
 export function unlockError(brick: string) {

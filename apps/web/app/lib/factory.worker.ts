@@ -1,4 +1,4 @@
-import { clearConsole, kettlewick, noteCheckReset } from '@inherit/sim/v8'
+import { clearConsole, kettlewick, noteCheckReset, pressManual, queueRun } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
@@ -31,7 +31,7 @@ async function act(command: FactoryCommand) {
     clearInterval(timer)
     try {
       if (command.kind === 'restart') {
-        const fresh = await createSession(kettlewick, command.files, command.saved)
+        const fresh = await createSession(kettlewick, command.files, command.saved, { fresh: command.fresh === true && !command.saved })
         session?.dispose()
         session = fresh
         publish(command.files)
@@ -50,6 +50,12 @@ async function act(command: FactoryCommand) {
         publish()
       } else if (command.kind === 'dump') {
         session!.dump(command.name)
+        publish()
+      } else if (command.kind === 'manual') {
+        pressManual(session!.world, command.action, command.drone)
+        publish()
+      } else if (command.kind === 'run-fn') {
+        queueRun(session!.world, command.name, command.file, command.line)
         publish()
       } else if (command.kind === 'clear-console') {
         clearConsole(session!.world)

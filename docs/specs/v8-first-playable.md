@@ -1,6 +1,6 @@
 # v8 first playable slice
 
-Governs: [ADR 0022](../adr/0022-quest-loop-no-loss.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [v8 concept](../concept/v8.md).
+Governs: [ADR 0022](../adr/0022-quest-loop-no-loss.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [v8 concept](../concept/v8.md).
 
 This file is the slice that is in the code. The quest table, the shop prices, and the later rules live in the concept and in ADR 0022. Where an older milestone mentioned rent, pause, speeds, bankruptcy, deadlines, Mayor Hale, three starting drones, `defineModule`, or a starter that already delivers, that milestone is withdrawn.
 
@@ -15,7 +15,8 @@ The site is Kettlewick Works.
 - One drone, capacity 3. Vein A is poor ore and vein B is poor coal: 5 ticks for 1 rock. Vein C is hidden rich ore: 1 tick for 2 rock. Veins do not run out. `dump()` drops ore or coal; mining the other rock does that on its own and writes an info line. Ingots and steel stay in the cart.
 - Furnace: 2 ore to 1 ingot in 4 ticks. The hopper holds 6 ore and 3 coal. Steel is 2 ore and 1 coal through `furnace.alloy()`, granted by taking Odile's quest. `prospect()` is granted by taking Harrow's quest, Bring Harrow 60 ingots, offered at level 4 before Tomas.
 - CPU limit 30. Tick 500 ms. Credits 300. Level 1. XP 0.
-- Uncle's `main.ts` mines vein A, never returns (`const home = false`), smelts when the furnace holds 2 ore, and ships open orders. Nothing is delivered.
+- A fresh `main.ts` exports `smeltOnce` and does not call it. Uncle's loop still mines vein A and never returns (`const home = false`).
+- Ingots and steel stay in the furnace until a drone picks them up and unloads them at the depot. Villagers take them from the depot. The furnace holds 6 of each. Run, `on()`, and `onTick` unlock when Ines, Odile, and Elsie are taken.
 
 The worker runs one tick on that interval even when the tab is hidden. The visibility message does nothing. The sim has no UI and no clock of its own.
 

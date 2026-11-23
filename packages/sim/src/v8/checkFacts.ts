@@ -80,7 +80,16 @@ function blockingFact(world: World, quest: QuestDef, id: string) {
     if (furnace.input < 2) return `furnace input ${furnace.input}`
     return 'furnace steel 0'
   }
-  if (id === 'done') return `shipped ${shipped(world, quest.id)}/${quest.qty}`
+  if (id === 'hands') {
+    if (world.manualRuns > 0) return `manual runs ${world.manualRuns}`
+    return `shipped ${shipped(world, quest.id)}/${quest.qty}`
+  }
+  if (id === 'done') {
+    const held = quest.item === 'steel' ? world.furnace.steel : world.furnace.output
+    const at = quest.item === 'steel' ? world.depot.steel : world.depot.ingots
+    const noun = quest.item === 'ingot' ? (held === 1 ? 'ingot' : 'ingots') : 'steel'
+    return `${held} ${noun} in the furnace, ${at} at the depot; carry them to the depot`
+  }
   if (id === 'drone') {
     const drone = world.drones.find(item => item.name === 'drone-2')
     if (!drone) return `drones ${world.drones.length}`
@@ -99,7 +108,7 @@ function motionKey(world: World, quest: QuestDef, id: string) {
   const furnace = world.furnace
   if (id === 'ingot' || id === 'smelt' || id === 'steel')
     return `${furnace.input}|${furnace.output}|${furnace.steel}|${furnace.readyAt}|${world.ingotsMade}|${world.steelMade}`
-  if (id === 'done') return `${shipped(world, quest.id)}|${furnace.output}|${furnace.steel}|${drones}`
+  if (id === 'done' || id === 'hands') return `${shipped(world, quest.id)}|${world.depot.ingots}|${world.depot.steel}|${furnace.output}|${furnace.steel}|${world.manualRuns}|${drones}`
   if (id === 'memory') return world.pathWindow.join(',')
   return `${drones}|${furnace.input}|${furnace.coal}|${furnace.output}`
 }

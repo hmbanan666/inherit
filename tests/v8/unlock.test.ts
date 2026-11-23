@@ -80,7 +80,7 @@ test('taking the 60 ingot quest unlocks prospect and reveals the rich vein', asy
   const session = await createSession(kettlewick, kettlewick.files)
   try {
     session.world.level = 4
-    session.world.cleared = ['bram', 'odile', 'elsie']
+    session.world.cleared = ['bram', 'ines', 'odile', 'elsie']
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('harrow')
     expect(session.world.orders.find(order => order.id === 'harrow')?.qty).toBe(60)

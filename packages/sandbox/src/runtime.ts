@@ -92,6 +92,8 @@ export async function openRuntime(
   let current: FactoryContext | undefined
   let formatError: QuickJSHandle | undefined
   const logs: { text: string; level: 'log' | 'info' | 'warn' | 'error'; file?: string; line?: number }[] = []
+  const handlers = new Map<string, QuickJSHandle | null>()
+  let emitFn: QuickJSHandle | undefined
 
   function begin(stats: CpuStats) {
     if (disposed) throw new Error('Program has been disposed.')
@@ -217,6 +219,9 @@ export async function openRuntime(
     })
     begin(fresh())
     unwrap(vm.evalCode(inheritModule(names, options.inheritSource), 'inherit', { type: 'module' })).dispose()
+    const globalEmit = vm.getProp(vm.global, '__inheritEmit')
+    if (vm.typeof(globalEmit) === 'function') emitFn = keep(globalEmit)
+    else globalEmit.dispose()
     runtime.setModuleLoader(project.load, (from, request) => project.resolve(from, request))
     current = initialFactory
     const namespace = keep(
@@ -230,11 +235,27 @@ export async function openRuntime(
       stats: () => ({ ...frame }),
       drainLogs: () => logs.splice(0).map(entry => entry.text),
       takeLogs: () => logs.splice(0),
-      handler(name: string) {
-        const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
-        if (vm.typeof(fn) === 'function') return fn
+      prime(used: number, tick: number) {
+        if (lastTick !== tick) {
+          frame = fresh()
+          lastTick = tick
+        }
+        frame.used = used
       },
-      dispatch(fn: QuickJSHandle, ctx: FactoryContext) {
+      emit(event: string, ctx: FactoryContext) {
+        if (emitFn) this.dispatch(emitFn, ctx, event)
+      },
+      handler(name: string) {
+        const cached = handlers.get(name)
+        if (cached !== undefined) return cached ?? undefined
+        const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
+        if (vm.typeof(fn) === 'function') {
+          handlers.set(name, fn)
+          return fn
+        }
+        handlers.set(name, null)
+      },
+      dispatch(fn: QuickJSHandle, ctx: FactoryContext, arg?: string) {
         if (lastTick !== ctx.tick) {
           frame = fresh()
           lastTick = ctx.tick
@@ -245,7 +266,8 @@ export async function openRuntime(
         current = ctx
         try {
           if (startTick) usingHandle(vm.newNumber(ctx.tick), value => invoke(startTick, value).dispose())
-          usingHandle(invoke(fn), assertSynchronous)
+          if (arg === undefined) usingHandle(invoke(fn), assertSynchronous)
+          else usingHandle(vm.newString(arg), value => usingHandle(invoke(fn, value), assertSynchronous))
         } finally {
           current = undefined
         }
