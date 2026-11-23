@@ -7,7 +7,7 @@ export const kettlewick: Site = {
   id: 'kettlewick',
   seed: 1,
   grid: { width: 16, height: 6 },
-  depot: { pos: depot, ore: 0 },
+  depot: { pos: depot, ore: 0, coal: 0 },
   drones: [{ name: 'drone-1', pos: { ...depot }, cargo: 0, capacity: 3, carrying: null, source: '' }],
   veins: [
     { name: 'A', pos: { x: 6, y: 2 }, left: 800, kind: 'ore' },

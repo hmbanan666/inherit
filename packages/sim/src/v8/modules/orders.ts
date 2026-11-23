@@ -61,9 +61,10 @@ export function orderBricks(site: Site): Brick[] {
     brick('ship', 'function ship(order: Order, qty?: number): void', 'Send the order its own item. A quest pays when you complete it.',
       'for (const order of orders()) ship(order)', site.costs.action, ({ world }, ref, qty) => {
         const order = world.orders.find(o => o.id === (ref as Partial<Order> | null)?.id)
-        if (!order || !canShip(order)) throw new Error('Choose an open order from orders().')
+        const open = world.orders.filter(canShip).map(item => `${item.id} ${item.item} ${item.shipped}/${item.qty}`).join(', ') || 'none'
+        if (!order || !canShip(order)) throw new Error(`No open order matches that id. Open orders: ${open}.`)
         if (qty !== undefined && (typeof qty !== 'number' || !Number.isSafeInteger(qty) || qty < 0))
-          throw new Error('Ship a whole, nonnegative number.')
+          throw new Error(`ship qty ${String(qty)} is not a whole nonnegative number. ${order.id} wants ${order.item}. furnace ${order.item === 'steel' ? 'steel ' + world.furnace.steel : 'output ' + world.furnace.output}.`)
         const remaining = order.qty - order.shipped
         const stock = order.item === 'steel' ? world.furnace.steel : world.furnace.output
         const amount = Math.min(qty ?? remaining, remaining, stock)

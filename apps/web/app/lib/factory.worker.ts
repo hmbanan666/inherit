@@ -9,6 +9,7 @@ function publish(deployed?: Record<string, string>) {
   if (!session) return
   const world = session.world
   world.console ??= []
+  world.depot.coal ??= 0
   if (world.messages.length > 20) world.messages.splice(0, world.messages.length - 20)
   self.postMessage({ world, deployed } satisfies FactoryFrame)
 }

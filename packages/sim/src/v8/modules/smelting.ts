@@ -46,7 +46,7 @@ export function smelting(site: Site): Brick[] {
       furnace.readyAt = world.tick + (world.batchTicks ?? site.recipe.ticks)
     }),
     brick('furnace.alloy', 'alloy(): void', 'Alloy 2 ore and 1 coal into 1 steel. Sold in the shop.', 'furnace.alloy()', action, ({ world }) => {
-      if (!world.bought.includes('alloy')) throw new Error('Alloy is in the shop.')
+      if (!world.bought.includes('alloy')) throw new Error('alloy is not bought. Alloy is in the shop.')
       const furnace = world.furnace
       if (furnace.readyAt !== null) return
       if (furnace.input < site.recipe.ore || furnace.coal < 1) {
