@@ -40,11 +40,16 @@ export async function migrateBeginner<W, A extends object>(
   const last = Math.max(0, ...pack.lessons.map((l, i) =>
     l === frontier || save.completed.includes(l.id) || l.id === old.lessonId ? i : 0))
   for (const [index, lesson] of pack.lessons.slice(0, last + 1).entries()) {
-    if (index) lesson.enter?.(trial.world)
+    if (index) {
+      const next = pack.initialWorld(1)
+      lesson.enter?.(next)
+      pack.decorateEntry?.(trial.world, next)
+      trial.world = next
+    }
     trial.lessonId = lesson.id
     trial.entryWorld = structuredClone(trial.world)
     trial.phase = 'brief'
-    const starter = lesson.starter(trial.project.working)
+    const starter = lesson.starter()
     const draft = lesson.id === old.lessonId && Object.hasOwn(old.project.working, starter.edit.file)
       ? { files: old.project.working as Files, activeFile: old.project.activeFile as string }
       : { files: starter.files, activeFile: starter.edit.file }

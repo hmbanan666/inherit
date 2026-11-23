@@ -40,7 +40,7 @@ for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirecto
       const path = entry.name+'/'+lesson.id+'/'
       const goal = page.getByTestId('task-card').getByRole('heading')
       await expect(goal).toHaveText(lesson.goal)
-      const starter = lesson.starter({})
+      const starter = lesson.starter()
       const comment = starter.files[starter.edit.file].split('\n')[starter.edit.line-2].trim()
       await expect(page.locator('.view-lines')).toContainText(comment)
       await expect(world).toBeVisible()

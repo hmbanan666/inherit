@@ -6,7 +6,7 @@ import { createFloor } from './floor'
 import pack from './pack'
 
 test.each(pack.lessons)('$id starts at a TODO and handles every independent input', async lesson => {
-  const starter = lesson.starter({})
+  const starter = lesson.starter()
   const lines = starter.files['main.ts'].split('\n')
   expect(lines.every(line => line === '' || line.startsWith('// TODO:'))).toBe(true)
   expect(lines[starter.edit.line - 2]).toMatch(/^\/\/ TODO:/)

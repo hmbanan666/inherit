@@ -2,7 +2,7 @@ import { definePack } from '../../framework/pack'
 import { lessons } from './lessons'
 import manifest from './manifest'
 import type { PlayerAPI } from './player'
-import { decodeWorld, initialWorld, villageAPI, type Village } from './world'
+import { decodeWorld, initialWorld, propText, villageAPI, type Village } from './world'
 
 const available = new Map<string, (keyof PlayerAPI)[]>()
 const introduced = new Set<keyof PlayerAPI>()
@@ -17,6 +17,18 @@ export default definePack<Village, PlayerAPI>({
   lessons,
   version: 2,
   initialWorld,
+  decorateEntry(world, next) {
+    const album = { ...world.album }
+    const landmarks = [...world.landmarks]
+    if (world.lessonId) {
+      album[world.lessonId] = propText(world, world.prop)
+      if (world.unit.lessonIds.every(id => Object.hasOwn(album, id)) &&
+        !landmarks.some(landmark => landmark.id === world.unit.id)) {
+        landmarks.push({ id: world.unit.id, title: world.unit.landmark })
+      }
+    }
+    Object.assign(next, { album, landmarks })
+  },
   decodeWorld,
   exposure: 'globals',
   retry: 'entry',

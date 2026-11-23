@@ -67,7 +67,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
   for (const lesson of pack.lessons) {
     const label = m.id+'/'+lesson.id
     const checkpoint = adapter?.checkpoint(lesson.id)
-    const starter = lesson.starter(checkpoint?.previous ?? save.project.working)
+    const starter = lesson.starter()
     const steps = lessonSteps(lesson, starter)
     expect(steps.at(-1), label).toBe('Press Run')
     steps.forEach(text)
@@ -77,6 +77,12 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     if (starter.placeholder !== undefined) text(starter.placeholder)
     if (lesson.focus !== undefined) text(lesson.focus)
     const world = checkpoint?.world ?? save.world
+    const direct = freshSave(pack, 1, lesson.id)
+    expect(direct.lessonId, label).toBe(save.lessonId)
+    expect(direct.project.working, label).toEqual(save.project.working)
+    // The souvenir album and unit landmarks decorate the village after earlier solves.
+    const playableWorld = ({ album: _album, landmarks: _landmarks, ...fixture }: typeof world) => fixture
+    expect(playableWorld(direct.entryWorld), label).toEqual(playableWorld(save.entryWorld))
     const methods = pack.available(world,lesson.id)
     const host = pack.beginAttempt(structuredClone(world),'run').api
     methods.forEach(name=>expect(typeof host[name],label+' '+name).toBe('function'))

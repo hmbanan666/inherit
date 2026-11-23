@@ -163,8 +163,9 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
         if (!save.completed.includes(earned.id)) break
         const trial = structuredClone(save)
         trial.lessonId = earned.id
-        trial.world = structuredClone(world)
+        trial.world = pack.initialWorld(1)
         earned.enter?.(trial.world)
+        pack.decorateEntry?.(world, trial.world)
         trial.entryWorld = structuredClone(trial.world)
         trial.phase = 'brief'
         const solved = () => trial.phase === 'solved'
@@ -174,7 +175,6 @@ export function createPackRunner<W, A extends object>(pack: Pack<W, A>) {
         if (!solved()) throw new Error('Could not restore the earned scene for ' + earned.goal)
         world = trial.world
       }
-      save.reasons = reasons
       save.world = world
     }
     continueLesson(pack, save)

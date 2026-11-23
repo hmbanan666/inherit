@@ -1,6 +1,6 @@
 import { lessonSteps } from '@inherit/sim/pack'
 import { getPack, playerSources } from '@inherit/sim/rules'
-import { continueLesson, freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
+import { freshSave, decodeSave, selectLesson, type PackSave } from '@inherit/sim/save'
 import { courseMap } from '@inherit/sim/course'
 import { migrateBeginner } from '@inherit/sim/migrate'
 import { PlayerRunError, declarations, createPackRunner, playerSchema } from '@inherit/sandbox/pack'
@@ -28,19 +28,7 @@ async function open(command: Extract<PackCommand, { kind: 'open' }>) {
     })
     save = decodeSave(pack, JSON.stringify(save))
   } else {
-    save = command.stored ? decodeSave(pack, command.stored) : freshSave(pack)
-  }
-  if (command.lesson !== undefined) {
-    if (!pack.lessons.some(l => l.id === command.lesson)) throw new Error('Unknown lesson.')
-    if (pack.manifest.track === 'challenges') selectLesson(pack, save, command.lesson)
-    else while (save.lessonId !== command.lesson) {
-      const lesson = current()!
-      await runner.play(save, lesson.referenceSolution, lesson.mode)
-      for (let i = 0; i < 1200 && lesson.mode === 'deploy' && save.phase !== 'solved'; i++)
-        await runner.play(save, lesson.referenceSolution, 'tick')
-      if (save.phase !== 'solved') throw new Error('Unable to open this lesson.')
-      continueLesson(pack, save)
-    }
+    save = command.stored ? decodeSave(pack, command.stored) : freshSave(pack, 1, command.lesson)
   }
   if (pack.manifest.track === 'challenges' && save.project.deployed && save.phase !== 'solved') {
     save.world = structuredClone(save.entryWorld)
@@ -151,8 +139,8 @@ async function act(command: PackCommand) {
       (error && (command.kind === 'run' || command.kind === 'tick'))) failedInputs = {}
   if (previousId !== save.lessonId) tickCount = 0
   const lesson = current()
-  const starter = lesson?.starter({})
-  if (lesson && !save.edit) save.edit = lesson.starter(save.project.working).edit
+  const starter = lesson?.starter()
+  if (lesson && !save.edit) save.edit = lesson.starter().edit
   const names = lesson ? pack.available(save.world, lesson.id) : []
   const source = playerSources['./' + pack.manifest.id + '/player.ts']
   const schema = playerSchema(source)

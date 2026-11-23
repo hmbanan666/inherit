@@ -2,7 +2,7 @@ import { mainFile, type Check, type Evidence, type Lesson } from '../../framewor
 import { units } from './map'
 import { inputCards } from './inputs'
 import type { PlayerAPI } from './player'
-import { initialWorld, propText, type Fixture, type Prop, type Scene, type Village } from './world'
+import { initialWorld, type Fixture, type Prop, type Scene, type Village } from './world'
 
 type Seen = Evidence<Village>
 
@@ -91,17 +91,7 @@ function lessonFor(unit: Unit, lessonIds: string[], page: Page) {
       idea: theory.title,
     },
     enter(world: Village) {
-      const { album, landmarks } = world
-      if (world.lessonId) {
-        album[world.lessonId] = propText(world, world.prop)
-        if (world.unit.lessonIds.every(id => Object.hasOwn(album, id)) &&
-          !landmarks.some(landmark => landmark.id === world.unit.id)) {
-          landmarks.push({ id: world.unit.id, title: world.unit.landmark })
-        }
-      }
       Object.assign(world, initialWorld(), {
-        album,
-        landmarks,
         unit: { id: unit.id, landmark: unit.landmark, lessonIds },
         lessonId: id,
         scene,

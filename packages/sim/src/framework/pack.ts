@@ -74,7 +74,7 @@ export interface Lesson<W> {
   variants?: readonly { input: string; enter(world: W): void; maxTicks?: number }[]
   inputs?(world: Readonly<W>): Record<string, { type: string; value: InputValue }>
   mode: 'run' | 'deploy'
-  starter(previous: Files): Starter
+  starter(): Starter
   hints?: readonly string[]
   checks: readonly Check<W>[]
   referenceSolution: Files
@@ -89,6 +89,7 @@ export interface Pack<W, A extends object> {
   manifest: PackManifest
   version: number
   initialWorld(seed: number): W
+  decorateEntry?(previous: Readonly<W>, next: W): void
   decodeWorld(input: unknown): W
   entities: Entity<W>[]
   panels: Panel<W>[]

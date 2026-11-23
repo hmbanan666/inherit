@@ -30,7 +30,10 @@ test('the cottage remembers the player’s lettering after changing scenes', asy
   await runPack(pack, save, { 'main.ts': 'const home = "Fox Hollow"\npaintSign(home)' })
   expect(save.phase).toBe('solved')
   const next = lessons.find(lesson => lesson.id === 'flag')!
+  const previous = save.world
+  save.world = pack.initialWorld(1)
   next.enter(save.world)
+  pack.decorateEntry!(previous, save.world)
   expect(save.world.album['house-sign']).toBe('Fox Hollow')
   expect(propText(save.world, 'flag')).toBe('blue')
 })

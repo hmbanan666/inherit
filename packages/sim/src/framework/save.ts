@@ -32,14 +32,16 @@ export interface PackSave<W> {
 
 export const packKey = (id: string) => 'inherit.pack.' + id
 
-export function freshSave<W, A extends object>(pack: Pack<W, A>, seed = 1): PackSave<W> {
-  const first = pack.lessons[0]
+export function freshSave<W, A extends object>(pack: Pack<W, A>, seed = 1, lessonId = pack.lessons[0].id): PackSave<W> {
+  const first = pack.lessons.find(lesson => lesson.id === lessonId)
+  if (!first) throw new Error('Unknown lesson.')
+  const completed = pack.manifest.track === 'course' ? pack.lessons.slice(0, pack.lessons.indexOf(first)).map(l => l.id) : []
   const world = pack.initialWorld(seed)
   first.enter?.(world)
-  const starter = first.starter({})
+  const starter = first.starter()
   return {
     formatVersion: 2, packVersion: pack.version, packId: pack.manifest.id,
-    lessonId: first.id, edit: starter.edit, phase: 'brief', completed: [], passed: [],
+    lessonId: first.id, edit: starter.edit, phase: 'brief', completed, passed: [],
     drafts: {}, hints: {}, attempts: {}, predictions: {}, seenTheory: [], awards: {}, firstTryStreak: 0,
     world, entryWorld: structuredClone(world), clockActive: false,
     project: { working: starter.files, deployed: null, activeFile: starter.edit.file, history: [], snapshots: [], nextRevision: 1 },
@@ -117,10 +119,12 @@ function enter<W, A extends object>(pack: Pack<W, A>, save: PackSave<W>, lesson?
   const draft = save.drafts[lesson.id]
   if (draft && restoreEntry) save.world = structuredClone(draft.entryWorld)
   else {
-    if (pack.manifest.track === 'challenges') save.world = pack.initialWorld(1)
-    lesson.enter?.(save.world)
+    const next = pack.initialWorld(1)
+    lesson.enter?.(next)
+    pack.decorateEntry?.(save.world, next)
+    save.world = next
   }
-  const starter = draft ?? lesson.starter(save.project.working)
+  const starter = draft ?? lesson.starter()
   save.entryWorld = structuredClone(save.world)
   save.edit = starter.edit
   save.project.working = { ...starter.files }
