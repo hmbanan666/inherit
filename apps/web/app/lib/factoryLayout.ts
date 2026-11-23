@@ -7,6 +7,12 @@ export const splitterPx = 7
 export const worldInsetPx = 8
 export const worldGapPx = 8
 
+/** One header row for the file tree, the open tabs, and the checks pane. */
+export const editorHeaderPx = 36
+
+/** Checks sit to the right of the code, inside the 280–320px band. */
+export const checksPanePx = 300
+
 /** Map row as a share of the column beside the quest rail. */
 export const mapHeightShare = 0.45
 export const mapHeightMin = 22

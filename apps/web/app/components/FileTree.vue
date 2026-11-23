@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight, FilePlus, Pencil, Trash2 } from '@lucide/vue'
 import { checkPath, treeRows } from '../lib/devtools/tree'
+import { editorHeaderPx } from '../lib/factoryLayout'
+
+const headerCss = editorHeaderPx + 'px'
 
 const files = defineModel<Record<string, string>>('files', { required: true })
 const activeFile = defineModel<string>('activeFile', { required: true })
@@ -132,14 +135,44 @@ function submit() {
 <style scoped src="../lib/devtools/panels.css"></style>
 <style scoped>
 .tree {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow: auto;
-  padding: 6px 8px;
+  overflow: hidden;
+  padding: 0;
+  gap: 0;
   border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+.tree .bar {
+  flex: none;
+  flex-wrap: nowrap;
+  height: v-bind(headerCss);
+  min-height: v-bind(headerCss);
+  margin: 0;
+  padding: 0 4px;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.tree .bar .tools {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.tree .bar .tools button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
 }
 .tree .rows {
+  flex: 1;
+  min-height: 0;
   gap: 0;
+  margin: 0;
+  padding: 4px 6px 8px;
+  overflow: auto;
 }
 .tree .rows button {
   display: flex;
@@ -163,29 +196,28 @@ function submit() {
 .tree form {
   display: grid;
   gap: 5px;
+  flex: none;
+  margin: 6px 8px 0;
 }
 .tree small {
   color: var(--accent-line);
 }
-.tree-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
+.tree .bar .tree-toggle {
   border: 0;
   background: transparent;
   color: var(--text);
-  font: 700 12px inherit;
+  font-weight: 700;
+  padding: 0 2px;
 }
 .tree.shut {
-  padding: 6px 4px;
+  padding: 0;
 }
 .tree.shut .bar {
   justify-content: center;
+  padding: 0 4px;
 }
 .tree.shut .tree-toggle {
   width: 100%;
   justify-content: center;
-  min-height: 28px;
 }
 </style>

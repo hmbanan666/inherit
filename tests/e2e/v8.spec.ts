@@ -15,7 +15,7 @@ async function settings(page: Page, name: string) {
   await page.getByRole('button', { name, exact: true }).click({ timeout: 5000 })
 }
 
-test('Bram offers a quest, the tests sit under the editor, and credits stay put', async ({ page }) => {
+test('Bram offers a quest, the checks sit beside the editor, and credits stay put', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
   await expect(page.getByLabel('Current request')).toContainText('cart fills')
@@ -34,7 +34,9 @@ test('Bram offers a quest, the tests sit under the editor, and credits stay put'
   await expect(files.getByRole('button', { name: 'main.ts' })).toBeVisible()
   await expect(files.getByRole('button', { name: 'lib', exact: true })).toBeVisible()
   await expect(page.locator('.view-lines')).toContainText('const home = false')
-  await expect(page.getByRole('button', { name: /^(Deploy|Pause|Resume|[124]x|Start over)$/ })).toHaveCount(0)
+  await expect(page.locator('.hud').getByRole('button', { name: /^(Deploy|Pause|Resume|[124]x|Start over)$/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Deploy' })).toBeVisible()
+  await expect(page.getByTestId('checks')).toHaveText('Take a quest to see checks')
   await page.getByTestId('take-quest').click()
   await expect(page.getByTestId('checks')).toContainText('Ore reaches the furnace')
   await expect(page.getByTestId('credits')).toHaveText('300 credits')
@@ -72,11 +74,11 @@ test('helpers deploy onto the live world and reload preserves drafts and the dep
   await edit(page, main)
   const before = (await saved(page)).world.tick
   await page.keyboard.press('Control+Enter')
-  await expect(deploy).toBeHidden()
+  await expect(deploy).toHaveAttribute('data-dirty', 'false')
   await expect.poll(async () => (await saved(page)).world.memory.count).toBeGreaterThan(0)
   const draft = main + '\n// next change'
   await edit(page, draft)
-  await expect(deploy).toBeVisible()
+  await expect(deploy).toHaveAttribute('data-dirty', 'true')
   await page.reload()
   await expect(deploy).toBeEnabled()
   await expect(page.locator('.view-lines')).toContainText('next change')
@@ -85,10 +87,10 @@ test('helpers deploy onto the live world and reload preserves drafts and the dep
   expect(restored.deployed['main.ts']).toBe(main)
   expect(restored.files['main.ts']).toBe(draft)
   await edit(page, main)
-  await expect(deploy).toBeHidden()
+  await expect(deploy).toHaveAttribute('data-dirty', 'false')
   await edit(page, draft)
   await deploy.click()
-  await expect(deploy).toBeHidden()
+  await expect(deploy).toHaveAttribute('data-dirty', 'false')
   page.once('dialog', dialog => dialog.dismiss())
   await settings(page, 'Start over')
   await expect(tree.getByRole('button', { name: 'lib/helpers.ts' })).toBeVisible()

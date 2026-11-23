@@ -2,8 +2,10 @@ import { expect, test } from 'vitest'
 import {
   clampMapHeight,
   containScale,
+  checksPanePx,
   creditSuffix,
   defaultMapHeight,
+  editorHeaderPx,
   filesNarrowPx,
   fitScale,
   formatCredits,
@@ -37,6 +39,12 @@ test('the map row defaults to 45% of the works column and a saved height stays i
   expect(readMapHeight('90')).toBe(mapHeightMax)
   expect(readMapHeight('nope')).toBe(45)
   expect(clampMapHeight(45)).toBe(45)
+})
+
+test('the checks pane is a fixed column beside the editor', () => {
+  expect(checksPanePx).toBeGreaterThanOrEqual(280)
+  expect(checksPanePx).toBeLessThanOrEqual(320)
+  expect(editorHeaderPx).toBeGreaterThan(0)
 })
 
 test('the file tree starts collapsed on a narrow window and open on a wide one', () => {

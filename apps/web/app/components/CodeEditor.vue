@@ -424,6 +424,7 @@ onBeforeUnmount(() => {
           </button>
         </span>
         <span class="space" />
+        <slot name="actions" />
         <template v-if="multiFile">
           <button title="Quick open (Ctrl/Cmd+P)" aria-label="Quick open" @click="find('open')">
             <FolderSearch :size="14" />
@@ -535,7 +536,7 @@ onBeforeUnmount(() => {
 .finder {
   position: absolute;
   z-index: 3;
-  top: 30px;
+  top: var(--editor-header, 30px);
   left: 4px;
   right: 4px;
   max-height: 65%;

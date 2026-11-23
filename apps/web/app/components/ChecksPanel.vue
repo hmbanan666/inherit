@@ -5,12 +5,14 @@ const props = defineProps<{
   label?: string
   tried: boolean
   messages?: readonly string[]
+  empty?: string
 }>()
 </script>
 <template>
   <div class="checks" data-testid="checks" :aria-label="label ?? 'Done when'">
     <p v-for="message in messages" :key="message">{{ message }}</p>
-    <ul>
+    <p v-if="empty && !checks.length" class="empty">{{ empty }}</p>
+    <ul v-else>
       <li v-for="check in props.checks" :key="check.id" :data-colour="label ? check.status : undefined" :data-state="!tried ? 'idle' : check.status === 'green' ? 'done' : 'open'">
         <span role="img" :aria-label="tried && check.status === 'green' ? 'Done' : 'Still to do'">{{ tried && check.status === 'green' ? '✓' : '○' }}</span>
         {{ check.text }}<small v-if="tried && check.status !== 'green' && (check.input || check.reason)"> {{ check.input }} {{ check.reason }}</small>
@@ -19,9 +21,10 @@ const props = defineProps<{
   </div>
 </template>
 <style scoped>
-.checks { padding: 6px 12px; font-size: 13px; color: var(--sub) }
+.checks { padding: 8px 10px; font-size: 13px; line-height: 1.35; color: var(--sub) }
+.empty { color: var(--soft) }
 ul { list-style: none; margin: 0; padding: 0 }
-li { padding: 3px 0 }
+li { padding: 2px 0 }
 [data-colour=red] { color: var(--alert) }
 [data-colour=amber] { color: var(--gold) }
 [data-state=done] { color: var(--mint) }
