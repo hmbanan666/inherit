@@ -11,4 +11,4 @@ From now on:
 - The place type is a string literal union generated from the machines on the floor, refreshed when the player buys a machine. Unknown places fail with a plain message at run time.
 - Dev and test hooks: `?step=<id>&speed=<n>` jumps to a lesson and speeds up the clock in development and tests, and the request card, checks, primary button and navigation carry `data-testid`s.
 
-> Superseded by ADR 0021 (v8: inherit a factory, play on ticks).
+> Superseded by ADR 0021. [ADR 0022](0022-quest-loop-no-loss.md) does not restore it.

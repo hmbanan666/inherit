@@ -1,6 +1,8 @@
 # A TypeScript course and a challenge pack
 
-[ADR 0019](../adr/0019-one-screen-two-tracks.md) governs v6. The [Beginner curriculum](v6-beginner-curriculum.md) and [Workshop briefs and reference](v6-workshop-challenges.md) are the pack content.
+> Legacy mode, not v8. Packs stay playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md).
+
+[ADR 0019](../adr/0019-one-screen-two-tracks.md) governed v6. It is not restored. The [Beginner curriculum](v6-beginner-curriculum.md) and [Workshop briefs and reference](v6-workshop-challenges.md) are the pack content.
 
 ## Problem
 

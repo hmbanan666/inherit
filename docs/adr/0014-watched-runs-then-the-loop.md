@@ -1,5 +1,7 @@
 # Watched runs, then the loop
 
+> Superseded by [ADR 0022](0022-quest-loop-no-loss.md) for v8. Deploy is the only run control. There is no watched playback and no solved card. Legacy packs keep the screen they already ship. This ADR does not govern new work.
+
 ## Context
 
 Nick played the from-scratch chapter (#44) and called it a failure: a junior would quit in the first minutes, and it felt like an idea, not a game. The foundation audit (`docs/audits/2026-11-21-foundation.md`) found the causes. The world was hidden while he learned, the first task taught files and imports before programming, `onTick` arrived before he needed it, tasks advanced on their own, reveals came in a burst, and place names were magic strings. It recommends keeping the world and the primitives and changing how they are taught. This ADR adopts that direction.

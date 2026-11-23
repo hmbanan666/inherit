@@ -1,5 +1,7 @@
 # Core loop: build the factory from scratch with three primitives
 
+> Superseded by [ADR 0022](0022-quest-loop-no-loss.md). The loop is one villager quest at a time on the inherited works. The player does not write the factory from three primitives, and there is no debt.
+
 ## Context
 
 The frame works and stays: the IDE, the navigation, the game area, the overall layout, the checks panel and the palette (ADR 0006, 0009, 0011, 0012). What did not work is the coding gameplay itself. v3 first taught a low-level `ctx` API, then ready-made machine handles with verbs (ADR 0010, PR #38). In both cases the player used a library he did not write, kept asking "what is this and where does it come from?", and never saw what the factory really does underneath. Separately, a running furnace and cart earned coins forever, so with no timers (ADR 0008) the debt paid itself while the player waited.

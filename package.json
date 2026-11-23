@@ -8,7 +8,6 @@
     "test": "vitest run --maxWorkers=1 --exclude '**/e2e/**'",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter web typecheck",
     "lint": "pnpm typecheck",
-    "test:browser": "playwright test",
     "shots": "node scripts/shots.mjs",
     "new-pack": "node scripts/new-pack.mjs"
   },

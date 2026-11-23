@@ -52,4 +52,4 @@ Learn opening by itself once per idea; the course map inside Learn; the goal bar
 
 Lessons gain fields for steps, prefill with caret, placeholder, check reasons and a focus box; the validator gives sensible defaults so 49 lessons and 11 challenges keep working without rewrites. Filling those fields for the rest of the content is later work.
 
-> Superseded by ADR 0021 (v8: inherit a factory, play on ticks).
+> Superseded by ADR 0021. [ADR 0022](0022-quest-loop-no-loss.md) does not restore it. v8 uses a quest card and live checks, not lesson steps.

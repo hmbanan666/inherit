@@ -1,5 +1,7 @@
 # Live checks under the editor
 
+> v8 checks are narrowed by [ADR 0022](0022-quest-loop-no-loss.md): open or done, live on the world, never auto-completing and never costing anything. Amber and the collapsed "N done" line stay with legacy pack lessons.
+
 v1 had a short list of checks that turned green while the factory ran, and players liked watching them. v2 hid them behind a Tests tab and v3 dropped them. Without them a player has to guess whether the code is close.
 
 From now on the panel under the editor has two tabs, Checks and Console, with Checks open by default. A check is one plain sentence about what the code should make happen ("The mine digs iron ore", "Ore reaches the furnace", "The furnace smelts ingots", "Ingots reach the cart: 1 / 3"). Each has a colour that updates live while the factory runs: red when nothing happened yet, amber when there is partial progress, green when it is done.

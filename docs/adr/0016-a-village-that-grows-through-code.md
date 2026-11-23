@@ -19,4 +19,4 @@ Nick confirmed the setting after the foundation audit: automating work by writin
 - Chapter 1 must not block this: the shed sits in the village from the start, the Town section shows the same village growing, and buildings and their unlocked elements are data, so later chapters add buildings without new UI frames.
 - Future chapters are designed as building unlocks plus the requests they make possible; each gets its own ADR when it is planned.
 
-> Superseded by ADR 0021 (v8: inherit a factory, play on ticks).
+> Superseded by ADR 0021. [ADR 0022](0022-quest-loop-no-loss.md) does not restore it. The village grows by quests, not by this ADR.

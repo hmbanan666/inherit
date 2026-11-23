@@ -1,28 +1,34 @@
 # Inherit
 
-One game played by writing TypeScript: you inherit a factory and its code ([ADR 0021](docs/adr/0021-v8-inherit-a-factory.md), [v8 concept](docs/concept/v8.md)).
+One game played by writing TypeScript. You inherit Kettlewick Works and Uncle's program, take a villager's quest, and complete it for credits and XP ([ADR 0022](docs/adr/0022-quest-loop-no-loss.md), [ADR 0021](docs/adr/0021-v8-inherit-a-factory.md), [v8 concept](docs/concept/v8.md)). Packs from v5 to v7 stay playable at `/?packs` as a legacy mode. They are not v8.
 
 ## v8 terms
 
 | Term | Meaning during play |
 | --- | --- |
-| Works | The inherited factory. The first site is Kettlewick Works. |
-| Site | A map with starting entities, inherited code, modules, unlocks, orders, crises and an audit tick. Pure data. |
-| Inherited code | Uncle's working but wasteful `main.ts`, running from the first tick. |
-| Tick | One step of the world, 0.5 s at 1x. `onTick` runs once per tick. |
-| CPU | The cost of API calls in one tick. Over the limit, the rest of the tick is skipped. |
-| Brick | One API call from `"inherit"` with a signature, doc line, CPU cost and the API version that added it. |
-| API version | A release of the bricks with a changelog. Bought with credits; may deprecate or remove bricks. |
-| Module | Content that extends the core: entities, bricks, orders and crises. |
-| Crisis | A world change that breaks or strains the current code, such as a vein running dry. |
-| Credits | Money from orders. Pays rent and unlocks. |
-| Rent | Credits charged every tick for drones, stations and CPU. |
-| Order | A request for items with a deadline in ticks and a pay. Late orders pay half. |
-| Audit | The end of a session, with a result screen. |
-| Session | One play of a site, 20 to 40 minutes, from inheritance to audit or bankruptcy. |
-| lib | The player's own files, kept across sessions. |
+| Works | The inherited factory. The first site is Kettlewick Works, Uncle's workshop in a village. |
+| Site | A map with a depot, drones, veins, a furnace, a quest list and starting files. Pure data. |
+| Inherited code | Uncle's `main.ts`. It mines and never comes home (`const home = false`). |
+| Tick | One step of the world, 0.5 s. `onTick` runs once per tick. The clock does not pause and has no speed control. |
+| CPU | The nav shows used/limit. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. |
+| Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. |
+| Quest | One villager's ask. Taken by hand, one at a time, with no deadline. Bram, Odile, Elsie, Tomas, Pell, then Wen. |
+| Check | One sentence under the editor about the live world. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. |
+| Hint | The quest card's why line. It never contains the solution. It may name a field, a brick, or a shop item. |
+| Credits | Paid by Complete quest. Spent only in the shop. Never negative. There is no rent. |
+| XP | Paid with the credits when a quest is completed. A speed bonus is decided and not built yet. |
+| Level | From XP. This chain's thresholds are 20, 40, 65, 90, 115 and 145, so each quest raises one level and unlocks the next villager. |
+| Shop | Where credits are spent. A purchase applies at once. An unaffordable item is refused. Level tiers are decided and not built yet. |
+| Order | The shipment on a taken quest: item, quantity, shipped. Complete quest pays. No deadline is shown. |
+| lib | The player's own files under `lib/`. The game does not replace them. |
+| Audit | Later. A chapter summary after the quest chain. It does not bankrupt or wipe. See ADR 0022. |
+| Next inheritance | Later. A new site. The player's `lib/`, credits and XP carry over. See ADR 0022. |
+| Session | The saved works on this device. Not a timed round, and not ended by bankruptcy. Start over is the player's own confirmed reset. |
+| Rent | Not used. Credits are not charged over time. |
+| Bankruptcy | Not used. The balance cannot end the works. |
+| Pause | Not used in v8. Legacy packs still have their own playback bar. |
 
-## Pack terms (v5 to v7, removed after the first v8 slice)
+## Pack terms (legacy mode at `/?packs`)
 
 | Term | Meaning during play |
 | --- | --- |

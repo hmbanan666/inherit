@@ -1,5 +1,7 @@
 # Author a game pack
 
+> Legacy mode, not v8. Packs stay playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md).
+
 Pick the learning goal first. What will a player know how to do at the end? Choose a setting where each idea does something visible. Village at Dawn uses a counted loop to light five separate lamps. A sixth lamp or a missing lamp is visible on the path.
 
 Run `pnpm new-pack lantern-garden`. Open `pnpm dev` and choose Lantern Garden. Its starter leaves a lantern dark. Enter `light()`, press Run, watch the lantern glow and Continue to the ending. The new folder is the registration. Use a fresh id for a different game.

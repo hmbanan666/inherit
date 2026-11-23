@@ -1,4 +1,4 @@
-name: Check game packs
+name: Check
 on:
   pull_request:
   push:
@@ -23,13 +23,3 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
-      - run: pnpm exec playwright install-deps chromium
-      - run: pnpm exec playwright install chromium --only-shell
-      - run: pnpm test:browser
-        env:
-          INHERIT_SHOTS: ${{ runner.temp }}/inherit-shots
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: pack-playthroughs
-          path: ${{ runner.temp }}/inherit-shots

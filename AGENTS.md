@@ -1,56 +1,37 @@
 # Inherit development
 
-Use Node 24 with the pnpm release pinned in the root manifest. Run `pnpm dev` from the workspace root to open the pack showcase.
+Use Node 24 and the pnpm release pinned in the root manifest. `pnpm dev` opens Kettlewick Works. Legacy packs stay at `/?packs`.
 
-Keep game rules and goal evaluation in `packages/sim`. Render the world sent by the worker. Keep player code inside QuickJS and expose operations through the typed factory bridge. When changing a lesson, exercise both the starter and a working solution.
+Keep game rules and goal evaluation in `packages/sim`. The page renders the world the worker sends. Player code stays in QuickJS. v8 code lives in `packages/sim/src/v8/`. Build on the existing frame and components. Do not restart a screen from scratch.
 
-Before a PR, run these checks on the final commit.
+Read [ADR 0022](docs/adr/0022-quest-loop-no-loss.md) and [ADR 0021](docs/adr/0021-v8-inherit-a-factory.md) before changing the game. The [v8 concept](docs/concept/v8.md) and the [first playable spec](docs/specs/v8-first-playable.md) match the shipped loop. The glossary is `CONTEXT.md`.
+
+When changing a quest, keep a test that the previous program fails it and a working program completes it.
+
+## Checks
+
+Nick playtests. Agents do not run browser suites or screenshots. Before a PR, on the final commit:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm test
 pnpm typecheck
-pnpm lint
 pnpm build
-pnpm exec playwright install chromium --only-shell
-pnpm test:browser
 ```
-
-Documentation-only PRs may skip the Chromium install and browser suite. Run both for changes to code, dependencies, build configuration or test tooling.
-
-The browser test serves the generated site on loopback port 4173. Set `INHERIT_SHOTS` to a directory outside the checkout when capturing pack screenshots.
-
-Capture a lesson on an existing site with Node 24 and the installed Chromium shell.
-
-```sh
-INHERIT_SHOTS=/tmp/inherit-v6-ui pnpm shots --url http://127.0.0.1:4173 --pack beginner --lesson hello
-```
-
-The command opens an isolated lesson preview and writes `<pack>/<lesson>/start.png` and its matching `start.txt`. Set the output directory outside the checkout. The same command accepts a production URL.
 
 ## Commits and merging
 
-Omit `Co-authored-by` trailers and AI tool or model names from commit messages, PR titles and PR bodies. When squash-merging on GitHub, pass an explicit subject and body, for example `gh pr merge --squash --subject "..." --body "..."`. GitHub's default squash message appends `Co-authored-by` trailers for commit authors.
+Cursor cloud agents run on grok-4.7 high. Squash-merge with an explicit subject and body. Omit `Co-authored-by` trailers and AI tool or model names from commit messages, PR titles, and PR bodies. GitHub's default squash message appends `Co-authored-by` trailers for commit authors.
 
-## Agent skills
+## Legacy packs
 
-### v8
+Packs are not v8. To add or change one, use [.agents/skills/author-pack/SKILL.md](.agents/skills/author-pack/SKILL.md) and [the authoring guide](docs/packs/AUTHORING.md). Do not delete pack code.
 
-v8 replaces packs with one game (ADR 0021). Read [the v8 concept](docs/concept/v8.md) and [the first playable spec](docs/specs/v8-first-playable.md) before v8 work. New code lives in `packages/sim/src/v8/`.
+## Issue tracker
 
-### Author a pack
+Track issues and specs in GitHub Issues. See `docs/agents/issue-tracker.md`. Triage with `docs/agents/triage-labels.md`.
 
-When adding a pack or designing a lesson, use [.agents/skills/author-pack/SKILL.md](.agents/skills/author-pack/SKILL.md) and [the authoring guide](docs/packs/AUTHORING.md). Use [ADR 0019](docs/adr/0019-one-screen-two-tracks.md) and the [v6 spec](docs/specs/v6-course-and-challenges.md) for course and challenge decisions. ADR 0018 governs the shared pack foundation.
-
-### Issue tracker
-
-Track issues and specs in GitHub Issues. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-When triaging an issue, use the labels in `docs/agents/triage-labels.md`.
-
-### Domain docs
+## Domain docs
 
 All packages share one glossary and one set of architecture decisions. See `docs/agents/domain.md`.
 
