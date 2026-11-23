@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
-import { Play, Settings2 } from '@lucide/vue'
+import { Play } from '@lucide/vue'
 import { readPackSlot } from '../lib/pack-storage'
 import { packKey } from '@inherit/sim/save'
 import type { PackManifest, Call, Files, Colour } from '@inherit/sim/pack'
@@ -16,7 +16,7 @@ const statuses = ref<Colour[]>([])
 const files = shallowRef<Files>({})
 const activeFile = ref('main.ts')
 const error = ref(''), blocked = ref(false), busy = ref(true), watching = ref(false), saved = ref(true)
-const settings = ref(false), contrast = useContrast()
+const contrast = useContrast()
 const diagnostic = shallowRef<PackFrame['diagnostic']>()
 const runMessage = ref('')
 const activeCall = shallowRef<Call>()
@@ -277,14 +277,12 @@ onBeforeUnmount(() => {
 <template>
   <StudioShell :class="{'high-contrast': contrast}">
     <template #nav>
-      <PackNav :busy="busy" @select="select" :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId" />
-      <div class="settings pack-settings">
-        <button aria-label="Settings" @click="settings = !settings"><Settings2 /></button>
-        <aside v-if="settings" class="hud-menu">
+      <PackNav :busy="busy" @select="select" :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId">
+        <template #settings>
           <button @click="contrast = !contrast">High contrast {{ contrast ? 'on' : 'off' }}</button>
           <SaveArchive v-if="lesson === undefined" :pack="manifest.id" />
-        </aside>
-      </div>
+        </template>
+      </PackNav>
       <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/?packs'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
       <button v-else class="deploy primary-run" data-testid="primary-button" :data-ready="!!frame && !busy && currentStep === frame.steps.length - 1" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved" @click="run">
         <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
