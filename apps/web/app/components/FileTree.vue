@@ -6,7 +6,13 @@ const files = defineModel<Record<string, string>>('files', { required: true })
 const activeFile = defineModel<string>('activeFile', { required: true })
 const collapsed = ref(new Set<string>())
 const paths = computed(() => Object.keys(files.value))
-const rows = computed(() => treeRows(paths.value, collapsed.value))
+const rows = computed(() => {
+  const list = treeRows(paths.value, collapsed.value)
+  if (list.some(row => row.path === 'lib' || row.path.startsWith('lib/'))) return list
+  const at = list.findIndex(row => row.path === 'main.ts')
+  list.splice(at < 0 ? 0 : at, 0, { path: 'lib', name: 'lib', depth: 0, folder: true })
+  return list
+})
 const selected = ref(activeFile.value)
 const action = ref<'file' | 'rename' | 'delete'>()
 const target = ref('')
@@ -122,8 +128,11 @@ function submit() {
 <style scoped src="../lib/devtools/panels.css"></style>
 <style scoped>
 .tree {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
   padding: 6px 8px;
-  max-height: clamp(95px, 20vh, 180px);
+  border-right: 1px solid var(--line);
 }
 .tree .rows {
   gap: 0;

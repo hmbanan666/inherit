@@ -39,6 +39,12 @@ test('sending the full cart home pays Bram and then the mayor asks', async () =>
     expect(session.world.growth[0]).toContain('forge is lit')
     expect(session.world.creditsPerMinute).toBeGreaterThan(0)
     expect(session.world.messages).toEqual([])
+    const pay = kettlewick.orderSchedule.reduce((total, order) => total + order.pay, 0)
+    while (session.world.ledger.income < pay && session.world.tick < 800) session.step(1)
+    expect(session.world.ledger.income).toBe(pay)
+    expect(session.world.orders.map(order => order.from)).toEqual(['Bram', 'Mayor Odile', 'Elsie'])
+    expect(session.world.credits).toBe(kettlewick.credits + pay)
+    expect(session.world.tick).toBeLessThan(500)
   } finally { session.dispose() }
 })
 

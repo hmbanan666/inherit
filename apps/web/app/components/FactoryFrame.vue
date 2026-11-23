@@ -135,13 +135,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <StudioShell class="factory">
+  <StudioShell class="factory" :dock="58">
     <template #nav>
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
         <template #clock>
           <div v-if="world" class="clock">
-            <span class="tick" data-testid="credits">Credits <b>{{ world.credits }}</b> · {{ world.creditsPerMinute.toFixed(1) }} cr/min</span>
+            <p class="balance" data-testid="credits"><b>{{ world.credits }}</b><span>credits</span></p>
+            <span class="tick">{{ Math.round(world.creditsPerMinute) }} / min</span>
             <span class="tick" data-testid="cpu">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
           </div>
         </template>
@@ -193,7 +194,19 @@ onBeforeUnmount(() => {
 <style scoped>
 .map-frame { flex: 1; min-height: 150px; position: relative }
 .factory :deep(.pack-settings) { z-index: 1 }
+.factory :deep(.editor-dock) {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.factory :deep(.editor-dock > .tree) { grid-column: 1; grid-row: 1 / -1 }
+.factory :deep(.editor-dock > .editor-pane) { grid-column: 2; grid-row: 1; height: 100%; min-height: 0 }
+.factory :deep(.editor-dock > .console),
+.factory :deep(.editor-dock > .reference) { grid-column: 2 }
 .objective { margin-bottom: 8px }
+.balance { display: flex; align-items: baseline; gap: 6px; color: var(--text) }
+.balance b { font-size: 22px; letter-spacing: -0.6px; line-height: 1 }
+.balance span { font: 12px var(--mono); color: var(--soft) }
 .bad { color: var(--alert) }
 .console, .reference { border-top: 1px solid var(--line); padding: 6px 12px; overflow: auto; max-height: 30% }
 .console { font: 12px var(--mono) }
@@ -202,5 +215,14 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: no-preference) { .live:not(.off) i { animation: guide 1.5s ease-in-out infinite } }
 @media(max-width:800px) {
   .live { grid-column: 3; grid-row: 1; justify-self: end }
+  .factory :deep(.editor-dock) { grid-template-columns: minmax(0, 1fr) }
+  .factory :deep(.editor-dock > .tree) {
+    grid-column: 1;
+    grid-row: 1;
+    max-height: 140px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .factory :deep(.editor-dock > .editor-pane) { grid-row: 2 }
 }
 </style>

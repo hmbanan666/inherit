@@ -4,7 +4,6 @@ import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
 let session: Awaited<ReturnType<typeof createSession>> | undefined
 let timer: ReturnType<typeof setInterval> | undefined
-let visible = false
 
 function publish(deployed?: Record<string, string>) {
   if (!session) return
@@ -15,17 +14,17 @@ function publish(deployed?: Record<string, string>) {
 
 function schedule() {
   clearInterval(timer)
-  if (session && visible) {
-    timer = setInterval(() => {
-      session!.step(1)
-      publish()
-    }, kettlewick.tickMs)
-  }
+  if (!session) return
+  // The works keep ticking when the tab is hidden. A later server owns this clock.
+  timer = setInterval(() => {
+    session!.step(1)
+    publish()
+  }, kettlewick.tickMs)
 }
 
 async function act(command: FactoryCommand) {
   if (command.kind === 'visibility') {
-    visible = command.visible
+    return
   } else {
     clearInterval(timer)
     try {

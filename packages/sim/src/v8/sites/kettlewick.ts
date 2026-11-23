@@ -30,6 +30,13 @@ export const kettlewick: Site = {
       change: 'The bridge stands. Kettlewick can cross the river again.',
       item: 'ingot', qty: 8, due: 2400, pay: 160,
     },
+    {
+      id: 'elsie', at: 0, after: 'odile', from: 'Elsie', who: 'elsie', role: 'Baker', building: 'bakery',
+      title: 'A grate for the oven',
+      text: 'The oven grate cracked. I need 6 ingots before the morning bread.',
+      change: 'The bakery is warm again.',
+      item: 'ingot', qty: 6, due: 2400, pay: 120,
+    },
   ],
   graceTicks: 160,
   latePayFraction: 0.5,

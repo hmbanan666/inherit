@@ -99,7 +99,7 @@ test('a direct haul route and earliest-due shipping fill the actual Kettlewick o
     const pay = kettlewick.orderSchedule.reduce((total, order) => total + order.pay, 0)
     while (session.world.ledger.income < pay && session.world.tick < kettlewick.orderSchedule[1].due) session.step(1)
     expect(session.world.messages).toEqual([])
-    expect(session.world.orders.map(o => o.status)).toEqual(['on time', 'on time'])
+    expect(session.world.orders.map(o => o.status)).toEqual(kettlewick.orderSchedule.map(() => 'on time'))
     expect(session.world.ledger.income).toBe(pay)
     expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
   } finally { session.dispose() }
