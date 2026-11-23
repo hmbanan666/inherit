@@ -1,10 +1,10 @@
-import { createWorld, mining, miningModule, operationName, runTicks, type Site, type TickContext } from '@inherit/sim/v8'
+import { createWorld, factoryBricks, miningModule, operationName, runTicks, type Site, type TickContext } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
 export async function createSession(site: Site, files = site.files) {
   const world = { ...createWorld(site), memory: {} as JsonObject }
-  const bricks = mining(site)
+  const bricks = factoryBricks(site)
   const operations = bricks.flatMap(b => typeof b.handler === 'function'
     ? [{ key: operationName(b), handler: b.handler, cost: b.cost }] : [])
   const names = bricks.map(b => b.name)
@@ -29,7 +29,7 @@ export async function createSession(site: Site, files = site.files) {
     ...Object.fromEntries(operations.map(op => [op.key, (...args: unknown[]) => op.handler(ctx, ...args)])),
   }
   function step(ticks: number) {
-    runTicks(world, ticks, () => {
+    runTicks(world, site, ticks, () => {
       try {
         try { program.onTick(host) }
         finally { world.memory = program.exportMemory() }
