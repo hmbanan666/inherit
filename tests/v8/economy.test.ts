@@ -69,7 +69,9 @@ test('bankruptcy counts consecutive closing balances, including ticks interrupte
 // reserves every ninth tick for production. Once one order closes, the spare
 // action can also start a batch between those production ticks.
 test('first-come shipping delivers both orders late; prioritizing the earlier deadline delivers both on time', async () => {
-  const site = { ...kettlewick, cpuLimit: 2, furnace: { ...kettlewick.furnace, input: 60 } }
+  const [hale, smithy] = kettlewick.orderSchedule
+  const site = { ...kettlewick, cpuLimit: 2,
+    orderSchedule: [{ ...hale, qty: 20, due: 180 }, { ...smithy, at: 1, due: 98 }], furnace: { ...kettlewick.furnace, input: 60 } }
   async function deliver(sort: string) {
     const session = await createSession(site, { 'main.ts': `import { furnace, orders, ship, tick } from "inherit"
       export function onTick() {
@@ -104,7 +106,7 @@ test('a direct haul route and earliest-due shipping fill the actual Kettlewick o
     session.step(180)
     expect(session.world.messages).toEqual([])
     expect(session.world.orders.map(o => o.status)).toEqual(['on time', 'on time'])
-    expect(session.world.ledger.income).toBe(280)
+    expect(session.world.ledger.income).toBe(160)
     expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
   } finally { session.dispose() }
 })

@@ -3,14 +3,30 @@ import { diagnostics } from '../packs/compiler'
 import { declarations, kettlewick, factoryBricks } from '../../packages/sim/src/v8'
 import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
-test('Uncle exhausts the budget hauling to the furnace and loses credits while both orders go overdue', async () => {
-  const world = await runSession(kettlewick, kettlewick.files, 181)
-  expect(world.cpu).toEqual({ used: 30, limit: 30 })
-  expect(world.messages.at(-1)?.text).toContain('CPU limit')
-  expect(world.furnace.input).toBeGreaterThan(0)
-  expect(world.credits).toBeLessThan(kettlewick.credits)
-  expect(world.orders.map(o => o.status)).toEqual(['overdue', 'overdue'])
-  expect(world.drones.at(-1)).toEqual(kettlewick.drones.at(-1))
+test('one drone runs comfortably under budget while Uncle burns fuel on an empty furnace', async () => {
+  const world = await runSession(kettlewick, kettlewick.files, 1)
+  expect(world.drones).toHaveLength(1)
+  expect(world.drones[0].pos).not.toEqual(kettlewick.depot.pos)
+  expect(world.cpu.used).toBeLessThan(world.cpu.limit / 2)
+  expect(world.furnace.input).toBe(0)
+  expect(world.credits).toBe(kettlewick.credits - kettlewick.rentPerTick - kettlewick.recipe.fuel)
+})
+
+test('guarding smelt stops the empty fuel charge and fills the first order on time', async () => {
+  const session = await createSession(kettlewick)
+  try {
+    session.step(1)
+    const balance = session.world.credits
+    await session.deploy({ 'main.ts': kettlewick.files['main.ts'].replace(
+      '  furnace.smelt()', '  if (furnace.input >= 2) furnace.smelt()',
+    ) })
+    session.step(1)
+    expect(session.world.credits).toBe(balance - kettlewick.rentPerTick)
+    session.step(kettlewick.orderSchedule[0].due - 2)
+    expect(session.world.orders[0].status).toBe('on time')
+    expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
+    expect(session.world.messages).toEqual([])
+  } finally { session.dispose() }
 })
 
 const cached = {
@@ -36,9 +52,10 @@ export function onTick() {
 }
 
 test('a cached route moves every drone and stays under 15 CPU on every tick', async () => {
-  const first = await runSession(kettlewick, cached, 1)
-  for (const [i, drone] of first.drones.entries()) expect(drone.pos).not.toEqual(kettlewick.drones[i].pos)
-  const world = await runSession(kettlewick, cached, 32)
+  const site = { ...kettlewick, drones: [1, 2, 3].map(i => ({ ...kettlewick.drones[0], name: 'drone-' + i })) }
+  const first = await runSession(site, cached, 1)
+  for (const [i, drone] of first.drones.entries()) expect(drone.pos).not.toEqual(site.drones[i].pos)
+  const world = await runSession(site, cached, 32)
   expect(world.messages).toEqual([])
   expect(world.depot.ore).toBeGreaterThanOrEqual(9)
   expect(world.memory.lastTick).toBe(32)

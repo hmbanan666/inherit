@@ -7,9 +7,7 @@ export const kettlewick: Site = {
   seed: 1,
   grid: { width: 16, height: 6 },
   depot: { pos: depot, ore: 0 },
-  drones: ['drone-1', 'drone-2', 'drone-3'].map(name => ({
-    name, pos: { ...depot }, cargo: 0, capacity: 3,
-  })),
+  drones: [{ name: 'drone-1', pos: { ...depot }, cargo: 0, capacity: 3 }],
   veins: [
     { name: 'A', pos: { x: 6, y: 2 }, left: 800 },
     { name: 'B', pos: { x: 14, y: 2 }, left: 1200 },
@@ -17,8 +15,8 @@ export const kettlewick: Site = {
   furnace: { pos: { x: 2, y: 1 }, input: 0, output: 0 },
   recipe: { ore: 2, ingots: 1, ticks: 4, fuel: 1 },
   orderSchedule: [
-    { id: 'hale', at: 0, from: 'Mayor Hale', item: 'ingot', qty: 20, due: 180, pay: 180 },
-    { id: 'smithy', at: 1, from: 'Smithy', item: 'ingot', qty: 10, due: 98, pay: 100 },
+    { id: 'hale', at: 0, from: 'Mayor Hale', item: 'ingot', qty: 4, due: 60, pay: 60 },
+    { id: 'smithy', at: 61, from: 'Smithy', item: 'ingot', qty: 10, due: 180, pay: 100 },
   ],
   graceTicks: 160,
   latePayFraction: 0.5,
@@ -35,21 +33,13 @@ export const kettlewick: Site = {
 import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 
 export function onTick() {
-  for (const drone of drones()) {
-    // find the nearest vein. Every tick, for every drone.
-    let best = veins()[0]
-    for (const v of veins()) {
-      if (findPath(drone.pos, v.pos).length < findPath(drone.pos, best.pos).length) best = v
-    }
-    if (drone.cargo < drone.capacity) {
-      if (drone.isNear(best)) drone.mine(best)
-      else drone.moveAlong(findPath(drone.pos, best.pos))
-    } else {
-      if (drone.isNear(furnace)) drone.unload(furnace)
-      else drone.moveAlong(findPath(drone.pos, furnace.pos))
-    }
-  }
-  furnace.smelt()                      // even when empty
+  const drone = drones()[0]
+  const vein = veins()[0]
+  const target = drone.cargo < drone.capacity ? vein : furnace
+  if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
+  else if (target === furnace) drone.unload(furnace)
+  else drone.mine(vein)
+  furnace.smelt()                      // every tick, even when empty
   for (const o of orders()) ship(o)    // first come, first served
 }`,
   },
