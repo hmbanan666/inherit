@@ -2,9 +2,11 @@
 
 Governs: [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [v8 concept](../concept/v8.md).
 
+The playable game is the quest loop in the concept. This file keeps the earlier milestones (a Run button, pause, speeds, rent, bankruptcy, and a starter that already works) as history. Where a milestone disagrees with the concept, the concept wins.
+
 ## Goal
 
-Nick opens the site, sees Uncle's code and the works, presses Run and within a minute sees why the code is bad (CPU red, drones idle, credits falling). He fixes it, fills orders, survives vein A running dry and buys one unlock. About 20 minutes, minimal visuals: a grid of squares with labels.
+Nick opens the site and reads one villager's quest: the goal, why the current code is not enough, and tests under the editor. Uncle's cart never comes home. He edits that, deploys, and presses Complete quest. Credits and XP arrive then. The next quest waits until he takes it. Credits fall only when he buys in the shop, and they never go below zero. The clock keeps ticking. There is no pause.
 
 ## Scope
 
@@ -35,6 +37,8 @@ Out: art, market, drill and slag, build and stations, AI agent, rivals, side con
 
 ### M2. The frame plays it
 
+The shipped frame does not pause, does not offer speeds, and keeps ticking while the tab is hidden. Deploy replaces Run.
+
 - `/` opens v8; the pack UI stays reachable at `/?packs` until removal.
 - Worker runs core and sandbox at 2 ticks per second, 2x and 4x, Pause, auto-pause when the tab is hidden.
 - Layout of the standing frame: grid map left, Monaco right with Uncle's `main.ts`, wide Run top right, nav meters (tick, credits, CPU used/limit, red at the limit), Console under the editor with the CPU-limit line, API cards from the registry with CPU cost.
@@ -44,6 +48,8 @@ Out: art, market, drill and slag, build and stations, AI agent, rivals, side con
 
 ### M3. Economy: furnace, orders, rent
 
+Rent and bankruptcy are not in the game. A quest pays when the player completes it. The shop is the only way credits fall.
+
 - Module `smelting`: furnace (2 ore to 1 ingot in 4 ticks), `furnace.smelt()` burns 1 cr even when empty.
 - Module `orders`: scheduled orders (`item`, `qty`, `due`, `pay`, `from`), `ship(order, qty?)`, late orders pay half, expired after a grace period.
 - Ledger: rent per tick from the site, income, bankruptcy (credits below 0 for 50 ticks) ends the session.
@@ -52,6 +58,8 @@ Out: art, market, drill and slag, build and stations, AI agent, rivals, side con
 - Tests: Uncle's first-come shipping makes both first orders late; sorting by `due` makes them on time; Uncle's code alone loses credits.
 
 ### M3.5. Onboarding and consistency (after Nick's playtest)
+
+The obvious problem is the cart that never comes home, not an empty furnace that spends credits. Quests, the test panel, Complete quest, and the shop are specified in the concept.
 
 - Start small: one drone, CPU well under the limit at start. More drones are an unlock.
 - Uncle's starter is the short version in the concept (about 10 lines) with one obvious problem first (smelting an empty furnace burns credits).

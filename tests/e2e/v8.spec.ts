@@ -1,4 +1,3 @@
-import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import type { FactorySave } from '../../apps/web/app/lib/factoryProtocol'
 
@@ -11,21 +10,18 @@ async function edit(page: Page, source: string) {
   await page.keyboard.press('Control+a')
   await page.keyboard.insertText(source)
 }
-async function calm(page: Page) {
-  await page.keyboard.press('Escape')
-  await page.getByLabel('Current request').hover()
-}
 async function settings(page: Page, name: string) {
   await page.getByRole('button', { name: 'Settings' }).click()
   await page.getByRole('button', { name, exact: true }).click({ timeout: 5000 })
 }
 
-test('Bram asks, the cart sticks, and deploying the one-line fix pays the village', async ({ page }) => {
-  test.setTimeout(240_000)
+test('Bram offers a quest, the tests sit under the editor, and credits stay put', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
-  await expect(page.getByTestId('ask')).toContainText('I need 4 ingots for horseshoes')
+  await expect(page.getByLabel('Current request')).toContainText('cart fills')
   await expect(page.getByLabel('Current request')).not.toContainText('Due in')
+  await expect(page.getByTestId('take-quest')).toBeVisible()
+  await expect(page.getByTestId('complete-quest')).toHaveCount(0)
   await expect(page.getByText('Running', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Inherit showcase' })).toBeVisible()
   await expect(page.getByLabel('Factory map').locator('canvas')).toBeVisible()
@@ -39,22 +35,16 @@ test('Bram asks, the cart sticks, and deploying the one-line fix pays the villag
   await expect(files.getByRole('button', { name: 'lib', exact: true })).toBeVisible()
   await expect(page.locator('.view-lines')).toContainText('const home = false')
   await expect(page.getByRole('button', { name: /^(Deploy|Pause|Resume|[124]x|Start over)$/ })).toHaveCount(0)
-  await expect(page.getByLabel('Factory metrics')).toBeHidden()
-  await expect(page.getByLabel('Console', { exact: true })).toBeHidden()
-  await expect(page.getByLabel('API reference')).toBeHidden()
-  const request = page.getByLabel('Current request')
-  await expect(request).toContainText('never comes back', { timeout: 15_000 })
+  await page.getByTestId('take-quest').click()
+  await expect(page.getByTestId('checks')).toContainText('Ore reaches the furnace')
   await expect(page.getByTestId('credits')).toContainText('300')
   await expect(page.getByTestId('credits')).toContainText('credits')
-  const stuck = request.locator('.next')
-  const stuckText = await stuck.innerText()
-  await page.waitForTimeout(1200)
-  await expect(stuck).toHaveText(stuckText)
-  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick-before.png') })
-  const dock = page.locator('.editor-dock')
-  const width = (await dock.boundingBox())!.width
-  await page.getByRole('separator', { name: 'Resize editor' }).press('ArrowLeft')
-  expect((await dock.boundingBox())!.width).toBeGreaterThan(width)
+  await expect(page.getByTestId('complete-quest')).toHaveCount(0)
+  const request = page.getByLabel('Current request')
+  const why = request.locator('.next')
+  const whyText = await why.innerText()
+  await page.waitForTimeout(600)
+  await expect(why).toHaveText(whyText)
   await settings(page, 'Charts')
   await expect(page.getByLabel('Factory metrics')).toBeVisible()
   await settings(page, 'API')
@@ -64,30 +54,6 @@ test('Bram asks, the cart sticks, and deploying the one-line fix pays the villag
   await expect(page.getByLabel('Factory metrics')).toBeHidden()
   await settings(page, 'Console')
   await expect(page.getByLabel('Console', { exact: true })).toBeHidden()
-  await page.locator('.view-line', { hasText: 'const home = false' }).click()
-  await page.keyboard.press('Home')
-  await page.keyboard.press('Shift+End')
-  await page.keyboard.insertText('  const home = drone.cargo >= drone.capacity')
-  await calm(page)
-  await expect(page.locator('.view-lines')).toContainText('const home = drone.cargo >= drone.capacity')
-  await expect(page.locator('.view-lines')).not.toContainText('const home = false')
-  await page.keyboard.press('Control+Enter')
-  await expect(page.getByRole('button', { name: 'Deploy' })).toBeHidden()
-  await expect(page.getByTestId('credits')).toContainText('380', { timeout: 45_000 })
-  await expect(page.getByRole('heading', { name: 'Metal for the bridge' })).toBeVisible()
-  await expect(page.getByTestId('ask')).toContainText('footbridge')
-  await calm(page)
-  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick-odile.png') })
-  await expect(page.getByTestId('credits')).toContainText('540', { timeout: 120_000 })
-  await expect(page.getByRole('heading', { name: 'A grate for the oven' })).toBeVisible()
-  await expect(page.getByTestId('ask')).toContainText('oven grate')
-  await calm(page)
-  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick-elsie.png') })
-  await expect(page.getByTestId('credits')).toContainText('660', { timeout: 120_000 })
-  await expect(page.getByRole('heading', { name: 'Horseshoes for the mail horse' })).toBeVisible()
-  await expect(page.getByText('The bakery is warm again.')).toBeVisible()
-  await calm(page)
-  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick-round.png') })
 })
 
 test('helpers deploy onto the live world and reload preserves drafts and the deployed controller', async ({ page }) => {

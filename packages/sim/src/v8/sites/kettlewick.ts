@@ -1,4 +1,5 @@
 import type { Site } from '../core/world'
+import { questList } from '../quests'
 
 const depot = { x: 1, y: 1 }
 
@@ -7,14 +8,16 @@ export const kettlewick: Site = {
   seed: 1,
   grid: { width: 16, height: 6 },
   depot: { pos: depot, ore: 0 },
-  drones: [{ name: 'drone-1', pos: { ...depot }, cargo: 0, capacity: 3 }],
+  drones: [{ name: 'drone-1', pos: { ...depot }, cargo: 0, capacity: 3, carrying: null, source: '' }],
   veins: [
-    { name: 'A', pos: { x: 6, y: 2 }, left: 800 },
-    { name: 'B', pos: { x: 14, y: 2 }, left: 1200 },
+    { name: 'A', pos: { x: 6, y: 2 }, left: 800, kind: 'ore' },
+    { name: 'B', pos: { x: 14, y: 2 }, left: 800, kind: 'coal' },
+    { name: 'C', pos: { x: 10, y: 4 }, left: 500, kind: 'ore', hidden: true },
   ],
   furnace: { pos: { x: 2, y: 1 }, input: 0, output: 0 },
   recipe: { ore: 2, ingots: 1, ticks: 4, fuel: 1 },
-  repeatOrders: true,
+  repeatOrders: false,
+  questList,
   orderSchedule: [
     {
       id: 'bram', at: 0, from: 'Bram', who: 'bram', role: 'Blacksmith', building: 'forge',
@@ -22,20 +25,6 @@ export const kettlewick: Site = {
       text: 'The mail horse threw a shoe. I need 4 ingots for horseshoes, and the post can ride tonight.',
       change: 'The forge is lit. The mail horse has shoes.',
       item: 'ingot', qty: 4, due: 2400, pay: 80,
-    },
-    {
-      id: 'odile', at: 0, after: 'bram', from: 'Mayor Odile', who: 'odile', role: 'Mayor', building: 'bridge',
-      title: 'Metal for the bridge',
-      text: 'The footbridge is out. I need 8 ingots to span the river.',
-      change: 'The bridge stands. Kettlewick can cross the river again.',
-      item: 'ingot', qty: 8, due: 2400, pay: 160,
-    },
-    {
-      id: 'elsie', at: 0, after: 'odile', from: 'Elsie', who: 'elsie', role: 'Baker', building: 'bakery',
-      title: 'A grate for the oven',
-      text: 'The oven grate cracked. I need 6 ingots before the morning bread.',
-      change: 'The bakery is warm again.',
-      item: 'ingot', qty: 6, due: 2400, pay: 120,
     },
   ],
   graceTicks: 160,
@@ -52,7 +41,7 @@ import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 export function onTick() {
   const drone = drones()[0]
   const vein = veins()[0]
-  const home = false // change to: drone.cargo >= drone.capacity
+  const home = false
   const target = home ? furnace : vein
   if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
   else if (home) drone.unload(furnace)

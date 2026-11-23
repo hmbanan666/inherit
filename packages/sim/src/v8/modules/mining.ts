@@ -22,6 +22,7 @@ function findPath({ world }: TickContext, from: unknown, to: unknown) {
     else y += Math.sign(end.y - y)
     path.push({ x, y })
   }
+  world.pathCallsTick += 1
   return path
 }
 
@@ -37,7 +38,6 @@ function bindings(site: Site): Brick[] {
   return [
     binding('tick', 'const tick: number', 'Current tick.', 'tick', 'export let tick = 0; state.clock(value => { tick = value })'),
     binding('memory', 'const memory: Record<string, any>', 'Data kept between ticks.', 'memory.route', 'export const memory = state.memory'),
-    binding('cpu.limit', 'readonly limit: number', 'CPU available per tick.', 'cpu.limit', `const cpuLimit = ${site.cpuLimit}`),
     binding('depot', 'const depot: Target', 'Unload ore here.', 'drone.unload(depot)', `export const depot = Object.freeze({ pos: Object.freeze(${JSON.stringify(site.depot.pos)}) })`),
   ]
 }
@@ -47,8 +47,14 @@ export function mining(site: Site): Brick[] {
   return [
     ...bindings(site),
     brick('cpu.used', 'used(): number', 'CPU spent this tick.', 'cpu.used()', read, ctx => ctx.cpuUsed()),
+    brick('cpu.limit', 'readonly limit: number', 'CPU available per tick.', 'cpu.limit', read, ({ world }) => world.cpu.limit),
     brick('drones', 'function drones(): Drone[]', 'Read your drones.', 'drones()[0]', read, ctx => ctx.world.drones),
-    brick('veins', 'function veins(): Vein[]', 'Read the known veins.', 'veins()[0]', read, ctx => ctx.world.veins),
+    brick('veins', 'function veins(): Vein[]', 'Read the known veins.', 'veins()[0]', read, ctx => ctx.world.veins.filter(vein => !vein.hidden)),
+    brick('prospect', 'function prospect(): void', 'Reveal the next hidden vein. Sold in the shop.', 'prospect()', action, ({ world }) => {
+      if (!world.bought.includes('prospect')) throw new Error('Prospect is in the shop.')
+      const vein = world.veins.find(item => item.hidden)
+      if (vein) vein.hidden = false
+    }),
     brick('findPath', 'function findPath(from: Cell, to: Cell): Cell[]', 'Cells to walk from here to the target.',
       'findPath(drone.pos, depot.pos)', site.costs.findPath, findPath),
     brick('drone.isNear', 'isNear(target: Target): boolean', 'Within one cell of a target.', 'drone.isNear(depot)', read,
@@ -70,19 +76,36 @@ export function mining(site: Site): Brick[] {
         const vein = ctx.world.veins.find(v => v.name === veinName)
         if (!vein || distance(d.pos, vein.pos) > 1) throw new Error('Move next to the vein first.')
         if (!vein.left) throw new Error('Vein ' + vein.name + ' is empty.')
+        if (d.cargo > 0 && d.carrying && d.carrying !== vein.kind) throw new Error('Unload the cart before mining a different rock.')
         const amount = Math.min(site.orePerMine, vein.left, d.capacity - d.cargo)
         vein.left -= amount
         d.cargo += amount
+        if (amount > 0) {
+          d.carrying = vein.kind
+          d.source = vein.name
+        }
       }),
     brick('drone.unload', 'unload(station: Target): void', 'Leave cargo at a nearby depot or furnace.', 'drone.unload(depot)', action,
       (ctx, name, target) => {
         const d = drone(ctx.world, name), { depot, furnace } = ctx.world
         const pos = cell(ctx.world, target)
         if (distance(d.pos, pos) > 1) throw new Error('Move next to the station to unload.')
-        if (distance(pos, furnace.pos) === 0) furnace.input += d.cargo
-        else if (distance(pos, depot.pos) === 0) depot.ore += d.cargo
-        else throw new Error('Choose the furnace or depot to unload.')
+        if (distance(pos, furnace.pos) === 0) {
+          if (d.carrying === 'coal') {
+            furnace.coal += d.cargo
+            if (d.cargo) furnace.coalAt = ctx.world.tick
+          } else {
+            furnace.input += d.cargo
+            if (d.cargo) furnace.oreAt = ctx.world.tick
+            const dry = ctx.world.veins.find(vein => vein.name === 'A')
+            if (d.cargo && d.source && d.source !== 'A' && dry && dry.left === 0) ctx.world.oreAfterDry += d.cargo
+          }
+        } else if (distance(pos, depot.pos) === 0) {
+          if (d.carrying === 'coal') depot.ore += 0
+          else depot.ore += d.cargo
+        } else throw new Error('Choose the furnace or depot to unload.')
         d.cargo = 0
+        d.carrying = null
       }),
   ]
 }
@@ -92,7 +115,7 @@ export function mining(site: Site): Brick[] {
 export function miningModule(bricks: Brick[]) {
   const source = bricks.flatMap(b => typeof b.handler === 'object' ? [b.handler.guest] : [])
   return [...source, `
-    export const cpu = Object.freeze({ used: api.cpu_used, limit: cpuLimit })
+    export const cpu = Object.freeze({ used: api.cpu_used, get limit() { return api.cpu_limit() } })
     export const veins = api.veins, findPath = api.findPath
     export function drones() {
       return api.drones().map(d => {

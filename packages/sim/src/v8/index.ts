@@ -2,6 +2,7 @@ export * from './core/world'
 export * from './core/bricks'
 export { mining, miningModule } from './modules/mining'
 export { kettlewick } from './sites/kettlewick'
+export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, levelFor } from './quests'
 
 import type { Brick } from './core/bricks'
 import { mining, miningModule } from './modules/mining'
@@ -14,5 +15,5 @@ export function factoryBricks(site: Site) {
 }
 
 export function factoryModule(bricks: Brick[]) {
-  return miningModule(bricks) + '\nexport const { orders, ship, credits } = api'
+  return miningModule(bricks) + '\nexport const { orders, ship, credits, prospect } = api'
 }

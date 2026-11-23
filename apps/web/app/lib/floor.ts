@@ -77,7 +77,16 @@ function equipment(parent: Container, pos: Cell, paint: (d: ReturnType<typeof dr
 
 export class FloorScene {
   root = new Container()
-  private readonly haulers
+  private readonly haulers: {
+    art: Container
+    cargo: Graphics
+    offset: number
+    fromX: number
+    fromY: number
+    x: number
+    y: number
+  }[] = []
+  private readonly seen = new Set<string>()
   private readonly fire: Graphics
   private readonly ingot: Graphics
   private arrivals = 0
@@ -85,16 +94,7 @@ export class FloorScene {
 
   constructor(world: FloorWorld) {
     land(this.root, world.grid)
-    for (const vein of world.veins) {
-      const { x, y } = center(vein.pos)
-      this.root.addChild(new Graphics()).ellipse(x, y + 5, 31, 14).fill({ color: 0x202126, alpha: 0.42 })
-      for (let i = 0; i < 7; i++) {
-        const ore = this.root.addChild(materialArt('iron-ore'))
-        ore.position.set(x - 19 + ((i * 11) % 39), y - 7 + ((i * 8) % 16))
-        ore.scale.set(1 + (i % 3) * 0.24)
-      }
-      caption(this.root, 'Vein ' + vein.name, x, y + 22)
-    }
+    for (const vein of world.veins) this.placeVein(vein)
     caption(equipment(this.root, world.depot.pos, depot), 'Depot', 0, -63)
     const smelter = equipment(this.root, world.furnace.pos, furnace)
     caption(smelter, 'Furnace', 0, -63)
@@ -103,31 +103,49 @@ export class FloorScene {
     this.fire.ellipse(3, -22, 9, 2.6).fill(0xffdb80)
     this.ingot = smelter.addChild(materialArt('iron-ingot'))
     this.ingot.position.set(31, 18)
-    this.haulers = world.drones.map((drone, i) => {
-      const d = drawing()
-      truck(d)
-      const art = this.root.addChild(new Container())
-      art.addChild(d.g).scale.set(0.54)
-      const cargo = art.addChild(materialArt('iron-ore'))
-      cargo.position.set(-7, -12)
-      caption(art, drone.name.slice(-1), 0, 9)
-      // Separate vehicles sharing a tile while keeping them within its bounds.
-      const offset = (i - (world.drones.length - 1) / 2) * 25
-      const { x, y } = center(drone.pos)
-      art.position.set(x + offset, y + 20)
-      return { art, cargo, offset, fromX: art.x, fromY: art.y, x: art.x, y: art.y }
-    })
+    for (const drone of world.drones) this.placeHauler(drone)
+  }
+
+  private placeVein(vein: FloorWorld['veins'][number]) {
+    if (vein.hidden || this.seen.has(vein.name)) return
+    this.seen.add(vein.name)
+    const { x, y } = center(vein.pos)
+    this.root.addChild(new Graphics()).ellipse(x, y + 5, 31, 14).fill({ color: 0x202126, alpha: 0.42 })
+    const rock = vein.kind === 'coal' ? 'coal' : 'iron-ore'
+    for (let i = 0; i < 7; i++) {
+      const ore = this.root.addChild(materialArt(rock))
+      ore.position.set(x - 19 + ((i * 11) % 39), y - 7 + ((i * 8) % 16))
+      ore.scale.set(1 + (i % 3) * 0.24)
+    }
+    caption(this.root, 'Vein ' + vein.name, x, y + 22)
+  }
+
+  private placeHauler(drone: FloorWorld['drones'][number]) {
+    const d = drawing()
+    truck(d)
+    const art = this.root.addChild(new Container())
+    art.addChild(d.g).scale.set(0.54)
+    const cargo = art.addChild(materialArt(drone.carrying === 'coal' ? 'coal' : 'iron-ore'))
+    cargo.position.set(-7, -12)
+    caption(art, drone.name.slice(-1), 0, 9)
+    const { x, y } = center(drone.pos)
+    art.position.set(x, y + 20)
+    this.haulers.push({ art, cargo, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
   }
 
   update(world: FloorWorld) {
+    for (const vein of world.veins) this.placeVein(vein)
+    while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
+    const count = world.drones.length
+    for (const [i, item] of this.haulers.entries()) item.offset = (i - (count - 1) / 2) * 25
     if (world.tick === this.lastTick) return
     const restart = world.tick < this.lastTick
     this.lastTick = world.tick
     this.arrivals = performance.now()
     this.fire.visible = world.furnace.readyAt !== null
-    this.ingot.visible = world.furnace.output > 0
+    this.ingot.visible = world.furnace.output > 0 || world.furnace.steel > 0
     for (const [i, drone] of world.drones.entries()) {
-      const item = this.haulers[i]
+      const item = this.haulers[i]!
       const pos = center(drone.pos)
       item.x = pos.x + item.offset
       item.y = pos.y + 20

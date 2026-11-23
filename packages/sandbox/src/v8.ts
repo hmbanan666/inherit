@@ -1,4 +1,4 @@
-import { createWorld, factoryBricks, factoryModule, operationName, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
+import { acceptQuest, buyUpgrade, completeQuest, createWorld, factoryBricks, factoryModule, operationName, runTicks, type Site, type World, type TickContext } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
@@ -26,6 +26,7 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
   const ctx: TickContext = { world, cpuUsed: () => program.stats.used }
   const host = {
     get tick() { return world.tick },
+    get cpuLimit() { return world.cpu.limit },
     ...Object.fromEntries(operations.map(op => [op.key, (...args: unknown[]) => op.handler(ctx, ...args)])),
   }
   function step(ticks: number) {
@@ -42,7 +43,12 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
       return { used: program.stats.used }
     })
   }
-  return { world, deploy, step, dispose: () => program.dispose() }
+  return {
+    world, deploy, step, dispose: () => program.dispose(),
+    accept: () => acceptQuest(world, site),
+    complete: () => completeQuest(world, site),
+    buy: (id: string) => buyUpgrade(world, id),
+  }
 }
 
 export async function runSession(site: Site, files: Record<string, string>, ticks: number) {
