@@ -110,7 +110,6 @@ watch([paused, speed], scheduleTick)
 function run() {
   if (frame.value?.save.clockActive) { stopLoop(); return }
   runMessage.value = ''
-  if (drawer.value && frame.value?.mode === 'deploy' && !setupTried.value) return
   if (busy.value || blocked.value || complete.value) return
   if (solved.value) return
   if (frame.value?.prediction && !frame.value.save.predictions[frame.value.save.lessonId!]) {
@@ -145,7 +144,7 @@ function runOnce() {
 }
 function advance() { if (solved.value && frame.value?.save.lessonId) send({kind:'continue', id: frame.value.save.lessonId}) }
 function shortcut(e:KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run() }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) run() }
 }
 function resize(event: PointerEvent) {
   const el = event.currentTarget as HTMLElement
@@ -280,7 +279,7 @@ onBeforeUnmount(() => {
         </aside>
       </div>
       <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
-      <button v-else class="deploy primary-run" data-testid="primary-button" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved || (!!drawer && frame?.mode === 'deploy' && !setupTried)" @click="run">
+      <button v-else class="deploy primary-run" data-testid="primary-button" :data-ready="!!frame && !busy && currentStep === frame.steps.length - 1" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved" @click="run">
         <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
       </button>
     </header>

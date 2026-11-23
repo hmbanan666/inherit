@@ -1590,3 +1590,8 @@ button.revisions:hover {
   .editor-dock > .editor-pane { flex: 0 1 var(--source-height, 220px); min-height: 100px }
   .editor-dock > .checks { max-height: 24%; overflow: auto; border-top: 1px solid var(--line) }
 }
+.hud .primary-run[data-ready=false] { background: transparent; color: var(--soft); border-color: var(--line-strong) }
+@media (prefers-reduced-motion: no-preference) {
+  .primary-run[data-ready=true] { animation: invite-run .65s ease-out 3 }
+  @keyframes invite-run { from { box-shadow: 0 0 0 2px var(--gold) } to { box-shadow: 0 0 0 7px transparent } }
+}
