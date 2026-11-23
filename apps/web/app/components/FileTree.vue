@@ -173,6 +173,9 @@ function submit() {
   margin: 0;
   padding: 4px 6px 8px;
   overflow: auto;
+  align-content: start;
+  align-items: start;
+  grid-auto-rows: max-content;
 }
 .tree .rows button {
   display: flex;

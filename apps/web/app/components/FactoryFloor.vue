@@ -3,6 +3,7 @@ import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containScale } from '../lib/factoryLayout'
+import { inspectAt } from '@inherit/sim/v8'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean }>()
 const emit = defineEmits<{ error: [message: string] }>()
@@ -18,6 +19,9 @@ let app: Application | undefined,
   disposed = false
 
 const pointers = new Map<number, { x: number; y: number }>()
+const card = ref<{ id: string; fields: string[]; x: number; y: number }>()
+let armed = false
+let origin = { x: 0, y: 0 }
 const worldSize = computed(() => ({
   w: tile * props.world.grid.width,
   h: tile * props.world.grid.height,
@@ -56,11 +60,24 @@ function sync() {
   scene.update(props.world)
 }
 watch([() => props.world, camera, scale], sync)
+function pick(clientX: number, clientY: number) {
+  const rect = host.value?.getBoundingClientRect()
+  if (!rect || scale.value === 0) return
+  const x = Math.floor((clientX - rect.left - camera.value.x) / scale.value / tile)
+  const y = Math.floor((clientY - rect.top - camera.value.y) / scale.value / tile)
+  return inspectAt(props.world, x, y)
+}
 function down(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('button,aside') || e.button !== 0) return
+  armed = true
+  origin = { x: e.clientX, y: e.clientY }
   host.value!.focus({ preventScroll: true })
   host.value!.setPointerCapture(e.pointerId)
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+}
+function hover(e: PointerEvent) {
+  if (pointers.size) return
+  scene?.highlight(pick(e.clientX, e.clientY)?.id ?? '')
 }
 function move(e: PointerEvent) {
   const old = pointers.get(e.pointerId)
@@ -85,9 +102,25 @@ function move(e: PointerEvent) {
 }
 function up(e: PointerEvent) {
   pointers.delete(e.pointerId)
+  if (!armed) return
+  armed = false
+  if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) return
+  const hit = pick(e.clientX, e.clientY)
+  const rect = host.value?.getBoundingClientRect()
+  if (!hit || !rect) {
+    card.value = undefined
+    return
+  }
+  card.value = {
+    id: hit.id,
+    fields: hit.fields,
+    x: Math.min(Math.max(8, rect.width - 168), Math.max(8, e.clientX - rect.left + 10)),
+    y: Math.min(Math.max(8, rect.height - 96), Math.max(8, e.clientY - rect.top + 10)),
+  }
 }
 function cancel() {
   pointers.clear()
+  armed = false
 }
 onMounted(async () => {
   const renderer = new Application()
@@ -151,8 +184,14 @@ onBeforeUnmount(() => {
     aria-label="Factory map"
     @wheel.prevent="wheel"
     @pointerdown="down"
+    @pointermove="hover"
   >
     <div ref="mount" class="pixi-mount"></div>
+    <aside v-if="card" class="inspect" :style="{ left: card.x + 'px', top: card.y + 'px' }">
+      <b>{{ card.id }}</b>
+      <p v-for="field in card.fields" :key="field">{{ field }}</p>
+      <button type="button" aria-label="Close" @click="card = undefined">×</button>
+    </aside>
     <div class="map-controls">
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
       ><button aria-label="Center map" @click="recenter()"><Maximize /></button
@@ -160,3 +199,31 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+<style scoped>
+.inspect {
+  position: absolute;
+  z-index: 4;
+  width: 156px;
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: 11px var(--mono);
+  color: var(--text);
+}
+.inspect b { font-size: 12px }
+.inspect p { margin: 0; color: var(--soft) }
+.inspect button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--sub);
+}
+</style>
