@@ -37,6 +37,7 @@ export interface PackFrame {
   focus?: string
   effect?: string
   goal: string
+  readyPattern?: RegExp
   steps: readonly string[]
   starter?: Starter
   edit: Starter['edit']

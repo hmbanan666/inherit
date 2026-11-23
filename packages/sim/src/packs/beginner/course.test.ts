@@ -22,8 +22,13 @@ test.each(lessons)('$id explains its edit and has an independent example', lesso
   expect(example.trim()).not.toBe(reference.trim())
   const { files, edit } = lesson.starter()
   const lines = files['main.ts'].split('\n')
-  expect(lines[edit.line - 2]).toMatch(/^\s*\/\/ TODO: /)
-  expect(lines[edit.line - 1].trim()).toBe('')
+  if (lesson.steps) {
+    expect(lesson.readyPattern!.test(files['main.ts'])).toBe(false)
+    expect(lesson.readyPattern!.test(reference)).toBe(true)
+  } else {
+    expect(lines[edit.line - 2]).toMatch(/^\s*\/\/ TODO: /)
+    expect(lines[edit.line - 1].trim()).toBe('')
+  }
   const answerLines = reference.split('\n').map(line => line.trim()).filter(line => line.length > 4)
   for (const todo of lines.filter(line => line.includes('// TODO:'))) {
     for (const answer of answerLines) expect(todo).not.toContain(answer)

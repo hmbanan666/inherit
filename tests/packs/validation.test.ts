@@ -6,7 +6,7 @@ import { manifests } from '../../packages/sim/src/packs/registry'
 import { getPack, packs, playerSources } from '../../packages/sim/src/packs/rules'
 import { readPlayerAPI } from '../../packages/sim/src/framework/declarations'
 import { freshSave, continueLesson, decodeSave } from '../../packages/sim/src/framework/save'
-import { declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
+import { PlayerRunError, declarations, createPackRunner } from '../../packages/sandbox/src/pack-run'
 import { lessonSteps, type Files } from '../../packages/sim/src/framework/pack'
 import { diagnostics } from './compiler'
 
@@ -136,7 +136,7 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       }
     }
     if (m.level === 'Game' || m.level === 'Advanced') {
-      expect(comments.some(line => /\bTODO\b/.test(line)), label).toBe(true)
+      if (!lesson.steps) expect(comments.some(line => /\bTODO\b/.test(line)), label).toBe(true)
       for (const hint of lesson.hints ?? []) {
         for (const line of hint.split('\n')) {
           const words = normalize(line)
@@ -169,7 +169,9 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       expect(files['main.ts'],label).not.toMatch(/\b(import|export|onTick)\b/)
     }
     for (const [files,solves] of [[starter.files,false],[lesson.referenceSolution,true]] as const) {
-      expect(diagnostics(files, [api, ...inputTypes].join('\n')),label+' '+(solves?'solution':'starter')).toEqual([])
+      const emptySlot = !solves && m.id === 'beginner' && ['hello', 'sign-spaces'].includes(lesson.id)
+      const expected = emptySlot && lesson.id === 'sign-spaces' ? ['/pack-validation/main.ts:2 Expected 1 arguments, but got 0.'] : []
+      expect(diagnostics(files, [api, ...inputTypes].join('\n')), label).toEqual(expected)
       const trial = solves ? save : structuredClone(save)
       let solved: boolean
       if (checkpoint) solved = await checkpoint.play(files)
@@ -177,7 +179,9 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
         const runner = createPackRunner(pack)
         try {
           const mode = !solves && m.track === 'challenges' ? 'run' : lesson.mode
-          await runner.play(trial,files,mode)
+          const attempt = runner.play(trial,files,mode)
+          if (emptySlot) await expect(attempt).rejects.toBeInstanceOf(PlayerRunError)
+          else await attempt
           if (mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
           solved = trial.phase==='solved'
         } finally {runner.dispose()}

@@ -158,7 +158,7 @@ async function act(command: PackCommand) {
     mode: lesson?.mode ?? 'run', clockMs: pack.clock?.intervalMs, goal: lesson?.goal ?? '',
     hiddenInputs: lesson?.variants?.length ?? 0,
     focus: lesson?.focus ?? lesson?.visibleEffect.testId, effect: lesson?.visibleEffect.testId,
-    starter, steps: lesson && starter ? lessonSteps(lesson, starter) : [],
+    readyPattern: lesson?.readyPattern, starter, steps: lesson && starter ? lessonSteps(lesson, starter) : [],
     edit: save.edit ?? {file: 'main.ts', line: 1}, hints: lesson?.hints ?? [],
     labels: lesson?.checks.map(({ id, label, input }) => ({id, text: label, input: failedInputs[id]?.join(', ') ?? input})) ?? [],
     checks: statuses ?? lesson?.checks.map(c => save.passed.includes(c.id) ? 'green' : 'red') ?? [],

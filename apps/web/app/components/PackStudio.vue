@@ -49,7 +49,7 @@ const currentStep = computed(() => {
   const { file } = data.starter.edit
   const body = (code: string) => code.split('\n').filter(line => !line.trimStart().startsWith('//')).join('\n').trim()
   const code = body(files.value[file] ?? '')
-  const edited = code && code !== body(data.starter.files[file])
+  const edited = data.readyPattern ? data.readyPattern.test(code) : code && code !== body(data.starter.files[file])
   return data.steps.length - (edited ? 1 : 2)
 })
 const query = new URLSearchParams(location.search)

@@ -61,6 +61,7 @@ export type InputValue = string | number | boolean | null | InputValue[] | { [ke
 
 export interface Lesson<W> {
   id: string
+  readyPattern?: RegExp
   steps?: readonly string[]
   focus?: string
   goal: string
