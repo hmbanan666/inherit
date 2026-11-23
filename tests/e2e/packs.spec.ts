@@ -10,7 +10,19 @@ const root = resolve('packages/sim/src/packs')
 for (const entry of readdirSync(root,{withFileTypes:true}).filter(e=>e.isDirectory() && !e.name.startsWith('.'))) {
   const folder = resolve(root,entry.name)
   if (existsSync(resolve(folder,'playthrough.ts'))) {
-    require(resolve(folder,'playthrough.ts'))
+    test.describe(() => {
+      // Pack-owned playthroughs enter the showcase at its original URL, sometimes with a playback speed.
+      test.beforeEach(async ({ page }) => {
+        await page.addInitScript(() => {
+          const url = new URL(location.href)
+          if (url.pathname === '/' && [...url.searchParams.keys()].every(key => key === 'speed')) {
+            url.searchParams.set('packs', '')
+            history.replaceState(history.state, '', url)
+          }
+        })
+      })
+      require(resolve(folder,'playthrough.ts'))
+    })
     continue
   }
   const {lessons} = require(resolve(folder,'lessons.ts')) as {lessons:Lesson<unknown>[]}
