@@ -40,6 +40,18 @@ for (const [width, height] of [[1440, 900], [1280, 720], [390, 844]]) {
   })
 }
 
+test('Enter and Tab accept the selected editor suggestion', async ({ page }) => {
+  await page.goto('/?pack=beginner&lesson=sign-spaces')
+  await expect(page.getByRole('textbox', {name: 'Player TypeScript'})).toBeFocused()
+  for (const key of ['Enter', 'Tab']) {
+    await page.keyboard.press('Control+a')
+    await page.keyboard.type('paintS')
+    await expect(page.locator('.suggest-widget .monaco-list-row.focused .label-name')).toHaveText('paintSign')
+    await page.keyboard.press(key)
+    await expect(page.locator('.view-line')).toHaveText(['paintSign'])
+  }
+})
+
 test('Enter advances once and review restores the forward draft after reload', async ({ page }) => {
   await page.emulateMedia({reducedMotion: 'reduce'})
   await page.goto('/?pack=beginner')
