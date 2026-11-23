@@ -22,11 +22,15 @@ export function smelting(site: Site): Brick[] {
       ({ world }) => world.furnace.input),
     brick('furnace.output', 'readonly output: number', 'Ingots ready to ship.', 'furnace.output', read,
       ({ world }) => world.furnace.output),
-    brick('furnace.smelt', 'smelt(): void', `Start a batch. Every call burns ${site.recipe.fuel} cr.`, 'furnace.smelt()', action,
+    brick('furnace.smelt', 'smelt(): void', `Start a batch. Calling with too little ore wastes ${site.recipe.fuel} credit of the next payout.`, 'furnace.smelt()', action,
       ({ world }) => {
-        world.credits -= site.recipe.fuel
         const furnace = world.furnace
-        if (furnace.readyAt !== null || furnace.input < site.recipe.ore) return
+        if (furnace.input < site.recipe.ore) {
+          world.ledger.waste += site.recipe.fuel
+          world.status = `The furnace burns fuel while empty: you lose ${site.recipe.fuel} credit of output per call. Smelt only when it has ${site.recipe.ore} ore.`
+          return
+        }
+        if (furnace.readyAt !== null) return
         furnace.input -= site.recipe.ore
         furnace.readyAt = world.tick + site.recipe.ticks
       }),

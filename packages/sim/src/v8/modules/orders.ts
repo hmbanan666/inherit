@@ -17,8 +17,17 @@ export interface Order extends ScheduledOrder {
 function canShip(order: Order) { return order.status === 'open' || order.status === 'overdue' }
 
 export function updateOrders(world: World, site: Site) {
+  if (site.repeatOrders && world.orders.length === site.orderSchedule.length && !world.orders.some(canShip)) {
+    world.orderRoundAt = world.tick
+    world.orders = []
+    world.ledger.waste = 0
+  }
   for (const scheduled of site.orderSchedule) {
-    if (scheduled.at === world.tick) world.orders.push({ ...scheduled, shipped: 0, status: 'open' })
+    const at = world.orderRoundAt + scheduled.at
+    if (at === world.tick) world.orders.push({
+      ...scheduled, at, due: world.orderRoundAt + scheduled.due, shipped: 0, status: 'open',
+      id: world.orderRoundAt ? scheduled.id + '-' + world.orderRoundAt : scheduled.id,
+    })
   }
   for (const order of world.orders) {
     if (!canShip(order) || order.due >= world.tick) continue
@@ -46,8 +55,10 @@ export function orderBricks(site: Site): Brick[] {
         if (order.shipped !== order.qty) return
         const onTime = world.tick <= order.due
         order.status = onTime ? 'on time' : 'late'
-        world.ledger.income += order.pay
-        world.credits += order.pay
+        const payout = Math.max(0, order.pay - world.ledger.waste)
+        world.ledger.waste = 0
+        world.ledger.income += payout
+        world.credits += payout
       }),
   ]
 }

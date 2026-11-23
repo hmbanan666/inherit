@@ -1,42 +1,109 @@
 import { join } from 'node:path'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+import type { FactorySave } from '../../apps/web/app/lib/factoryProtocol'
 
-test('the inherited controller hauls ore and a new deployment keeps the factory', async ({ page }) => {
+const saveKey = 'inherit.v8.kettlewick'
+function saved(page: Page): Promise<FactorySave> {
+  return page.evaluate(key => JSON.parse(localStorage.getItem(key)!), saveKey)
+}
+async function edit(page: Page, source: string) {
+  await page.getByRole('textbox', { name: 'Player TypeScript' }).focus()
+  await page.keyboard.press('Control+a')
+  await page.keyboard.insertText(source)
+}
+async function settings(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name, exact: true }).click({ timeout: 5000 })
+}
+
+test('the running works show the order, the first fix and tools on demand', async ({ page }) => {
   await page.goto('/')
-  const run = page.getByRole('button', { name: 'Run', exact: true })
-  const editor = page.getByRole('textbox', { name: 'Player TypeScript' })
-  await expect(editor).toBeVisible()
-  await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
+  await expect(page.getByRole('heading', { name: "Fulfil Mayor Hale's order: 20 ingots" })).toBeVisible()
+  await expect(page.getByText('+180 from Mayor Hale: deliver 20 ingots')).toBeVisible()
+  await expect(page.getByLabel('Current order')).toContainText('Smelt only when it has 2 ore')
+  await expect(page.getByText('Running', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Inherit showcase' })).toBeVisible()
   await expect(page.getByLabel('Factory map').locator('canvas')).toBeVisible()
-  await expect(page.getByLabel('Factory metrics')).toBeVisible()
-  await expect(page.getByText(/drone-1 · cargo/)).toBeVisible()
-  const resizer = page.getByRole('separator', { name: 'Resize editor' })
+  await expect(page.getByLabel('Project files').getByRole('button', { name: 'main.ts' })).toBeVisible()
+  await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
+  await expect(page.getByRole('button', { name: /^(Deploy|Pause|Resume|[124]x|Start over)$/ })).toHaveCount(0)
+  await expect(page.getByLabel('Factory metrics')).toBeHidden()
+  await expect(page.getByLabel('Console', { exact: true })).toBeHidden()
+  await expect(page.getByLabel('API reference')).toBeHidden()
+  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick.png') })
   const dock = page.locator('.editor-dock')
   const width = (await dock.boundingBox())!.width
-  await resizer.press('ArrowLeft')
+  await page.getByRole('separator', { name: 'Resize editor' }).press('ArrowLeft')
   expect((await dock.boundingBox())!.width).toBeGreaterThan(width)
-  await expect(page.getByLabel('Orders')).toContainText(/Mayor Hale.*due in \d+ ticks/)
-  await run.click()
-  await page.getByRole('button', { name: '4x' }).click()
-  await expect(page.getByTestId('cpu')).toHaveText('CPU 30/30')
-  await expect(page.getByLabel('Console')).toContainText(/main\.ts:\d+ · CPU limit/)
-  const ore = page.getByTestId('ore')
-  await expect(ore).not.toHaveText('Furnace ore 0')
-  await page.getByRole('button', { name: 'Pause' }).click()
-  const tick = await page.getByTestId('tick').innerText()
-  const stored = await ore.innerText()
-  if (process.env.INHERIT_SHOTS) await page.screenshot({ path: join(process.env.INHERIT_SHOTS, 'kettlewick.png') })
-  await editor.focus()
-  await page.keyboard.press('Control+a')
-  await page.keyboard.insertText('export function onTick() {}')
-  await run.click()
-  await expect(run).toBeEnabled()
-  await expect(page.getByTestId('tick')).toHaveText(tick)
-  await page.getByRole('button', { name: 'Resume' }).click()
-  await expect(page.getByTestId('cpu')).toHaveText('CPU 0/30')
-  await expect(ore).toHaveText(stored)
-  await page.getByRole('button', { name: 'Restart' }).click()
-  await expect(ore).toHaveText('Furnace ore 0')
+  await settings(page, 'Charts')
+  await expect(page.getByLabel('Factory metrics')).toBeVisible()
+  await settings(page, 'API')
+  await expect(page.getByLabel('API reference')).toContainText('furnace.smelt()')
+  await settings(page, 'Console')
+  await expect(page.getByTestId('tick')).toBeVisible()
+  await expect(page.getByLabel('Factory metrics')).toBeHidden()
+})
+
+test('helpers deploy onto the live world and reload preserves drafts and the deployed controller', async ({ page }) => {
+  await page.goto('/')
+  const tree = page.getByLabel('Project files')
+  const deploy = page.getByRole('button', { name: 'Deploy' })
+  await expect(page.getByRole('textbox', { name: 'Player TypeScript' })).toBeVisible()
+  await tree.getByRole('button', { name: 'New file' }).click()
+  await tree.getByLabel('Project path').fill('lib/nested/helpers.ts')
+  await tree.getByRole('button', { name: 'Create' }).click()
+  await expect(tree.getByRole('alert')).toContainText('directly in lib/')
+  await tree.getByLabel('Project path').fill('lib/helpers.ts')
+  await tree.getByRole('button', { name: 'Create' }).click()
+  await edit(page, 'import { memory } from "inherit"; export function tally() { memory.count = (memory.count ?? 0) + 1 }')
+  await tree.getByRole('button', { name: 'main.ts' }).click()
+  const main = 'import { tally } from "./lib/helpers"; export function onTick() { tally() }'
+  await edit(page, main)
+  const before = (await saved(page)).world.tick
+  await page.keyboard.press('Control+Enter')
+  await expect(deploy).toBeHidden()
+  await expect.poll(async () => (await saved(page)).world.memory.count).toBeGreaterThan(0)
+  const draft = main + '\n// next change'
+  await edit(page, draft)
+  await expect(deploy).toBeVisible()
+  await page.reload()
+  await expect(deploy).toBeEnabled()
+  await expect(page.locator('.view-lines')).toContainText('next change')
+  const restored = await saved(page)
+  expect(restored.world.tick).toBeGreaterThan(before)
+  expect(restored.deployed['main.ts']).toBe(main)
+  expect(restored.files['main.ts']).toBe(draft)
+  await edit(page, main)
+  await expect(deploy).toBeHidden()
+  await edit(page, draft)
+  await deploy.click()
+  await expect(deploy).toBeHidden()
+  page.once('dialog', dialog => dialog.dismiss())
+  await settings(page, 'Start over')
+  await expect(tree.getByRole('button', { name: 'lib/helpers.ts' })).toBeVisible()
+  page.once('dialog', dialog => dialog.accept())
+  await settings(page, 'Start over')
+  await expect(tree.getByRole('button', { name: 'lib/helpers.ts' })).toBeHidden()
   await expect(page.locator('.view-lines')).toContainText('Uncle Ambrose')
+  expect((await saved(page)).world.memory).toEqual({})
+})
+
+test('visibility suspends the worker clock and resumes the same works', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByText('Running', { exact: true })).toBeVisible()
+  await expect.poll(async () => (await saved(page)).world.tick).toBeGreaterThan(0)
+  async function hidden(value: boolean) {
+    await page.evaluate(flag => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: flag })
+      document.dispatchEvent(new Event('visibilitychange'))
+    }, value)
+  }
+  await hidden(true)
+  // Allow an in-flight snapshot to arrive, then observe two site tick intervals.
+  await page.waitForTimeout(550)
+  const frozen = (await saved(page)).world
+  await page.waitForTimeout(1050)
+  expect((await saved(page)).world).toEqual(frozen)
+  await hidden(false)
+  await expect.poll(async () => (await saved(page)).world.tick).toBeGreaterThan(frozen.tick)
 })
