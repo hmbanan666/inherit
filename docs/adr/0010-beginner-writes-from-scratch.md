@@ -1,5 +1,7 @@
 # Beginners write the controller from scratch, and task words are method names
 
+> Superseded by [ADR 0022](0022-quest-loop-no-loss.md). v8 starts from Uncle's program. A hint may name a field, a brick, or a shop item, and it never shows the expression.
+
 Playtesting v3, a beginner reached Bram's step "tell the furnace to smelt" and was stuck: there was no `smelt` method, only `ctx.work`, and autocomplete on `ctx.` listed a dozen unexplained methods. A `Factory` object passed into a function the player never wrote was the hardest part of the game, not the easiest.
 
 From now on:

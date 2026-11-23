@@ -1,5 +1,7 @@
 # TypeScript from zero
 
+> Legacy mode, not v8. This course stays playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md).
+
 An ordered course for someone opening a code editor for the first time. Read each unit from top to bottom. In Learn, preserve the three short text lines and render the example below them as code. The heading supplies the unit for every lesson beneath it. Each lesson gives its stable id, concept, exercise kind, one-line goal, reason and visible effect, the text and example for Learn, the initial contents of main.ts, successive hint rungs and the checks the player sees.
 
 Allow 3–6 minutes per lesson. Budget four minutes for most lessons and six for the final builds, about three and a half hours of play. Aim for a first visible response within thirty seconds. Got it returns focus to the first TODO. Lines beginning with // are comments for the reader. TODO marks where to work; write the instruction on the line below it. Run can be tried repeatedly. A predict task records a choice in Learn before Run, then shows the actual outcome. The TODO still gives the player a purposeful edit.

@@ -1,5 +1,7 @@
 # Game packs on one framework
 
+> Legacy mode, not v8. Packs stay playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md). CI does not run a browser suite.
+
 ## Problem
 
 Nick played v4 as a beginner. His eight notes follow verbatim.

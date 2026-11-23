@@ -1,8 +1,8 @@
 # Inherit
 
-Learn TypeScript by changing a game world. Choose a pack, edit the code beside its world and press **Run**. Calls play back beside their source lines. **Continue** opens the next lesson when you are ready.
+You inherit Kettlewick Works, Uncle's workshop in a village. Villagers give one quest at a time. Edit the program beside the works, press **Deploy**, and press **Complete quest** when the checks pass. That pays credits and XP. Credits are spent in the shop. The clock keeps ticking, and the works do not play themselves.
 
-Start with **Village at Dawn**. Help Mila wake a village and build a fair in thirteen lessons, from one greeting to functions, choices and loops. **Workshop** offers twelve independent parcel challenges. Route batches, compare labels and deploy a controller to respond to arrivals. The pack switcher keeps each game and its working files on this device.
+**Game packs** are a legacy mode at `/?packs`. Village at Dawn and Workshop stay playable there. They are not the v8 game, and they are not removed.
 
 ## Run locally
 
@@ -14,7 +14,7 @@ pnpm install
 pnpm dev
 ```
 
-Open the local address printed by Nuxt. To play a production build locally:
+Open the local address the dev server prints. That is Kettlewick Works. Add `?packs` for the legacy showcase. To serve a production build locally:
 
 ```sh
 pnpm build
@@ -28,12 +28,12 @@ docker build -t inherit .
 docker run --rm -p 8080:80 inherit
 ```
 
-Open `http://localhost:8080`. The image builds the workspace with Node 24 and serves the static files with nginx on **port 80**. Fonts, editor workers, artwork and the WebAssembly engine are included in the build.
+Open `http://localhost:8080`. The image builds the workspace with Node 24 and serves the static files with nginx on **port 80**. Fonts, editor workers, artwork, and the WebAssembly engine are included in the build.
 
-## Add a pack
+## Legacy packs
 
-Run `pnpm new-pack <id>` to create a playable pack in `packages/sim/src/packs`. Its folder supplies its cover, world, player functions, lessons and view. The showcase and validation suite discover it automatically. Follow the [authoring guide](docs/packs/AUTHORING.md).
+`pnpm new-pack <id>` creates a pack in `packages/sim/src/packs`. Follow the [authoring guide](docs/packs/AUTHORING.md). The showcase at `/?packs` discovers the folder. Packs are a legacy mode.
 
-`packages/sandbox` runs player projects inside QuickJS. `apps/web` contains the showcase, editor and worker sessions. Run `pnpm test` for lesson validation, then `pnpm build` and `pnpm test:browser` for the player playthroughs. Set `INHERIT_SHOTS` outside the checkout to keep screenshots and their visible text.
+`packages/sandbox` runs player projects inside QuickJS. `apps/web` contains the frame, the editor, and the worker. Before a change, run `pnpm test`, `pnpm typecheck`, and `pnpm build`.
 
 Released under the [MIT license](LICENSE).

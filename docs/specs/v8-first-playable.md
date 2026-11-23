@@ -1,95 +1,63 @@
 # v8 first playable slice
 
-Governs: [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [v8 concept](../concept/v8.md).
+Governs: [ADR 0022](../adr/0022-quest-loop-no-loss.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [v8 concept](../concept/v8.md).
 
-The playable game is the quest loop in the concept. This file keeps the earlier milestones (a Run button, pause, speeds, rent, bankruptcy, and a starter that already works) as history. Where a milestone disagrees with the concept, the concept wins.
+This file is the slice that is in the code. The quest table, the shop prices, and the later rules live in the concept and in ADR 0022. Where an older milestone mentioned rent, pause, speeds, bankruptcy, deadlines, Mayor Hale, three starting drones, `defineModule`, or a starter that already delivers, that milestone is withdrawn.
 
-## Goal
+## Playable now
 
-Nick opens the site and reads one villager's quest: the goal, why the current code is not enough, and tests under the editor. Uncle's cart never comes home. He edits that, deploys, and presses Complete quest. Credits and XP arrive then. The next quest waits until he takes it. Credits fall only when he buys in the shop, and they never go below zero. The clock keeps ticking. There is no pause.
+Nick opens `/` and reads one villager's quest: the goal, the why line, and the checks under the editor. Uncle's cart never comes home. He edits that, deploys, and presses Complete quest. Credits and XP arrive then. The next quest waits until he takes it. Credits fall only in the shop and never go below zero. The clock keeps ticking. There is no pause and no speed button.
 
-## Scope
+`/?packs` opens the legacy pack showcase. Pack code stays.
 
-In: one site (Kettlewick Works), veins A and B (C comes with scan), 3 drones, 1 furnace, orders with deadlines in ticks, rent, CPU limit, one crisis (vein runs dry), three unlocks (drone, CPU +10, API v1.1 `scan`), audit and result screen, versioned save.
+The site is Kettlewick Works.
 
-Out: art, market, drill and slag, build and stations, AI agent, rivals, side contracts, more sites, removing packs (separate PR after Nick plays).
+- One drone, capacity 3. Vein A is ore, vein B is coal, vein C is hidden ore.
+- Furnace: 2 ore to 1 ingot in 4 ticks. Steel is 2 ore and 1 coal through `furnace.alloy()`, which the shop sells.
+- CPU limit 30. Tick 500 ms. Credits 300. Level 1. XP 0.
+- Uncle's `main.ts` mines vein A, never returns (`const home = false`), smelts when the furnace holds 2 ore, and ships open orders. Nothing is delivered.
 
-## Rules for every milestone
+The worker runs one tick on that interval even when the tab is hidden. The visibility message does nothing. The sim has no UI and no clock of its own.
 
-- One PR per milestone, small, tracer bullet: each ends with something visible or testable end to end.
-- Game rules in `packages/sim/src/v8/`; player code only in QuickJS; the worker owns the simulation; the page renders snapshots.
-- Do not edit pack content (`packages/sim/src/packs/`). Shared sandbox changes must keep pack tests green.
-- Minimal visuals and texts. Spend effort on the loop, not on polish.
-- Numbers come from the site file so they can be tuned without code changes.
-- Checks before PR as in `AGENTS.md`; squash-merge with an explicit subject and body, no co-author trailers or tool names.
+## Quest counting
 
-## Milestones
+`acceptQuest` opens one order for the quest. Its shipped count starts at 0. `updateOrders` does nothing while the site has a quest list, so the unused schedule on the site is not the live quest. `order.due` is set far ahead, is not shown, and does not change pay.
 
-### M1. Core, bricks and CPU (sim only)
+Checks are evaluated on the live world every tick after accept. Prepare sets the baseline the quest cares about:
 
-- `v8/core`: seeded deterministic tick loop, world store (grid, entities), CPU meter, message queue.
-- Brick registry: name, signature, doc line, example, CPU cost, `since`, optional `deprecated`, handler. Generate declarations for the `"inherit"` module from it.
-- Module `mining`: `tick`, `cpu.used()`, `cpu.limit`, `memory`, `drones()`, `veins()`, `findPath`, `drone.moveAlong`, `drone.isNear`, `drone.mine`, `drone.unload` (into the depot for now).
-- Site `kettlewick`: map, 3 drones, veins A and B, CPU limit 30, Uncle's movement code from the concept (without furnace and orders yet).
-- Sandbox: weighted operation cost instead of a flat count when a cost table is given; when the limit is spent the rest of `onTick` is skipped and the line is reported. Packs keep the flat count.
-- Headless `runSession(site, files, ticks)`.
-- Tests: Uncle's code hits 30/30 and drones 2 and 3 never move; a cached-path solution moves all three under 15 CPU; same seed and code give the same world.
+- Elsie sets `holdTicks` to 20 and remembers `steelMade`. Ore waiting longer than 20 ticks is cleared. Coal waiting longer than 8 ticks is cleared.
+- Tomas sets vein A to 2 left and `oreAfterDry` to 0. Mining an empty vein throws and stops the rest of that tick's player code.
+- Pell sets `ingotsMade` to 0. "Pell receives 4 ingots" also requires four ingots smelted this quest.
+- Wen sets the CPU limit to 18 if CPU +10 is owned, otherwise 8, and clears the path window. "The route is remembered" needs 8 recorded ticks whose `findPath` calls sum to at most 4.
 
-### M2. The frame plays it
+Bram and Odile do not reset the furnace. Their delivery checks still start at zero when the quest is taken. A program that cleared the previous quest does not pass the next one. The quest test locks that.
 
-The shipped frame does not pause, does not offer speeds, and keeps ticking while the tab is hidden. Deploy replaces Run.
+Complete pays `pay` and `xp` in full, then clears the quest id. Waste on the ledger does not reduce the payout or the balance.
 
-- `/` opens v8; the pack UI stays reachable at `/?packs` until removal.
-- Worker runs core and sandbox at 2 ticks per second, 2x and 4x, Pause, auto-pause when the tab is hidden.
-- Layout of the standing frame: grid map left, Monaco right with Uncle's `main.ts`, wide Run top right, nav meters (tick, credits, CPU used/limit, red at the limit), Console under the editor with the CPU-limit line, API cards from the registry with CPU cost.
-- Run deploys the edited code onto the running world without resetting it. Restart resets the site.
-- Editor suggestions rank game API bricks above TypeScript keywords and globals (typing `sa` must offer `say` before `satisfies`, since Enter accepts the top item after PR #66). Unit test on the ranking.
-- Browser test: open, Run, ore count rises, CPU meter reads 30/30.
+## Shop and frame
 
-### M3. Economy: furnace, orders, rent
+Shop items and prices are the concept's list. `buyUpgrade` refuses an owned item and an item the player cannot afford, and it does not change the balance when it refuses.
 
-Rent and bankruptcy are not in the game. A quest pays when the player completes it. The shop is the only way credits fall.
+The frame is the standing shell: nav, quest card and portrait above the floor, Monaco with the file tree, checks under the editor while a quest is open, Deploy or Running at the top right. Console, API, and Charts open from the menu. The CPU line is `used/limit`. A call that would pass the limit does not run, and the guest stops the rest of `onTick`. The sim tick still finishes.
 
-- Module `smelting`: furnace (2 ore to 1 ingot in 4 ticks), `furnace.smelt()` burns 1 cr even when empty.
-- Module `orders`: scheduled orders (`item`, `qty`, `due`, `pay`, `from`), `ship(order, qty?)`, late orders pay half, expired after a grace period.
-- Ledger: rent per tick from the site, income, bankruptcy (credits below 0 for 50 ticks) ends the session.
-- Uncle's full code from the concept.
-- Orders strip under the editor: compact coloured rows (amber open with "due in N ticks", green on time, red late).
-- Tests: Uncle's first-come shipping makes both first orders late; sorting by `due` makes them on time; Uncle's code alone loses credits.
+The save is version 3 under `inherit.v8.kettlewick`. It stores the world, the deployed files, and the editor files. An unreadable slot is archived. Project files are kept when the world cannot be trusted. Unknown saves follow [ADR 0004](../adr/0004-v3-save-reset.md).
 
-### M3.5. Onboarding and consistency (after Nick's playtest)
+## Standing rules
 
-The obvious problem is the cart that never comes home, not an empty furnace that spends credits. Quests, the test panel, Complete quest, and the shop are specified in the concept.
+- Game rules live in `packages/sim/src/v8/`. Player code runs only in QuickJS. The worker owns the session. The page renders snapshots.
+- Do not edit pack content for a v8 change. Shared sandbox changes must keep pack tests green.
+- Do not rebuild the frame. Adapt the components that are already there.
+- Before a PR: `pnpm test`, `pnpm typecheck`, `pnpm build`. Nick playtests. No browser suite and no screenshots.
 
-- Start small: one drone, CPU well under the limit at start. More drones are an unlock.
-- Uncle's starter is the short version in the concept (about 10 lines) with one obvious problem first (smelting an empty furnace burns credits).
-- The current order is the goal line at the top, with one plain status line under it: what is wrong now and what to do.
-- Top right: a small running indicator (pulse) while the deployed code matches the editor. As soon as the editor differs, a Deploy button (Ctrl+Enter) replaces it and deploys the new code onto the running works; then the indicator returns. No version numbers yet.
-- Restart leaves the toolbar and becomes "Start over" in a menu, with a confirm.
-- Console, API and the charts are collapsed by default and open on demand.
-- Reuse the earlier components and styles (icon playback buttons, the API reference panel, existing styles); remove invented replacements.
+## Later
 
-### M4. Vein runs dry: crises and plain runtime errors
+Not in the code. [ADR 0022](../adr/0022-quest-loop-no-loss.md) has the decisions. Do not invent a deadline, a rent charge, or a wipe in their place.
 
-- `defineCrisis({ id, when, apply, message })` in core; crisis `vein-dry` from the site schedule.
-- Vein A empty: `mine` throws "Vein A is empty..." as a plain-word runtime error under the line, with the raw message behind details (reuse the v7 translator).
-- Foreman notes: a drone idle for 40 ticks, the furnace burning while empty, CPU at the limit for 20 ticks. One line each, deduplicated, in the Console.
-- Tests: Uncle's code freezes after vein A runs dry; skipping empty veins keeps drones working on vein B.
+- Speed XP bonus, with a par time on the card and no penalty.
+- Shop tiers by level. Villager unlocks by level are already in.
+- Audit: a chapter summary after the chain.
+- Next inheritance: a new site, the player's `lib/` carried over, credits and XP kept.
 
-### M5. Unlocks and API versions
+## Out
 
-- Unlock list in the nav (only items affordable soon): drone (+1 drone, rent), CPU +10 (rent), API v1.1.
-- API version gating: declarations and cards show only bricks with `since` up to the owned version; calling a locked brick gives a plain error.
-- v1.1 adds `scan(range)` (CPU 10) and reveals vein C. Changelog card on purchase. `@deprecated` support in declarations (tested with a fixture brick; real deprecation comes with `drill` later).
-- Tests: buying v1.1 makes `scan` compile and find vein C; before that it does not compile.
-
-### M6. Audit, result screen, saves
-
-- Audit tick from the site (about 2400 ticks at the first tuning). Result screen: credits, orders on time, average CPU per tick, CPU per ingot, Uncle's lines still present, player's lines. One button: new session.
-- Versioned v8 save in localStorage (`schema`, `site`, module versions, tick, seed, world, files, `lib/` files) with a migration hook; unknown saves archived per ADR 0004. Reload resumes paused.
-- README and `CONTEXT.md` describe v8.
-- Browser test: play to the audit at 4x with a reference solution and see the result screen.
-
-### After the slice
-
-Nick plays. Then: remove packs (one PR), tune numbers, next modules (market, drill and slag, build and stations), side contracts, AI agent hints.
+Art, a market, more sites, deleting packs, pause, speeds, rent, bankruptcy, deadlines, a shop of API versions, `defineModule`, Mayor Hale, and three drones at the start.

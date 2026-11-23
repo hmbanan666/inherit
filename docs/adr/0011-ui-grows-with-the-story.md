@@ -1,5 +1,7 @@
 # The screen grows with the story
 
+> Superseded by [ADR 0022](0022-quest-loop-no-loss.md). The floor, quest card, editor, checks and nav meters are on screen from the first tick. There are no speed buttons.
+
 At first launch the v3 workshop showed the floor, the town ribbon, coins, speed buttons, Orders and an Inbox button tucked into a corner, all before the player had written a line. Players did not know where to look, and many never noticed the Inbox at all.
 
 The frame of the workshop is fixed and is not redesigned: the top navigation, the thin footer with the Deploy button, the context menus and the charcoal palette (ADR 0006) stay as they are. Changes happen only inside the frame: texts, request cards, the deploy flow, coins and other counters, and the console.
