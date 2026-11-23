@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./v8": "./src/v8/index.ts",
     ".": "./src/index.ts",
     "./migrate": "./src/framework/migrate.ts",
     "./archive": "./src/framework/archive.ts",

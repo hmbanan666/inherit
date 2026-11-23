@@ -96,7 +96,6 @@ export const guestSetup = String.raw`
     if (ambient) global(name, method);
   }
   freeze(api);
-  define(globalThis, "__inherit", { value: api, configurable: true });
 
   function errorText(e) {
     if (typeof e === "string") return "[" + stringify(cut(e, 0, 1024)) + ',""]';
@@ -111,12 +110,19 @@ export const guestSetup = String.raw`
     const property = own(namespace, name);
     return property && has(property, "value") ? property.value : undefined;
   }
-  return { snapshot, errorText, exported };
+  let updateClock;
+  define(globalThis, "__inherit", { configurable: true, value: {
+    api, memory, clock: update => { updateClock = update }
+  } });
+  return { snapshot, errorText, exported, startTick: value => updateClock?.(value) };
 })
 `
 
 // Install the built-in module before any player module runs. Only its exports survive.
-export function inheritModule(names: readonly string[]) {
-  return names.map(name => 'export const ' + name + ' = globalThis.__inherit.' + name).join('\n') +
+export function inheritModule(names: readonly string[], source?: string) {
+  if (source !== undefined) return `const state = globalThis.__inherit, api = state.api;
+delete globalThis.__inherit;
+${source}`
+  return names.map(name => 'export const ' + name + ' = globalThis.__inherit.api.' + name).join('\n') +
     '\ndelete globalThis.__inherit'
 }

@@ -1,3 +1,4 @@
+import { chargeCpu } from '../../sim/src/v8/core/cpu'
 import variant from '@jitl/quickjs-singlefile-browser-release-sync'
 import {
   DefaultIntrinsics,
@@ -144,16 +145,15 @@ export async function openRuntime(
       vm.newFunction('factory', (name, length, ...args) => {
         if (!current) throw new Error('Factory calls require an active handler.')
         const key = vm.getString(name)
-        const site = project.callSite(vm.getString(args[4]))
-        const next = meter.used + (costs ? costs[key] : 1)
+        const charge = costs && chargeCpu(meter.used, budget, costs[key])
         meter.calls++
-        meter.used = costs ? Math.min(next, budget) : next
+        meter.used = charge?.used ?? meter.used + 1
         function stopAtLimit() {
           stopped = `CPU limit (${budget}) hit.`
-          stopLocation = `${site.file}:${site.line}`
+          stopLocation = project.location(vm.getString(args[4]))
           return vm.null
         }
-        if (costs && next > budget) return stopAtLimit()
+        if (charge && !charge.allowed) return stopAtLimit()
         if (exceeded(false)) throw new Error(stopped)
         const method = names.includes(key) && Reflect.get(current, key)
         if (typeof method !== 'function') throw new Error(`Factory method ${key} is unavailable.`)
@@ -162,9 +162,13 @@ export async function openRuntime(
           if (type === 'number') return vm.getNumber(h)
           if (type === 'string') return JSON.parse(vm.getString(h))
         })
-        current.traceSite?.(site)
-        const result = Reflect.apply(method, current, params)
-        if (costs && next === budget) return stopAtLimit()
+        current.traceSite?.(project.callSite(vm.getString(args[4])))
+        let result: unknown
+        try { result = Reflect.apply(method, current, params) }
+        catch (error) {
+          if (!charge?.exhausted) throw error
+        }
+        if (charge?.exhausted) return stopAtLimit()
         return result === undefined ? vm.undefined : vm.newString(hostJson(result))
       }),
     )
@@ -187,6 +191,7 @@ export async function openRuntime(
       ),
     )
     const helper = (key: string) => keep(vm.getProp(helpers, key))
+    const startTick = options.inheritSource === undefined ? undefined : helper('startTick')
     const snapshot = helper('snapshot')
     const exported = helper('exported')
     formatError = helper('errorText')
@@ -199,7 +204,7 @@ export async function openRuntime(
       return exceeded(true)
     })
     begin(fresh())
-    unwrap(vm.evalCode(inheritModule(names), 'inherit', { type: 'module' })).dispose()
+    unwrap(vm.evalCode(inheritModule(names, options.inheritSource), 'inherit', { type: 'module' })).dispose()
     runtime.setModuleLoader(project.load, (from, request) => project.resolve(from, request))
     current = initialFactory
     const namespace = keep(
@@ -221,10 +226,12 @@ export async function openRuntime(
           frame = fresh()
           lastTick = ctx.tick
         }
+        if (costs && frame.used === budget) throw new Error(`CPU limit (${budget}) hit.`)
         begin(frame)
         if (frame.used > budget) throw new Error(`Operation budget (${budget}) exceeded.`)
         current = ctx
         try {
+          if (startTick) usingHandle(vm.newNumber(ctx.tick), value => invoke(startTick, value).dispose())
           usingHandle(invoke(fn), assertSynchronous)
         } finally {
           current = undefined
