@@ -21,10 +21,8 @@ export const lessons = (Object.keys(briefs) as ChallengeId[]).map(id => {
     idea: brief.practice,
     task: { condition: brief.condition, examples: brief.examples },
     theory: { title: brief.title, body: brief.body, example: brief.example },
-    starter: () => ({
-      ...mainFile(brief.todo.map(note => (brief.steps ? '// ' : '// TODO: ') + note).join('\n') + '\n'),
-      placeholder: brief.placeholder,
-    }),
+    starter: () => mainFile(brief.todo.map(note => (brief.steps ? '// ' : '// TODO: ') + note).join('\n') + '\n',
+      brief.todo.length + 1, brief.placeholder),
     hints: brief.hints,
     checks: brief.checks.map((label, index) => ({
       id: id + '-' + (index + 1),

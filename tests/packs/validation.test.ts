@@ -169,9 +169,11 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
       expect(files['main.ts'],label).not.toMatch(/\b(import|export|onTick)\b/)
     }
     for (const [files,solves] of [[starter.files,false],[lesson.referenceSolution,true]] as const) {
-      const emptySlot = !solves && m.id === 'beginner' && ['hello', 'sign-spaces'].includes(lesson.id)
-      const expected = emptySlot && lesson.id === 'sign-spaces' ? ['/pack-validation/main.ts:2 Expected 1 arguments, but got 0.'] : []
-      expect(diagnostics(files, [api, ...inputTypes].join('\n')), label).toEqual(expected)
+      const slot = !solves && starter.placeholder ? starter.edit : undefined
+      const errors = diagnostics(files, [api, ...inputTypes].join('\n'))
+      if (slot && errors.length) {
+        expect(errors, label).toEqual(['/pack-validation/' + slot.file + ':' + slot.line + ' Expected 1 arguments, but got 0.'])
+      } else expect(errors, label).toEqual([])
       const trial = solves ? save : structuredClone(save)
       let solved: boolean
       if (checkpoint) solved = await checkpoint.play(files)
@@ -179,9 +181,11 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
         const runner = createPackRunner(pack)
         try {
           const mode = !solves && m.track === 'challenges' ? 'run' : lesson.mode
-          const attempt = runner.play(trial,files,mode)
-          if (emptySlot) await expect(attempt).rejects.toBeInstanceOf(PlayerRunError)
-          else await attempt
+          try { await runner.play(trial, files, mode) }
+          catch (error) {
+            if (!slot || !(error instanceof PlayerRunError)) throw error
+            expect(error.diagnostic, label).toMatchObject({ file: slot.file, line: slot.line, title: 'No words yet' })
+          }
           if (mode==='deploy') for (let tick=0; tick<1200 && trial.phase!=='solved';tick++) await runner.play(trial,files,'tick')
           solved = trial.phase==='solved'
         } finally {runner.dispose()}

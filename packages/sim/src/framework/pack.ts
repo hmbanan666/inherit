@@ -107,8 +107,8 @@ export interface Pack<W, A extends object> {
   upgrade?(fromVersion: number, input: unknown): unknown
 }
 export function definePack<W, A extends object>(pack: Pack<W, A>) { return pack }
-export function mainFile(source: string, line = source.split('\n').length): Starter {
-  return { files: { 'main.ts': source }, edit: { file: 'main.ts', line } }
+export function mainFile(source: string, line = source.split('\n').length, placeholder = 'Write your code here'): Starter {
+  return { files: { 'main.ts': source }, edit: { file: 'main.ts', line, column: 1 }, placeholder }
 }
 
 export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter): readonly string[] {
