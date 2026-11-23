@@ -31,7 +31,6 @@ export interface PackFrame {
   previewWorld?: unknown
   notice?: string
   tickCount: number
-  showLearn: boolean
   noCalls?: boolean
   finishIdeas?: string[]
   goal: string

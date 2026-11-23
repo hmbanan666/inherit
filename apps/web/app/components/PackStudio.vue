@@ -176,7 +176,7 @@ async function receive(data: PackFrame | {loadError:string}) {
   if (changed) {
     setupTried.value = false
     previewingTick.value = false
-    drawer.value = data.showLearn ? 'learn' : undefined
+    drawer.value = undefined
     files.value = data.save.project.working
     activeFile.value = data.save.project.activeFile
     navigation.value = data.edit.file === activeFile.value ? data.edit : {file: activeFile.value, line: 1}
@@ -272,7 +272,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="workshop pack-studio" :class="{'high-contrast': contrast}" :style="{'--dock-width': width+'%'}">
     <header class="hud">
-      <PackNav :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId" />
+      <PackNav :busy="busy" @select="select" :manifest="manifest" :lessons="frame?.map ?? []" :selected="frame?.save.lessonId" />
       <div class="settings pack-settings">
         <button aria-label="Settings" @click="settings = !settings"><Settings2 /></button>
         <aside v-if="settings" class="hud-menu">
@@ -292,11 +292,11 @@ onBeforeUnmount(() => {
           <PlaybackBar v-if="frame.save.clockActive || tickCount" :live="frame.save.clockActive" v-model:paused="paused" v-model:speed="speed" :inert="stoppingLoop" :tick-count="tickCount" @stop="stopLoop" />
           <button v-if="(!frame.save.clockActive || paused || previewingTick) && !solved" :disabled="busy" @click="runOnce">{{ previewingTick ? 'Return to paused floor' : 'Run once' }}</button>
         </div>
-        <SideDrawer v-if="drawer && frame" :tab="drawer" :manifest="manifest" :lessons="frame.map" :selected="frame.save.lessonId"
-          :clock="frame.mode === 'deploy'" :theory="frame.theory" :task="frame.task" :prediction="frame.prediction" :choice="frame.save.predictions[frame.save.lessonId!]"
+        <SideDrawer v-if="drawer && frame" :tab="drawer"
+          :clock="frame.mode === 'deploy'" :theory="frame.theory" :task="frame.task"
           :hints="frame.hints" :rung="frame.save.hints[frame.save.lessonId!] ?? 0" :entries="frame.reference" :types="frame.types"
           :busy="busy" :logs="frame.logs" @tab="drawer = $event" @close="closeDrawer()" @edit="closeDrawer(true)"
-          @predict="send({kind: 'predict', choice: $event})" @hint="send({kind: 'hint'})" @select="select">
+          @hint="send({kind: 'hint'})">
           <template #learn>
             <div v-if="Object.keys(files).length > 1"><button v-for="(_, path) in files" :key="path" @click="activeFile = path; closeDrawer(); persist()">{{ path }}</button></div>
             <section v-for="p in frame.panels" :key="p.id"><h3>{{ p.label }}</h3>
@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
       </section>
       <div class="resizer" role="separator" tabindex="0" aria-label="Resize editor" @pointerdown="resize" @keydown.left.prevent="width=Math.min(62,width+2)" @keydown.right.prevent="width=Math.max(30,width-2)" />
       <section class="editor-dock">
-        <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @map="openDrawer('learn')" @replay="start(true)" />
+        <PackFinish v-if="complete && frame?.finishIdeas" :manifest="manifest" :ideas="frame.finishIdeas" :awards="Object.values(frame.save.awards)" @replay="start(true)" />
         <template v-else-if="frame">
           <StepCard :goal="frame.goal" :steps="frame.steps" :current="currentStep" :prediction="frame.prediction" :choice="choice" :busy="busy" @predict="send({kind: 'predict', choice: $event})" @help="openDrawer('learn')" />
           <div class="editor-pane"><div class="editor-host"><LazyCodeEditor :starter="frame.starter" :diagnostic="diagnostic" @hint="openDrawer('hints')" :error="error" @reference="openDrawer('api')" /></div></div>

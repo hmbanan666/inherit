@@ -162,11 +162,8 @@ async function act(command: PackCommand) {
   const inputs = lesson?.inputs?.(save.entryWorld) ?? {}
   const api = declarations(source, names, pack.exposure, pack.typeAliases?.(save.world))
   const map = courseMap(pack.manifest, pack.lessons, save.completed)
-  const showLearn = !!lesson && !!(lesson.theory || lesson.task) && save.phase !== 'solved' &&
-    (command.kind === 'open' ? !save.seenTheory.includes(lesson.id) : previousId !== lesson.id)
-  if (showLearn && !save.seenTheory.includes(lesson!.id)) save.seenTheory.push(lesson!.id)
   self.postMessage({
-    previewWorld, notice, showLearn, tickCount, save, map, reference, inputs,
+    previewWorld, notice, tickCount, save, map, reference, inputs,
     types: Object.entries(schema.types).filter(([name]) => reference.some(m => m.signature.includes(name))).map(([,type]) => type),
     scene: lesson?.scene, theory: lesson?.theory, task: lesson?.task, prediction: lesson?.prediction,
     noCalls: command.kind === 'run' && lesson?.mode === 'run' && !moments.length && !logs.length && !error,
