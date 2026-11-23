@@ -6,7 +6,7 @@ import {
   type QuickJSHandle,
 } from 'quickjs-emscripten'
 import { guestSetup, inheritModule } from './guest'
-import type { compileProject } from './project'
+import type { compileProject, ProjectOptions } from './project'
 
 const engine = () => newQuickJSWASMModuleFromVariant(variant)
 let engineReady: ReturnType<typeof engine> | undefined
@@ -49,16 +49,16 @@ export async function openRuntime(
   project: ReturnType<typeof compileProject>,
   memory: object,
   budget: number,
-  operations: readonly string[],
+  options: ProjectOptions,
   initialFactory?: FactoryContext,
-  exposure: 'globals' | 'module' = 'module',
-  inputs: Record<string, unknown> = {},
 ) {
   if (!Number.isInteger(budget) || budget < 1 || budget > 4096)
     throw new Error('Budget must be an integer from 1 to 4096.')
   if (!memory || typeof memory !== 'object' || Array.isArray(memory))
     throw new Error('Memory must be a JSON object.')
-  const names = operations
+  const { operations: names = [], inputs = {}, exposure = 'module', costs } = options
+  if (costs && names.some(name => !Number.isSafeInteger(costs[name]) || costs[name] < 0))
+    throw new Error('Every operation needs a nonnegative integer CPU cost.')
   if (names.some(n => !/^[a-zA-Z_$][a-zA-Z_$0-9]*$/.test(n) || n in Object.prototype)) throw new Error('Invalid player function name.')
   const initial = hostJson(memory)
   const module = await (engineReady ??= engine())
@@ -86,6 +86,7 @@ export async function openRuntime(
     lastTick: number | undefined
   let deadline = 0,
     stopped = ''
+  let stopLocation = project.entry
   let current: FactoryContext | undefined
   let formatError: QuickJSHandle | undefined
   const logs: string[] = []
@@ -95,8 +96,10 @@ export async function openRuntime(
     meter = stats
     deadline = performance.now() + 25
     stopped = ''
+    stopLocation = project.entry
   }
   function exceeded(checkTime: boolean) {
+    if (stopped) return true
     if (meter.used > budget) stopped = `Operation budget (${budget}) exceeded; controller interrupted.`
     else if (checkTime && performance.now() >= deadline)
       stopped = 'Controller interrupted by 25 ms time budget.'
@@ -117,11 +120,11 @@ export async function openRuntime(
         error.dispose()
       }
       const [message, stack] = detail ? (JSON.parse(detail) as [string, string]) : ['', '']
-      throw new Error(`${project.location(stack)} · ${stopped || message || 'Controller stopped.'}`)
+      throw new Error(`${stopped ? stopLocation : project.location(stack)} · ${stopped || message || 'Controller stopped.'}`)
     }
     if (stopped) {
       result.value.dispose()
-      throw new Error(`${project.entry} · ${stopped}`)
+      throw new Error(`${stopLocation} · ${stopped}`)
     }
     return result.value
   }
@@ -140,10 +143,18 @@ export async function openRuntime(
     const call = keep(
       vm.newFunction('factory', (name, length, ...args) => {
         if (!current) throw new Error('Factory calls require an active handler.')
-        meter.calls++
-        meter.used++
-        if (exceeded(false)) throw new Error(stopped)
         const key = vm.getString(name)
+        const site = project.callSite(vm.getString(args[4]))
+        const next = meter.used + (costs ? costs[key] : 1)
+        meter.calls++
+        meter.used = costs ? Math.min(next, budget) : next
+        function stopAtLimit() {
+          stopped = `CPU limit (${budget}) hit.`
+          stopLocation = `${site.file}:${site.line}`
+          return vm.null
+        }
+        if (costs && next > budget) return stopAtLimit()
+        if (exceeded(false)) throw new Error(stopped)
         const method = names.includes(key) && Reflect.get(current, key)
         if (typeof method !== 'function') throw new Error(`Factory method ${key} is unavailable.`)
         const params = args.slice(0, vm.getNumber(length)).map((h) => {
@@ -151,8 +162,9 @@ export async function openRuntime(
           if (type === 'number') return vm.getNumber(h)
           if (type === 'string') return JSON.parse(vm.getString(h))
         })
-        current.traceSite?.(project.callSite(vm.getString(args[4])))
+        current.traceSite?.(site)
         const result = Reflect.apply(method, current, params)
+        if (costs && next === budget) return stopAtLimit()
         return result === undefined ? vm.undefined : vm.newString(hostJson(result))
       }),
     )
@@ -183,7 +195,7 @@ export async function openRuntime(
     // bootstrap above runs before any player code can enter this context.
     runtime.setInterruptHandler(() => {
       meter.interrupts++
-      meter.used++
+      if (!costs) meter.used++
       return exceeded(true)
     })
     begin(fresh())

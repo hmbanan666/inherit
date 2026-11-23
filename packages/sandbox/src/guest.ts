@@ -86,7 +86,11 @@ export const guestSetup = String.raw`
     const method = (...args) => {
       if (args.length > 4) throw new Fault("Use at most four arguments.");
       const at = i => args[i] === undefined || typeof args[i] === "number" ? args[i] : snapshot(args[i]);
-      return result(call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096)));
+      const reply = call(name, args.length, at(0), at(1), at(2), at(3), cut(new Fault().stack, 0, 4096));
+      // A null handle requests a VM interrupt. Yield to its instruction poll so
+      // a guest catch block cannot resume the remainder of an exhausted tick.
+      if (reply === null) { for (;;) {} }
+      return result(reply);
     };
     api[name] = freeze(method);
     if (ambient) global(name, method);

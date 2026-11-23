@@ -13,6 +13,7 @@ export interface ProjectOptions {
   budget?: number
   exposure?: 'globals' | 'module'
   inputs?: Record<string, JsonValue>
+  costs?: Readonly<Record<string, number>>
   operations?: readonly string[]
 }
 
