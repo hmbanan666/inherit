@@ -3,7 +3,7 @@ import { finishBatch } from '../modules/smelting'
 import { syncQuest, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
-export interface Drone { name: string; pos: Cell; cargo: number; capacity: number; carrying: 'ore' | 'coal' | null; source: string }
+export interface Drone { name: string; pos: Cell; cargo: number; capacity: number; carrying: 'ore' | 'coal' | null; source: string; route?: Cell[] }
 export interface Vein { name: string; pos: Cell; left: number; kind: 'ore' | 'coal'; hidden?: boolean }
 export interface Site {
   id: string

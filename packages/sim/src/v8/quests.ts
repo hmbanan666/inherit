@@ -15,6 +15,8 @@ export interface QuestDef {
   title: string
   goal: string
   why: string
+  /** One line in the villager's voice. It is not a hint and not a solution. */
+  quote: string
   change: string
   item: 'ingot' | 'steel'
   qty: number
@@ -53,6 +55,7 @@ export const questList: QuestDef[] = [
     title: 'Horseshoes for the mail horse',
     goal: 'Bring Bram 4 ingots.',
     why: 'The cart fills at the vein and stays there, so the furnace never receives ore.',
+    quote: 'The mail horse throws a shoe on every hill.',
     change: 'The forge is lit. The mail horse has shoes.',
     item: 'ingot', qty: 4, pay: 80, xp: 20, needLevel: 1,
     tests: [
@@ -66,6 +69,7 @@ export const questList: QuestDef[] = [
     title: 'Steel for the bridge',
     goal: 'Bring Odile 4 steel.',
     why: 'Steel is ore and coal smelted together. Vein B is coal. Alloy is in the shop.',
+    quote: 'Two banks, and no way across.',
     change: 'The bridge stands. Kettlewick can cross the river again.',
     item: 'steel', qty: 4, pay: 100, xp: 20, needLevel: 2,
     tests: [
@@ -79,6 +83,7 @@ export const questList: QuestDef[] = [
     title: 'A grate for the oven',
     goal: 'Bring Elsie 6 steel before the ore cools.',
     why: 'One cart cannot fetch coal before the ore cools. A second drone is in the shop. Give each drone a job.',
+    quote: 'The oven has been cold since dawn.',
     change: 'The bakery is warm again.',
     item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
     prepare: world => {
@@ -101,6 +106,7 @@ export const questList: QuestDef[] = [
     title: 'Iron for the mill wheel',
     goal: 'Bring Tomas 4 ingots after vein A runs out.',
     why: 'Vein A is nearly spent. Mining an empty vein stops the tick. Prospect, in the shop, opens another ore vein.',
+    quote: 'The wheel sits in the race and will not turn.',
     change: 'The mill wheel turns.',
     item: 'ingot', qty: 4, pay: 100, xp: 25, needLevel: 4,
     prepare: world => {
@@ -119,6 +125,7 @@ export const questList: QuestDef[] = [
     title: 'Hinges for the barrels',
     goal: 'Bring Pell 4 ingots.',
     why: 'Pell wants plain ingots. Steel will not do. Smelt ore on its own when the order asks for ingots.',
+    quote: 'Rope will not hold a barrel of ale.',
     change: 'The barrels have hinges.',
     item: 'ingot', qty: 4, pay: 80, xp: 25, needLevel: 5,
     prepare: world => { world.ingotsMade = 0 },
@@ -132,6 +139,7 @@ export const questList: QuestDef[] = [
     title: 'Steel for the lamps',
     goal: 'Bring Wen 4 steel without spending the CPU on a fresh path every tick.',
     why: 'Calling findPath for every drone on every tick spends the CPU. Remember a route and reuse it.',
+    quote: 'The street lamps have been dark a week.',
     change: 'The lamps are lit.',
     item: 'steel', qty: 4, pay: 120, xp: 30, needLevel: 6,
     prepare: world => {
@@ -159,6 +167,25 @@ export const shop: ShopItem[] = [
   { id: 'prospect', name: 'Prospect', price: 40, detail: 'prospect() reveals the next hidden vein.', apply: () => {} },
   { id: 'cpu', name: 'CPU +10', price: 80, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
+
+/** Shop tiers open with the villager who needs them. The names are the shelf labels. */
+export const shopTiers: { level: number; items: string[] }[] = [
+  { level: 1, items: ['Bigger cart', 'Hotter furnace'] },
+  { level: 2, items: ['Alloy'] },
+  { level: 3, items: ['Second drone'] },
+  { level: 4, items: ['Prospect'] },
+  { level: 6, items: ['CPU +10'] },
+]
+
+export function nextUnlock(level: number) {
+  return shopTiers.find(tier => tier.level > level)
+}
+
+export function upcomingQuests(id: string, count = 3) {
+  const index = questList.findIndex(quest => quest.id === id)
+  if (index < 0) return []
+  return questList.slice(index + 1, index + 1 + count).map(quest => quest.title)
+}
 
 export function nextQuest(world: World, site: Site) {
   const quest = site.questList?.find(item => !world.cleared.includes(item.id))

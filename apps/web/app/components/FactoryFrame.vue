@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { declarations, kettlewick, factoryBricks, shop, levelSpan, type World } from '@inherit/sim/v8'
+import { declarations, kettlewick, factoryBricks, shop, levelSpan, readChecks, nextUnlock, type World } from '@inherit/sim/v8'
 import ChecksPanel from './ChecksPanel.vue'
 import { Play } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
@@ -76,28 +76,74 @@ const offers = computed(() => {
 const shown = computed(() => activeQuest.value ? [activeQuest.value] : offers.value)
 const order = computed(() => world.value?.orders.find(item => item.id === world.value?.questId))
 const ready = computed(() => !!activeQuest.value && !!world.value?.checks.length && world.value.checks.every(check => check.status === 'green'))
-const checks = computed(() => (world.value?.checks ?? []).map(check => ({ ...check, status: check.status === 'green' ? 'green' as const : 'red' as const })))
+const passedChecks = computed(() => world.value?.checks.filter(check => check.status === 'green').length ?? 0)
+const readings = computed(() => {
+  const quest = activeQuest.value
+  const current = world.value
+  if (!quest || !current?.questId) return []
+  return readChecks(current, quest)
+})
+const checks = computed(() => readings.value.map(check => ({
+  id: check.id,
+  text: check.text,
+  status: check.state === 'passing' ? 'green' as const : 'red' as const,
+  mark: check.state,
+  reason: check.reason,
+})))
+const upcoming = computed(() => {
+  const id = shown.value[0]?.id
+  if (!id || !kettlewick.questList) return []
+  const index = kettlewick.questList.findIndex(quest => quest.id === id)
+  return kettlewick.questList.slice(index + 1, index + 4)
+})
+const unlock = computed(() => nextUnlock(world.value?.level ?? 1))
+const pulse = ref(false)
+let pulseTimer = 0
+watch(ready, (value, previous) => {
+  if (!value || previous) return
+  pulse.value = true
+  window.clearTimeout(pulseTimer)
+  pulseTimer = window.setTimeout(() => { pulse.value = false }, 700)
+})
+const gains = ref<{ id: number; text: string; kind: 'credits' | 'xp' }[]>([])
+let gainSerial = 0
+let gainTimer = 0
+watch(world, (next, previous) => {
+  if (!next || !previous || !previous.questId || next.questId) return
+  const earned = next.credits - previous.credits
+  const xpGain = next.xp - previous.xp
+  if (earned <= 0 && xpGain <= 0) return
+  const batch: { id: number; text: string; kind: 'credits' | 'xp' }[] = []
+  if (earned > 0) batch.push({ id: ++gainSerial, text: `+${earned} credits`, kind: 'credits' })
+  if (xpGain > 0) batch.push({ id: ++gainSerial, text: `+${xpGain} XP`, kind: 'xp' })
+  gains.value = batch
+  window.clearTimeout(gainTimer)
+  gainTimer = window.setTimeout(() => { gains.value = [] }, 1200)
+})
+const log = computed(() => {
+  const lines: { text: string; file?: string; line?: number; bad?: boolean }[] = []
+  if (error.value) lines.push({ text: error.value, bad: true })
+  if (saveError.value) lines.push({ text: saveError.value, bad: true })
+  if (floorError.value) lines.push({ text: floorError.value, bad: true })
+  const current = world.value
+  if (current?.status.startsWith('CPU')) lines.push({ text: current.status, bad: true })
+  for (const message of [...(current?.messages ?? [])].reverse()) {
+    if (lines.length >= 4) break
+    lines.push({ text: message.text, file: message.file, line: message.line, bad: true })
+  }
+  return lines
+})
+function openLine(entry: { file: string; line: number }) {
+  activeFile.value = entry.file
+  navigation.value = { file: entry.file, line: entry.line }
+}
 const xp = computed(() => {
   const value = world.value?.xp ?? 0
   const span = levelSpan(value)
-  if (span.next === null) return { width: '100%', title: `Level ${span.level}` }
+  if (span.next === null) return { width: '100%', label: `XP ${value}`, title: `Level ${span.level}` }
   const into = value - span.start
   const size = span.next - span.start
-  return { width: `${Math.min(100, (into / size) * 100)}%`, title: `${into} / ${size} XP` }
-})
-const notice = computed(() => {
-  if (error.value) return { text: error.value, bad: true }
-  if (saveError.value) return { text: saveError.value, bad: true }
-  if (floorError.value) return { text: floorError.value, bad: true }
-  const current = world.value
-  if (!current) return undefined
-  const status = current.status
-  const echoed = current.checks.some(check => check.text === status)
-    || shown.value.some(quest => status === quest.why || status === quest.goal)
-    || status === 'More is coming.'
-  if (status && !echoed) return { text: status, bad: false }
-  const line = !current.questId ? current.growth.at(-1) : undefined
-  return line ? { text: line, bad: false } : undefined
+  return { width: `${Math.min(100, (into / size) * 100)}%`, label: `XP ${into}/${size}`, title: `${into} / ${size} XP` }
 })
 function hintSteps(why: string) {
   return why.split(/(?<=\.)\s+/).map(step => step.trim()).filter(Boolean)
@@ -239,9 +285,11 @@ onBeforeUnmount(() => {
             <div class="xp" data-testid="level">
               <span class="tick">Level <b>{{ world.level }}</b></span>
               <span class="xp-bar" :title="xp.title"><i :style="{ width: xp.width }" /></span>
+              <span class="tick">{{ xp.label }}</span>
             </div>
             <span class="tick" data-testid="cpu">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
             <span class="live"><i />Running</span>
+            <span v-for="gain in gains" :key="gain.id" class="gain" :class="gain.kind">{{ gain.text }}</span>
           </div>
           <span v-else class="live off"><i />{{ error ? 'Offline' : 'Starting' }}</span>
         </template>
@@ -273,7 +321,15 @@ onBeforeUnmount(() => {
                 </ol>
               </div>
               <p class="reward"><b>{{ quest.pay }}</b> credits · <b>{{ quest.xp }}</b> XP</p>
+              <p class="quote">{{ quest.quote }}</p>
               <p v-if="order && quest.id === world?.questId" class="progress"><b>{{ order.shipped }}/{{ order.qty }}</b> {{ order.item }}</p>
+              <div v-if="upcoming.length" class="next">
+                <span>Next</span>
+                <ol>
+                  <li v-for="item in upcoming" :key="item.id">{{ item.title }}</li>
+                </ol>
+              </div>
+              <p v-if="unlock" class="unlock">Level {{ unlock.level }} unlocks: {{ unlock.items.join(', ') }}</p>
             </article>
             <div v-if="!shown.length" class="quest">
               <h2>{{ world?.cleared.length ? 'More is coming' : 'Kettlewick Works' }}</h2>
@@ -293,7 +349,7 @@ onBeforeUnmount(() => {
         </div>
         <div v-if="zone === 'quests' && (activeQuest || offers.length)" class="quest-action">
           <button v-if="offers.length" class="gold" type="button" data-testid="take-quest" @click="send({ kind: 'accept' })">Take quest</button>
-          <button v-else class="gold" type="button" data-testid="complete-quest" :disabled="!ready" @click="send({ kind: 'complete' })">Complete quest</button>
+          <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" :disabled="!ready" @click="send({ kind: 'complete' })">{{ ready ? 'Complete quest' : `Complete · ${passedChecks}/${world?.checks.length ?? 0}` }}</button>
         </div>
       </section>
       <div class="stage">
@@ -324,13 +380,12 @@ onBeforeUnmount(() => {
           </div>
           <aside class="checks-pane" aria-label="Quest checks">
             <div class="checks-head">Checks</div>
-            <ChecksPanel :tried="!!world?.questId" :checks="world?.questId ? checks : []" empty="Take a quest to see checks" />
+            <ChecksPanel :tried="!!world?.questId" :checks="world?.questId ? checks : []" :log="log" empty="Take a quest to see checks" @open="openLine" />
           </aside>
         </div>
       </div>
     </template>
     <template #status>
-      <span class="notice" :class="{ bad: notice?.bad }" :role="notice ? 'status' : undefined">{{ notice?.text }}</span>
       <span v-if="world" class="meters">
         <span>Depot ore {{ world.depot.ore }}</span>
         <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
@@ -479,6 +534,38 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--accent-line);
 }
 .quest-action .gold { width: 100%; height: 34px }
+.quest-action .gold:disabled { opacity: 0.45 }
+.quest-action .gold.pulse { animation: quest-ready 0.7s ease-out 1 }
+@keyframes quest-ready {
+  0% { transform: scale(1) }
+  40% { transform: scale(1.04) }
+  100% { transform: scale(1) }
+}
+.quote { margin: 0; color: var(--soft); font-size: 13px; line-height: 1.4 }
+.next { display: grid; gap: 4px }
+.next > span { font: 11px var(--mono); color: var(--sub); letter-spacing: 0.4px }
+.next ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px }
+.next li {
+  color: var(--sub);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.unlock { margin: 0; font: 12px var(--mono); color: var(--sub) }
+.clock { position: relative }
+.gain {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  color: var(--gold);
+  font: 700 12px var(--mono);
+  pointer-events: none;
+  animation: rise 1.1s ease-out;
+}
+.gain.credits { left: 0 }
+.gain.xp { left: 112px }
+@keyframes rise { to { transform: translateY(-14px) } }
 .shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
 .shop-list button {
   width: 100%;

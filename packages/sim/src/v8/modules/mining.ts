@@ -68,7 +68,9 @@ export function mining(site: Site): Brick[] {
         if (!next) return
         const pos = cell(ctx.world, next)
         if (distance(d.pos, pos) !== 1) throw new Error('The next path cell must be one step away.')
+        const cells = path.map(step => cell(ctx.world, step))
         d.pos = pos
+        d.route = cells.slice(index + 1)
       }),
     brick('drone.mine', 'mine(vein: Vein): void', 'Take nearby ore into cargo.', 'drone.mine(veins()[0])', action,
       (ctx, name, veinName) => {

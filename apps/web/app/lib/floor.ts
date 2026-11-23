@@ -80,6 +80,7 @@ export class FloorScene {
   private readonly haulers: {
     art: Container
     cargo: Graphics
+    badge: Text
     offset: number
     fromX: number
     fromY: number
@@ -87,13 +88,19 @@ export class FloorScene {
     y: number
   }[] = []
   private readonly seen = new Set<string>()
+  private readonly paths: Graphics
+  private readonly ring: Graphics
   private readonly fire: Graphics
   private readonly ingot: Graphics
   private arrivals = 0
   private lastTick = -1
+  private hover = ''
+  private latest: FloorWorld
 
   constructor(world: FloorWorld) {
+    this.latest = world
     land(this.root, world.grid)
+    this.paths = this.root.addChild(new Graphics())
     for (const vein of world.veins) this.placeVein(vein)
     caption(equipment(this.root, world.depot.pos, depot), 'Depot', 0, -63)
     const smelter = equipment(this.root, world.furnace.pos, furnace)
@@ -103,6 +110,7 @@ export class FloorScene {
     this.fire.ellipse(3, -22, 9, 2.6).fill(0xffdb80)
     this.ingot = smelter.addChild(materialArt('iron-ingot'))
     this.ingot.position.set(31, 18)
+    this.ring = this.root.addChild(new Graphics())
     for (const drone of world.drones) this.placeHauler(drone)
   }
 
@@ -128,16 +136,59 @@ export class FloorScene {
     const cargo = art.addChild(materialArt(drone.carrying === 'coal' ? 'coal' : 'iron-ore'))
     cargo.position.set(-7, -12)
     caption(art, drone.name, 0, 9)
+    const badge = art.addChild(label(`${drone.cargo}/${drone.capacity}`, 13, 0xf2ead8))
+    badge.anchor.set(0.5, 1)
+    badge.position.set(0, -30)
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
-    this.haulers.push({ art, cargo, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+    this.haulers.push({ art, cargo, badge, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+  }
+
+  highlight(id = '') {
+    if (id === this.hover) return
+    this.hover = id
+    this.paintRing(this.latest)
+  }
+
+  private paintRing(world: FloorWorld) {
+    this.ring.clear()
+    if (!this.hover) return
+    const spots = [
+      ...world.drones.map(drone => ({ id: drone.name, pos: drone.pos })),
+      ...world.veins.filter(vein => !vein.hidden).map(vein => ({ id: `Vein ${vein.name}`, pos: vein.pos })),
+      { id: 'furnace', pos: world.furnace.pos },
+      { id: 'depot', pos: world.depot.pos },
+    ]
+    const spot = spots.find(item => item.id === this.hover)
+    if (!spot) return
+    const point = center(spot.pos)
+    this.ring.circle(point.x, point.y, 38).stroke({ color: 0xeabe50, width: 2, alpha: 0.85 })
+  }
+
+  private paintRoutes(world: FloorWorld) {
+    this.paths.clear()
+    for (const drone of world.drones) {
+      const route = drone.route
+      if (!route?.length) continue
+      const start = center(drone.pos)
+      let pen = this.paths.moveTo(start.x, start.y)
+      for (const step of route) {
+        const point = center(step)
+        pen = pen.lineTo(point.x, point.y)
+      }
+      pen.stroke({ color: 0xf2ead8, width: 2, alpha: 0.28 })
+    }
   }
 
   update(world: FloorWorld) {
+    this.latest = world
     for (const vein of world.veins) this.placeVein(vein)
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
     const count = world.drones.length
     for (const [i, item] of this.haulers.entries()) item.offset = (i - (count - 1) / 2) * 25
+    for (const [i, drone] of world.drones.entries()) this.haulers[i]!.badge.text = `${drone.cargo}/${drone.capacity}`
+    this.paintRoutes(world)
+    this.paintRing(world)
     if (world.tick === this.lastTick) return
     const restart = world.tick < this.lastTick
     this.lastTick = world.tick
