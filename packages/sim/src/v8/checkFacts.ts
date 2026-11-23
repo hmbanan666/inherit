@@ -53,16 +53,29 @@ function fullStillAtVein(world: World, kind?: 'ore' | 'coal') {
   return `${best.name} is full (${best.cargo}/${best.capacity}) at Vein ${best.vein} and not moving`
 }
 
+function miningFact(world: World) {
+  for (const drone of world.drones) {
+    const dig = drone.dig
+    if (!dig || dig.ticks < 1) continue
+    const vein = world.veins.find(item => item.name === dig.vein)
+    if (!vein) continue
+    return `${drone.name} mining Vein ${vein.name} (${vein.purity}): ${dig.ticks}/${vein.ticksPerUnit} ticks`
+  }
+}
+
 /** The first fact that explains why this one check is not passing. */
 function blockingFact(world: World, quest: QuestDef, id: string) {
   const furnace = world.furnace
-  if (id === 'ore') return fullStillAtVein(world) ?? 'furnace input 0'
+  if (id === 'ore') return fullStillAtVein(world) ?? miningFact(world) ?? (furnace.input >= (furnace.oreMax ?? 6) ? 'furnace full' : 'furnace input 0')
   if (id === 'ingot' || id === 'smelt') {
+    if (furnace.input >= (furnace.oreMax ?? 6) && furnace.output === 0 && world.ingotsMade === 0) return 'furnace full'
     if (furnace.output === 0 && world.ingotsMade === 0) return 'furnace output 0'
     return `ingots made ${world.ingotsMade}`
   }
-  if (id === 'coal') return fullStillAtVein(world, 'coal') ?? 'furnace coal 0'
+  if (id === 'coal') return fullStillAtVein(world, 'coal') ?? miningFact(world) ?? (furnace.coal >= (furnace.coalMax ?? 3) ? 'furnace full' : 'furnace coal 0')
   if (id === 'steel' || id === 'both') {
+    if (furnace.coal >= (furnace.coalMax ?? 3) && furnace.steel === 0 && world.steelMade === world.steelMark) return 'furnace full'
+    if (furnace.input >= (furnace.oreMax ?? 6) && furnace.steel === 0 && world.steelMade === world.steelMark) return 'furnace full'
     if (furnace.coal === 0) return 'furnace coal 0'
     if (furnace.input < 2) return `furnace input ${furnace.input}`
     return 'furnace steel 0'
@@ -73,11 +86,6 @@ function blockingFact(world: World, quest: QuestDef, id: string) {
     if (!drone) return `drones ${world.drones.length}`
     if (drone.pos.x === world.depot.pos.x && drone.pos.y === world.depot.pos.y) return 'drone-2 is at the depot'
     return `drone-2 pos ${drone.pos.x},${drone.pos.y}`
-  }
-  if (id === 'dry' || id === 'other') {
-    const vein = world.veins.find(item => item.name === 'A')
-    if (id === 'dry') return `Vein A left ${vein?.left ?? 0}`
-    return `ore after dry ${world.oreAfterDry}`
   }
   if (id === 'memory') {
     const calls = world.pathWindow.reduce((sum, count) => sum + count, 0)
@@ -92,8 +100,6 @@ function motionKey(world: World, quest: QuestDef, id: string) {
   if (id === 'ingot' || id === 'smelt' || id === 'steel')
     return `${furnace.input}|${furnace.output}|${furnace.steel}|${furnace.readyAt}|${world.ingotsMade}|${world.steelMade}`
   if (id === 'done') return `${shipped(world, quest.id)}|${furnace.output}|${furnace.steel}|${drones}`
-  if (id === 'dry' || id === 'other')
-    return world.veins.map(vein => `${vein.name}:${vein.left}`).join(';') + `|${world.oreAfterDry}`
   if (id === 'memory') return world.pathWindow.join(',')
   return `${drones}|${furnace.input}|${furnace.coal}|${furnace.output}`
 }
@@ -129,7 +135,9 @@ export function readChecks(world: World, quest: QuestDef): CheckReading[] {
     if (!blocker) {
       const stuck = stalled(world, quest, test.id)
       blocker = { label: test.text, stuck }
-      return { id: test.id, text, state: stuck ? 'failed' as const : 'pending' as const, reason: stuck ? blockingFact(world, quest, test.id) : undefined }
+      const fact = blockingFact(world, quest, test.id)
+      const live = fact.includes(' mining Vein ')
+      return { id: test.id, text, state: stuck ? 'failed' as const : 'pending' as const, reason: stuck || live ? fact : undefined }
     }
     return {
       id: test.id,
@@ -140,20 +148,21 @@ export function readChecks(world: World, quest: QuestDef): CheckReading[] {
   })
 }
 
-export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'depot'>, x: number, y: number) {
+export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'depot'>, x: number, y: number): { id: string; fields: string[]; dump?: string } | undefined {
   const drone = world.drones.find(item => item.pos.x === x && item.pos.y === y)
   if (drone) return {
     id: drone.name,
     fields: [`pos ${drone.pos.x},${drone.pos.y}`, `cargo ${drone.cargo}/${drone.capacity}`, `cargoKind ${drone.carrying ?? 'null'}`],
+    dump: drone.name,
   }
   const vein = world.veins.find(item => !item.hidden && item.pos.x === x && item.pos.y === y)
   if (vein) return {
     id: `Vein ${vein.name}`,
-    fields: [`pos ${vein.pos.x},${vein.pos.y}`, `ore left ${vein.left}`],
+    fields: [`pos ${vein.pos.x},${vein.pos.y}`, `purity ${vein.purity}`, `${vein.ticksPerUnit} ticks per unit`, `${vein.yield} per action`],
   }
   if (world.furnace.pos.x === x && world.furnace.pos.y === y) return {
     id: 'furnace',
-    fields: [`pos ${world.furnace.pos.x},${world.furnace.pos.y}`, `input ${world.furnace.input}`],
+    fields: [`pos ${world.furnace.pos.x},${world.furnace.pos.y}`, `input ${world.furnace.input}/${world.furnace.oreMax ?? 6}`, `coal ${world.furnace.coal}/${world.furnace.coalMax ?? 3}`],
   }
   if (world.depot.pos.x === x && world.depot.pos.y === y) return {
     id: 'depot',

@@ -24,14 +24,14 @@ export function brick(name: string, signature: string, doc: string, example: str
   return { name, signature, doc, example, cost, since: '1.0', handler }
 }
 
-export function declarations(bricks: Brick[]) {
+export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new Set()) {
   const declaration = (b: Brick, prefix = '') =>
-    `  /** ${b.doc} CPU: ${b.cost}.${b.deprecated ? ' @deprecated Use ' + b.deprecated.use : ''} */\n  ${prefix}${b.signature}`
+    `  /** ${fresh.has(b.name) ? 'new. ' : ''}${b.doc} CPU: ${b.cost}.${b.deprecated ? ' @deprecated Use ' + b.deprecated.use : ''} */\n  ${prefix}${b.signature}`
   const members = (owner: string) => bricks.filter(b => b.name.startsWith(owner)).map(b => declaration(b)).join('\n')
   return `declare module "inherit" {
   export interface Cell { x: number; y: number }
   export interface Target { readonly pos: Cell }
-  export interface Vein extends Target { readonly name: string; readonly left: number; readonly kind: 'ore' | 'coal' }
+  export interface Vein extends Target { readonly name: string; readonly kind: 'ore' | 'coal'; readonly purity: 'poor' | 'normal' | 'rich'; readonly ticksPerUnit: number; readonly yield: number }
   export interface Order { readonly id: string; readonly item: 'ingot' | 'steel'; readonly qty: number; readonly shipped: number; readonly due: number; readonly pay: number; readonly from: string }
   export interface Furnace extends Target {
 ${members('furnace.')}

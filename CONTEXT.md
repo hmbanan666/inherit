@@ -10,12 +10,12 @@ One game played by writing TypeScript. You inherit Kettlewick Works and Uncle's 
 | Site | A map with a depot, drones, veins, a furnace, a quest list and starting files. Pure data. |
 | Inherited code | Uncle's `main.ts`. It mines and never comes home (`const home = false`). |
 | Tick | One step of the world, 0.5 s. `onTick` runs once per tick. The clock does not pause and has no speed control. |
-| CPU | The nav shows used/limit. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. |
+| CPU | A budget per tick. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it when the tick is spending half the budget or more. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. |
 | Quest | One villager's ask. Taken by hand, one at a time, with no deadline. Bram, Odile, Elsie, Tomas, Pell, then Wen. |
-| Check | One sentence under the editor about the live world. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. |
-| Hint | The quest card's why line. It never contains the solution. It may name a field, a brick, or a shop item. |
-| Credits | Paid by Complete quest. Spent only in the shop. Never negative. There is no rent. |
+| Check | One progress line on the quest rail. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. |
+| Hint | A comment inserted once at the top of the open file when the quest is taken. It never contains the solution, and it is not put back if the player deletes it. |
+| Credits | Paid by Hand over. Spent only in the shop. Never negative. There is no rent. |
 | XP | Paid with the credits when a quest is completed. A speed bonus is decided and not built yet. |
 | Level | From XP. This chain's thresholds are 20, 40, 65, 90, 115 and 145, so each quest raises one level and unlocks the next villager. |
 | Shop | Where credits are spent. A purchase applies at once. An unaffordable item is refused. Level tiers are decided and not built yet. |

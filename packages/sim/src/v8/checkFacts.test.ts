@@ -86,21 +86,29 @@ test('counts advance and a passing check has no reason', () => {
 test('a route check stays pending until the window is full and the count has sat still', () => {
   const earlyWorld = createWorld(kettlewick)
   earlyWorld.pathWindow = [1, 1, 1]
-  const early = readChecks(earlyWorld, questList[5]!).find(check => check.id === 'memory')
+  const early = readChecks(earlyWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'memory')
   expect(early?.text).toBe('The route is remembered 3/8')
   expect(early?.state).toBe('pending')
   const lateWorld = createWorld(kettlewick)
   lateWorld.pathWindow = [1, 1, 1, 1, 1, 1, 1, 1]
-  const late = afterStill(lateWorld, questList[5]!).find(check => check.id === 'memory')
+  const late = afterStill(lateWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'memory')
   expect(late?.state).toBe('failed')
   expect(late?.reason).toBe('path calls 8')
-  expect(readChecks(lateWorld, questList[5]!).find(check => check.id === 'done')?.reason).toBe('waits on: The route is remembered')
+  expect(readChecks(lateWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'done')?.reason).toBe('waits on: The route is remembered')
 })
 
 test('the next shop tier is the one above this level', () => {
   expect(nextUnlock(1)?.level).toBe(2)
-  expect(nextUnlock(1)?.items).toEqual(['Alloy'])
+  expect(nextUnlock(1)?.items).toEqual(['Bigger hopper'])
   expect(nextUnlock(6)).toBeUndefined()
+})
+
+test('a full hopper is named when it blocks the ingot', () => {
+  const world = bramWorld()
+  world.furnace.input = world.furnace.oreMax
+  const readings = afterStill(world)
+  expect(readings.find(check => check.id === 'ingot')?.reason).toBe('furnace full')
+  expect(readings.find(check => check.id === 'done')?.reason).toBe('waits on: The furnace makes an ingot')
 })
 
 test('a click reads the fields on that cell', () => {
@@ -108,8 +116,8 @@ test('a click reads the fields on that cell', () => {
   const drone = world.drones[0]!
   drone.pos = { x: 6, y: 2 }
   drone.cargo = 3
-  expect(inspectAt(world, 6, 2)).toEqual({ id: 'drone-1', fields: ['pos 6,2', 'cargo 3/3', 'cargoKind null'] })
-  expect(inspectAt(world, 2, 1)?.fields).toContain('input 0')
+  expect(inspectAt(world, 6, 2)).toEqual({ id: 'drone-1', fields: ['pos 6,2', 'cargo 3/3', 'cargoKind null'], dump: 'drone-1' })
+  expect(inspectAt(world, 2, 1)?.fields).toContain('input 0/6')
   expect(inspectAt(world, 1, 1)?.id).toBe('depot')
 })
 

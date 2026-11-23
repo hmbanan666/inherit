@@ -20,8 +20,8 @@ const home = {
 const steel = `import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 export function onTick() {
   const drone = drones()[0]
-  const ore = veins().find(vein => vein.kind === "ore" && vein.left > 0)
-  const coal = veins().find(vein => vein.kind === "coal" && vein.left > 0)
+  const ore = veins().find(vein => vein.kind === "ore")
+  const coal = veins().find(vein => vein.kind === "coal")
   const fetchingCoal = drone.carrying === "coal" || (furnace.coal < 1 && furnace.input >= 2 && drone.cargo === 0)
   const vein = fetchingCoal ? coal : ore
   if (!vein) return
@@ -36,8 +36,8 @@ export function onTick() {
 
 const pair = `import { drones, veins, furnace, orders, ship, findPath } from "inherit"
 export function onTick() {
-  const ore = veins().find(vein => vein.kind === "ore" && vein.left > 0)
-  const coal = veins().find(vein => vein.kind === "coal" && vein.left > 0)
+  const ore = veins().find(vein => vein.kind === "ore")
+  const coal = veins().find(vein => vein.kind === "coal")
   for (const drone of drones()) {
     const vein = drone.name === "drone-2" ? coal : ore
     if (!vein) continue
@@ -66,8 +66,8 @@ function walk(drone, target) {
   drone.moveAlong(path)
 }
 export function onTick() {
-  const ore = veins().find(vein => vein.kind === "ore" && vein.left > 0)
-  const coal = veins().find(vein => vein.kind === "coal" && vein.left > 0)
+  const ore = veins().find(vein => vein.kind === "ore")
+  const coal = veins().find(vein => vein.kind === "coal")
   for (const drone of drones()) {
     const vein = drone.name === "drone-2" ? coal : ore
     if (!vein) continue
@@ -86,10 +86,25 @@ export function onTick() {
   for (const order of orders()) ship(order)
 }`
 
+const richHaul = `import { drones, veins, furnace, orders, ship, findPath, prospect, memory } from "inherit"
+export function onTick() {
+  if (!memory.opened) { prospect(); memory.opened = true }
+  const vein = veins().find(item => item.name === "C") || veins().find(item => item.kind === "ore")
+  const drone = drones()[0]
+  if (!vein) return
+  const home = drone.cargo >= drone.capacity
+  const target = home ? furnace : vein
+  if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
+  else if (home) drone.unload(furnace)
+  else drone.mine(vein)
+  if (furnace.input >= 2) furnace.smelt()
+  for (const order of orders()) ship(order)
+}`
+
 const prospected = `import { drones, veins, furnace, orders, ship, findPath, prospect, memory } from "inherit"
 export function onTick() {
   if (!memory.opened) { prospect(); memory.opened = true }
-  const vein = veins().find(item => item.kind === "ore" && item.left > 0)
+  const vein = veins().find(item => item.kind === "ore")
   const drone = drones()[0]
   if (!vein) return
   const home = drone.cargo >= drone.capacity
@@ -132,14 +147,14 @@ test('each quest pays on completion and the previous program does not pass the n
     expect(session.accept()).toBe(true)
     session.step(80)
     expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
-    expect(session.buy('alloy')).toBe(true)
-    expect(session.world.credits).toBe(330)
+    expect(session.buy('alloy')).toBe(false)
+    const held = session.world.credits
     session.world.credits = 10
     expect(session.buy('drone')).toBe(false)
     expect(session.world.credits).toBe(10)
-    session.world.credits = 330
+    session.world.credits = held
     await session.deploy({ 'main.ts': steel })
-    await reach(session, session.world.tick + 500)
+    await reach(session, session.world.tick + 1500)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
 
@@ -148,18 +163,26 @@ test('each quest pays on completion and the previous program does not pass the n
     expect(open(session.world)).toBe(true)
     expect(session.buy('drone')).toBe(true)
     await session.deploy({ 'main.ts': pair })
-    await reach(session, session.world.tick + 700)
+    await reach(session, session.world.tick + 2000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
 
     expect(session.accept()).toBe(true)
-    await session.deploy(home)
+    expect(session.world.questId).toBe('harrow')
     session.step(40)
-    expect(session.world.messages.some(message => message.text.includes('Vein A (ore) left 0'))).toBe(true)
-    expect(session.world.checks.find(check => check.id === 'other')?.status).not.toBe('green')
-    expect(session.buy('prospect')).toBe(true)
-    await session.deploy({ 'main.ts': prospected })
-    await reach(session, session.world.tick + 400)
+    expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
+    await session.deploy({ 'main.ts': richHaul })
+    await reach(session, session.world.tick + 5000)
+    expect(open(session.world)).toBe(false)
+    expect(session.complete()).toBe(true)
+
+    expect(session.accept()).toBe(true)
+    expect(session.world.questId).toBe('tomas')
+    await session.deploy({ 'main.ts': steel })
+    session.step(40)
+    expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
+    await session.deploy({ 'main.ts': richHaul })
+    await reach(session, session.world.tick + 1200)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
 
@@ -168,7 +191,7 @@ test('each quest pays on completion and the previous program does not pass the n
     session.step(60)
     expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
     await session.deploy({ 'main.ts': prospected })
-    await reach(session, session.world.tick + 300)
+    await reach(session, session.world.tick + 800)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
 
@@ -177,7 +200,7 @@ test('each quest pays on completion and the previous program does not pass the n
     session.step(30)
     expect(session.world.checks.find(check => check.id === 'memory')?.status).not.toBe('green')
     await session.deploy({ 'main.ts': remembered })
-    await reach(session, session.world.tick + 500)
+    await reach(session, session.world.tick + 1500)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
     expect(session.world.status).toBe('More is coming.')

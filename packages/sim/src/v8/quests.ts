@@ -10,20 +10,26 @@ export interface QuestTest {
 export interface QuestDef {
   id: string
   from: string
-  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen'
+  who: 'bram' | 'odile' | 'elsie' | 'tomas' | 'pell' | 'wen' | 'harrow'
   role: string
-  building: 'forge' | 'bridge' | 'bakery' | 'mill' | 'riverside' | 'lamp-street'
+  building: 'forge' | 'bridge' | 'bakery' | 'mill' | 'riverside' | 'lamp-street' | 'town-hall'
   title: string
   goal: string
   why: string
   /** One line in the villager's voice. It is not a hint and not a solution. */
   quote: string
+  /** One line under the name. The quote and the need, and nothing else. */
+  ask: string
+  /** Inserted once at the top of the open file. A nudge, never a solution or a shop. */
+  nudge: string
   change: string
   item: 'ingot' | 'steel'
   qty: number
   pay: number
   xp: number
   needLevel: number
+  /** A function this quest grants on Take. The signature is a recipe, not a solution. */
+  unlock?: { brick: string; signature: string; legacy?: string }
   prepare?(world: World): void
   tests: QuestTest[]
 }
@@ -57,6 +63,8 @@ export const questList: QuestDef[] = [
     goal: 'Bring Bram 4 ingots.',
     why: 'The cart fills at the vein and stays there, so the furnace never receives ore.',
     quote: 'The mail horse throws a shoe on every hill.',
+    ask: 'The mail horse throws a shoe on every hill. I need four ingots.',
+    nudge: 'the cart sits full at the vein, and the furnace is still cold.',
     change: 'The forge is lit. The mail horse has shoes.',
     item: 'ingot', qty: 4, pay: 80, xp: 20, needLevel: 1,
     tests: [
@@ -69,8 +77,11 @@ export const questList: QuestDef[] = [
     id: 'odile', from: 'Mayor Odile', who: 'odile', role: 'Mayor', building: 'bridge',
     title: 'Steel for the bridge',
     goal: 'Bring Odile 4 steel.',
-    why: 'Steel is ore and coal smelted together. Vein B is coal. Alloy is in the shop.',
+    why: 'Steel is 2 ore and 1 coal alloyed together. Vein B is coal. furnace.alloy() makes steel.',
+    unlock: { brick: 'furnace.alloy', signature: 'furnace.alloy(): 2 ore + 1 coal -> 1 steel', legacy: 'alloy' },
     quote: 'Two banks, and no way across.',
+    ask: 'Two banks, and no way across. I need steel for the bridge.',
+    nudge: 'steel is ore and coal together. Where would they meet?',
     change: 'The bridge stands. Kettlewick can cross the river again.',
     item: 'steel', qty: 4, pay: 100, xp: 20, needLevel: 2,
     tests: [
@@ -83,14 +94,17 @@ export const questList: QuestDef[] = [
     id: 'elsie', from: 'Elsie', who: 'elsie', role: 'Baker', building: 'bakery',
     title: 'A grate for the oven',
     goal: 'Bring Elsie 6 steel before the ore cools.',
-    why: 'One cart cannot fetch coal before the ore cools. A second drone is in the shop. Give each drone a job.',
+    why: 'One cart cannot fetch coal before the ore cools. One cart cannot be in two places.',
     quote: 'The oven has been cold since dawn.',
+    ask: 'The oven has been cold since dawn. I need a grate before the ore cools.',
+    nudge: 'ore cools if the coal is late. One cart cannot be in two places.',
     change: 'The bakery is warm again.',
     item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
     prepare: world => {
-      // Ore lasts 20 ticks, long enough for a drone that only hauls ore.
-      // Coal lasts 8, shorter than a trip to the ore vein, so one drone cannot keep both.
-      world.holdTicks = 20
+      // Poor veins are slow. Ore lasts 48 ticks and coal 24, long enough for two drones
+      // working at once, and shorter than one drone fetching both.
+      world.holdTicks = 48
+      world.coalHold = 24
       world.steelMark = world.steelMade
     },
     tests: [
@@ -103,22 +117,34 @@ export const questList: QuestDef[] = [
     ],
   },
   {
+    id: 'harrow', from: 'Harrow', who: 'harrow', role: 'Surveyor', building: 'town-hall',
+    title: 'Iron from the hill',
+    goal: 'Bring Harrow 60 ingots.',
+    why: 'Vein A is poor: 5 ticks for 1 ore. A richer vein is hidden. prospect() reveals it.',
+    quote: 'The stores want iron, and the old cut is a slow teacher.',
+    ask: 'The stores want iron, and the old cut is a slow teacher. I need sixty ingots.',
+    nudge: 'the old cut is slow. A richer vein is still hidden.',
+    change: 'The hill is open.',
+    item: 'ingot', qty: 60, pay: 80, xp: 0, needLevel: 4,
+    unlock: { brick: 'prospect', signature: 'prospect(): reveals the next hidden vein', legacy: 'prospect' },
+    tests: [
+      { id: 'done', text: 'Harrow receives 60 ingots', pass: world => shipped(world, 'harrow') >= 60 },
+    ],
+  },
+  {
     id: 'tomas', from: 'Tomas', who: 'tomas', role: 'Miller', building: 'mill',
     title: 'Iron for the mill wheel',
-    goal: 'Bring Tomas 4 ingots after vein A runs out.',
-    why: 'Vein A is nearly spent. Mining an empty vein stops the tick. Prospect, in the shop, opens another ore vein.',
+    goal: 'Bring Tomas 8 ingots.',
+    why: 'The mill wheel needs iron. Smelt ore into ingots.',
     quote: 'The wheel sits in the race and will not turn.',
+    ask: 'The wheel sits in the race and will not turn. I need iron for it.',
+    nudge: 'the wheel needs iron. Ore will not turn it.',
     change: 'The mill wheel turns.',
-    item: 'ingot', qty: 4, pay: 100, xp: 25, needLevel: 4,
-    prepare: world => {
-      const vein = world.veins.find(item => item.name === 'A')
-      if (vein) vein.left = 2
-      world.oreAfterDry = 0
-    },
+    item: 'ingot', qty: 8, pay: 100, xp: 25, needLevel: 4,
+    prepare: world => { world.ingotsMade = 0 },
     tests: [
-      { id: 'dry', text: 'Vein A is empty', pass: world => world.veins.find(item => item.name === 'A')?.left === 0 },
-      { id: 'other', text: 'Ore arrives from another vein', pass: world => world.oreAfterDry > 0 },
-      { id: 'done', text: 'Tomas receives 4 ingots', pass: world => shipped(world, 'tomas') >= 4 },
+      { id: 'smelt', text: 'An ingot is smelted this quest', pass: world => world.ingotsMade > 0 },
+      { id: 'done', text: 'Tomas receives 8 ingots', pass: world => shipped(world, 'tomas') >= 8 },
     ],
   },
   {
@@ -127,6 +153,8 @@ export const questList: QuestDef[] = [
     goal: 'Bring Pell 4 ingots.',
     why: 'Pell wants plain ingots. Steel will not do. Smelt ore on its own when the order asks for ingots.',
     quote: 'Rope will not hold a barrel of ale.',
+    ask: 'Rope will not hold a barrel of ale. I need plain ingots.',
+    nudge: 'the barrels want plain ingots. Steel will not do.',
     change: 'The barrels have hinges.',
     item: 'ingot', qty: 4, pay: 80, xp: 25, needLevel: 5,
     prepare: world => { world.ingotsMade = 0 },
@@ -141,6 +169,8 @@ export const questList: QuestDef[] = [
     goal: 'Bring Wen 4 steel without spending the CPU on a fresh path every tick.',
     why: 'Calling findPath for every drone on every tick spends the CPU. Remember a route and reuse it.',
     quote: 'The street lamps have been dark a week.',
+    ask: 'The street lamps have been dark a week. I need steel, and a path worth keeping.',
+    nudge: 'a fresh path every tick spends the oil. A road can be remembered.',
     change: 'The lamps are lit.',
     item: 'steel', qty: 4, pay: 120, xp: 30, needLevel: 6,
     prepare: world => {
@@ -155,7 +185,6 @@ export const questList: QuestDef[] = [
 ]
 
 export const shop: ShopItem[] = [
-  { id: 'alloy', name: 'Alloy', price: 50, detail: 'furnace.alloy() makes one steel from 2 ore and 1 coal.', apply: () => {} },
   { id: 'furnace', name: 'Hotter furnace', price: 60, detail: 'A batch finishes in 2 ticks instead of 4.', apply: world => { world.batchTicks = 2 } },
   { id: 'cart', name: 'Bigger cart', price: 40, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
   {
@@ -165,16 +194,15 @@ export const shop: ShopItem[] = [
       world.drones.push({ name: 'drone-2', pos: { ...world.depot.pos }, cargo: 0, capacity: world.drones[0]?.capacity ?? 3, carrying: null, source: '' })
     },
   },
-  { id: 'prospect', name: 'Prospect', price: 40, detail: 'prospect() reveals the next hidden vein.', apply: () => {} },
+  { id: 'hopper', name: 'Bigger hopper', price: 50, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
   { id: 'cpu', name: 'CPU +10', price: 80, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
 
-/** Shop tiers open with the villager who needs them. The names are the shelf labels. */
+/** Conveniences and limits. A function is granted by the quest that needs it, not sold. */
 export const shopTiers: { level: number; items: string[] }[] = [
   { level: 1, items: ['Bigger cart', 'Hotter furnace'] },
-  { level: 2, items: ['Alloy'] },
+  { level: 2, items: ['Bigger hopper'] },
   { level: 3, items: ['Second drone'] },
-  { level: 4, items: ['Prospect'] },
   { level: 6, items: ['CPU +10'] },
 ]
 
@@ -189,8 +217,7 @@ export function upcomingQuests(id: string, count = 3) {
 }
 
 export function nextQuest(world: World, site: Site) {
-  const quest = site.questList?.find(item => !world.cleared.includes(item.id))
-  if (!quest || world.level < quest.needLevel) return undefined
+  const quest = site.questList?.find(item => !world.cleared.includes(item.id) && world.level >= item.needLevel)
   return quest
 }
 
@@ -206,9 +233,11 @@ export function syncQuest(world: World, site: Site) {
   return world.checks.find(check => check.status !== 'green')?.text ?? 'Every test passes. Complete the quest.'
 }
 
-export function acceptQuest(world: World, site: Site) {
+export function acceptQuest(world: World, site: Site, id?: string) {
   if (world.questId) return false
-  const quest = nextQuest(world, site)
+  const quest = id
+    ? site.questList?.find(item => item.id === id && !world.cleared.includes(item.id) && world.level >= item.needLevel)
+    : nextQuest(world, site)
   if (!quest) return false
   world.questId = quest.id
   quest.prepare?.(world)
@@ -245,4 +274,27 @@ export function buyUpgrade(world: World, id: string) {
   world.bought.push(id)
   item.apply(world)
   return true
+}
+
+/** True when no quest owns the brick, the player already bought it, or they have reached the quest that grants it. */
+export function functionUnlocked(world: Pick<World, 'questId' | 'cleared' | 'bought'>, brick: string) {
+  const quest = questList.find(item => item.unlock?.brick === brick)
+  if (!quest?.unlock) return true
+  if (quest.unlock.legacy && world.bought.includes(quest.unlock.legacy)) return true
+  if (world.questId === quest.id || world.cleared.includes(quest.id)) return true
+  const index = questList.findIndex(item => item.id === quest.id)
+  return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
+}
+
+/** The brick the active quest just granted. It clears when that quest is completed. */
+export function freshBrick(world: Pick<World, 'questId'> | undefined, brick: string) {
+  if (!world?.questId) return false
+  return questList.find(item => item.id === world.questId)?.unlock?.brick === brick
+}
+
+export function unlockError(brick: string) {
+  const quest = questList.find(item => item.unlock?.brick === brick)
+  const call = `${brick}()`
+  if (!quest) return `${call} is not unlocked.`
+  return `${call} unlocks with the quest ${quest.title} (level ${quest.needLevel}).`
 }

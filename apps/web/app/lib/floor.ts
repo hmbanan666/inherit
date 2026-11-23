@@ -81,6 +81,7 @@ export class FloorScene {
     art: Container
     cargo: Graphics
     badge: Text
+    bar: Graphics
     offset: number
     fromX: number
     fromY: number
@@ -88,6 +89,7 @@ export class FloorScene {
     y: number
   }[] = []
   private readonly seen = new Set<string>()
+  private readonly veinBars = new Map<string, Graphics>()
   private readonly paths: Graphics
   private readonly ring: Graphics
   private readonly fire: Graphics
@@ -125,7 +127,11 @@ export class FloorScene {
       ore.position.set(x - 19 + ((i * 11) % 39), y - 7 + ((i * 8) % 16))
       ore.scale.set(1 + (i % 3) * 0.24)
     }
-    caption(this.root, 'Vein ' + vein.name, x, y + 22)
+    const tint = vein.purity === 'rich' ? 0xe0b15a : vein.purity === 'normal' ? 0x8d9a6a : 0x7a6558
+    this.root.addChild(new Graphics()).ellipse(x, y + 4, 36, 16).stroke({ color: tint, width: 3, alpha: 0.9 })
+    caption(this.root, `Vein ${vein.name}  ${vein.purity ?? 'poor'}`, x, y + 22)
+    const bar = this.root.addChild(new Graphics())
+    this.veinBars.set(vein.name, bar)
   }
 
   private placeHauler(drone: FloorWorld['drones'][number]) {
@@ -139,9 +145,10 @@ export class FloorScene {
     const badge = art.addChild(label(`${drone.cargo}/${drone.capacity}`, 13, 0xf2ead8))
     badge.anchor.set(0.5, 1)
     badge.position.set(0, -30)
+    const bar = art.addChild(new Graphics())
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
-    this.haulers.push({ art, cargo, badge, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+    this.haulers.push({ art, cargo, badge, bar, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
   }
 
   highlight(id = '') {
@@ -189,7 +196,28 @@ export class FloorScene {
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
     const count = world.drones.length
     for (const [i, item] of this.haulers.entries()) item.offset = (i - (count - 1) / 2) * 25
-    for (const [i, drone] of world.drones.entries()) this.haulers[i]!.badge.text = `${drone.cargo}/${drone.capacity}`
+    for (const [i, drone] of world.drones.entries()) {
+      const item = this.haulers[i]!
+      item.badge.text = `${drone.cargo}/${drone.capacity}`
+      item.bar.clear()
+      const dig = drone.dig
+      const vein = dig && world.veins.find(entry => entry.name === dig.vein)
+      if (dig && vein && dig.ticks > 0) {
+        const width = 36 * Math.min(1, dig.ticks / vein.ticksPerUnit)
+        item.bar.roundRect(-18, -44, 36, 4, 1).fill(0x2a2b2e)
+        item.bar.roundRect(-18, -44, width, 4, 1).fill(0xe7c56a)
+      }
+    }
+    for (const [name, bar] of this.veinBars) {
+      bar.clear()
+      const vein = world.veins.find(entry => entry.name === name)
+      const digger = world.drones.find(drone => drone.dig?.vein === name && (drone.dig?.ticks ?? 0) > 0)
+      if (!vein || !digger?.dig) continue
+      const { x, y } = center(vein.pos)
+      const width = 40 * Math.min(1, digger.dig.ticks / vein.ticksPerUnit)
+      bar.roundRect(x - 20, y + 42, 40, 4, 1).fill(0x2a2b2e)
+      bar.roundRect(x - 20, y + 42, width, 4, 1).fill(0xe7c56a)
+    }
     this.paintRoutes(world)
     this.paintRing(world)
     if (world.tick === this.lastTick) return

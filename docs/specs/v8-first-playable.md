@@ -12,8 +12,8 @@ Nick opens `/` and reads one villager's quest: the goal, the why line, and the c
 
 The site is Kettlewick Works.
 
-- One drone, capacity 3. Vein A is ore, vein B is coal, vein C is hidden ore.
-- Furnace: 2 ore to 1 ingot in 4 ticks. Steel is 2 ore and 1 coal through `furnace.alloy()`, which the shop sells.
+- One drone, capacity 3. Vein A is poor ore and vein B is poor coal: 5 ticks for 1 rock. Vein C is hidden rich ore: 1 tick for 2 rock. Veins do not run out. `dump()` drops ore or coal; mining the other rock does that on its own and writes an info line. Ingots and steel stay in the cart.
+- Furnace: 2 ore to 1 ingot in 4 ticks. The hopper holds 6 ore and 3 coal. Steel is 2 ore and 1 coal through `furnace.alloy()`, granted by taking Odile's quest. `prospect()` is granted by taking Harrow's quest, Bring Harrow 60 ingots, offered at level 4 before Tomas.
 - CPU limit 30. Tick 500 ms. Credits 300. Level 1. XP 0.
 - Uncle's `main.ts` mines vein A, never returns (`const home = false`), smelts when the furnace holds 2 ore, and ships open orders. Nothing is delivered.
 
@@ -25,8 +25,8 @@ The worker runs one tick on that interval even when the tab is hidden. The visib
 
 Checks are evaluated on the live world every tick after accept. Prepare sets the baseline the quest cares about:
 
-- Elsie sets `holdTicks` to 20 and remembers `steelMade`. Ore waiting longer than 20 ticks is cleared. Coal waiting longer than 8 ticks is cleared.
-- Tomas sets vein A to 2 left and `oreAfterDry` to 0. Mining an empty vein throws and stops the rest of that tick's player code.
+- Elsie sets `holdTicks` to 48 and `coalHold` to 24 and remembers `steelMade`. Ore waiting longer than 48 ticks is cleared. Coal waiting longer than 24 ticks is cleared.
+- Tomas sets `ingotsMade` to 0. The checks are an ingot smelted this quest, and Tomas receiving 8 ingots.
 - Pell sets `ingotsMade` to 0. "Pell receives 4 ingots" also requires four ingots smelted this quest.
 - Wen sets the CPU limit to 18 if CPU +10 is owned, otherwise 8, and clears the path window. "The route is remembered" needs 8 recorded ticks whose `findPath` calls sum to at most 4.
 
@@ -36,7 +36,7 @@ Complete pays `pay` and `xp` in full, then clears the quest id. Waste on the led
 
 ## Shop and frame
 
-Shop items and prices are the concept's list. `buyUpgrade` refuses an owned item and an item the player cannot afford, and it does not change the balance when it refuses.
+Shop items and prices are the concept's list. `buyUpgrade` refuses an unknown id, an owned item, and an item the player cannot afford, and it does not change the balance when it refuses. `alloy` and `prospect` are not shop ids. A `bought` list that still contains them keeps those functions.
 
 The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). The quest card and portrait are on the left, the works are in the center, and Monaco and the file tree are on the right. Checks and Console share the pane to the right of the code. Deploy sits on the editor when the code differs. The nav says Running. Settings open API and Charts. The CPU line is `used/limit`. A call that would pass the limit does not run, and the guest stops the rest of `onTick`. The sim tick still finishes.
 

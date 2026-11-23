@@ -21,6 +21,8 @@ export interface EditorSession {
   traces?: Read<Record<string, {file: string; line: number}[]>>
   setFile(file: string, code: string): void
   openFile(file: string): void
+  /** The factory footer reads the caret. Packs leave it unset. */
+  cursor?: Ref<{ line: number; column: number }>
 }
 export const editorKey: InjectionKey<EditorSession> = Symbol('editor')
 

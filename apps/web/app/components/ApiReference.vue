@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { ApiMethod } from '@inherit/sim/declarations'
-defineProps<{ entries: ApiMethod[]; types?: string[] }>()
+defineProps<{ entries: (ApiMethod & { fresh?: boolean })[]; types?: string[] }>()
 </script>
 
 <template>
   <section class="reference" aria-label="API reference">
     <article v-for="entry in entries" :key="entry.name">
-      <h3><code>{{ entry.signature }}</code></h3>
+      <h3><code>{{ entry.signature }}</code> <small v-if="entry.fresh" class="new">new</small></h3>
       <p>{{ entry.description }}</p>
       <dl v-if="entry.params.length"><template v-for="param in entry.params" :key="param.name">
         <dt><code>{{ param.name }}</code></dt><dd>{{ param.description }}</dd>
@@ -20,6 +20,17 @@ defineProps<{ entries: ApiMethod[]; types?: string[] }>()
 <style scoped>
 article + article { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line) }
 h3 { font-size: 14px; color: var(--accent-soft); overflow-wrap: anywhere }
+.new {
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent-shadow);
+  color: var(--gold);
+  font: 10px var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  vertical-align: 1px;
+}
 p, dl { margin: 6px 0; line-height: 1.5; font-size: 13px }
 dt { color: var(--soft) }
 dd { margin-left: 10px }

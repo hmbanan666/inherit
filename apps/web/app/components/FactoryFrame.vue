@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { declarations, kettlewick, factoryBricks, shop, levelSpan, readChecks, nextUnlock, repeatedLabel, type World } from '@inherit/sim/v8'
+import { declarations, kettlewick, factoryBricks, shop, levelSpan, readChecks, repeatedLabel, functionUnlocked, freshBrick, type World } from '@inherit/sim/v8'
 import ChecksPanel from './ChecksPanel.vue'
-import { Play } from '@lucide/vue'
+import PaneSplit from './PaneSplit.vue'
+import { CircleAlert, Coins, Cpu, Play, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
-  checksPanePx, clampMapHeight, creditSuffix, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
-  questRailPx, readFilesOpen, readMapHeight, readSideTab, sideTabKey, treeRailPx, worldGapPx, worldInsetPx,
+  checksPanePx, clampMapHeight, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
+  questRailPx, readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
+  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
+import { goalLabel, insertQuestNote, questComment } from '../lib/questNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
 const bricks = factoryBricks(kettlewick)
-const locked: Record<string, string> = { 'furnace.alloy': 'alloy', prospect: 'prospect' }
-const visibleBricks = computed(() => bricks.filter(brick => !locked[brick.name] || world.value?.bought.includes(locked[brick.name]!)))
-const api = ref(declarations(bricks.filter(brick => !locked[brick.name])))
+const lockedWorld = { questId: undefined, cleared: [] as string[], bought: [] as string[] }
+const visibleBricks = computed(() => bricks.filter(brick => functionUnlocked(world.value ?? lockedWorld, brick.name)))
+const freshNames = computed(() => new Set(bricks.filter(brick => freshBrick(world.value, brick.name)).map(brick => brick.name)))
+const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name))))
 const entries = computed(() => visibleBricks.value.map(brick => ({
   name: brick.name, signature: brick.name.includes('.') ? brick.name.split('.')[0] + '.' + brick.signature.replace(/^readonly /, '') : brick.signature,
   description: brick.doc + ' CPU: ' + brick.cost + '.', params: [], returns: '', example: brick.example,
+  fresh: freshNames.value.has(brick.name),
 })))
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
@@ -24,8 +29,11 @@ const dirty = computed(() => Object.keys(files.value).length !== Object.keys(dep
   Object.entries(files.value).some(([path, source]) => source !== deployed.value[path]))
 const activeFile = ref('main.ts')
 const navigation = ref({ file: 'main.ts', line: 1 })
+const cursor = ref({ line: 1, column: 1 })
+const notesKey = 'inherit.v8.notes'
+const notes = ref<string[]>([])
 const world = shallowRef<World>()
-watch(visibleBricks, list => { api.value = declarations(list) })
+watch([visibleBricks, freshNames], () => { api.value = declarations(visibleBricks.value, freshNames.value) })
 const error = ref('')
 const saveError = ref('')
 const floorError = ref('')
@@ -33,6 +41,7 @@ const pending = ref(true)
 const panels = ['API', 'Charts'] as const
 const tool = ref<typeof panels[number]>()
 const side = ref<'checks' | 'console'>('checks')
+const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
 const blankConsole = ref(false)
 const zone = ref<'quests' | 'shop'>('quests')
@@ -40,10 +49,13 @@ const questRailCss = questRailPx + 'px'
 const worldGapCss = worldGapPx + 'px'
 const worldInsetCss = worldInsetPx + 'px'
 const headerCss = editorHeaderPx + 'px'
-const checksPaneCss = checksPanePx + 'px'
+const checksPaneCss = computed(() => sideWidth.value + 'px')
 const filesOpen = ref(false)
 const mapHeight = ref(defaultMapHeight())
-const treeColumnCss = computed(() => (filesOpen.value ? fileTreePx : treeRailPx) + 'px')
+const treeWidth = ref(fileTreePx)
+const sideWidth = ref(checksPanePx)
+const editorBay = ref<HTMLElement | null>(null)
+const treeColumnCss = computed(() => (filesOpen.value ? treeWidth.value : treeRailPx) + 'px')
 const mapRowCss = computed(() => mapHeight.value + '%')
 let filesReady = false
 let sideReady = false
@@ -62,50 +74,69 @@ function setMapHeight(value: number) {
   try { localStorage.setItem(mapHeightKey, String(Math.round(mapHeight.value * 10) / 10)) }
   catch { /* Keep the height for this session. */ }
 }
-function resizeMap(event: PointerEvent) {
-  const stage = (event.currentTarget as HTMLElement).parentElement
-  if (!stage) return
-  const el = event.currentTarget as HTMLElement
-  el.setPointerCapture(event.pointerId)
-  const move = (e: PointerEvent) => {
-    const rect = stage.getBoundingClientRect()
-    if (rect.height < 1) return
-    setMapHeight(((e.clientY - rect.top) / rect.height) * 100)
-  }
-  el.addEventListener('pointermove', move)
-  el.addEventListener('lostpointercapture', () => el.removeEventListener('pointermove', move), { once: true })
+function rememberWidth(key: string, value: number) {
+  try { localStorage.setItem(key, String(value)) }
+  catch { /* Keep the width for this session. */ }
 }
-const hintOpen = ref(true)
+function setTreeWidth(value: number) {
+  treeWidth.value = readPaneWidth(String(value), treeWidthMin, treeWidthMax, fileTreePx)
+  rememberWidth(treeWidthKey, treeWidth.value)
+}
+function setSideWidth(value: number) {
+  sideWidth.value = readPaneWidth(String(value), sideWidthMin, sideWidthMax, checksPanePx)
+  rememberWidth(sideWidthKey, sideWidth.value)
+}
+function onMap(event: PointerEvent) {
+  const stage = (event.currentTarget as HTMLElement).parentElement
+  const rect = stage?.getBoundingClientRect()
+  if (!rect || rect.height < 1) return
+  setMapHeight(((event.clientY - rect.top) / rect.height) * 100)
+}
+function onTree(event: PointerEvent) {
+  const rect = editorBay.value?.getBoundingClientRect()
+  if (!rect) return
+  filesOpen.value = true
+  setTreeWidth(event.clientX - rect.left)
+}
+function onSide(event: PointerEvent) {
+  const rect = editorBay.value?.getBoundingClientRect()
+  if (!rect) return
+  setSideWidth(rect.right - event.clientX)
+}
+function nudgeTree(direction: -1 | 1) {
+  filesOpen.value = true
+  setTreeWidth(treeWidth.value + direction * 16)
+}
+function nudgeSide(direction: -1 | 1) {
+  setSideWidth(sideWidth.value - direction * 16)
+}
 const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
-const offers = computed(() => {
+const available = computed(() => {
   const current = world.value
   if (!current || current.questId) return []
-  return (kettlewick.questList ?? []).filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel)
+  return kettlewick.questList?.filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel) ?? []
 })
-const shown = computed(() => activeQuest.value ? [activeQuest.value] : offers.value)
-const order = computed(() => world.value?.orders.find(item => item.id === world.value?.questId))
+const readingId = ref<string>()
+const reading = computed(() => available.value.find(quest => quest.id === readingId.value))
+const shownQuest = computed(() => activeQuest.value ?? reading.value)
 const ready = computed(() => !!activeQuest.value && !!world.value?.checks.length && world.value.checks.every(check => check.status === 'green'))
-const passedChecks = computed(() => world.value?.checks.filter(check => check.status === 'green').length ?? 0)
-const readings = computed(() => {
-  const quest = activeQuest.value
+const goals = computed(() => {
+  const quest = shownQuest.value
   const current = world.value
-  if (!quest || !current?.questId) return []
-  return readChecks(current, quest)
+  if (!quest || !current) return []
+  const shipped = current.orders.find(order => order.id === quest.id)?.shipped ?? 0
+  const live = current.questId === quest.id ? readChecks(current, quest) : quest.tests.map(test => ({ id: test.id, state: 'pending' as const, reason: undefined }))
+  return live.map(check => {
+    const meter = goalLabel(check.id, quest.item, quest.qty, shipped, check.state === 'passing', current.pathWindow.length)
+    return { id: check.id, ...meter, state: check.state, reason: check.reason }
+  })
 })
-const checks = computed(() => readings.value.map(check => ({
-  id: check.id,
-  text: check.text,
-  status: check.state === 'passing' ? 'green' as const : 'red' as const,
-  mark: check.state,
-  reason: check.reason,
-})))
-const upcoming = computed(() => {
-  const id = shown.value[0]?.id
-  if (!id || !kettlewick.questList) return []
-  const index = kettlewick.questList.findIndex(quest => quest.id === id)
-  return kettlewick.questList.slice(index + 1, index + 4)
-})
-const unlock = computed(() => nextUnlock(world.value?.level ?? 1))
+function grantCall(signature: string) {
+  return signature.split(':')[0] ?? signature
+}
+function initial(name: string) {
+  return name.replace(/^Mayor /, '').slice(0, 1)
+}
 const pulse = ref(false)
 let pulseTimer = 0
 watch(ready, (value, previous) => {
@@ -165,13 +196,65 @@ function openLine(entry: { file: string; line: number }) {
 const xp = computed(() => {
   const value = world.value?.xp ?? 0
   const span = levelSpan(value)
-  if (span.next === null) return { width: '100%', label: `XP ${value}`, title: `Level ${span.level}` }
+  if (span.next === null) return { width: '100%', label: `XP ${value}`, title: `Level ${span.level}. ${value} XP.` }
   const into = value - span.start
   const size = span.next - span.start
-  return { width: `${Math.min(100, (into / size) * 100)}%`, label: `XP ${into}/${size}`, title: `${into} / ${size} XP` }
+  return { width: `${Math.min(100, (into / size) * 100)}%`, label: `XP ${into}/${size}`, title: `Level ${span.level}. ${into} / ${size} XP.` }
 })
-function hintSteps(why: string) {
-  return why.split(/(?<=\.)\s+/).map(step => step.trim()).filter(Boolean)
+function notesFromBrowser() {
+  try {
+    const raw = localStorage.getItem(notesKey)
+    const parsed = raw ? JSON.parse(raw) as unknown : []
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
+  } catch { return [] }
+}
+function rememberNotes(ids: string[]) {
+  notes.value = ids
+  try { localStorage.setItem(notesKey, JSON.stringify(ids)) } catch { /* The save still carries the ids. */ }
+}
+function take(id: string) {
+  const quest = kettlewick.questList?.find(item => item.id === id)
+  const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
+  if (quest) {
+    const note = questComment(quest.from, quest.nudge)
+    const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value)
+    rememberNotes(next.remembered)
+    if (next.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: next.source }
+  }
+  send({ kind: 'accept', id })
+}
+const shownConsole = computed(() => {
+  const lines = consoleLines.value
+  return consoleFilter.value === 'all' ? lines : lines.filter(line => line.level === 'error' || line.level === 'warn')
+})
+const problems = computed(() => {
+  let errors = 0
+  let warnings = 0
+  for (const line of world.value?.console ?? []) {
+    const count = line.count ?? 1
+    if (line.level === 'error') errors += count
+    else if (line.level === 'warn') warnings += count
+  }
+  return { errors, warnings }
+})
+const scriptState = computed<'running' | 'error' | 'stopped'>(() => {
+  if (!world.value) return 'stopped'
+  if (error.value || saveError.value || floorError.value || world.value.status.startsWith('CPU')) return 'error'
+  return 'running'
+})
+const scriptTip = computed(() => {
+  if (scriptState.value === 'stopped') return 'The script is stopped.'
+  if (scriptState.value === 'error') return 'The script hit an error.'
+  return 'The script is running.'
+})
+const cpuHot = computed(() => {
+  const cpu = world.value?.cpu
+  if (!cpu || cpu.limit <= 0) return false
+  return !!world.value?.status.startsWith('CPU') || cpu.used * 2 >= cpu.limit
+})
+function openProblems() {
+  side.value = 'console'
+  consoleFilter.value = 'problems'
 }
 const saveKey = 'inherit.v8.' + kettlewick.id
 let worker: Worker | undefined
@@ -183,6 +266,7 @@ provide(editorKey, {
   dirty, multiFile: ref(true), navigation, watching: ref(false), call: ref(), tickCalls: ref([]),
   setFile(file, code) { files.value = { ...files.value, [file]: code } },
   openFile(file) { activeFile.value = file },
+  cursor,
 })
 
 function send(command: FactoryCommand) { worker?.postMessage(command) }
@@ -192,7 +276,7 @@ function persist() {
   if (preserveSlot || !world.value || resetting) return
   try {
     localStorage.setItem(saveKey, JSON.stringify({
-      version: 3, world: world.value, deployed: deployed.value, files: files.value, activeFile: activeFile.value,
+      version: 3, world: world.value, deployed: deployed.value, files: files.value, activeFile: activeFile.value, notes: notes.value,
     } satisfies FactorySave))
     saveError.value = ''
   } catch { saveError.value = 'Could not save the works in this browser.' }
@@ -208,6 +292,7 @@ function deploy() {
 function startOver() {
   if (!window.confirm('Start over at Kettlewick? This replaces your saved works and all project files.')) return
   preserveSlot = false
+  rememberNotes([])
   resetting = true
   pending.value = true
   error.value = ''
@@ -225,14 +310,20 @@ onMounted(async () => {
   let storedFiles: string | null = null
   let storedMap: string | null = null
   let storedSide: string | null = null
+  let storedTree: string | null = null
+  let storedChecks: string | null = null
   try {
     storedFiles = localStorage.getItem(filesStorageKey)
     storedMap = localStorage.getItem(mapHeightKey)
     storedSide = localStorage.getItem(sideTabKey)
+    storedTree = localStorage.getItem(treeWidthKey)
+    storedChecks = localStorage.getItem(sideWidthKey)
   } catch { /* Use the defaults. */ }
   filesOpen.value = readFilesOpen(storedFiles, window.innerWidth)
   mapHeight.value = readMapHeight(storedMap)
   side.value = readSideTab(storedSide)
+  treeWidth.value = readPaneWidth(storedTree, treeWidthMin, treeWidthMax, fileTreePx)
+  sideWidth.value = readPaneWidth(storedChecks, sideWidthMin, sideWidthMax, checksPanePx)
   filesReady = true
   sideReady = true
   worker = new Worker(new URL('../lib/factory.worker.ts', import.meta.url), { type: 'module' })
@@ -265,6 +356,7 @@ onMounted(async () => {
     if (recovery.kind === 'resume') {
       files.value = recovery.save.files
       deployed.value = recovery.save.deployed
+      rememberNotes(Array.isArray(recovery.save.notes) ? recovery.save.notes.filter(id => typeof id === 'string') : notesFromBrowser())
       activeFile.value = Object.hasOwn(recovery.save.files, recovery.save.activeFile) ? recovery.save.activeFile : 'main.ts'
       navigation.value = { file: activeFile.value, line: 1 }
       send({ kind: 'restart', files: recovery.save.deployed, saved: recovery.save.world })
@@ -274,6 +366,7 @@ onMounted(async () => {
       if (recovery.kind === 'files') {
         files.value = recovery.files
         deployed.value = recovery.deployed
+        rememberNotes(notesFromBrowser())
         activeFile.value = recovery.activeFile
         navigation.value = { file: activeFile.value, line: 1 }
         saveError.value = 'The saved works could not be restored. Your files are still here.'
@@ -309,18 +402,17 @@ onBeforeUnmount(() => {
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
         <template #clock>
-          <div v-if="world" class="clock">
-            <p class="balance" data-testid="credits"><b>{{ world.credits }}</b>{{ creditSuffix }}</p>
-            <div class="xp" data-testid="level">
-              <span class="tick">Level <b>{{ world.level }}</b></span>
-              <span class="xp-bar" :title="xp.title"><i :style="{ width: xp.width }" /></span>
-              <span class="tick">{{ xp.label }}</span>
-            </div>
-            <span class="tick" data-testid="cpu">CPU <b>{{ world.cpu.used }}/{{ world.cpu.limit }}</b></span>
-            <span class="live"><i />Running</span>
-            <span v-for="gain in gains" :key="gain.id" class="gain" :class="gain.kind">{{ gain.text }}</span>
+          <div v-if="world" class="pills">
+            <p class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
+              <Coins />
+              <b>{{ world.credits }}</b>
+              <span v-for="gain in gains.filter(item => item.kind === 'credits')" :key="gain.id" class="float">{{ gain.text }}</span>
+            </p>
+            <p class="pill" data-testid="level" :title="xp.title">
+              <span class="badge">{{ world.level }}</span>
+              <i class="bar" aria-hidden="true"><i :style="{ width: xp.width }" /></i>
+            </p>
           </div>
-          <span v-else class="live off"><i />{{ error ? 'Offline' : 'Starting' }}</span>
         </template>
         <template #settings="{ close }">
           <button v-for="name in panels" :key="name" :aria-pressed="tool === name"
@@ -337,30 +429,33 @@ onBeforeUnmount(() => {
         </nav>
         <div class="quest-scroll">
           <template v-if="zone === 'quests'">
-            <article v-for="quest in shown" :key="quest.id" class="quest">
-              <VillageAsk :who="quest.who" :name="quest.from" :role="quest.role" :building-id="quest.building" />
-              <div class="goal-body">
-                <h2>{{ quest.title }}</h2>
-                <p class="goal">{{ quest.goal }}</p>
-              </div>
-              <div class="lesson">
-                <button class="hint" type="button" :aria-expanded="hintOpen" @click="hintOpen = !hintOpen">Hint</button>
-                <ol v-if="hintOpen">
-                  <li v-for="step in hintSteps(quest.why)" :key="step">{{ step }}</li>
-                </ol>
-              </div>
-              <p class="reward"><b>{{ quest.pay }}</b> credits · <b>{{ quest.xp }}</b> XP</p>
-              <p class="quote">{{ quest.quote }}</p>
-              <p v-if="order && quest.id === world?.questId" class="progress"><b>{{ order.shipped }}/{{ order.qty }}</b> {{ order.item }}</p>
-              <div v-if="upcoming.length" class="next">
-                <span>Next</span>
-                <ol>
-                  <li v-for="item in upcoming" :key="item.id">{{ item.title }}</li>
-                </ol>
-              </div>
-              <p v-if="unlock" class="unlock">Level {{ unlock.level }} unlocks: {{ unlock.items.join(', ') }}</p>
+            <ul v-if="!shownQuest && available.length" class="requests">
+              <li v-for="quest in available" :key="quest.id">
+                <button type="button" @click="readingId = quest.id">
+                  <span class="initial" aria-hidden="true">{{ initial(quest.from) }}</span>
+                  <span>
+                    <b>{{ quest.from.replace(/^Mayor /, '') }}</b>
+                    <small>{{ quest.ask }}</small>
+                  </span>
+                </button>
+              </li>
+            </ul>
+            <article v-else-if="shownQuest" class="quest">
+              <VillageAsk :who="shownQuest.who" :name="shownQuest.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="shownQuest.ask" />
+              <ul class="goals" data-testid="checks">
+                <li v-for="goal in goals" :key="goal.id" :data-mark="goal.state">
+                  <span class="goal-line">{{ goal.text }}</span>
+                  <progress :value="goal.value" :max="goal.max" :aria-label="goal.text" />
+                  <small v-if="goal.reason">{{ goal.reason }}</small>
+                </li>
+              </ul>
+              <ul class="rewards">
+                <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
+                <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
+                <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}</li>
+              </ul>
             </article>
-            <div v-if="!shown.length" class="quest">
+            <div v-else class="quest">
               <h2>{{ world?.cleared.length ? 'More is coming' : 'Kettlewick Works' }}</h2>
               <p v-if="!world" class="goal">Uncle Ambrose left you the works.</p>
             </div>
@@ -376,18 +471,20 @@ onBeforeUnmount(() => {
             </li>
           </ul>
         </div>
-        <div v-if="zone === 'quests' && (activeQuest || offers.length)" class="quest-action">
-          <button v-if="offers.length" class="gold" type="button" data-testid="take-quest" @click="send({ kind: 'accept' })">Take quest</button>
-          <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" :disabled="!ready" @click="send({ kind: 'complete' })">{{ ready ? 'Complete quest' : `Complete · ${passedChecks}/${world?.checks.length ?? 0}` }}</button>
+        <div v-if="zone === 'quests' && (activeQuest || reading)" class="quest-action">
+          <button v-if="reading" class="gold" type="button" data-testid="take-quest" @click="take(reading.id)">Take quest</button>
+          <p v-else-if="!ready" class="calm">In progress</p>
+          <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" @click="send({ kind: 'complete' })">Hand over</button>
         </div>
       </section>
       <div class="stage">
         <div class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :interval="kettlewick.tickMs" @error="floorError = $event" />
+          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :interval="kettlewick.tickMs" @error="floorError = $event" @dump="send({ kind: 'dump', name: $event })" />
         </div>
-        <div class="row-split" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize map" @pointerdown="resizeMap" @keydown.up.prevent="setMapHeight(mapHeight - 2)" @keydown.down.prevent="setMapHeight(mapHeight + 2)" />
-        <div class="editor-bay">
+        <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
+        <div ref="editorBay" class="editor-bay">
           <FileTree id="project-files" v-model:open="filesOpen" v-model:files="files" v-model:active-file="activeFile" />
+          <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
           <div class="editor-column">
             <div class="editor-pane"><div class="editor-host">
               <LazyCodeEditor @reference="tool = 'API'">
@@ -403,30 +500,32 @@ onBeforeUnmount(() => {
               <MetricsPanel v-else-if="world" :world="world" />
             </div>
           </div>
+          <PaneSplit class="side-split" axis="x" label="Resize checks" @move="onSide" @reset="setSideWidth(checksPanePx)" @nudge="nudgeSide" />
           <aside class="checks-pane" :aria-label="side === 'checks' ? 'Quest checks' : 'Console'">
             <div class="checks-head" role="tablist" aria-label="Checks and console">
               <button type="button" role="tab" :aria-selected="side === 'checks'" @click="side = 'checks'">Checks</button>
-              <button type="button" role="tab" :aria-selected="side === 'console'" @click="side = 'console'">
+              <button type="button" role="tab" :aria-selected="side === 'console'" @click="side = 'console'; consoleFilter = 'all'">
                 Console
                 <span v-if="unseen.count" class="badge" :class="{ bad: unseen.error }">{{ unseen.count }}</span>
               </button>
               <template v-if="side === 'console'">
                 <button type="button" class="clear" @click="clearLog">Clear</button>
-                <span class="tick-now">Tick <b data-testid="tick">{{ world?.tick ?? 0 }}</b></span>
+                <span class="tick-now"><span>Tick</span><b data-testid="tick">{{ world?.tick ?? 0 }}</b></span>
               </template>
             </div>
-            <ChecksPanel v-if="side === 'checks'" :tried="!!world?.questId" :checks="world?.questId ? checks : []" :log="log" empty="Take a quest to see checks" @open="openLine" />
+            <ChecksPanel v-if="side === 'checks'" :tried="!!world?.questId" :checks="[]" :log="log" @open="openLine" />
             <section v-else class="console" aria-label="Console">
-              <p v-if="!consoleLines.length" class="empty">Nothing logged yet.</p>
-              <template v-for="line in consoleLines" :key="line.seq">
+              <p v-if="consoleFilter === 'problems'" class="filter">Errors and warnings. <button type="button" @click="consoleFilter = 'all'">Show all</button></p>
+              <p v-if="!shownConsole.length" class="empty">Nothing logged yet.</p>
+              <template v-for="line in shownConsole" :key="line.seq">
                 <button v-if="line.file && line.line" type="button" class="line" :class="line.level" @click="openLine({ file: line.file, line: line.line })">
                   <span class="when">{{ line.tick }}</span>
-                  <span class="text">{{ repeatedLabel(line.text, line.count) }}</span>
+                  <span class="text"><span class="body">{{ consoleBody(line.text) }}</span><span v-if="(line.count ?? 1) > 1" class="count">x {{ line.count }}</span></span>
                   <span class="where">{{ line.file }}:{{ line.line }}</span>
                 </button>
                 <p v-else class="line" :class="line.level">
                   <span class="when">{{ line.tick }}</span>
-                  <span class="text">{{ repeatedLabel(line.text, line.count) }}</span>
+                  <span class="text"><span class="body">{{ consoleBody(line.text) }}</span><span v-if="(line.count ?? 1) > 1" class="count">x {{ line.count }}</span></span>
                 </p>
               </template>
             </section>
@@ -435,15 +534,25 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <template #status>
-      <span v-if="world" class="meters">
-        <span>Depot ore {{ world.depot.ore }}</span>
-        <span>Depot coal {{ world.depot.coal ?? 0 }}</span>
-        <span data-testid="ore">Furnace ore {{ world.furnace.input }}</span>
-        <span>Furnace coal {{ world.furnace.coal }}</span>
-        <span>Ingots {{ world.furnace.output }}</span>
-        <span>Steel {{ world.furnace.steel }}</span>
-        <span v-for="drone in world.drones" :key="drone.name">{{ drone.name }} {{ drone.carrying ?? 'empty' }} {{ drone.cargo }}/{{ drone.capacity }}</span>
-      </span>
+      <div class="context">
+        <button type="button" class="item" :data-state="scriptState" :title="scriptTip" :aria-label="scriptTip">
+          <i class="lamp" />
+        </button>
+        <button type="button" class="item" title="Errors and warnings in the console. Click to open that list." @click="openProblems">
+          <CircleAlert />{{ problems.errors }}
+          <TriangleAlert />{{ problems.warnings }}
+        </button>
+        <span class="grow" />
+        <span class="item" title="The caret in the open file.">
+          <TextCursor />Ln {{ cursor.line }}, Col {{ cursor.column }}
+        </span>
+        <span v-if="world" class="item" title="The sim tick. The works advance twice a second.">
+          <Timer />{{ world.tick }}
+        </span>
+        <span v-if="cpuHot && world" class="item" :title="`CPU ${world.cpu.used}/${world.cpu.limit}. A call past the limit does not run.`">
+          <Cpu />{{ world.cpu.used }}/{{ world.cpu.limit }}
+        </span>
+      </div>
     </template>
   </StudioShell>
 </template>
@@ -489,26 +598,20 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   overflow: hidden;
 }
-.row-split {
-  flex: 0 0 7px;
-  cursor: row-resize;
-  background: var(--base);
-  touch-action: none;
-  border: 1px solid var(--line);
-}
-.row-split:hover { background: var(--accent-line); }
 .editor-bay {
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-columns: v-bind(treeColumnCss) minmax(0, 1fr) v-bind(checksPaneCss);
+  grid-template-columns: v-bind(treeColumnCss) 0 minmax(0, 1fr) 0 v-bind(checksPaneCss);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background: var(--surface-low);
   border: 1px solid var(--line);
   border-radius: 7px;
 }
+.editor-bay :deep(.tree-split) { grid-column: 2; grid-row: 1 }
+.editor-bay :deep(.side-split) { grid-column: 4; grid-row: 1 }
 .editor-bay :deep(.tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
 .quest-zone {
   width: v-bind(questRailCss);
@@ -584,38 +687,124 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--accent-line);
 }
 .quest-action .gold { width: 100%; height: 34px }
-.quest-action .gold:disabled { opacity: 0.45 }
 .quest-action .gold.pulse { animation: quest-ready 0.7s ease-out 1 }
+.quest-action .calm { margin: 0; text-align: center; color: var(--sub); font-size: 13px }
 @keyframes quest-ready {
   0% { transform: scale(1) }
   40% { transform: scale(1.04) }
   100% { transform: scale(1) }
 }
-.quote { margin: 0; color: var(--soft); font-size: 13px; line-height: 1.4 }
-.next { display: grid; gap: 4px }
-.next > span { font: 11px var(--mono); color: var(--sub); letter-spacing: 0.4px }
-.next ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px }
-.next li {
-  color: var(--sub);
+.requests { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
+.requests button {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  background: transparent;
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 3px 6px;
-  font-size: 12px;
+  border-radius: 7px;
+  padding: 8px;
+  color: var(--text);
 }
-.unlock { margin: 0; font: 12px var(--mono); color: var(--sub) }
-.clock { position: relative }
-.gain {
+.requests b { display: block; font-size: 14px }
+.requests small { display: block; color: var(--soft); font-size: 12px; line-height: 1.35 }
+.initial {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-low);
+  color: var(--gold);
+  font: 700 13px var(--mono);
+}
+.goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px }
+.goals li { display: grid; gap: 3px; min-width: 0 }
+.goal-line { font-size: 13px; line-height: 1.3 }
+.goals progress { width: 100%; height: 4px; border: 0; background: var(--line); accent-color: var(--mint) }
+.goals progress::-webkit-progress-bar { background: var(--line) }
+.goals [data-mark=passing] { color: var(--mint) }
+.goals [data-mark=pending] { color: var(--text) }
+.goals [data-mark=failed] { color: var(--alert) }
+.goals [data-mark=failed] progress { accent-color: var(--alert) }
+.goals small { color: var(--soft); font-size: 12px; line-height: 1.35 }
+.rewards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px }
+.rewards li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-low);
+  font: 12px var(--mono);
+  color: var(--text);
+}
+.rewards svg { width: 13px; height: 13px; color: var(--gold) }
+.pills { display: flex; align-items: center; gap: 8px; margin-inline: auto }
+.pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-low);
+  color: var(--text);
+}
+.pill svg { width: 14px; height: 14px; color: var(--gold) }
+.pill b { font: 600 13px var(--mono) }
+.badge {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--base);
+  font: 700 11px var(--mono);
+}
+.bar { width: 48px; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden }
+.bar i { display: block; height: 100%; background: var(--gold) }
+.float {
   position: absolute;
-  top: 0;
-  z-index: 2;
+  top: -2px;
+  right: 8px;
   color: var(--gold);
   font: 700 12px var(--mono);
   pointer-events: none;
   animation: rise 1.1s ease-out;
 }
-.gain.credits { left: 0 }
-.gain.xp { left: 112px }
-@keyframes rise { to { transform: translateY(-14px) } }
+@keyframes rise { to { transform: translateY(-14px); opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .float { animation: none } }
+.context { display: flex; align-items: center; width: 100%; height: 100%; gap: 2px }
+.context .grow { flex: 1 }
+.context .item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--sub);
+  font: 11px var(--mono);
+}
+.context button.item { cursor: pointer }
+.context button.item:hover { background: var(--surface-low); color: var(--text) }
+.context svg { width: 12px; height: 12px }
+.lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--mint) }
+.context [data-state=error] .lamp { background: var(--alert) }
+.context [data-state=stopped] .lamp { background: var(--sub) }
+.filter { margin: 0; padding: 6px 8px 0; color: var(--sub); font: 11px var(--mono) }
+.filter button { border: 0; background: transparent; color: var(--text); font: inherit; text-decoration: underline }
 .shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
 .shop-list button {
   width: 100%;
@@ -645,7 +834,7 @@ onBeforeUnmount(() => {
 .xp-bar i { display: block; height: 100%; background: var(--gold) }
 .editor-column {
   --editor-header: v-bind(headerCss);
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   height: 100%;
   display: flex;
@@ -687,14 +876,13 @@ onBeforeUnmount(() => {
 }
 .editor-column :deep(.finder) { top: v-bind(headerCss) }
 .checks-pane {
-  grid-column: 3;
+  grid-column: 5;
   grid-row: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-left: 1px solid var(--line);
   background: var(--panel);
 }
 .checks-head {
@@ -739,6 +927,7 @@ onBeforeUnmount(() => {
 .checks-head .tick-now {
   display: flex;
   align-items: center;
+  gap: 4px;
   margin-right: 8px;
   color: var(--sub);
   font: 11px var(--mono);
@@ -769,8 +958,9 @@ onBeforeUnmount(() => {
 .console .empty { margin: 0; color: var(--sub) }
 .console .line {
   display: grid;
-  grid-template-columns: 2.4em minmax(0, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: 4.6em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
   width: 100%;
   margin: 0;
   padding: 2px 0;
@@ -780,12 +970,23 @@ onBeforeUnmount(() => {
   font: inherit;
   text-align: left;
 }
-.console .line.error, .console .line.warn { color: var(--alert) }
-.console .text { min-width: 0; white-space: normal }
-.console .where { color: var(--sub) }
+.console .when, .console .where { color: var(--sub) }
+.console .where { white-space: nowrap }
+.console .text { display: flex; gap: 6px; align-items: flex-start; min-width: 0 }
+.console .body { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere }
+.console .line.error .body, .console .line.warn .body { color: var(--alert) }
+.console .count {
+  flex: none;
+  margin-top: 1px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent-shadow);
+  color: var(--sub);
+  font-size: 10px;
+  line-height: 16px;
+}
 .notice { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .notice.bad { color: var(--alert) }
-.meters { margin-left: auto }
 @media (max-width: 800px) {
   .factory :deep(.hud) {
     display: flex;
@@ -805,6 +1006,7 @@ onBeforeUnmount(() => {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) minmax(72px, 28%);
   }
+  .tree-split, .side-split { display: none }
   .editor-bay :deep(.tree) {
     grid-column: 1;
     grid-row: 1;

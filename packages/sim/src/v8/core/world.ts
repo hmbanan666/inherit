@@ -3,8 +3,64 @@ import { finishBatch } from '../modules/smelting'
 import { syncQuest, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
-export interface Drone { name: string; pos: Cell; cargo: number; capacity: number; carrying: 'ore' | 'coal' | null; source: string; route?: Cell[] }
-export interface Vein { name: string; pos: Cell; left: number; kind: 'ore' | 'coal'; hidden?: boolean }
+export interface Drone {
+  name: string
+  pos: Cell
+  cargo: number
+  capacity: number
+  carrying: 'ore' | 'coal' | 'ingot' | 'steel' | null
+  source: string
+  route?: Cell[]
+  /** Ticks spent on the current rock. Null when the drone is not mining. */
+  dig?: { vein: string; ticks: number } | null
+}
+export type Purity = 'poor' | 'normal' | 'rich'
+export interface Vein {
+  name: string
+  pos: Cell
+  kind: 'ore' | 'coal'
+  purity: Purity
+  ticksPerUnit: number
+  yield: number
+  hidden?: boolean
+}
+
+/** Poor is slow. Rich is faster and yields two rocks. Veins do not run out. */
+export function purityRate(purity: Purity) {
+  if (purity === 'rich') return { ticksPerUnit: 1, yield: 2 }
+  if (purity === 'normal') return { ticksPerUnit: 2, yield: 1 }
+  return { ticksPerUnit: 5, yield: 1 }
+}
+
+export function settleVein(input: {
+  name: string
+  pos: Cell
+  kind?: 'ore' | 'coal'
+  purity?: string
+  hidden?: boolean
+}): Vein {
+  const purity: Purity = input.purity === 'rich' || input.purity === 'normal' || input.purity === 'poor'
+    ? input.purity
+    : input.name === 'C' ? 'rich' : 'poor'
+  return {
+    name: input.name,
+    pos: { x: input.pos.x, y: input.pos.y },
+    kind: input.kind === 'coal' ? 'coal' : 'ore',
+    purity,
+    ...purityRate(purity),
+    hidden: input.hidden ?? false,
+  }
+}
+
+/** Old saves stored a finite vein.left. Drop it and fill purity. A furnace without caps keeps 6 and 3. */
+export function migrateWorld(world: World) {
+  world.veins = world.veins.map(vein => settleVein(vein))
+  world.furnace.oreMax ??= 6
+  world.furnace.coalMax ??= 3
+  for (const drone of world.drones) if (drone.dig === undefined) drone.dig = null
+  world.coalHold ??= 8
+  return world
+}
 export interface Site {
   id: string
   seed: number
@@ -12,7 +68,7 @@ export interface Site {
   drones: Drone[]
   veins: Vein[]
   depot: { pos: Cell; ore: number; coal: number }
-  furnace: { pos: Cell; input: number; output: number }
+  furnace: { pos: Cell; input: number; output: number; oreMax: number; coalMax: number }
   recipe: { ore: number; ingots: number; ticks: number; fuel: number }
   orderSchedule: ScheduledOrder[]
   questList?: QuestDef[]
@@ -63,6 +119,8 @@ export interface World {
   bought: string[]
   checks: { id: string; text: string; status: 'open' | 'green' }[]
   holdTicks: number
+  /** Coal waiting in the furnace is cleared after this many ticks. 0 means the ore hold. */
+  coalHold: number
   batchTicks?: number
   ingotsMade: number
   steelMade: number
@@ -78,13 +136,13 @@ export interface World {
 export function createWorld(site: Site): World {
   const world: World = {
     tick: 0, seed: site.seed, credits: site.credits, grid: structuredClone(site.grid),
-    drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '' })),
-    veins: structuredClone(site.veins).map(vein => ({ ...vein, kind: vein.kind ?? 'ore', hidden: vein.hidden ?? false })),
+    drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null })),
+    veins: site.veins.map(vein => settleVein(vein)),
     depot: structuredClone(site.depot),
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, oreAt: null, coalAt: null, batch: null },
     orderRoundAt: 0, orders: [], growth: [], status: '', creditsPerMinute: 0,
     ledger: { income: 0, waste: 0, payouts: [] }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
-    xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0,
+    xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0, coalHold: 8,
     ingotsMade: 0, steelMade: 0, steelMark: 0, oreAfterDry: 0, pathCallsTick: 0, pathWindow: [],
     checkSince: 0, checkMoved: {},
   }
@@ -126,7 +184,7 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
         furnace.input = 0
         furnace.oreAt = null
       }
-      if (furnace.coalAt !== null && world.tick - furnace.coalAt > 8) {
+      if (furnace.coalAt !== null && world.tick - furnace.coalAt > (world.coalHold || world.holdTicks)) {
         furnace.coal = 0
         furnace.coalAt = null
       }
