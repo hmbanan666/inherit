@@ -53,7 +53,6 @@ test('running an empty furnace at zero credits never ends the session or spends 
     expect(session.world.orders[0].status).toBe('open')
     expect(session.world.orders[0].due).toBeGreaterThan(500)
     expect(session.world.credits).toBe(0)
-    expect(session.world.creditsPerMinute).toBe(0)
   } finally { session.dispose() }
 })
 

@@ -1,6 +1,8 @@
 # v8 coherence audit (2026-11-23)
 
-Scope: an audit only. No product code was changed. Live `main` is `293cf29` (PR #72). Inputs: [the v8 concept](../concept/v8.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [the first playable spec](../specs/v8-first-playable.md), `CONTEXT.md`, the v8 sim and `FactoryFrame.vue`, and the v2/v3 town plus the v6 frame in git history. Nick's decisions of 23 November 2026 override the concept wherever they disagree, including the later note that the works need villagers and a reason.
+> Historical snapshot of `293cf29` (PR #72). The "what is on main now" section is not the current game. [ADR 0026](../adr/0026-quantity-quests-one-world.md) is the vision. The chain is `packages/sim/src/v8/quests.ts`.
+
+Scope: an audit only. No product code was changed. The `main` this audit read is `293cf29` (PR #72). Inputs: [the v8 concept](../concept/v8.md), [ADR 0021](../adr/0021-v8-inherit-a-factory.md), [the first playable spec](../specs/v8-first-playable.md), `CONTEXT.md`, the v8 sim and `FactoryFrame.vue`, and the v2/v3 town plus the v6 frame in git history. Nick's decisions of 23 November 2026 override the concept wherever they disagree, including the later note that the works need villagers and a reason.
 
 ## Verdict
 

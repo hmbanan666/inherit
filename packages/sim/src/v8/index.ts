@@ -2,7 +2,7 @@ export * from './core/world'
 export * from './core/bricks'
 export { mining, miningModule, dumpCargo } from './modules/mining'
 export { kettlewick, uncleMain } from './sites/kettlewick'
-export { questList, shop, shopTiers, acceptQuest, completeQuest, buyUpgrade, nextQuest, nextUnlock, upcomingQuests, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, unlockError } from './quests'
+export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, unlockError } from './quests'
 export { outputCap } from './modules/smelting'
 export {
   worksEvents, onApi, pressManual, queueRun, grantLegacy, ensureTriggers, actManual, dueEvents, settleTriggers,

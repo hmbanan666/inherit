@@ -1,5 +1,7 @@
 # Chapter 1 as a game: watched runs, then the loop
 
+> Historical. This chapter was removed. It is not v8. [ADR 0026](../adr/0026-quantity-quests-one-world.md) is the vision. The legacy packs are a different mode.
+
 ## Problem Statement
 
 Nick played the from-scratch chapter (#44) and failed it. As a beginner he saw only a code editor with no world, the first task asked for imports from two files, a constant and a two-argument `put` with a magic place name, the next task had an unclear goal, tasks advanced on their own after a timer, `inherit` and `onTick` appeared before anyone explained them, words like "verbs" and "wire-up" leaked into the text, the Deploy button shrank to the bottom, and a lone "Code" tab sat in the navigation. The world never appeared when he needed it. It felt like exercises, not a game.

@@ -1,6 +1,6 @@
 # Inherit
 
-You inherit Kettlewick Works, Uncle's workshop in a village. Villagers give one quest at a time. Edit the program beside the works, press **Deploy**, and press **Complete quest** when the checks pass. That pays credits and XP. Credits are spent in the shop. The clock keeps ticking, and the works do not play themselves.
+You inherit Kettlewick Works, Uncle's workshop in a village. Villagers give one quest at a time, and a quest asks for a count of goods. Edit the program beside the works, press **Deploy**, and press **Hand over** when the goal lines pass. That pays credits and XP. The shop sells conveniences. The clock keeps ticking, and the works do not play themselves. The vision is [docs/concept/v8.md](docs/concept/v8.md).
 
 **Game packs** are a legacy mode at `/?packs`. Village at Dawn and Workshop stay playable there. They are not the v8 game, and they are not removed.
 
