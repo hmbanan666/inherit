@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { continueWithLoan, kettlewick } from '../../packages/sim/src/v8'
+import { kettlewick } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 
 test('a nearby drone supplies the furnace and one batch finishes four ticks after ignition', async () => {
@@ -15,7 +15,7 @@ test('a nearby drone supplies the furnace and one batch finishes four ticks afte
     expect(session.world.memory.stock).toEqual([0, 0])
     session.step(1)
     expect(session.world.memory.stock).toEqual([0, 1])
-    expect(session.world.credits).toBe(300 - 5 * (1 + kettlewick.rentPerTick))
+    expect(session.world.credits).toBe(kettlewick.credits)
   } finally { session.dispose() }
 })
 
@@ -40,51 +40,18 @@ test('ship draws only available ingots, pays on completion and closes expired or
     expect(session.world.orders.map(o => o.status)).toEqual(['on time', 'late', 'expired'])
     expect(session.world.furnace.output).toBe(2)
     expect(session.world.ledger.income).toBe(60)
-    expect(session.world.memory).toEqual({ open: 0, balance: 357.5 })
+    expect(session.world.memory).toEqual({ open: 0, balance: 360 })
   } finally { session.dispose() }
 })
 
-test('Uncle covers opening losses and the first customer keeps accepting ingots', async () => {
-  const site = { ...kettlewick, credits: 0, graceTicks: 1,
-    orderSchedule: [{ ...kettlewick.orderSchedule[0], due: 1 }] }
+test('running an empty furnace at zero credits never ends the session or spends savings', async () => {
+  const site = { ...kettlewick, credits: 0 }
   const session = await createSession(site, { 'main.ts': 'import { furnace } from "inherit"; export function onTick() { furnace.smelt() }' })
   try {
-    session.step(100)
-    expect(session.world.bankrupt).toBe(false)
-    expect(session.world.orders[0].status).toBe('overdue')
-    expect(session.world.credits).toBeGreaterThanOrEqual(0)
-    expect(session.world.ledger.fuel).toBe(100)
-    expect(session.world.ledger.loan).toBe(session.world.credits + 150)
-    expect(session.world.status).toMatch(/Uncle.*empty/)
-  } finally { session.dispose() }
-})
-
-test('bankruptcy counts consecutive closing balances, including ticks interrupted by a guest error', async () => {
-  const site = { ...kettlewick, credits: 0, furnace: { ...kettlewick.furnace, output: 1 },
-    orderSchedule: [{ ...kettlewick.orderSchedule[0], qty: 1, pay: 25 }] }
-  const session = await createSession(site, { 'main.ts': `import { orders, ship, tick } from "inherit"
-    export function onTick() {
-      if (tick === 1) ship(orders()[0])
-      throw new Error("Stopped")
-    }` })
-  try {
-    session.step(49)
-    expect(session.world.credits).toBe(0.5)
-    expect(session.world.ledger.debtTicks).toBe(0)
-    session.step(14)
-    expect(session.world.status).toBe('Credits below zero: bankrupt in 37 ticks. Fill an order or cut costs.')
-    session.step(36)
-    expect(session.world.bankrupt).toBe(false)
-    session.step(3)
-    expect(session.world.bankrupt).toBe(true)
-    expect(session.world.tick).toBe(100)
-    expect(session.world.ledger.rent).toBe(50)
-    continueWithLoan(session.world, site)
-    expect(session.world.bankrupt).toBe(false)
-    expect(session.world.ledger.debtTicks).toBe(0)
-    expect(session.world.ledger.loan).toBeGreaterThan(25)
-    session.step(1)
-    expect(session.world.tick).toBe(101)
+    session.step(500)
+    expect(session.world.tick).toBe(500)
+    expect(session.world.credits).toBe(0)
+    expect(session.world.creditsPerMinute).toBe(0)
   } finally { session.dispose() }
 })
 

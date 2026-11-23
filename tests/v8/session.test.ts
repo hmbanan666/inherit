@@ -9,32 +9,24 @@ test('one drone runs comfortably under budget while Uncle burns fuel on an empty
   expect(world.drones[0].pos).not.toEqual(kettlewick.depot.pos)
   expect(world.cpu.used).toBeLessThan(world.cpu.limit / 2)
   expect(world.status).toContain('burns fuel while empty')
-  expect(world.creditChange).toBe(-1.5)
+  expect(world.ledger.waste).toBe(kettlewick.recipe.fuel)
   expect(world.furnace.input).toBe(0)
-  expect(world.credits).toBe(kettlewick.credits - kettlewick.rentPerTick - kettlewick.recipe.fuel)
+  expect(world.credits).toBe(kettlewick.credits)
 })
 
-test('guarding smelt stops the empty fuel charge and fills the first order on time', async () => {
-  const session = await createSession(kettlewick)
-  try {
-    session.step(1)
-    const balance = session.world.credits
-    await session.deploy({ 'main.ts': kettlewick.files['main.ts'].replace(
-      '  furnace.smelt()', '  if (furnace.input >= 2) furnace.smelt()',
-    ) })
-    session.step(1)
-    expect(session.world.credits).toBe(balance - kettlewick.rentPerTick)
-    let minimum = session.world.credits
-    while (session.world.orders[0].status === 'open' && session.world.tick < kettlewick.orderSchedule[0].due) {
-      session.step(1)
-      minimum = Math.min(minimum, session.world.credits)
-    }
-    expect(minimum).toBeGreaterThan(kettlewick.credits / 2)
-    expect(session.world.creditChange).toBeGreaterThan(0)
-    expect(session.world.orders[0].status).toBe('on time')
-    expect(session.world.credits).toBeGreaterThan(kettlewick.credits)
-    expect(session.world.messages).toEqual([])
-  } finally { session.dispose() }
+test('guarding smelt fills the first order and earns more credits per minute than Uncle', async () => {
+  const fixed = { 'main.ts': kettlewick.files['main.ts'].replace(
+    '  furnace.smelt()', '  if (furnace.input >= 2) furnace.smelt()',
+  ) }
+  const ticks = kettlewick.orderSchedule[0].due
+  const uncle = await runSession(kettlewick, kettlewick.files, ticks)
+  const world = await runSession(kettlewick, fixed, ticks)
+  expect(world.orders[0].status).toBe('on time')
+  expect(world.credits).toBe(kettlewick.credits + kettlewick.orderSchedule[0].pay)
+  expect(world.ledger.waste).toBe(0)
+  expect(uncle.credits).toBeGreaterThan(kettlewick.credits)
+  expect(world.creditsPerMinute).toBeGreaterThan(uncle.creditsPerMinute)
+  expect(world.messages).toEqual([])
 })
 
 const cached = {

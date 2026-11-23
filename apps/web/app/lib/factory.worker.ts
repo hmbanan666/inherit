@@ -1,4 +1,4 @@
-import { continueWithLoan, kettlewick } from '@inherit/sim/v8'
+import { kettlewick } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
@@ -16,10 +16,9 @@ function publish(deployed?: Record<string, string>) {
 
 function schedule() {
   clearInterval(timer)
-  if (session && !session.world.bankrupt && !paused) {
+  if (session && !paused) {
     timer = setInterval(() => {
       session!.step(1)
-      if (session!.world.bankrupt) clearInterval(timer)
       publish()
     }, kettlewick.tickMs / speed)
   }
@@ -29,9 +28,6 @@ async function act(command: FactoryCommand) {
   if (command.kind === 'clock') {
     paused = command.paused
     speed = command.speed
-  } else if (command.kind === 'continue') {
-    if (session) continueWithLoan(session.world, kettlewick)
-    publish()
   } else {
     clearInterval(timer)
     try {
