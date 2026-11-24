@@ -6,6 +6,8 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "test": "vitest run --maxWorkers=1 --exclude '**/e2e/**'",
+    "sim": "vitest run --maxWorkers=1 --reporter=verbose tests/balance",
+    "sim:report": "pnpm sim -t 'the checked-in balance report' --update",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter web typecheck",
     "lint": "pnpm typecheck",
     "shots": "node scripts/shots.mjs"
