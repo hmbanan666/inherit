@@ -19,7 +19,8 @@ jobs:
           cache: pnpm
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+      - run: pnpm test --exclude 'tests/balance/**'
+      - run: pnpm sim
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
