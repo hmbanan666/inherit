@@ -26,6 +26,16 @@ function intervals(events: Event[], moved: (e: Event) => boolean) {
 export const gapMinutes = (gap: Gap) => minutes(gap.end - gap.start)
 export const span = (gap: Gap) => `${gapMinutes(gap).toFixed(2)} min (ticks ${gap.start}–${gap.end})`
 
+/** Hand-over that can first afford each convenience when the reference run does not buy. */
+export const affordances = [
+  ['cart', 'ines'],
+  ['hopper', 'odile'],
+  ['furnace', 'elsie'],
+  ['racks', 'harrow'],
+  ['cpu', 'tomas'],
+  ['spare', 'pell'],
+] as const
+
 export function assess(run: Run) {
   const failures = new Map<string, string>()
   // A check can move or a delivery arrive during a long wait for a new decision.
@@ -68,16 +78,8 @@ export function assess(run: Run) {
   // Each convenience is priced against the purse at the hand-over that can
   // first afford it. A ratio under 1 is a shortfall. A ratio over the cap is
   // late hoarding. Cheap items are not scored against the final purse.
-  const planned: [string, string][] = [
-    ['cart', 'ines'],
-    ['hopper', 'odile'],
-    ['furnace', 'elsie'],
-    ['racks', 'harrow'],
-    ['cpu', 'tomas'],
-    ['spare', 'pell'],
-  ]
   const openings = []
-  for (const [id, questId] of planned) {
+  for (const [id, questId] of affordances) {
     const item = shop.find(entry => entry.id === id)
     const quest = run.quests.find(entry => entry.id === questId)
     const plan = questList.find(entry => entry.id === questId)

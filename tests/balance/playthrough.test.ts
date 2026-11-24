@@ -4,6 +4,8 @@ import { diagnostics } from '../v8/diagnostics'
 import { report } from '../../sim/report'
 import { assess } from '../../sim/assessment'
 import { balance } from '../../sim/config'
+import { humanTime } from '../../sim/human'
+import { estimateHuman } from '../../sim/humanEstimate'
 import { players } from '../../sim/policy'
 import { playthrough, type Run } from '../../sim/playthrough'
 
@@ -14,7 +16,8 @@ beforeAll(async () => {
   const ticks = run.quests.at(-1)!.finish.tick
   const trials = run.probes.reduce((total, trial) => total + trial.ticks, 0)
   const rate = Math.round((ticks + trials) * 1000 / (performance.now() - start))
-  console.info(`${ticks} playthrough ticks + ${trials} previous-program ticks, ${rate} ticks/s including deploys.`)
+  const average = estimateHuman(run).profiles.find(profile => profile.id === humanTime.defaultProfile)
+  console.info(`${ticks} playthrough ticks + ${trials} previous-program ticks, ${rate} ticks/s including deploys. Average human estimate ${average?.totals.total.toFixed(2)} min.`)
 }, 120_000)
 
 test('a fresh works hands over every quest before the run limit', () => {
@@ -43,6 +46,20 @@ test('Loop and drone-2 arrive on hand-over, before the next Take', () => {
 test('each reference project typechecks against the real editor declarations', () => {
   const types = declarations(factoryBricks(kettlewick))
   for (const [name, files] of Object.entries(players)) expect(diagnostics(files, types), name).toEqual([])
+})
+
+test('human time stays out of the balance gate', () => {
+  const { failures } = assess(run)
+  const estimate = estimateHuman(run)
+  for (const warning of estimate.warnings) expect(failures.has(warning.id), warning.text).toBe(false)
+  const average = estimate.profiles.find(profile => profile.id === humanTime.defaultProfile)
+  expect(average?.quests).toHaveLength(run.quests.length)
+  expect(average?.totals.total).toBe(average?.quests.at(-1)?.cumulative)
+  const fast = estimate.profiles.find(profile => profile.id === 'fast')
+  const newbie = estimate.profiles.find(profile => profile.id === 'newbie')
+  expect(fast && average && newbie && fast.totals.total < average.totals.total && newbie.totals.total > average.totals.total).toBe(true)
+  expect(report(run)).toContain('## Human time')
+  expect(report(run)).toContain('| **Total** |')
 })
 
 test('the balance findings match the explicit expected failures', () => {
