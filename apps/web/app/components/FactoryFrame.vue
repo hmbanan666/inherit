@@ -637,12 +637,13 @@ onBeforeUnmount(() => {
               <p v-if="!world" class="goal">Uncle Ambrose left you the works.</p>
             </div>
           </template>
-          <ul v-else-if="zone === 'shop'" class="shop-list">
+          <ul v-else-if="zone === 'shop'" class="shop-list purchases">
             <li v-for="item in catalog" :key="item.id">
               <button type="button" :disabled="!world || world.bought.includes(item.id) || world.credits < item.price"
                 @click="send({ kind: 'buy', id: item.id })">
                 <b>{{ item.name }}</b>
-                <span>{{ world?.bought.includes(item.id) ? 'Owned' : item.price + ' credits' }}</span>
+                <span v-if="world?.bought.includes(item.id)" class="owned">Owned</span>
+                <span v-else>{{ item.price }} credits</span>
                 <small>{{ item.detail }}</small>
               </button>
             </li>
@@ -653,7 +654,7 @@ onBeforeUnmount(() => {
               <h2>{{ inspected.name }}</h2>
               <p>{{ inspected.description }}</p>
               <ul class="facts">
-                <li v-for="line in inspected.lines" :key="line.label"><b>{{ line.label }}</b> {{ line.value }}</li>
+                <li v-for="line in inspected.lines" :key="line.label" :class="{ 'task-line': line.label === 'Task' }"><b>{{ line.label }}</b> {{ line.value }}</li>
                 <li v-for="recipe in inspected.recipes" :key="recipe.id">
                   <b>{{ recipe.input }} → {{ recipe.output }}</b>
                   <template v-if="recipe.missing"> Missing {{ recipe.missing }}.</template>
@@ -1138,13 +1139,22 @@ onBeforeUnmount(() => {
 .shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
 .shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
 .shop-list button:disabled, .shop-list button.locked { opacity: 0.45 }
+.purchases button:enabled { border-color: var(--gold); background: var(--accent-surface) }
+.purchases button:enabled:hover { background: var(--hover) }
+.purchases button:disabled { opacity: 1 }
+.purchases button .owned { color: var(--sub) }
 .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font: 12px var(--mono); color: var(--soft) }
 .facts li {
+  min-width: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.facts .task-line {
   height: 1.45em;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
 }
 .facts b { color: var(--text); font-weight: 600 }
 .quest .bar { display: block; height: 5px; border-radius: 3px; background: var(--accent-shadow); overflow: hidden }

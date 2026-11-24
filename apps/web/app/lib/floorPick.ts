@@ -21,6 +21,7 @@ export interface CartHit {
   /** Sprite origin in world pixels. The truck is drawn here, 20px below its cell. */
   x: number
   y: number
+  waiting?: boolean
 }
 
 export interface Box { x: number; y: number; w: number; h: number }
@@ -79,6 +80,8 @@ const cartParts: Box[] = [
 
 /** Badge and truck, the mark drawn around a selected cart. The name stays clickable without widening it. */
 export const cartMark: Box = { x: -22, y: -48, w: 46, h: 63 }
+/** Backing for the two pause bars above a waiting cart's cargo badge. */
+export const pauseMark: Box = { x: -7, y: -58, w: 14, h: 12 }
 
 export function captionBox(title: string, top: number): Box {
   const n = title.length
@@ -156,7 +159,9 @@ export function pickFloor(
 ) {
   for (let i = carts.length - 1; i >= 0; i--) {
     const cart = carts[i]!
-    if (hitsShapes(px - cart.x, py - cart.y, cartShapes(), cartPadding)) return cart.id
+    const x = px - cart.x, y = py - cart.y
+    if (cart.waiting && hitsBox(x, y, pauseMark, cartPadding)) return cart.id
+    if (hitsShapes(x, y, cartShapes(), cartPadding)) return cart.id
   }
   for (let i = stations.length - 1; i >= 0; i--) {
     const station = stations[i]!
