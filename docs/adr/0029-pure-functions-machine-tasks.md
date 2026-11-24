@@ -1,6 +1,6 @@
 # Pure functions, machine tasks
 
-Accepted 24 November 2026. Supersedes the Run rule in [ADR 0028](0028-run-to-completion.md): a function does not span ticks, and `yield` does not continue it. The trigger order stays. Bram grants Run, Ines grants Loop and `onTick`, and Elsie grants `on()`. [ADR 0036](0036-region-1-fabrication-chain.md) adds `start(recipe)` and `transfer` on that same rule: the function returns, and the machine or the drone keeps the task.
+Accepted 24 November 2026. Supersedes the Run rule in [ADR 0028](0028-run-to-completion.md): a function does not span ticks, and `yield` does not continue it. The trigger order stays. Bram grants Run, Ines grants Loop and `onTick`, and Elsie grants `on()`. [ADR 0036](0036-region-1-fabrication-chain.md) adds `start(recipe)` and `transfer` on that same rule: the function returns, and the machine or the drone keeps the task. [ADR 0038](0038-soft-occupancy.md) keeps one drone on a cell; a step onto an occupied cell waits.
 
 ## Context
 

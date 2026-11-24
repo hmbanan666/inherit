@@ -75,7 +75,8 @@ export function onTick() { memory.names = drones().map(drone => drone.name) }`,
     session.world.steelMade = 1
     expect(session.complete()).toBe(true)
     expect(session.world.drones.map(drone => drone.name)).toEqual(['drone-1', 'drone-2'])
-    expect(session.world.drones[1]?.pos).toEqual(session.world.depot.pos)
+    expect(session.world.drones[0]?.pos).toEqual(session.world.depot.pos)
+    expect(session.world.drones[1]?.pos).toEqual({ x: session.world.depot.pos.x, y: session.world.depot.pos.y - 1 })
     expect(machineList(session.world).some(row => row.id === 'drone-2')).toBe(true)
     expect(inspectMachine(session.world, kettlewick, 'drone-2')?.name).toBe('drone-2')
     session.step(1)

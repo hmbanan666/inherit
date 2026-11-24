@@ -23,7 +23,7 @@ const groups: { id: string; title: string; match(name: string): boolean }[] = [
   { id: 'press', title: 'Press', match: name => name === 'press' || name.startsWith('press.') || name === 'spare' || name.startsWith('spare.') },
   { id: 'lathe', title: 'Lathe', match: name => name === 'lathe' || name.startsWith('lathe.') },
   { id: 'bench', title: 'Assembly table', match: name => name === 'bench' || name.startsWith('bench.') },
-  { id: 'drone', title: 'Drone', match: name => name === 'drones' || name.startsWith('drone.') },
+  { id: 'drone', title: 'Drone', match: name => name === 'drones' || name.startsWith('drone.') || name === 'isFree' || name === 'reserve' },
   { id: 'depot', title: 'Depot', match: name => name === 'depot' || name.startsWith('depot.') },
   { id: 'veins', title: 'Veins', match: name => name === 'veins' || name === 'prospect' || name === 'findPath' },
 ]

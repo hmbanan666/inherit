@@ -20,7 +20,7 @@ function sample(stages: { id: string; from?: Stage; to: Stage; start: number; en
     if (item.from)
       events.push({ ...state(item.start), quest: item.id, kind: 'code change', from: item.from, to: item.to, detail: 'edit' })
     events.push({ ...state(item.end), quest: item.id, kind: 'finish', detail: item.id })
-    return { id: item.id, start: state(item.start), finish: state(item.end), stage: item.to }
+    return { id: item.id, start: state(item.start), finish: state(item.end), stage: item.to, waits: 0 }
   })
   return { events, quests, probes: [], cleared: stages.map(item => item.id) }
 }

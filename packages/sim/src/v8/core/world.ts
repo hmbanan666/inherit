@@ -1,6 +1,7 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
 import { emptyBin, emptyManifest, ensureBin, finishPress, normalizeManifest, type Bin, type Item, type Manifest, type Press, type StationId } from '../modules/stock'
+import { separateDrones, type CellClaim } from '../occupancy'
 import { pinLegacyTriggers, repairHarrow, syncBench, syncLathe, syncPress, syncQuest, syncSecondDrone, syncSpare, triggerUnlocked, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
@@ -23,6 +24,12 @@ export interface Drone {
   dig?: { vein: string; ticks: number } | null
   /** The command the drone is carrying out. Null when it is free. */
   task?: DroneTask | null
+  /** Set while the next cell is occupied. Null when the drone is moving or working. */
+  wait?: { ticks: number; blocked: Cell; place: string; logged: number } | null
+  /** Occupied cell this drone is walking around. Cleared when that cell frees or the goal is close. */
+  avoid?: Cell | null
+  /** Drone-ticks spent waiting on an occupied cell. */
+  waited?: number
 }
 export type Purity = 'poor' | 'normal' | 'rich'
 export interface Vein {
@@ -76,7 +83,11 @@ export function migrateWorld(world: World) {
   for (const drone of world.drones) {
     if (drone.dig === undefined) drone.dig = null
     if (drone.task === undefined) drone.task = null
+    if (drone.wait === undefined) drone.wait = null
+    if (drone.avoid === undefined) drone.avoid = null
+    drone.waited ??= 0
   }
+  world.cellClaims ??= []
   if (world.jobs) {
     for (const [name, job] of Object.entries(world.jobs)) {
       const found = world.drones.find(item => item.name === name)
@@ -135,6 +146,7 @@ export function migrateWorld(world: World) {
   syncLathe(world)
   syncBench(world)
   repairHarrow(world)
+  separateDrones(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
     ingotsMade: world.ingotsMade,
@@ -191,6 +203,8 @@ export interface World {
   credits: number
   grid: Site['grid']
   drones: Drone[]
+  /** Cells a player has reserved so engine steps leave them alone. */
+  cellClaims?: CellClaim[]
   veins: Vein[]
   depot: Site['depot'] & { bin: Bin }
   orders: Order[]
@@ -266,7 +280,8 @@ export interface World {
 export function createWorld(site: Site): World {
   const world: World = {
     tick: 0, seed: site.seed, credits: site.credits, grid: structuredClone(site.grid),
-    drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null, task: null })),
+    drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null, task: null, wait: null, avoid: null, waited: 0 })),
+    cellClaims: [],
     veins: site.veins.map(vein => settleVein(vein)),
     depot: { ...structuredClone(site.depot), bin: emptyBin() },
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null, bin: emptyBin() },
@@ -300,6 +315,7 @@ export function createWorld(site: Site): World {
   syncPress(world)
   syncLathe(world)
   syncBench(world)
+  separateDrones(world)
   world.status = site.questList ? syncQuest(world, site) : (world.growth.at(-1) ?? 'The village is quiet.')
   return world
 }

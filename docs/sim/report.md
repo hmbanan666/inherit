@@ -1,6 +1,6 @@
 # Kettlewick balance report
 
-The reference player handed over 9 quests in **977 ticks (8.14 minutes)** and finished with **1120 credits, 210 XP, level 7**.
+The reference player handed over 9 quests in **947 ticks (7.89 minutes)** and finished with **1120 credits, 210 XP, level 7**.
 
 Each tick represents 500 ms on the [worker clock](../../apps/web/app/lib/factory.worker.ts), using [the site interval](../../packages/sim/src/v8/sites/kettlewick.ts). Actions are immediate. Reading, writing, debugging, and the shop are estimated under Human time.
 
@@ -18,14 +18,30 @@ Balances at Take precede any purchase for that quest. Hand-over includes its rew
 | bram | 0 (0.00) | 32 (0.27) | 0.27 | 80 → 120 | 10 | 2 | run | 0–24 |
 | ines | 32 (0.27) | 55 (0.46) | 0.19 | 120 → 180 | 20 | 3 | survey | 32–55 |
 | odile | 55 (0.46) | 166 (1.38) | 0.93 | 180 → 260 | 40 | 4 | steel-loop | 55–96 |
-| elsie | 166 (1.38) | 258 (2.15) | 0.77 | 260 → 360 | 60 | 4 | grates | 166–247 |
-| harrow | 258 (2.15) | 320 (2.67) | 0.52 | 360 → 470 | 85 | 5 | dies | 259–292 |
-| tomas | 320 (2.67) | 418 (3.48) | 0.82 | 470 → 600 | 110 | 5 | gears | 320–378 |
-| pell | 418 (3.48) | 590 (4.92) | 1.43 | 600 → 750 | 140 | 6 | hinges | 418–535 |
-| wen | 590 (4.92) | 646 (5.38) | 0.47 | 750 → 920 | 170 | 7 | shutters | 590–635 |
-| crew | 646 (5.38) | 977 (8.14) | 2.76 | 920 → 1120 | 210 | 7 | kits | 646–838 |
+| elsie | 166 (1.38) | 290 (2.42) | 1.03 | 260 → 360 | 60 | 4 | grates | 166–279 |
+| harrow | 290 (2.42) | 340 (2.83) | 0.42 | 360 → 470 | 85 | 5 | dies | 291–329 |
+| tomas | 340 (2.83) | 442 (3.68) | 0.85 | 470 → 600 | 110 | 5 | gears | 340–404 |
+| pell | 442 (3.68) | 573 (4.78) | 1.09 | 600 → 750 | 140 | 6 | hinges | 442–573 |
+| wen | 573 (4.78) | 667 (5.56) | 0.78 | 750 → 920 | 170 | 7 | shutters | 573–634 |
+| crew | 667 (5.56) | 947 (7.89) | 2.33 | 920 → 1120 | 210 | 7 | kits | 667–823 |
 
-Longest gap between unlocks, quest boundaries, or edits was 2.76 min (ticks 646–977). Including quest progress, the longest idle stretch was 1.60 min (ticks 646–838) on crew. The longest XP/level plateau was 2.76 min (ticks 646–977).
+Longest gap between unlocks, quest boundaries, or edits was 2.33 min (ticks 667–947). Including quest progress, the longest idle stretch was 1.30 min (ticks 667–823) on crew. The longest XP/level plateau was 2.33 min (ticks 667–947).
+
+## Waiting
+
+A wait tick is one drone standing for one tick because its next cell held another drone. The pause is already included in the quest duration above.
+
+| Quest | Wait ticks |
+|---|---:|
+| bram | 0 |
+| ines | 0 |
+| odile | 0 |
+| elsie | 6 |
+| harrow | 0 |
+| tomas | 0 |
+| pell | 10 |
+| wen | 2 |
+| crew | 10 |
 
 ## Human time
 
@@ -40,13 +56,13 @@ Writing counts non-blank lines inserted or deleted when the reference program ga
 | bram | 0.27 | 0.81 | 1.47 | 1.20 | 3.00 | 6.75 | 6.75 |
 | ines | 0.19 | 0.75 | 7.67 | 2.80 | 0.67 | 12.08 | 18.83 |
 | odile | 0.93 | 0.70 | 9.93 | 2.40 | 1.83 | 15.79 | 34.62 |
-| elsie | 0.77 | 0.91 | 16.33 | 3.00 | 0.67 | 21.68 | 56.30 |
-| harrow | 0.52 | 0.70 | 31.33 | 1.40 | 1.33 | 35.28 | 91.58 |
-| tomas | 0.82 | 0.55 | 9.53 | 1.40 | 1.00 | 13.30 | 104.88 |
-| pell | 1.43 | 0.57 | 11.53 | 1.40 | 0.67 | 15.60 | 120.48 |
-| wen | 0.47 | 0.58 | 14.00 | 1.00 | 0.00 | 16.05 | 136.53 |
-| crew | 2.76 | 0.73 | 21.27 | 1.20 | 0.00 | 25.96 | 162.49 |
-| **Total** | **8.16** | **6.30** | **123.06** | **15.80** | **9.17** | **162.49** | **162.49** |
+| elsie | 1.03 | 0.91 | 16.33 | 3.00 | 0.67 | 21.94 | 56.56 |
+| harrow | 0.42 | 0.70 | 31.33 | 1.40 | 1.33 | 35.18 | 91.74 |
+| tomas | 0.85 | 0.55 | 9.53 | 1.40 | 1.00 | 13.33 | 105.07 |
+| pell | 1.09 | 0.57 | 11.53 | 1.40 | 0.67 | 15.26 | 120.33 |
+| wen | 0.78 | 0.58 | 14.00 | 1.00 | 0.00 | 16.36 | 136.69 |
+| crew | 2.33 | 0.73 | 21.27 | 1.20 | 0.00 | 25.53 | 162.22 |
+| **Total** | **7.89** | **6.30** | **123.06** | **15.80** | **9.17** | **162.22** | **162.22** |
 
 ### Profiles
 
@@ -54,18 +70,18 @@ Bot minutes are the same run. The other columns scale with the profile.
 
 | Profile | Bot | Reading | Writing | Debugging | Shop | Human |
 |---|---:|---:|---:|---:|---:|---:|
-| Fast | 8.16 | 3.78 | 58.74 | 7.11 | 5.50 | 83.29 |
-| Average | 8.16 | 6.30 | 123.06 | 15.80 | 9.17 | 162.49 |
-| New to TypeScript | 8.16 | 7.26 | 234.58 | 34.76 | 12.83 | 297.59 |
+| Fast | 7.89 | 3.78 | 58.74 | 7.11 | 5.50 | 83.02 |
+| Average | 7.89 | 6.30 | 123.06 | 15.80 | 9.17 | 162.22 |
+| New to TypeScript | 7.89 | 7.26 | 234.58 | 34.76 | 12.83 | 297.32 |
 
 ### Warnings
 
 | Warning | Measurement |
 |---|---|
-| `human/quest/harrow` | 35.28 min for the average player, above 25 min. |
-| `human/quest/crew` | 25.96 min for the average player, above 25 min. |
+| `human/quest/harrow` | 35.18 min for the average player, above 25 min. |
+| `human/quest/crew` | 25.53 min for the average player, above 25 min. |
 
-Longest machine stretch with no code change was 2.76 min on crew (ticks 646–977). The warning line is 15 min.
+Longest machine stretch with no code change was 2.33 min on crew (ticks 667–947). The warning line is 15 min.
 
 <details>
 <summary>Fast, new to TypeScript, and the counts behind the minutes</summary>
@@ -77,13 +93,13 @@ Longest machine stretch with no code change was 2.76 min on crew (ticks 646–97
 | bram | 0.27 | 0.49 | 0.63 | 0.54 | 1.80 | 3.73 | 3.73 |
 | ines | 0.19 | 0.45 | 3.13 | 1.26 | 0.40 | 5.43 | 9.16 |
 | odile | 0.93 | 0.42 | 4.47 | 1.08 | 1.10 | 8.00 | 17.16 |
-| elsie | 0.77 | 0.54 | 7.37 | 1.35 | 0.40 | 10.43 | 27.59 |
-| harrow | 0.52 | 0.42 | 15.47 | 0.63 | 0.80 | 17.84 | 45.43 |
-| tomas | 0.82 | 0.33 | 4.57 | 0.63 | 0.60 | 6.95 | 52.38 |
-| pell | 1.43 | 0.34 | 5.57 | 0.63 | 0.40 | 8.37 | 60.75 |
-| wen | 0.47 | 0.35 | 7.00 | 0.45 | 0.00 | 8.27 | 69.02 |
-| crew | 2.76 | 0.44 | 10.53 | 0.54 | 0.00 | 14.27 | 83.29 |
-| **Total** | **8.16** | **3.78** | **58.74** | **7.11** | **5.50** | **83.29** | **83.29** |
+| elsie | 1.03 | 0.54 | 7.37 | 1.35 | 0.40 | 10.69 | 27.85 |
+| harrow | 0.42 | 0.42 | 15.47 | 0.63 | 0.80 | 17.74 | 45.59 |
+| tomas | 0.85 | 0.33 | 4.57 | 0.63 | 0.60 | 6.98 | 52.57 |
+| pell | 1.09 | 0.34 | 5.57 | 0.63 | 0.40 | 8.03 | 60.60 |
+| wen | 0.78 | 0.35 | 7.00 | 0.45 | 0.00 | 8.58 | 69.18 |
+| crew | 2.33 | 0.44 | 10.53 | 0.54 | 0.00 | 13.84 | 83.02 |
+| **Total** | **7.89** | **3.78** | **58.74** | **7.11** | **5.50** | **83.02** | **83.02** |
 
 ### New to TypeScript
 
@@ -92,13 +108,13 @@ Longest machine stretch with no code change was 2.76 min on crew (ticks 646–97
 | bram | 0.27 | 0.94 | 3.11 | 2.64 | 4.20 | 11.16 | 11.16 |
 | ines | 0.19 | 0.86 | 17.07 | 6.16 | 0.93 | 25.21 | 36.37 |
 | odile | 0.93 | 0.81 | 20.21 | 5.28 | 2.57 | 29.80 | 66.17 |
-| elsie | 0.77 | 1.04 | 33.13 | 6.60 | 0.93 | 42.47 | 108.64 |
-| harrow | 0.52 | 0.81 | 57.33 | 3.08 | 1.87 | 63.61 | 172.25 |
-| tomas | 0.82 | 0.63 | 18.09 | 3.08 | 1.40 | 24.02 | 196.27 |
-| pell | 1.43 | 0.66 | 21.69 | 3.08 | 0.93 | 27.79 | 224.06 |
-| wen | 0.47 | 0.67 | 25.20 | 2.20 | 0.00 | 28.54 | 252.60 |
-| crew | 2.76 | 0.84 | 38.75 | 2.64 | 0.00 | 44.99 | 297.59 |
-| **Total** | **8.16** | **7.26** | **234.58** | **34.76** | **12.83** | **297.59** | **297.59** |
+| elsie | 1.03 | 1.04 | 33.13 | 6.60 | 0.93 | 42.73 | 108.90 |
+| harrow | 0.42 | 0.81 | 57.33 | 3.08 | 1.87 | 63.51 | 172.41 |
+| tomas | 0.85 | 0.63 | 18.09 | 3.08 | 1.40 | 24.05 | 196.46 |
+| pell | 1.09 | 0.66 | 21.69 | 3.08 | 0.93 | 27.45 | 223.91 |
+| wen | 0.78 | 0.67 | 25.20 | 2.20 | 0.00 | 28.85 | 252.76 |
+| crew | 2.33 | 0.84 | 38.75 | 2.64 | 0.00 | 44.56 | 297.32 |
+| **Total** | **7.89** | **7.26** | **234.58** | **34.76** | **12.83** | **297.32** | **297.32** |
 
 Counts are shared by every profile. Debug runs are the expectation before a profile scales the minutes.
 
@@ -129,19 +145,19 @@ First-time API calls and concepts:
 
 ## Quest timeline and balances at hand-over
 
-The time column spans 0–8.14 minutes. Credit bars share a scale. Each level block represents one level.
+The time column spans 0–7.89 minutes. Credit bars share a scale. Each level block represents one level.
 
 ```text
 Quest     Time along run                    Credits at hand-over       Level
 bram      ━                                 ██               120   ██ 2
 ines       ━                                ███              180   ███ 3
-odile       ━━━                             ████             260   ████ 4
-elsie          ━━━                          █████            360   ████ 4
-harrow            ━━                        ███████          470   █████ 5
-tomas               ━━━━                    █████████        600   █████ 5
-pell                    ━━━━━               ███████████      750   ██████ 6
-wen                          ━━             █████████████    920   ███████ 7
-crew                           ━━━━━━━━━━━  ████████████████ 1120  ███████ 7
+odile       ━━━━                            ████             260   ████ 4
+elsie           ━━━━                        █████            360   ████ 4
+harrow              ━                       ███████          470   █████ 5
+tomas                ━━━━                   █████████        600   █████ 5
+pell                     ━━━━               ███████████      750   ██████ 6
+wen                          ━━━━           █████████████    920   ███████ 7
+crew                             ━━━━━━━━━  ████████████████ 1120  ███████ 7
 ```
 
 ## Shop at the planned hand-over
@@ -152,10 +168,10 @@ Each convenience is priced against the unspent purse at the hand-over that can f
 |---|---|---:|---:|---:|---:|
 | cart | Ore from the normal cut | 55 | 180 | 150 | 1.20× |
 | hopper | Steel for the bridge | 166 | 260 | 240 | 1.08× |
-| furnace | A grate for the oven | 258 | 360 | 350 | 1.03× |
-| racks | Iron from the hill | 320 | 470 | 450 | 1.04× |
-| cpu | Gears for the mill wheel | 418 | 600 | 580 | 1.03× |
-| spare | Hinges for the barrels | 590 | 750 | 720 | 1.04× |
+| furnace | A grate for the oven | 290 | 360 | 350 | 1.03× |
+| racks | Iron from the hill | 340 | 470 | 450 | 1.04× |
+| cpu | Gears for the mill wheel | 442 | 600 | 580 | 1.03× |
+| spare | Hinges for the barrels | 573 | 750 | 720 | 1.04× |
 
 ## Previous program trials
 
@@ -177,7 +193,7 @@ Each proposed edit gets a separate replay from Take with the same purchase polic
 
 | Tick | Minute | Event | Detail | Credits | XP | Level |
 |---:|---:|---|---|---:|---:|---:|
-| 0 | 0.00 | unlock | tick, memory, depot, cpu.used, cpu.limit, drones, veins, findPath, drone.isNear, drone.moveAlong, drone.cargoKind, drone.busy, drone.task, drone.dump, depot.ore, depot.coal, depot.ingots, depot.steel, drone.mine, drone.unload, drone.pickup, drone.transfer, furnace, furnace.input, furnace.output, furnace.coal, furnace.inputMax, furnace.coalMax, furnace.steel, furnace.clear, furnace.smelt, furnace.start, manifest, depot.count, credits, orders, Run, Machine · furnace, Machine · depot, Machine · drone-1, Machine · Vein A, Machine · Vein B, Machine · Vein D, Shop · Bigger cart, Shop · Bigger hopper, Shop · Hotter furnace, Shop · CPU +10 | 80 | 0 | 1 |
+| 0 | 0.00 | unlock | tick, memory, depot, cpu.used, cpu.limit, drones, veins, findPath, isFree, reserve, drone.isNear, drone.moveAlong, drone.cargoKind, drone.busy, drone.task, drone.dump, depot.ore, depot.coal, depot.ingots, depot.steel, drone.mine, drone.unload, drone.pickup, drone.transfer, furnace, furnace.input, furnace.output, furnace.coal, furnace.inputMax, furnace.coalMax, furnace.steel, furnace.clear, furnace.smelt, furnace.start, manifest, depot.count, credits, orders, Run, Machine · furnace, Machine · depot, Machine · drone-1, Machine · Vein A, Machine · Vein B, Machine · Vein D, Shop · Bigger cart, Shop · Bigger hopper, Shop · Hotter furnace, Shop · CPU +10 | 80 | 0 | 1 |
 | 0 | 0.00 | start | Horseshoes for the mail horse | 80 | 0 | 1 |
 | 0 | 0.00 | code change | manual → run. smeltOnce starts the batch. Buttons may fill the hopper and haul. | 80 | 0 | 1 |
 | 32 | 0.27 | finish | Horseshoes for the mail horse | 120 | 10 | 2 |
@@ -192,27 +208,27 @@ Each proposed edit gets a separate replay from Take with the same purchase polic
 | 166 | 1.38 | unlock | press, press.installed, press.count, press.start, Machine · press, Machine · drone-2, Shop · Output racks, Shop · Spare press | 260 | 40 | 4 |
 | 166 | 1.38 | start | A grate for the oven | 260 | 40 | 4 |
 | 166 | 1.38 | code change | steel-loop → grates. Each cart hauls steel to the press or a grate to the depot. | 260 | 40 | 4 |
-| 258 | 2.15 | finish | A grate for the oven | 360 | 60 | 4 |
-| 258 | 2.15 | unlock | on | 360 | 60 | 4 |
-| 258 | 2.15 | start | Iron from the hill | 360 | 60 | 4 |
-| 258 | 2.15 | unlock | prospect | 360 | 60 | 4 |
-| 258 | 2.15 | code change | grates → dies. The order names a plate and a blank, so the press die has to change. | 360 | 60 | 4 |
-| 259 | 2.16 | unlock | Machine · Vein C | 360 | 60 | 4 |
-| 320 | 2.67 | finish | Iron from the hill | 470 | 85 | 5 |
-| 320 | 2.67 | unlock | lathe, lathe.installed, lathe.count, lathe.start, Machine · lathe | 470 | 85 | 5 |
-| 320 | 2.67 | start | Gears for the mill wheel | 470 | 85 | 5 |
-| 320 | 2.67 | code change | dies → gears. A blank is cut into a gear on the lathe. | 470 | 85 | 5 |
-| 418 | 3.48 | finish | Gears for the mill wheel | 600 | 110 | 5 |
-| 418 | 3.48 | unlock | bench, bench.installed, bench.count, bench.start, Machine · bench | 600 | 110 | 5 |
-| 418 | 3.48 | start | Hinges for the barrels | 600 | 110 | 5 |
-| 418 | 3.48 | code change | gears → hinges. A hinge joins a plate from the press with a pin from the lathe. | 600 | 110 | 5 |
-| 590 | 4.92 | finish | Hinges for the barrels | 750 | 140 | 6 |
-| 590 | 4.92 | start | Shutters for the lamps | 750 | 140 | 6 |
-| 590 | 4.92 | code change | hinges → shutters. A plate goes to the lathe, and the cut plate comes back to the press. | 750 | 140 | 6 |
-| 646 | 5.38 | finish | Shutters for the lamps | 920 | 170 | 7 |
-| 646 | 5.38 | start | Kits for the bridge crew | 920 | 170 | 7 |
-| 646 | 5.38 | code change | shutters → kits. Pack the winch crate, then the lamp crate. | 920 | 170 | 7 |
-| 977 | 8.14 | finish | Kits for the bridge crew | 1120 | 210 | 7 |
+| 290 | 2.42 | finish | A grate for the oven | 360 | 60 | 4 |
+| 290 | 2.42 | unlock | on | 360 | 60 | 4 |
+| 290 | 2.42 | start | Iron from the hill | 360 | 60 | 4 |
+| 290 | 2.42 | unlock | prospect | 360 | 60 | 4 |
+| 290 | 2.42 | code change | grates → dies. The order names a plate and a blank, so the press die has to change. | 360 | 60 | 4 |
+| 291 | 2.42 | unlock | Machine · Vein C | 360 | 60 | 4 |
+| 340 | 2.83 | finish | Iron from the hill | 470 | 85 | 5 |
+| 340 | 2.83 | unlock | lathe, lathe.installed, lathe.count, lathe.start, Machine · lathe | 470 | 85 | 5 |
+| 340 | 2.83 | start | Gears for the mill wheel | 470 | 85 | 5 |
+| 340 | 2.83 | code change | dies → gears. A blank is cut into a gear on the lathe. | 470 | 85 | 5 |
+| 442 | 3.68 | finish | Gears for the mill wheel | 600 | 110 | 5 |
+| 442 | 3.68 | unlock | bench, bench.installed, bench.count, bench.start, Machine · bench | 600 | 110 | 5 |
+| 442 | 3.68 | start | Hinges for the barrels | 600 | 110 | 5 |
+| 442 | 3.68 | code change | gears → hinges. A hinge joins a plate from the press with a pin from the lathe. | 600 | 110 | 5 |
+| 573 | 4.78 | finish | Hinges for the barrels | 750 | 140 | 6 |
+| 573 | 4.78 | start | Shutters for the lamps | 750 | 140 | 6 |
+| 573 | 4.78 | code change | hinges → shutters. A plate goes to the lathe, and the cut plate comes back to the press. | 750 | 140 | 6 |
+| 667 | 5.56 | finish | Shutters for the lamps | 920 | 170 | 7 |
+| 667 | 5.56 | start | Kits for the bridge crew | 920 | 170 | 7 |
+| 667 | 5.56 | code change | shutters → kits. Pack the winch crate, then the lamp crate. | 920 | 170 | 7 |
+| 947 | 7.89 | finish | Kits for the bridge crew | 1120 | 210 | 7 |
 
 <details>
 <summary>All intervals between quest progress or milestones</summary>
@@ -222,11 +238,11 @@ Each proposed edit gets a separate replay from Take with the same purchase polic
 | bram | 0–24, 24–25, 25–32 |
 | ines | 32–55 |
 | odile | 55–96, 96–122, 122–141, 141–166 |
-| elsie | 166–247, 247–258 |
-| harrow | 258–259, 259–292, 292–320 |
-| tomas | 320–378, 378–418 |
-| pell | 418–535, 535–590 |
-| wen | 590–635, 635–646 |
-| crew | 646–838, 838–977 |
+| elsie | 166–279, 279–290 |
+| harrow | 290–291, 291–329, 329–340 |
+| tomas | 340–404, 404–442 |
+| pell | 442–573 |
+| wen | 573–634, 634–667 |
+| crew | 667–823, 823–947 |
 
 </details>
