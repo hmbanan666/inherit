@@ -151,6 +151,18 @@ export function onTick() { furnace.start("smelt") }`,
   } finally { session.dispose() }
 })
 
+test('the depot inspector lists physical parts and reports transfer reservations separately', () => {
+  const world = createWorld(kettlewick)
+  const depot = port(world, 'depot')!
+  depot.add('gear', 3)
+  depot.bin.reservedOut.gear = 1
+  depot.bin.reservedIn.pin = 2
+  const lines = inspectMachine(world, kettlewick, 'depot')!.lines
+  expect(lines).toContainEqual({ label: 'Gear', value: '3' })
+  expect(lines).toContainEqual({ label: 'Reserved', value: '1 gear out · 2 pin in' })
+  expect(lines.some(line => line.label === 'Pin')).toBe(false)
+})
+
 test('the press inspector names the recipe, the missing input, and the reserved load', () => {
   const world = createWorld(kettlewick)
   world.press = createPress()
@@ -229,6 +241,8 @@ test('the assembly table packs the active crate, and a partial delivery stays', 
   port(world, 'depot')!.take('gear', 1)
   tick(world, 1)
   expect(world.manifest.staged.gear).toBe(1)
+  expect(inspectMachine(world, kettlewick, 'bench')!.lines).toContainEqual({ label: 'Set aside', value: '1/1 gear · 0/2 hinge' })
+  expect(inspectMachine(world, kettlewick, 'depot')!.lines.some(line => line.label === 'Gear')).toBe(false)
   port(world, 'bench')!.add('gear', 1)
   port(world, 'bench')!.add('hinge', 2)
   expect(startRecipe(world, 'bench', 'pack')).toBe('started')
@@ -238,6 +252,7 @@ test('the assembly table packs the active crate, and a partial delivery stays', 
   port(world, 'depot')!.add('winch', 1)
   tick(world, 1)
   expect(world.manifest.winch).toBe(true)
+  expect(inspectMachine(world, kettlewick, 'depot')!.lines.some(line => line.label === 'Winch')).toBe(false)
   expect(world.manifest.active).toBe('lamp')
   expect(world.manifest.staged.gear).toBeUndefined()
   const saved = migrateWorld(structuredClone(world))

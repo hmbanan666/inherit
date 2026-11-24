@@ -4,7 +4,7 @@ import { pushConsole, type Cell, type Site, type World } from './core/world'
 import { dumpCargo, mining, orderMine, orderPickup, orderUnload } from './modules/mining'
 import { takeFromDepot } from './modules/orders'
 import { outputCap, smelting } from './modules/smelting'
-import { ensureBin, finishedCap, hingeRecipe, kitLines, kitRecipe, latheRecipes, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel, type Item, type Press, type Recipe } from './modules/stock'
+import { ensureBin, finishedCap, hingeRecipe, itemNames, kitLines, kitRecipe, latheRecipes, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel, type Item, type Press, type Recipe } from './modules/stock'
 import { functionUnlocked, triggerUnlocked, unlockError } from './quests'
 
 export const worksEvents = ['furnace.full', 'furnace.ready', 'drone.idle', 'drone.full'] as const
@@ -499,16 +499,19 @@ function inspectBench(world: World): InspectView {
 }
 
 function inspectDepot(world: World): InspectView {
+  const depot = port(world, 'depot')!
+  const stapleLabels: Partial<Record<Item, string>> = { ore: 'Ore', coal: 'Coal', ingot: 'Ingots', steel: 'Steel' }
+  const lines = itemNames.flatMap(item => {
+    const qty = depot.get(item)
+    const label = stapleLabels[item]
+    if (!label && qty === 0) return []
+    return [{ label: label ?? item[0]!.toUpperCase() + item.slice(1), value: String(qty) }]
+  })
   return {
     id: 'depot',
     name: 'Depot',
-    description: 'Villagers take ingots and steel from here. Ore and coal can wait here too.',
-    lines: [
-      { label: 'Ingots', value: String(world.depot.ingots) },
-      { label: 'Steel', value: String(world.depot.steel) },
-      { label: 'Ore', value: String(world.depot.ore) },
-      { label: 'Coal', value: String(world.depot.coal) },
-    ],
+    description: 'Stock on hand, including goods reserved for pickup. Villagers collect their orders here.',
+    lines: [...lines, { label: 'Reserved', value: reservedLabel(depot.bin) }],
     recipes: [],
     actions: [],
   }
