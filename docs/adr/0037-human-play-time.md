@@ -17,9 +17,9 @@ The same reference run estimates human play time. Human minutes are the bot's qu
 
 Every rate, concept rule, and profile multiplier lives in [sim/human.ts](../../sim/human.ts). The profiles are fast, average, and new to TypeScript. Average is the default. The report shows a per-quest table for that profile: bot minutes, each overhead, human minutes, and cumulative time. Each profile has a total line.
 
-Two checks are warnings, not balance failures. An average quest longer than about 25 minutes warns. A stretch of machine time longer than about 15 minutes with no code change warns. `pnpm sim` does not fail on either. A warning is not an expected-failure key.
+Three checks are warnings, not balance failures. An average quest longer than about 25 minutes warns. A stretch of machine time longer than about 15 minutes with no code change warns. An edit that adds no new function, branch, loop, or API call warns. `pnpm sim` does not fail on these. A warning is not an expected-failure key.
 
-The diff is the deployed project, including files under `lib/`. A library is charged on the quest that first deploys it.
+The diff is the deployed project, including files under `lib/`. Reference programs grow by quest. Each quest keeps the previous files and adds the step it teaches: die switching, the lathe, two-input assembly, cargo-dependent routing, then manifests. A swapped literal or job name is not new code. A token diff at or below the count in `sim/human.ts` is not new code either. New code is a new function, a branch, a loop, or an API call, and it has to clear that count. A quest whose edit is not new code warns. That warning is not a balance failure, and it is not silenced by raising the caps.
 
 ## Consequences
 

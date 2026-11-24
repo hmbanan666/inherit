@@ -1,6 +1,6 @@
-import { tick } from './lib/mill'
+import { workShutters } from './lib/shutters'
 
-// Wen: the next station depends on the part. A plate goes to the lathe, a cut plate back to the press.
+// Wen: the next station depends on the part. A plate goes to the lathe, a cut plate comes back to the press.
 export function onTick() {
-  tick('shutters')
+  workShutters()
 }

@@ -29,6 +29,7 @@ export interface QuestHuman {
   decisions: number
   machines: number
   purchases: number
+  logic: boolean
 }
 
 export interface ProfileEstimate {
@@ -142,6 +143,51 @@ function projectSource(files: Record<string, string>) {
   return Object.keys(files).sort().map(path => stripComments(files[path])).join('\n')
 }
 
+function tokens(source: string) {
+  return source.match(/===|!==|=>|\?\?|\?\.|&&|\|\||[A-Za-z_]\w*|'(?:\\'|[^'\n])*'|"(?:\\"|[^"\n])*"|`(?:\\`|[^`])*`|\d+(?:\.\d+)?|[{}()[\].,;:+\-*/%<>=!?&|]/g) ?? []
+}
+
+function tokenEdits(before: string, after: string) {
+  return lineEdits(tokens(before), tokens(after))
+}
+
+function normalized(files: Record<string, string>) {
+  return Object.keys(files).sort().map(path => {
+    const text = stripComments(files[path] ?? '').replace(/'(?:\\'|[^'\n])*'|"(?:\\"|[^"\n])*"|`(?:\\`|[^`])*`|\b\d+(?:\.\d+)?\b/g, '0')
+    return `${path}\n${text}`
+  }).join('\n')
+}
+
+function functionNames(source: string) {
+  return new Set([...source.matchAll(/\bfunction\s+([A-Za-z_]\w*)/g)].map(match => match[1] ?? ''))
+}
+
+function branches(source: string) {
+  const code = source.replace(/\?\./g, '').replace(/\?\?/g, '')
+  return (code.match(/\bif\b/g)?.length ?? 0) + (code.match(/\?/g)?.length ?? 0)
+}
+
+function loops(source: string) {
+  return source.match(/\b(?:for|while)\b/g)?.length ?? 0
+}
+
+function hasNewLogic(before: string, after: string, names: readonly string[]) {
+  const previous = functionNames(before)
+  for (const name of functionNames(after)) if (name && !previous.has(name)) return true
+  if (branches(after) > branches(before) || loops(after) > loops(before)) return true
+  const seen = new Set(apiCallsIn(before, names))
+  return apiCallsIn(after, names).some(name => !seen.has(name))
+}
+
+/** A literal or job-name swap is not new code. Nor is a token diff at or below the configured count, unless it adds a function, a branch, a loop, or an API call above that count. */
+export function isNewLogic(before: Record<string, string>, after: Record<string, string>, names: readonly string[]) {
+  if (normalized(before) === normalized(after)) return false
+  const beforeText = projectSource(before)
+  const afterText = projectSource(after)
+  if (!hasNewLogic(beforeText, afterText, names)) return false
+  return tokenEdits(beforeText, afterText) > humanTime.writing.trivialTokenEdits
+}
+
 function isCodeChange(event: Event): event is Extract<Event, { kind: 'code change' }> {
   return event.kind === 'code change'
 }
@@ -168,6 +214,7 @@ interface QuestFacts {
   apis: string[]
   concepts: string[]
   debugRuns: number
+  logic: boolean
   shopSeconds: number
   listings: number
   decisions: number
@@ -222,13 +269,16 @@ function factsFor(run: Run): QuestFacts[] {
     apis.forEach(name => seenApis.add(name))
     concepts.forEach(id => seenConcepts.add(id))
     const def = questList.find(item => item.id === quest.id)
+    const logic = !!edit && isNewLogic(players[stage], players[next], catalog)
     facts.push({
       id: quest.id,
       bot: minutes(quest.finish.tick - quest.start.tick),
       words: def ? questWords(def) : 0,
-      lines: changedLines(players[stage], players[next]),
-      apis, concepts,
-      debugRuns: debugRuns(!!edit, apis.length, concepts.length),
+      lines: logic ? changedLines(players[stage], players[next]) : 0,
+      apis: logic ? apis : [],
+      concepts: logic ? concepts : [],
+      debugRuns: debugRuns(logic, apis.length, concepts.length),
+      logic,
       ...shopFacts(run, quest.id, first),
     })
     stage = next
@@ -262,10 +312,10 @@ function scale(facts: QuestFacts, pace: Pace) {
   }
 }
 
-/** Machine time from one code change to the next, and from the start until the first edit. */
-export function waitingStretches(run: Run): Wait[] {
+/** Machine time from one code change to the next, and from the start until the first edit. A logic set keeps only quests whose edit is new logic. */
+export function waitingStretches(run: Run, logicQuests?: ReadonlySet<string>): Wait[] {
   const end = run.quests.at(-1)?.finish.tick ?? 0
-  const marks = [...new Set([0, ...run.events.filter(event => event.kind === 'code change').map(event => event.tick), end])]
+  const marks = [...new Set([0, ...run.events.filter(event => event.kind === 'code change' && (!logicQuests || (!!event.quest && logicQuests.has(event.quest)))).map(event => event.tick), end])]
     .sort((a, b) => a - b)
   const waits: Wait[] = []
   for (let i = 0; i < marks.length - 1; i++) {
@@ -278,13 +328,18 @@ export function waitingStretches(run: Run): Wait[] {
   return waits
 }
 
-export function humanWarnings(quests: { id: string; total: number }[], waits: Wait[]): HumanWarning[] {
+export function humanWarnings(quests: { id: string; total: number; logic?: boolean }[], waits: Wait[]): HumanWarning[] {
   const warnings: HumanWarning[] = []
   for (const quest of quests) {
     if (quest.total > humanTime.maxQuestMinutes)
       warnings.push({
         id: `human/quest/${quest.id}`,
         text: `${quest.total.toFixed(2)} min for the average player, above ${humanTime.maxQuestMinutes} min.`,
+      })
+    if (quest.logic === false)
+      warnings.push({
+        id: `human/code/${quest.id}`,
+        text: 'The reference edit adds no new function, branch, loop, or API call.',
       })
   }
   for (const wait of waits) {
@@ -299,7 +354,7 @@ export function humanWarnings(quests: { id: string; total: number }[], waits: Wa
 
 export function estimateHuman(run: Run): HumanEstimate {
   const facts = factsFor(run)
-  const waits = waitingStretches(run)
+  const waits = waitingStretches(run, new Set(facts.filter(fact => fact.logic).map(fact => fact.id)))
   const profiles = humanTime.profileOrder.map(id => {
     const profile = humanTime.profiles[id]
     let spent = 0
@@ -364,7 +419,7 @@ export function humanMarkdown(run: Run) {
   const rows = [
     '## Human time', '',
     `The tick clock is the works. These minutes add reading, writing, debugging, and the shop. The rates and the profiles are [sim/human.ts](../../sim/human.ts). ${humanTime.profiles[humanTime.defaultProfile].label} is the default. A warning here does not fail the balance gate.`, '',
-    'Writing counts non-blank lines inserted or deleted between the previous reference project and the next, plus a one-time cost for each works API call and each concept the first time it appears. A library is charged on the quest that deploys it. Debugging is the expected failed runs, higher when a concept is new, times the time to run and inspect. The successful run is the bot column.', '',
+    'Writing counts non-blank lines inserted or deleted when the reference program gains a function, a branch, a loop, or an API call. A swapped literal or job name, and a token diff at or below the configured count, is not new code: it charges no lines, no new calls, and no debug runs. Each quest keeps the previous files and adds the step it teaches. Debugging is the expected failed runs, higher when a concept is new, times the time to run and inspect. The successful run is the bot column.', '',
   ]
   if (average) rows.push(...profileTable(average), '')
   rows.push(
@@ -392,11 +447,11 @@ export function humanMarkdown(run: Run) {
   }
   rows.push(
     'Counts are shared by every profile. Debug runs are the expectation before a profile scales the minutes.', '',
-    '| Quest | Words | Lines | New APIs | New concepts | Debug runs | Listings | Decisions | Machines |',
-    '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
+    '| Quest | Words | Lines | New logic | New APIs | New concepts | Debug runs | Listings | Decisions | Machines |',
+    '|---|---:|---:|---|---:|---:|---:|---:|---:|---:|',
   )
   for (const quest of average?.quests ?? [])
-    rows.push(`| ${quest.id} | ${quest.words} | ${quest.lines} | ${quest.apis.length} | ${quest.concepts.length} | ${formatRuns(quest.debugRuns)} | ${quest.listings} | ${quest.decisions} | ${quest.machines} |`)
+    rows.push(`| ${quest.id} | ${quest.words} | ${quest.lines} | ${quest.logic ? 'yes' : 'no'} | ${quest.apis.length} | ${quest.concepts.length} | ${formatRuns(quest.debugRuns)} | ${quest.listings} | ${quest.decisions} | ${quest.machines} |`)
   rows.push('', 'First-time API calls and concepts:')
   for (const quest of average?.quests ?? []) {
     const apis = quest.apis.join(', ') || 'none'
