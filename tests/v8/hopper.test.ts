@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { kettlewick } from '../../packages/sim/src/v8'
+import { kettlewick, shop } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 
 const unload = `import { drones, furnace } from "inherit"
@@ -45,7 +45,7 @@ test('Bigger hopper raises both caps and the depot stays unlimited', async () =>
     expect(session.buy('hopper')).toBe(true)
     expect(session.world.furnace.oreMax).toBe(12)
     expect(session.world.furnace.coalMax).toBe(6)
-    expect(session.world.credits).toBe(credits - 50)
+    expect(session.world.credits).toBe(credits - shop.find(item => item.id === 'hopper')!.price)
     const drone = session.world.drones[0]!
     Object.assign(drone, { pos: { ...session.world.depot.pos }, cargo: 3, carrying: 'ore' as const })
     await session.deploy({ 'main.ts': 'import { drones, depot } from "inherit"\nexport function onTick() { drones()[0].unload(depot) }' })

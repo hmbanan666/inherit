@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createWorld, kettlewick, migrateWorld } from '../../packages/sim/src/v8'
+import { createWorld, kettlewick, levelFor, migrateWorld, questList, shop } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 
 test('a nearby drone supplies the furnace and one batch finishes four ticks after ignition', async () => {
@@ -82,4 +82,39 @@ test('an old save keeps its credits, drops waste and due, and gains drone-2 afte
   migrateWorld(world)
   expect(world.drones.filter(drone => drone.name === 'drone-2')).toHaveLength(1)
   expect(world.credits).toBe(140)
+})
+
+/** How many catalog items fit if the purse always takes the cheapest one still unpaid. */
+function itemsWithin(credits: number) {
+  const prices = shop.map(item => item.price).sort((a, b) => a - b)
+  let spent = 0
+  let count = 0
+  for (const price of prices) {
+    if (spent + price > credits) break
+    spent += price
+    count += 1
+  }
+  return count
+}
+
+test('each quest purse buys one or two shop items', () => {
+  let credits = kettlewick.credits
+  let xp = 0
+  const cleared: string[] = []
+  const catalog = shop.reduce((sum, item) => sum + item.price, 0)
+  for (const quest of questList) {
+    const next = questList.find(item => !cleared.includes(item.id) && levelFor(xp) >= item.needLevel)
+    expect(next?.id).toBe(quest.id)
+    const affordable = shop.filter(item => item.price <= credits)
+    const within = itemsWithin(credits)
+    expect(affordable.length, quest.id).toBeGreaterThanOrEqual(1)
+    expect(within, quest.id).toBeGreaterThanOrEqual(1)
+    expect(within, quest.id).toBeLessThanOrEqual(2)
+    if (within === 1) expect(affordable.length, quest.id).toBeGreaterThanOrEqual(2)
+    expect(credits, quest.id).toBeLessThan(catalog)
+    credits += quest.pay
+    xp += quest.xp
+    cleared.push(quest.id)
+  }
+  expect(itemsWithin(credits)).toBeLessThanOrEqual(2)
 })
