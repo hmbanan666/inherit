@@ -5,8 +5,8 @@ import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
 import {
-  cartDrawScale, cartMark, hoverScale, hoverStroke, selectionColor, selectionStroke, stationShapes, stationsOf,
-  type Shape,
+  cartDrawScale, cartMark, pauseMark, hoverScale, hoverStroke, selectionColor, selectionStroke, stationShapes, stationsOf,
+  type CartHit, type Shape,
 } from './floorPick'
 
 export type FloorWorld = Omit<World, 'memory'>
@@ -96,7 +96,7 @@ export class FloorScene {
     badge: Text
     name: Text
     bar: Graphics
-    offset: number
+    pause: Graphics
     fromX: number
     fromY: number
     x: number
@@ -105,6 +105,7 @@ export class FloorScene {
   private readonly seen = new Set<string>()
   private readonly veinBars = new Map<string, Graphics>()
   private readonly stations = new Map<string, Container>()
+  private readonly equipmentLayer = new Container({ label: 'equipment' })
   private readonly paths: Graphics
   private readonly ring: Graphics
   private readonly fire: Graphics
@@ -131,12 +132,13 @@ export class FloorScene {
   constructor(world: FloorWorld) {
     this.latest = world
     land(this.root, world.grid)
-    this.paths = this.root.addChild(new Graphics())
+    this.paths = this.root.addChild(new Graphics({ label: 'routes' }))
+    this.root.addChild(this.equipmentLayer)
     for (const vein of world.veins) this.placeVein(vein)
-    const yard = equipment(this.root, world.depot.pos, depot)
+    const yard = equipment(this.equipmentLayer, world.depot.pos, depot)
     caption(yard, 'Depot', 0, -63)
     this.stations.set('depot', yard)
-    const smelter = equipment(this.root, world.furnace.pos, furnace)
+    const smelter = equipment(this.equipmentLayer, world.furnace.pos, furnace)
     caption(smelter, 'Furnace', 0, -63)
     this.stations.set('furnace', smelter)
     this.fire = smelter.addChild(new Graphics())
@@ -159,7 +161,7 @@ export class FloorScene {
     if (vein.hidden || this.seen.has(vein.name)) return
     this.seen.add(vein.name)
     const { x, y } = center(vein.pos)
-    const group = this.root.addChild(new Container())
+    const group = this.equipmentLayer.addChild(new Container())
     group.position.set(x, y)
     this.stations.set(`Vein ${vein.name}`, group)
     group.addChild(new Graphics()).ellipse(0, 5, 31, 14).fill({ color: 0x202126, alpha: 0.42 })
@@ -189,9 +191,14 @@ export class FloorScene {
     badge.anchor.set(0.5, 1)
     badge.position.set(0, -30)
     const bar = art.addChild(new Graphics())
+    const pause = art.addChild(new Graphics({ label: 'pause' }))
+    pause.position.set(pauseMark.x, pauseMark.y)
+    pause.roundRect(0, 0, pauseMark.w, pauseMark.h, 2).fill(0x2a2b2e)
+    pause.roundRect(2, 2, 3, 8, 1).roundRect(pauseMark.w - 5, 2, 3, 8, 1).fill(0xe7c56a)
+    pause.visible = false
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
-    this.haulers.push({ art, cargo, load, badge, name, bar, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+    this.haulers.push({ art, cargo, load, badge, name, bar, pause, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
   }
 
   private showLoad(item: FloorScene['haulers'][number], drone: FloorWorld['drones'][number]) {
@@ -222,11 +229,11 @@ export class FloorScene {
 
   /** Live cart anchors, including the walk between cells. */
   cartAnchors() {
-    const anchors: { id: string; x: number; y: number }[] = []
+    const anchors: CartHit[] = []
     for (const [i, item] of this.haulers.entries()) {
       const id = this.latest.drones[i]?.name
       if (!id || !item.art.visible) continue
-      anchors.push({ id, x: item.art.x, y: item.art.y })
+      anchors.push({ id, x: item.art.x, y: item.art.y, waiting: item.pause.visible })
     }
     return anchors
   }
@@ -247,9 +254,11 @@ export class FloorScene {
   private strokeId(world: FloorWorld, id: string, style: { width: number; alpha: number; grow: number }) {
     const drone = world.drones.findIndex(item => item.name === id)
     if (drone >= 0) {
-      const art = this.haulers[drone]?.art
-      if (!art?.visible) return
-      this.strokeBox(art.x, art.y, cartMark, style)
+      const hauler = this.haulers[drone]
+      if (!hauler?.art.visible) return
+      const { art, pause } = hauler
+      const top = pause.visible ? pauseMark.y : cartMark.y
+      this.strokeBox(art.x, art.y, { ...cartMark, y: top, h: cartMark.h + cartMark.y - top }, style)
       return
     }
     const spot = stationsOf(world).find(item => item.id === id)
@@ -289,7 +298,6 @@ export class FloorScene {
       }
     }
     if (drawn) this.paths.stroke({ color: 0xe7c56a, width: 8, alpha: 0.55 })
-    this.root.addChild(this.paths)
   }
 
   private syncPress(world: FloorWorld) {
@@ -299,14 +307,13 @@ export class FloorScene {
       return
     }
     if (!this.pressArt) {
-      this.pressArt = equipment(this.root, press.pos, pressDrawing)
+      this.pressArt = equipment(this.equipmentLayer, press.pos, pressDrawing)
       caption(this.pressArt, 'Press', 0, -63)
       this.stations.set('press', this.pressArt)
       this.pressWork = this.pressArt.addChild(new Graphics())
       this.pressWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.pressMark = this.pressArt.addChild(materialArt('steel'))
       this.pressMark.position.set(18, 8)
-      if (this.ring) this.root.addChild(this.ring)
     }
     this.pressArt.visible = true
     if (this.pressWork) this.pressWork.visible = press.readyAt !== null
@@ -321,14 +328,13 @@ export class FloorScene {
       return
     }
     if (!this.latheArt) {
-      this.latheArt = equipment(this.root, machine.pos, cutter)
+      this.latheArt = equipment(this.equipmentLayer, machine.pos, cutter)
       caption(this.latheArt, 'Lathe', 0, -63)
       this.stations.set('lathe', this.latheArt)
       this.latheWork = this.latheArt.addChild(new Graphics())
       this.latheWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.latheMark = this.latheArt.addChild(materialArt('steel'))
       this.latheMark.position.set(18, 8)
-      if (this.ring) this.root.addChild(this.ring)
     }
     this.latheArt.visible = true
     if (this.latheWork) this.latheWork.visible = machine.readyAt !== null
@@ -343,14 +349,13 @@ export class FloorScene {
       return
     }
     if (!this.benchArt) {
-      this.benchArt = equipment(this.root, machine.pos, assembler)
+      this.benchArt = equipment(this.equipmentLayer, machine.pos, assembler)
       caption(this.benchArt, 'Assembly', 0, -63)
       this.stations.set('bench', this.benchArt)
       this.benchWork = this.benchArt.addChild(new Graphics())
       this.benchWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.benchMark = this.benchArt.addChild(materialArt('iron-ingot'))
       this.benchMark.position.set(18, 8)
-      if (this.ring) this.root.addChild(this.ring)
     }
     this.benchArt.visible = true
     if (this.benchWork) this.benchWork.visible = machine.readyAt !== null
@@ -365,14 +370,13 @@ export class FloorScene {
       return
     }
     if (!this.spareArt) {
-      this.spareArt = equipment(this.root, press.pos, pressDrawing)
+      this.spareArt = equipment(this.equipmentLayer, press.pos, pressDrawing)
       caption(this.spareArt, 'Spare', 0, -63)
       this.stations.set('spare', this.spareArt)
       this.spareWork = this.spareArt.addChild(new Graphics())
       this.spareWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.spareMark = this.spareArt.addChild(materialArt('steel'))
       this.spareMark.position.set(18, 8)
-      if (this.ring) this.root.addChild(this.ring)
     }
     this.spareArt.visible = true
     if (this.spareWork) this.spareWork.visible = press.readyAt !== null
@@ -388,12 +392,8 @@ export class FloorScene {
     this.syncBench(world)
     for (const vein of world.veins) this.placeVein(vein)
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
-    const count = world.drones.length
     const snap = new Set<number>()
-    for (const [i, item] of this.haulers.entries()) {
-      if (i >= count) item.art.visible = false
-      item.offset = (i - (count - 1) / 2) * 25
-    }
+    for (const item of this.haulers.slice(world.drones.length)) item.art.visible = false
     for (const [i, drone] of world.drones.entries()) {
       const item = this.haulers[i]!
       if (!item.art.visible) snap.add(i)
@@ -401,10 +401,7 @@ export class FloorScene {
       item.name.text = drone.name
       item.badge.text = `${drone.cargo}/${drone.capacity}`
       item.bar.clear()
-      if (drone.wait && drone.wait.ticks > 0) {
-        item.bar.roundRect(-6, -54, 3, 8, 1).fill(0xe7c56a)
-        item.bar.roundRect(1, -54, 3, 8, 1).fill(0xe7c56a)
-      }
+      item.pause.visible = (drone.wait?.ticks ?? 0) > 0
       const dig = drone.dig
       const vein = dig && world.veins.find(entry => entry.name === dig.vein)
       if (dig && vein && dig.ticks > 0) {
@@ -429,7 +426,7 @@ export class FloorScene {
       const item = this.haulers[i]!
       const drone = world.drones[i]!
       const pos = center(drone.pos)
-      item.x = pos.x + item.offset
+      item.x = pos.x
       item.y = pos.y + 20
       item.fromX = item.x
       item.fromY = item.y
@@ -447,7 +444,7 @@ export class FloorScene {
     for (const [i, drone] of world.drones.entries()) {
       const item = this.haulers[i]!
       const pos = center(drone.pos)
-      item.x = pos.x + item.offset
+      item.x = pos.x
       item.y = pos.y + 20
       item.fromX = restart ? item.x : item.art.x
       item.fromY = restart ? item.y : item.art.y

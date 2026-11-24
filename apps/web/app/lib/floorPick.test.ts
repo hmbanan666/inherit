@@ -1,11 +1,11 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { createWorld, kettlewick } from '@inherit/sim/v8'
 import type { Cell } from '@inherit/sim/v8'
 import { benchAt, createBench, createLathe, createPress, createSpare, latheAt, pressAt, spareAt } from '../../../../packages/sim/src/v8/modules/stock'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press } from './art/fabrication'
-import { tile } from './floor'
+import { FloorScene, tile } from './floor'
 import {
   buildingLabelHit, captionBox, cartDrawScale, floorCursor, floorPoint, footprintContains, hitPadding, hoverScale,
   pickFloor, stationsOf, type MachineKind, type StationHit,
@@ -111,6 +111,62 @@ test('a cart parked on the depot does not take the building, and its sprite stil
   expect(pickFloor(point.x, point.y, tile, placed, [cart])).toBe('drone-1')
   const name = at(pos, 0, 36)
   expect(pickFloor(name.x, name.y, tile, placed, [cart])).toBe('drone-1')
+})
+
+test('the pause mark stays on the waiting cart beside the occupied assembly table', () => {
+  const world = fitted()
+  const waiting = world.drones[0]!
+  waiting.pos = { x: benchAt.x - 1, y: benchAt.y }
+  waiting.route = [benchAt]
+  waiting.wait = { ticks: 1, blocked: benchAt, place: 'bench', logged: 0 }
+  world.drones.push({ ...waiting, name: 'drone-2', pos: benchAt, wait: null, route: [] })
+  world.bench = null
+  const scene = new FloorScene(world)
+  world.bench = createBench()
+  scene.update(world)
+  scene.animate(0, 500, true)
+
+  const anchors = scene.cartAnchors()
+  expect(anchors[0]).toMatchObject(at(waiting.pos, 0, 20))
+  expect(anchors[1]).toMatchObject(at(benchAt, 0, 20))
+  expect(pick(benchAt, 0, 20, anchors)).toBe('drone-2')
+  expect(pick(benchAt, 0, -34, anchors)).toBe('bench')
+  const marks = scene.root.getChildrenByLabel('pause', true).filter(mark => mark.visible)
+  expect(marks).toHaveLength(1)
+  const routes = scene.root.getChildByLabel('routes')!
+  const equipment = scene.root.getChildByLabel('equipment')!
+  expect(scene.root.getChildIndex(routes)).toBeLessThan(scene.root.getChildIndex(equipment))
+  expect(scene.root.getChildIndex(equipment)).toBeLessThan(scene.root.getChildIndex(marks[0]!.parent!))
+  const bounds = marks[0]!.getBounds()
+  const top = at(waiting.pos, 0, -38)
+  expect(bounds.x + bounds.width / 2).toBe(top.x)
+  expect(bounds.y).toBe(top.y)
+  expect(bounds.height).toBe(12)
+  // Both gold bars are selectable all the way to their top edge.
+  for (const dx of [-3, 3]) expect(pickFloor(top.x + dx, top.y + 2, tile, placed, anchors)).toBe(waiting.name)
+
+  waiting.wait = null
+  scene.update(world)
+  expect(marks[0]!.visible).toBe(false)
+  expect(pickFloor(top.x, top.y + 2, tile, placed, scene.cartAnchors())).not.toBe(waiting.name)
+})
+
+test('a cart on a detour is picked at its interpolated sprite', () => {
+  const world = fitted()
+  const cart = world.drones[0]!
+  cart.pos = { x: benchAt.x - 1, y: benchAt.y - 1 }
+  const scene = new FloorScene(world)
+  using now = vi.spyOn(performance, 'now')
+  now.mockReturnValue(1000)
+  scene.update(world)
+  world.tick++
+  cart.pos = { ...cart.pos, x: benchAt.x }
+  scene.update(world)
+  scene.animate(1250, 500, false)
+  const anchors = scene.cartAnchors()
+  expect(anchors[0]).toMatchObject(at(cart.pos, -tile / 2, 20))
+  expect(pick(cart.pos, -tile / 2, 20, anchors)).toBe(cart.name)
+  expect(pick(cart.pos, 0, 20, anchors)).not.toBe(cart.name)
 })
 
 test('the selection footprint follows the drawing, not a circle at the cell centre', () => {
