@@ -97,8 +97,16 @@ export async function openRuntime(
   const handlers = new Map<string, QuickJSHandle | null>()
   let emitFn: QuickJSHandle | undefined
 
-  function begin(stats: CpuStats) {
+  // The host's cpuLimit is the live ceiling (the shop and a quest both write it).
+  // The budget captured at deploy applies only when the host does not pass one.
+  function tickLimit(ctx?: FactoryContext) {
+    const offered = (ctx ?? current)?.cpuLimit
+    if (typeof offered === 'number' && Number.isInteger(offered) && offered >= 1 && offered <= 4096) return offered
+    return budget
+  }
+  function begin(stats: CpuStats, ctx?: FactoryContext) {
     if (disposed) throw new Error('Program has been disposed.')
+    stats.budget = tickLimit(ctx)
     meter = stats
     deadline = performance.now() + 25
     stopped = ''
@@ -106,7 +114,7 @@ export async function openRuntime(
   }
   function exceeded(checkTime: boolean) {
     if (stopped) return true
-    if (meter.used > budget) stopped = `Operation budget (${budget}) exceeded; controller interrupted.`
+    if (meter.used > meter.budget) stopped = `Operation budget (${meter.budget}) exceeded; controller interrupted.`
     else if (checkTime && performance.now() >= deadline)
       stopped = 'Controller interrupted by 25 ms time budget.'
     return !!stopped
@@ -150,7 +158,7 @@ export async function openRuntime(
       vm.newFunction('factory', (name, length, ...args) => {
         if (!current) throw new Error('Factory calls require an active handler.')
         const key = vm.getString(name)
-        const limit = current.cpuLimit ?? budget
+        const limit = tickLimit()
         const charge = costs && chargeCpu(meter.used, limit, costs[key])
         meter.calls++
         meter.used = charge?.used ?? meter.used + 1
@@ -307,9 +315,11 @@ export async function openRuntime(
           frame = fresh()
           lastTick = ctx.tick
         }
-        if (costs && frame.used === budget) throw new Error(`CPU limit (${budget}) hit.`)
-        begin(frame)
-        if (frame.used > budget) throw new Error(`Operation budget (${budget}) exceeded.`)
+        const limit = tickLimit(ctx)
+        frame.budget = limit
+        if (costs && frame.used === limit) throw new Error(`CPU limit (${limit}) hit.`)
+        begin(frame, ctx)
+        if (frame.used > limit) throw new Error(`Operation budget (${limit}) exceeded.`)
         current = ctx
         try {
           if (startTick) usingHandle(vm.newNumber(ctx.tick), value => invoke(startTick, value).dispose())
@@ -325,9 +335,11 @@ export async function openRuntime(
           frame = fresh()
           lastTick = ctx.tick
         }
-        if (costs && frame.used === budget) throw new Error(`CPU limit (${budget}) hit.`)
-        begin(frame)
-        if (frame.used > budget) throw new Error(`Operation budget (${budget}) exceeded.`)
+        const limit = tickLimit(ctx)
+        frame.budget = limit
+        if (costs && frame.used === limit) throw new Error(`CPU limit (${limit}) hit.`)
+        begin(frame, ctx)
+        if (frame.used > limit) throw new Error(`Operation budget (${limit}) exceeded.`)
         current = ctx
         try {
           if (startTick) usingHandle(vm.newNumber(ctx.tick), value => invoke(startTick, value).dispose())

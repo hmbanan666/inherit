@@ -34,7 +34,7 @@ The rail shows the title, the ask, what is needed, and one quantity bar. Checks 
 
 The save is version 3 under `inherit.v8.kettlewick`. It stores the world, the deployed files, and the editor files. An unreadable slot is archived. Project files are kept when the world cannot be trusted. Unknown saves follow [ADR 0004](../adr/0004-v3-save-reset.md).
 
-The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). Goal lines are on the quest rail. Tests and Console share the pane beside the code. A failed save, a failed restore, and a floor renderer error are console rows, and the same line stays above the list. Deploy sits on the editor. The nav is the logo, the place, credits, level, and Settings. CPU shows in the status bar when the tick has spent at least half its budget or has hit the limit. A call that would pass the limit does not run, and the guest stops the rest of that tick's player code. The sim tick still finishes.
+The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). Goal lines are on the quest rail. Tests and Console share the pane beside the code. A failed save, a failed restore, and a floor renderer error are console rows, and the same line stays above the list. Deploy sits on the editor. The nav is the logo, the place, credits, level, and Settings. CPU is always on the status bar, as the recent spend against `world.cpu.limit`, with a short bar. A call that would pass the limit does not run, and the guest stops the rest of that tick's player code. The sim tick still finishes. The guest ceiling is that same limit, including after CPU +10.
 
 ## Standing rules
 

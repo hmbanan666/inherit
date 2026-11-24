@@ -115,6 +115,29 @@ test('reports the source line inside an imported module', async () => {
   finally { program.dispose() }
 })
 
+test('a context CPU limit replaces the program budget', async () => {
+  const calls: string[] = []
+  const program = await createProgram({
+    budget: 3,
+    operations: ['act'],
+    costs: { act: 2 },
+    files: {
+      'main.ts': 'import { act } from "inherit"\nexport function onTick() { act(); act(); act() }',
+    },
+  })
+  try {
+    expect(() => program.onTick({ tick: 1, cpuLimit: 6, act() { calls.push('go') } })).toThrow(/CPU limit \(6\) hit/)
+    expect(calls).toEqual(['go', 'go', 'go'])
+    expect(program.stats.used).toBe(6)
+    calls.length = 0
+    expect(() => program.onTick({ tick: 2, cpuLimit: 2, act() { calls.push('go') } })).toThrow(/CPU limit \(2\) hit/)
+    expect(calls).toEqual(['go'])
+    expect(program.stats.used).toBe(2)
+  } finally {
+    program.dispose()
+  }
+})
+
 test('weighted calls stop on the mapped line, including inside a guest catch', async () => {
   const calls: string[] = []
   const program = await createProgram({

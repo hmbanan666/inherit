@@ -12,6 +12,7 @@ import {
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { deliveryNote, firstOpenTest, quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
+import { cpuTitle, readCpu, steadyCpu, type CpuHold, type CpuMeter } from '../lib/cpuMeter'
 import { droneStatusLine, grantNote, questNextStep, steadyLine, type CartCue, type SteadyLine } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { reduceApiBook } from '../lib/apiBookState'
@@ -360,6 +361,14 @@ const droneLive = computed(() => droneStatusLine((world.value?.drones ?? []).map
 }))))
 const droneHold = shallowRef<SteadyLine>({ shown: '', pending: '', ticks: 0 })
 watch(droneLive, line => { droneHold.value = steadyLine(droneHold.value, line) }, { immediate: true })
+const cpuHold = shallowRef<CpuHold>()
+const cpuMeter = shallowRef<CpuMeter>(readCpu({ used: 0, limit: kettlewick.cpuLimit }))
+watch(world, (current) => {
+  const cpu = current?.cpu ?? { used: 0, limit: kettlewick.cpuLimit }
+  const next = steadyCpu(cpuHold.value, { used: cpu.used, limit: cpu.limit, tick: current?.tick })
+  cpuHold.value = next.hold
+  cpuMeter.value = next.meter
+})
 const nextStep = computed(() => {
   if (!activeQuest.value && readingHold.value) return readingHold.value
   return questNextStep({
@@ -427,11 +436,6 @@ const scriptTip = computed(() => {
   if (scriptState.value === 'stopped') return 'The script is stopped.'
   if (scriptState.value === 'error') return 'The script hit an error.'
   return 'The script is running.'
-})
-const cpuHot = computed(() => {
-  const cpu = world.value?.cpu
-  if (!cpu || cpu.limit <= 0) return false
-  return !!world.value?.status.startsWith('CPU') || cpu.used * 2 >= cpu.limit
 })
 function openProblems() {
   side.value = 'console'
@@ -802,14 +806,26 @@ onBeforeUnmount(() => {
         <span class="grow">
           <div class="drone-now" title="What the drone is doing now.">{{ droneHold.shown }}</div>
         </span>
+        <span
+          class="item cpu-meter"
+          role="meter"
+          data-testid="cpu"
+          :data-tone="cpuMeter.tone"
+          :aria-valuenow="cpuMeter.used"
+          aria-valuemin="0"
+          :aria-valuemax="cpuMeter.limit"
+          :aria-label="cpuTitle(cpuMeter)"
+          :title="cpuTitle(cpuMeter)"
+        >
+          <Cpu />
+          <b class="readout">{{ cpuMeter.label }}</b>
+          <i class="bar" aria-hidden="true"><i :style="{ width: cpuMeter.fill }" /></i>
+        </span>
         <span class="item" title="The caret in the open file.">
           <TextCursor />Ln {{ cursor.line }}, Col {{ cursor.column }}
         </span>
         <span v-if="world" class="item" title="The sim tick. The works advance twice a second.">
           <Timer />{{ world.tick }}
-        </span>
-        <span v-if="cpuHot && world" class="item" :title="`CPU ${world.cpu.used}/${world.cpu.limit}. A call past the limit does not run.`">
-          <Cpu />{{ world.cpu.used }}/{{ world.cpu.limit }}
         </span>
       </div>
     </template>
@@ -1107,6 +1123,27 @@ onBeforeUnmount(() => {
 }
 .context button.item { cursor: pointer }
 .context button.item:hover { background: var(--surface-low); color: var(--text) }
+.cpu-meter {
+  flex: none;
+  width: 148px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.cpu-meter .readout {
+  width: 10ch;
+  flex: none;
+  text-align: right;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.cpu-meter .bar { width: 36px; flex: none }
+.cpu-meter .bar i { background: var(--mint) }
+.cpu-meter[data-tone="near"] { color: var(--gold) }
+.cpu-meter[data-tone="near"] .bar i { background: var(--gold) }
+.cpu-meter[data-tone="over"] { color: var(--alert); background: var(--alert-surface) }
+.cpu-meter[data-tone="over"] .bar i { background: var(--alert) }
+.cpu-meter[data-tone="near"] :deep(svg),
+.cpu-meter[data-tone="over"] :deep(svg) { color: currentColor }
 .context svg { width: 12px; height: 12px }
 .lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--mint) }
 .context [data-state=error] .lamp { background: var(--alert) }

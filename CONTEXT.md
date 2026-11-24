@@ -14,7 +14,7 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | Loop | Calls `onTick` every tick until Stop. Handing over Ines's quest grants it and turns it on. |
 | Depot delivery | A quest takes ingots and steel from the depot. The furnace holds them until a drone picks them up and unloads them there. `takeFromDepot` is the only path that counts them. |
 | Tick | One step of the world, 0.5 s. While Loop is on, and no Run is in progress, `onTick` runs once per tick. The clock does not pause and has no speed control. |
-| CPU | A budget per tick. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it when the tick is spending half the budget or more. |
+| CPU | A budget per tick, stored on the world as spent and limit. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it on every tick. CPU +10 in the shop raises the limit. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. A new one is granted by taking a quest. |
 | Quest | One villager's ask, a count of goods, taken by hand, one at a time. The order is `questList`. |
 | Check | One test of the open quest. It lives beside the code, with a plain line for what it checks. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. The rail shows the quantity, not these rows. |
