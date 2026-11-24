@@ -6,7 +6,7 @@ Where an older milestone mentioned rent, pause, speeds, bankruptcy, deadlines, a
 
 ## Playable now
 
-Nick opens `/`. Nobody is asking until he takes a quest. Bram is first, at level 1: buttons on the furnace and the drone, and four ingots taken from the depot. **Hand over** pays that quest's credits and XP when every goal line passes. Shipping does not pay. The next villager waits until this one is handed over and the level is high enough. The clock keeps ticking while the tab is hidden. There is no pause and no speed button.
+Nick opens `/`. Nobody is asking until he takes a quest. Bram is first, at level 1: buttons on the furnace and the drone, and two ingots taken from the depot. **Hand over** pays that quest's credits and XP when every goal line passes. Shipping does not pay. The next villager waits until this one is handed over and the level is high enough. The clock keeps ticking while the tab is hidden. There is no pause and no speed button.
 
 `/?packs` opens the legacy pack showcase. Pack code stays.
 
@@ -15,8 +15,8 @@ The site is Kettlewick Works. Its numbers live on `kettlewick` in `packages/sim/
 - One drone, capacity 3, until Odile is handed over. That hand-over puts drone-2 at the depot. Vein A is poor ore (5 ticks, 1 rock) and vein B is poor coal. Vein D is normal ore (2 ticks, 1 rock), further out than A and closer than vein C. Vein C is hidden rich ore (1 tick, 2 rocks) until `prospect()`. Veins do not run out. `dump()` drops ore or coal. Mining the other rock does that on its own and writes an info line. Ingots and steel stay in the cart.
 - The furnace turns 2 ore into 1 ingot in 4 ticks. The hopper holds 6 ore and 3 coal. Output holds 6 ingots and 6 steel. Unload fills the free hopper space and the drone keeps the rest.
 - A fresh `main.ts` exports `smeltOnce` and does not call it. `uncleMain` is the old loop, with `const home = false`. A fresh world does not start there. Old saves can still be running it.
-- Ingots and steel stay in the furnace until a drone picks them up and unloads them at the depot. `takeFromDepot` moves the open quest's goods from the depot onto the order. That is the only delivery. `ship()` does not move goods. An old file may still import it. The call does nothing, and the file still runs. There is no shipment from the furnace and no half pay.
-- Run unlocks with Bram and plays a function until it returns. Loop and `onTick` unlock with Ines. `on()` unlocks with Elsie. `furnace.alloy()` unlocks with Odile. `prospect()` unlocks with Harrow. The shop does not sell those, and it does not sell drone-2. A `bought` list that still contains `alloy`, `prospect`, or `drone` keeps what it already granted. Nothing is refunded. Credits are not reset. A save with no `automation` field keeps every trigger. A save that already recorded them keeps the ones it had.
+- Ingots and steel stay in the furnace until a drone picks them up and unloads them at the depot. Collect is that pickup. `takeFromDepot` moves the open quest's goods from the depot onto the order. That is the only delivery. `ship()` does not move goods. An old file may still import it. The call does nothing, and the file still runs. There is no shipment from the furnace and no half pay.
+- Run unlocks with Bram and calls one exported function once. The drone keeps the command. Loop and `onTick` unlock with Ines and call `onTick` every tick. `on()` unlocks with Elsie. `furnace.alloy()` unlocks with Odile. `prospect()` unlocks with Harrow. The shop does not sell those, and it does not sell drone-2. A `bought` list that still contains `alloy`, `prospect`, or `drone` keeps what it already granted. Nothing is refunded. Credits are not reset. A save with no `automation` field keeps every trigger. A save that already recorded them keeps the ones it had. A Harrow save that already delivered 60 ingots can still be handed over.
 - CPU limit 30. Tick 500 ms. Credits 300. Level 1. XP 0. Level thresholds are `levelFor`.
 - `buyUpgrade` refuses an unknown id, an owned item, and an item the player cannot afford, and it does not change the balance when it refuses. A purchase that succeeds subtracts the price.
 
@@ -34,7 +34,7 @@ The rail shows the title, the ask, what is needed, and one quantity bar. Checks 
 
 The save is version 3 under `inherit.v8.kettlewick`. It stores the world, the deployed files, and the editor files. An unreadable slot is archived. Project files are kept when the world cannot be trusted. Unknown saves follow [ADR 0004](../adr/0004-v3-save-reset.md).
 
-The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). Goal lines are on the quest rail. The Checks tab is the error log. Deploy sits on the editor. The nav is the logo, the place, credits, level, and Settings. CPU shows in the status bar when the tick has spent at least half its budget or has hit the limit. A call that would pass the limit does not run, and the guest stops the rest of that tick's player code. The sim tick still finishes.
+The frame is the standing shell, arranged in [the screen layout](v8-screen-layout.md). Goal lines are on the quest rail. Tests and Console share the pane beside the code. A failed save, a failed restore, and a floor renderer error are console rows, and the same line stays above the list. Deploy sits on the editor. The nav is the logo, the place, credits, level, and Settings. CPU shows in the status bar when the tick has spent at least half its budget or has hit the limit. A call that would pass the limit does not run, and the guest stops the rest of that tick's player code. The sim tick still finishes.
 
 ## Standing rules
 

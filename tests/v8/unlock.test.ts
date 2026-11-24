@@ -40,7 +40,7 @@ test('the editor types gain alloy when Odile is open, marked new', () => {
   const fresh = new Set(bricks.filter(brick => brick.name === 'furnace.alloy').map(brick => brick.name))
   const after = declarations(bricks.filter(brick => functionUnlocked(world, brick.name)), fresh)
   expect(after).toContain('alloy(): void')
-  expect(after).toContain('new. Alloy 2 ore and 1 coal into 1 steel.')
+  expect(after).toContain('new. Start alloying 2 ore and 1 coal into 1 steel.')
 })
 
 test('alloy and prospect name the quest that grants them, and smelt notes steel once', async () => {

@@ -29,7 +29,7 @@ export function onTick() {
   const drone = drones()[0]
   if (bringHome(drone)) return
   const order = orders()[0]
-  if (order && order.shipped >= 4) return
+  if (order && order.shipped >= 2) return
   const vein = veins().find(item => item.kind === "ore")
   if (!vein) return
   const home = drone.cargo >= drone.capacity
@@ -40,7 +40,7 @@ export function onTick() {
   if (furnace.output < 6 && furnace.input >= 2) furnace.smelt()
 }`
 
-const ingots = haul.replace('if (order && order.shipped >= 4) return', '')
+const ingots = haul.replace('if (order && order.shipped >= 2) return', '')
 
 const bring = `function bringHome(drone) {
   const kind = drone.cargoKind

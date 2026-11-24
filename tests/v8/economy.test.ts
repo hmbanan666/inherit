@@ -26,17 +26,17 @@ export function onTick() { for (const order of orders()) ship(order) }`,
   })
   try {
     expect(session.accept()).toBe(true)
-    session.world.depot.ingots = 3
+    session.world.depot.ingots = 1
     session.world.furnace.output = 8
     session.step(1)
-    expect(session.world.orders[0]).toMatchObject({ shipped: 3, status: 'open' })
+    expect(session.world.orders[0]).toMatchObject({ shipped: 1, status: 'open' })
     expect(session.world.depot.ingots).toBe(0)
     expect(session.world.furnace.output).toBe(8)
     expect(session.world.ledger.income).toBe(0)
     expect(session.world.credits).toBe(kettlewick.credits)
     session.world.depot.ingots = 5
     session.step(1)
-    expect(session.world.orders[0]).toMatchObject({ shipped: 4, status: 'ready' })
+    expect(session.world.orders[0]).toMatchObject({ shipped: 2, status: 'ready' })
     expect(session.world.depot.ingots).toBe(4)
     expect(session.world.credits).toBe(kettlewick.credits)
     expect(session.world.messages).toEqual([])

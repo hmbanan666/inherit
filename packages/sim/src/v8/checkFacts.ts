@@ -80,10 +80,7 @@ function blockingFact(world: World, quest: QuestDef, id: string) {
     if (furnace.input < 2) return `furnace input ${furnace.input}`
     return 'furnace steel 0'
   }
-  if (id === 'hands') {
-    if (world.manualRuns > 0) return `manual runs ${world.manualRuns}`
-    return `shipped ${shipped(world, quest.id)}/${quest.qty}`
-  }
+  if (id === 'hands') return `shipped ${shipped(world, quest.id)}/${quest.qty}`
   if (id === 'done') {
     const held = quest.item === 'steel' ? world.furnace.steel : world.furnace.output
     const at = quest.item === 'steel' ? world.depot.steel : world.depot.ingots

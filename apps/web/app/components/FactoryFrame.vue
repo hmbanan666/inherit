@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiBook, declarations, inspectMachine, kettlewick, factoryBricks, machineList, shop, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type World } from '@inherit/sim/v8'
+import { apiBook, declarations, inspectMachine, kettlewick, factoryBricks, machineList, shop, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { CircleAlert, Coins, Cpu, Play, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
@@ -192,11 +192,18 @@ watch(world, (next, previous) => {
   gainTimer = window.setTimeout(() => { gains.value = [] }, 1200)
 })
 const hostError = computed(() => error.value || saveError.value || floorError.value)
-const consoleLines = computed(() => blankConsole.value ? [] : (world.value?.console ?? []))
+const hostLines = computed((): ConsoleLine[] => {
+  const tick = world.value?.tick ?? 0
+  return [error.value, saveError.value, floorError.value].filter((text): text is string => !!text).map((text, index) => ({
+    seq: -(index + 1), tick, text, level: 'error', count: 1,
+  }))
+})
+const consoleLines = computed(() => [...hostLines.value, ...(blankConsole.value ? [] : (world.value?.console ?? []))])
 const unseen = computed(() => {
   if (side.value === 'console') return { count: 0, error: false }
-  const fresh = (world.value?.console ?? []).filter(line => line.seq > seenSeq.value)
-  return { count: fresh.length, error: fresh.some(line => line.level === 'error') }
+  const fresh = blankConsole.value ? [] : (world.value?.console ?? []).filter(line => line.seq > seenSeq.value)
+  const host = hostLines.value.length
+  return { count: fresh.length + host, error: host > 0 || fresh.some(line => line.level === 'error') }
 })
 watch([side, world], () => {
   if (blankConsole.value && (world.value?.console.length ?? 0) === 0) blankConsole.value = false
@@ -237,10 +244,13 @@ function focusedExport() {
   const found = runnableExports(source)
   return found.find(item => item.line === cursor.value.line) ?? found[0]
 }
+function runCommand(name: string, file: string, line: number) {
+  send({ kind: 'run-fn', name, file, line, files: dirty.value ? files.value : undefined })
+}
 function runFocused() {
   const hit = focusedExport()
   if (!hit) return
-  send({ kind: 'run-fn', name: hit.name, file: activeFile.value, line: hit.line })
+  runCommand(hit.name, activeFile.value, hit.line)
 }
 function toggleLoop() {
   send({ kind: 'loop', on: !loopOn.value })
@@ -268,12 +278,14 @@ const shownConsole = computed(() => {
   return consoleFilter.value === 'all' ? lines : lines.filter(line => line.level === 'error' || line.level === 'warn')
 })
 const problems = computed(() => {
-  let errors = 0
+  let errors = hostLines.value.reduce((sum, line) => sum + (line.count ?? 1), 0)
   let warnings = 0
-  for (const line of world.value?.console ?? []) {
-    const count = line.count ?? 1
-    if (line.level === 'error') errors += count
-    else if (line.level === 'warn') warnings += count
+  if (!blankConsole.value) {
+    for (const line of world.value?.console ?? []) {
+      const count = line.count ?? 1
+      if (line.level === 'error') errors += count
+      else if (line.level === 'warn') warnings += count
+    }
   }
   return { errors, warnings }
 })
@@ -311,7 +323,7 @@ provide(editorKey, {
   apiNames: shallowRef(new Set(bricks.map(b => b.name.split('.').at(-1)!))),
   dirty, multiFile: ref(true), navigation, watching: ref(false), call: ref(), tickCalls: ref([]),
   canRun,
-  runAt(name, file, line) { send({ kind: 'run-fn', name, file, line }) },
+  runAt(name, file, line) { runCommand(name, file, line) },
   setFile(file, code) { files.value = { ...files.value, [file]: code } },
   openFile(file) { activeFile.value = file },
   cursor,
@@ -542,7 +554,7 @@ onBeforeUnmount(() => {
               </ul>
               <ul v-if="inspected.actions.length" class="shop-list">
                 <li v-for="action in inspected.actions" :key="action.id">
-                  <button type="button" :disabled="!action.enabled" @click="send({ kind: 'manual', action: action.id, drone: action.drone })">
+                  <button type="button" :disabled="!action.enabled" @click="send({ kind: 'manual', action: action.id, drone: action.drone, vein: action.vein })">
                     <b>{{ action.label }}</b>
                     <span v-if="action.api">{{ action.api }}</span>
                     <small v-if="action.reason">{{ action.reason }}</small>
@@ -580,7 +592,7 @@ onBeforeUnmount(() => {
                 <template #actions>
                   <button class="ide" type="button" @click="bookOpen = true">API</button>
                   <button v-if="canRun" class="ide" type="button" :disabled="pending || !world" @click="runFocused">Run</button>
-                  <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" title="Run the function again each time it finishes. onTick is the same loop." @click="toggleLoop">Loop</button>
+                  <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" title="Call onTick every tick until Stop." @click="toggleLoop">Loop</button>
                   <button v-if="running" class="ide" type="button" @click="send({ kind: 'stop' })">Stop</button>
                   <span v-if="running" class="running">{{ paceName }}</span>
                   <button class="deploy" type="button" aria-label="Deploy" :data-dirty="dirty ? 'true' : 'false'" :disabled="pending || !world" @click="deploy">

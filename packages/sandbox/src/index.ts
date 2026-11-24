@@ -4,12 +4,12 @@ import { openRuntime, type CpuStats, type FactoryContext } from './runtime'
 export type { JsonObject, JsonValue, ProjectOptions } from './project'
 export type { CpuStats, FactoryContext } from './runtime'
 
-export type StepState = 'missing' | 'yield' | 'again' | 'done'
+export type StepState = 'missing' | 'done'
 
 export interface Program {
   onTick<C extends FactoryContext>(ctx: C): void
   call<C extends FactoryContext>(name: string, ctx: C): boolean
-  /** Resume a generator one yield, or call a function once. return false means call again. */
+  /** Call an exported function once. The call finishes in this tick. */
   step<C extends FactoryContext>(name: string, ctx: C): StepState
   release(): void
   emit<C extends FactoryContext>(event: string, ctx: C): void

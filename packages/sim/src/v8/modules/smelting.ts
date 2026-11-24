@@ -61,7 +61,7 @@ export function smelting(site: Site): Brick[] {
       world.furnace.input = 0
       world.furnace.coal = 0
     }),
-    brick('furnace.smelt', 'smelt(): void', 'Smelt 2 ore into 1 ingot.', `// The hopper needs 2 ore. This starts one ingot.\nfurnace.smelt()`, action, ({ world }) => {
+    brick('furnace.smelt', 'smelt(): void', 'Start smelting 2 ore into 1 ingot. The furnace finishes the batch on its own.', `// The hopper needs 2 ore. This starts one ingot.\nfurnace.smelt()`, action, ({ world }) => {
       noteSteel(world)
       const furnace = world.furnace
       if (furnace.readyAt !== null) return
@@ -71,7 +71,7 @@ export function smelting(site: Site): Brick[] {
       furnace.batch = 'ingot'
       furnace.readyAt = world.tick + (world.batchTicks ?? site.recipe.ticks)
     }),
-    brick('furnace.alloy', 'alloy(): void', 'Alloy 2 ore and 1 coal into 1 steel.', `// 2 ore and 1 coal in the hopper become 1 steel.\nfurnace.alloy()`, action, ({ world }) => {
+    brick('furnace.alloy', 'alloy(): void', 'Start alloying 2 ore and 1 coal into 1 steel. The furnace finishes the batch on its own.', `// 2 ore and 1 coal in the hopper become 1 steel.\nfurnace.alloy()`, action, ({ world }) => {
       if (!functionUnlocked(world, 'furnace.alloy')) throw new Error(unlockError('furnace.alloy'))
       const furnace = world.furnace
       if (furnace.readyAt !== null) return

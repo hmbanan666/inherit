@@ -8,7 +8,7 @@ The works already tick, and `onTick` is the only way a program runs. A new playe
 
 ## Decision
 
-**Three triggers.** An exported function runs when something asks it to. [ADR 0028](0028-run-to-completion.md) is the order and the Run rule: Run plays a function until it returns, Ines grants Loop and `onTick`, and Elsie grants `on()`. The module top level still runs once, at deploy. A manual run spends CPU like any other call. Nothing is instant: a button spends the machine's turn.
+**Three triggers.** An exported function runs when something asks it to. [ADR 0028](0028-run-to-completion.md) is the order: Bram grants Run, Ines grants Loop and `onTick`, and Elsie grants `on()`. [ADR 0029](0029-pure-functions-machine-tasks.md) is the Run rule: the function finishes in one tick. The module top level still runs once, at deploy. A manual run spends CPU like any other call. Nothing is instant: a button spends the machine's turn.
 
 **Unlock on take.** The same rule as `furnace.alloy()` and `prospect()`. A later quest keeps the earlier triggers. The shop does not sell them. A fresh world starts with buttons only. A save with no `automation` field keeps Run, `on()`, and `onTick`. Start over is a fresh world. A recovered file whose world could not be read keeps the triggers, so an old loop is not taken away.
 

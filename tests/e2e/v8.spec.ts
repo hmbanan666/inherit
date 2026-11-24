@@ -18,7 +18,7 @@ async function settings(page: Page, name: string) {
 test('Bram offers a quest, the checks sit beside the editor, and credits stay put', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: /mail horse/ }).click()
-  await expect(page.getByLabel('Current request')).toContainText('I need four ingots')
+  await expect(page.getByLabel('Current request')).toContainText('I need two ingots')
   await expect(page.getByLabel('Current request')).not.toContainText('Due in')
   await expect(page.getByTestId('take-quest')).toBeVisible()
   await expect(page.getByTestId('complete-quest')).toHaveCount(0)

@@ -1,8 +1,8 @@
 export * from './core/world'
 export * from './core/bricks'
-export { mining, miningModule, dumpCargo } from './modules/mining'
+export { mining, miningModule, dumpCargo, stepDroneTasks } from './modules/mining'
 export { kettlewick, uncleMain } from './sites/kettlewick'
-export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, unlockError, pinLegacyTriggers } from './quests'
+export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
 export { outputCap } from './modules/smelting'
 export {
   worksEvents, onApi, triggerDocs, pressManual, queueRun, stopScript, setLoop, grantLegacy, ensureTriggers, actManual, dueEvents, settleTriggers,
@@ -31,6 +31,7 @@ export function on(event, fn) {
   const known = ["furnace.full", "furnace.ready", "drone.idle", "drone.full"]
   if (known.indexOf(event) < 0) throw new Error("Unknown event " + event + ".")
   if (!listeners[event]) listeners[event] = []
+  if (listeners[event].indexOf(fn) !== -1) return
   listeners[event].push(fn)
 }
 globalThis.__inheritEmit = function (event) {

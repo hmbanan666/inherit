@@ -8,8 +8,8 @@ export type FactoryCommand =
   | { kind: 'complete' }
   | { kind: 'buy'; id: string }
   | { kind: 'dump'; name: string }
-  | { kind: 'manual'; action: 'smelt' | 'alloy' | 'collect' | 'clear' | 'mine' | 'unload' | 'dump'; drone?: string }
-  | { kind: 'run-fn'; name: string; file: string; line: number }
+  | { kind: 'manual'; action: 'smelt' | 'alloy' | 'collect' | 'clear' | 'mine' | 'unload' | 'dump'; drone?: string; vein?: string }
+  | { kind: 'run-fn'; name: string; file: string; line: number; files?: Record<string, string> }
   | { kind: 'stop' }
   | { kind: 'loop'; on: boolean; name?: string; file?: string; line?: number }
   | { kind: 'clear-console' }

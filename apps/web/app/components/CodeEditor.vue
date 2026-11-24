@@ -86,10 +86,18 @@ function markRuns() {
     runMarks.clear()
     return
   }
-  const source = files.value[activeFile.value] ?? ''
+  if (activeFile.value !== 'main.ts') {
+    runMarks.clear()
+    return
+  }
+  const source = files.value['main.ts'] ?? ''
+  const pending = source !== (deployed.value['main.ts'] ?? '')
   runMarks.set(runnableExports(source).map(item => ({
     range: new monaco.Range(item.line, 1, item.line, 1),
-    options: { glyphMarginClassName: 'run-glyph', glyphMarginHoverMessage: { value: `Run ${item.name}` } },
+    options: {
+      glyphMarginClassName: 'run-glyph',
+      glyphMarginHoverMessage: { value: pending ? `Deploy and run ${item.name}` : `Run ${item.name}` },
+    },
   })))
 }
 
@@ -416,7 +424,7 @@ onMounted(() => {
   emit('ready')
 })
 watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLines, { flush: 'post' })
-watch([() => game.canRun?.value, activeFile, files], markRuns, { flush: 'post' })
+watch([() => game.canRun?.value, activeFile, files, deployed], markRuns, { flush: 'post' })
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)

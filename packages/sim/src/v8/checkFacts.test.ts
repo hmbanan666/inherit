@@ -24,7 +24,7 @@ test('a new quest stays pending until the works have been still', () => {
   const readings = readChecks(bramWorld(), questList[0]!)
   expect(readings.every(check => check.state === 'pending')).toBe(true)
   expect(readings.every(check => check.reason === undefined)).toBe(true)
-  expect(readings.find(check => check.id === 'done')?.text).toBe('Bram receives 4 ingots 0/4')
+  expect(readings.find(check => check.id === 'done')?.text).toBe('Bram receives 2 ingots 0/2')
 })
 
 test('the first stuck check names the blocking fact and the rest wait on it', () => {
@@ -72,12 +72,12 @@ test('counts advance and a passing check has no reason', () => {
   world.furnace.output = 1
   world.ingotsMade = 4
   const order = world.orders.find(item => item.id === 'bram')!
-  order.shipped = 2
+  order.shipped = 1
   const midway = afterStill(world).find(check => check.id === 'done')
-  expect(midway?.text).toBe('Bram receives 4 ingots 2/4')
+  expect(midway?.text).toBe('Bram receives 2 ingots 1/2')
   expect(midway?.state).toBe('failed')
   expect(midway?.reason).toBe('1 ingot in the furnace, 0 at the depot; carry them to the depot')
-  order.shipped = 4
+  order.shipped = 2
   const done = readChecks(world, questList[0]!)
   expect(done.every(check => check.state === 'passing')).toBe(true)
   expect(done.every(check => check.reason === undefined)).toBe(true)

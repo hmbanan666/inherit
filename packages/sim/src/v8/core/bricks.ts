@@ -27,10 +27,15 @@ export function brick(name: string, signature: string, doc: string, example: str
 /** on() is declared with the bricks so the book, the hover, and the type string stay one text. */
 export const onSignature = "function on(event: 'furnace.full' | 'furnace.ready' | 'drone.idle' | 'drone.full', fn: () => void): void"
 export const onDoc = 'Call fn once when that event happens. A quest unlocks on().'
-export const onExample = `// furnace.full: the output cap was just reached.
+export const onExample = `import { on, memory } from "inherit"
+
+// furnace.full: the output cap was just reached.
 // furnace.ready: an ingot or steel just finished.
-// drone.idle: the cart is empty and not walking.
+// drone.idle: the cart is empty and has no task.
 // drone.full: the cart just filled.
+function haul() {
+  memory.hauls = (memory.hauls ?? 0) + 1
+}
 on("drone.idle", haul)`
 
 /** One example block. A bare call gains a comment from its doc line, so the book and the hover stay together. */
