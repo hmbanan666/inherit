@@ -4,7 +4,7 @@ import { pushConsole, type Cell, type Site, type World } from './core/world'
 import { dumpCargo, mining, orderMine, orderPickup, orderUnload } from './modules/mining'
 import { takeFromDepot } from './modules/orders'
 import { outputCap, smelting } from './modules/smelting'
-import { ensureBin, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel } from './modules/stock'
+import { ensureBin, finishedCap, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel, type Press } from './modules/stock'
 import { functionUnlocked, triggerUnlocked, unlockError } from './quests'
 
 export const worksEvents = ['furnace.full', 'furnace.ready', 'drone.idle', 'drone.full'] as const
@@ -197,8 +197,10 @@ function trySmelt(world: World, site: Site, ctx: { world: World; cpuUsed: () => 
   if (furnace.input < site.recipe.ore) return note(world, `The furnace needs ${site.recipe.ore} ore.`)
   if (!spend(site.costs.action)) return
   world.manualRuns++
+  world.manualCommand = true
   try { handler(site, 'furnace.smelt')?.(ctx) }
   catch (error) { note(world, error instanceof Error ? error.message : String(error)) }
+  finally { world.manualCommand = false }
 }
 
 function tryAlloy(world: World, site: Site, ctx: { world: World; cpuUsed: () => number }, spend: (cost: number) => boolean) {
@@ -336,6 +338,7 @@ export function machineList(world: World) {
   return [
     { id: 'furnace', name: 'Furnace', detail: furnaceDetail(world.furnace) },
     ...world.press ? [{ id: 'press', name: 'Press', detail: pressStockLabel(world.press) }] : [],
+    ...world.spare ? [{ id: 'spare', name: 'Spare press', detail: pressStockLabel(world.spare) }] : [],
     { id: 'depot', name: 'Depot', detail: `${world.depot.ingots} ingots · ${world.depot.steel} steel` },
     ...world.drones.map(drone => ({
       id: drone.name,
@@ -357,7 +360,8 @@ function bar(label: string, done: number, total: number): InspectProgress {
 
 export function inspectMachine(world: World, site: Site, id: string): InspectView | undefined {
   if (id === 'furnace') return inspectFurnace(world, site)
-  if (id === 'press' && world.press) return inspectPress(world)
+  if (id === 'press' && world.press) return inspectPress(world, world.press, 'press', 'Press')
+  if (id === 'spare' && world.spare) return inspectPress(world, world.spare, 'spare', 'Spare press')
   if (id === 'depot') return inspectDepot(world)
   const drone = world.drones.find(item => item.name === id)
   if (drone) return inspectDrone(world, drone)
@@ -413,9 +417,8 @@ function inspectFurnace(world: World, site: Site): InspectView {
   }
 }
 
-function inspectPress(world: World): InspectView {
-  const press = world.press!
-  const view = port(world, 'press')!
+function inspectPress(world: World, press: Press, id: 'press' | 'spare', name: string): InspectView {
+  const view = port(world, id)!
   const active = press.recipe ? recipeById(press.recipe) : undefined
   const activeText = active ? recipeParts(active) : undefined
   const span = active?.ticks ?? 1
@@ -426,9 +429,10 @@ function inspectPress(world: World): InspectView {
     const missing = missingInputs(view, recipe)
     return missing ? [`${recipe.id} needs ${missing}`] : []
   })
+  const cap = finishedCap(world)
   return {
-    id: 'press',
-    name: 'Press',
+    id,
+    name,
     description: 'Forms a grate from steel, a plate from an ingot, or a blank from steel.',
     lines: [
       { label: 'Recipe', value: activeText ? `${activeText.input} → ${activeText.output}` : 'Idle' },
@@ -436,7 +440,7 @@ function inspectPress(world: World): InspectView {
       { label: 'Reserved', value: reservedLabel(ensureBin(press.bin)) },
       { label: 'Steel', value: `${view.get('steel')}/${machineSlot}` },
       { label: 'Ingots', value: `${view.get('ingot')}/${machineSlot}` },
-      { label: 'Finished', value: `${view.get('grate') + view.get('plate') + view.get('blank')}/${machineSlot}` },
+      { label: 'Finished', value: `${view.get('grate') + view.get('plate') + view.get('blank')}/${cap}` },
     ],
     recipes: pressRecipes.map(recipe => {
       const text = recipeParts(recipe)

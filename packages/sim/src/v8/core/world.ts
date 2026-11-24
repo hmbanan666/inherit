@@ -1,7 +1,7 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
 import { emptyBin, ensureBin, finishPress, type Bin, type Item, type Press, type StationId } from '../modules/stock'
-import { pinLegacyTriggers, repairHarrow, syncPress, syncQuest, syncSecondDrone, triggerUnlocked, type QuestDef } from '../quests'
+import { pinLegacyTriggers, repairHarrow, syncPress, syncQuest, syncSecondDrone, syncSpare, triggerUnlocked, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
 /** One machine command. The drone keeps it across ticks. `since` is the tick it was given. */
@@ -121,8 +121,14 @@ export function migrateWorld(world: World) {
   delete (world as { coalHold?: number }).coalHold
   world.furnace.bin = ensureBin(world.furnace.bin)
   world.depot.bin = ensureBin(world.depot.bin)
+  world.codedBatch ??= false
+  world.manualCommand ??= false
+  world.hauled ??= {}
+  world.outputRacks = !!world.bought?.includes('racks')
+  world.spare ??= null
   syncSecondDrone(world)
   syncPress(world)
+  syncSpare(world)
   repairHarrow(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
@@ -190,6 +196,11 @@ export interface World {
   furnace: Site['furnace'] & { readyAt: number | null; coal: number; steel: number; batch: 'ingot' | 'steel' | null; bin: Bin }
   /** The press Odile installs. Null until that Hand over. */
   press: Press | null
+  spare: Press | null
+  outputRacks: boolean
+  codedBatch: boolean
+  manualCommand: boolean
+  hauled: Record<string, boolean>
   cpu: { used: number; limit: number }
   memory: Record<string, unknown>
   messages: Message[]
@@ -249,10 +260,11 @@ export function createWorld(site: Site): World {
     depot: { ...structuredClone(site.depot), bin: emptyBin() },
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null, bin: emptyBin() },
     press: null,
+    spare: null, outputRacks: false, codedBatch: false, manualCommand: false, hauled: {},
     orders: [], growth: [], status: '',
     ledger: { income: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [],
-    automation: { run: false, events: false, tick: false, pinned: true },
+    automation: { run: true, events: false, tick: false, pinned: true },
     loop: false, holding: false, script: null, pace: { mode: 'idle', name: '' },
     manualRuns: 0, pendingRuns: [], jobs: {}, inbox: { smelt: false, alloy: false, collect: false, clear: false, drones: {} },
     collectAt: null, collectSpan: 0,

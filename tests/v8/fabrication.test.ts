@@ -75,6 +75,7 @@ test('a saved haul keeps its reservation', () => {
 
 test('start(recipe) consumes inputs, reserves the output, and finishes on its own ticks', () => {
   const world = createWorld(kettlewick)
+  world.questId = 'elsie'
   world.press = createPress()
   const press = port(world, 'press')!
   press.add('steel', 2)
@@ -196,6 +197,7 @@ test('the press line carries steel onto the press and a grate into the depot', a
   const session = await createSession(kettlewick, players['press-line'], undefined, { fresh: true })
   try {
     session.world.cleared = ['bram', 'ines', 'odile']
+    session.world.questId = 'elsie'
     syncPress(session.world)
     session.world.furnace.steel = 2
     session.world.drones[0]!.pos = { ...session.world.furnace.pos }

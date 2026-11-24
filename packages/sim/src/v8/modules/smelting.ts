@@ -39,7 +39,9 @@ export function finishBatch(world: World, site: Site) {
 
 function beginFurnace(world: World, id: string) {
   if (id === alloyRecipe.id && !functionUnlocked(world, 'furnace.alloy')) throw new Error(unlockError('furnace.alloy'))
+  const manual = world.manualCommand
   const result = startRecipe(world, 'furnace', id)
+  if (result === 'started' && !manual && id === smeltRecipe.id) world.codedBatch = true
   if (result === 'full') throw new Error(furnaceFullMessage(id === alloyRecipe.id ? 'steel' : 'ingot'))
 }
 

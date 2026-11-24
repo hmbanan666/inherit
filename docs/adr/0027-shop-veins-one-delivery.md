@@ -26,9 +26,9 @@ Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0
 
 ## Still open
 
-- The level curve after this chain. The steps in `levelFor` stay as they are.
 - What fills the ten-hour world. The Kettlewick grid on screen is still the first slice.
-- Harrow's check that the ingots arrived with no manual runs, and that the quest pays no XP. It is unchanged.
+
+[ADR 0036](0036-region-1-fabrication-chain.md) settles the level steps at 10, 20, 40, 85, 140, and 170. Harrow pays XP. The check that the ingots arrived with no manual runs is not in the quest. A save that already shipped 60 still hands over.
 
 ## Consequences
 

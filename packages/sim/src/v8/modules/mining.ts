@@ -1,7 +1,7 @@
 import { brick, type Brick, type TickContext } from '../core/bricks'
 import { chargeCpu } from '../core/cpu'
 import { pushConsole, type Cell, type Drone, type Site, type Vein, type World } from '../core/world'
-import { functionUnlocked, unlockError } from '../quests'
+import { functionUnlocked, notePartHaul, unlockError } from '../quests'
 import { isItem, itemType, port, release, releaseTransfer, reserve, stationAt as stationIdAt, stationLabel } from './stock'
 
 export type OrderResult = 'started' | 'same' | 'full'
@@ -164,6 +164,15 @@ function digOnce(world: World, d: Drone, vein: Vein) {
   d.dig = null
 }
 
+/** Vein D ore counted at the depot stays in the stock. Another vein does not count. */
+function creditSurvey(world: World, source: string, amount: number) {
+  if (source !== 'D' || amount <= 0) return
+  const order = world.orders.find(item => item.id === world.questId && (item.status === 'open' || item.status === 'overdue'))
+  if (!order || order.item !== 'ore') return
+  order.shipped = Math.min(order.qty, order.shipped + amount)
+  if (order.shipped >= order.qty) order.status = 'ready'
+}
+
 function unloadOnce(world: World, d: Drone, target: Cell) {
   const { depot, furnace } = world
   const station = stationAt(world, target)
@@ -177,6 +186,7 @@ function unloadOnce(world: World, d: Drone, target: Cell) {
   if (!rawCargo(held)) {
     if (station !== 'Depot')
       throw new Error(`${who(d)}; cart holds ${held}. Unload ingots and steel at the depot.`)
+    if (held === 'steel' || held === 'grate') notePartHaul(world, d.name)
     if (held) port(world, 'depot')?.add(held, d.cargo)
     d.cargo = 0
     d.carrying = null
@@ -195,7 +205,10 @@ function unloadOnce(world: World, d: Drone, target: Cell) {
     if (kind === 'coal') furnace.coal += moved
     else furnace.input += moved
   } else if (kind === 'coal') depot.coal = (depot.coal ?? 0) + moved
-  else depot.ore += moved
+  else {
+    depot.ore += moved
+    if (station === 'Depot') creditSurvey(world, d.source, moved)
+  }
   d.cargo -= moved
   if (d.cargo === 0) {
     d.carrying = null
@@ -446,6 +459,7 @@ function actTransfer(world: World, d: Drone, task: TransferTask, walk: boolean, 
   const dropped = d.cargo
   release(view.bin.reservedIn, task.item, dropped)
   view.add(task.item, dropped)
+  if (task.item === 'steel' || task.item === 'grate') notePartHaul(world, d.name)
   task.delivered += dropped
   d.cargo = 0
   d.carrying = null

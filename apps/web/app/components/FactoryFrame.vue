@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shop, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { CircleAlert, Coins, Cpu, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
@@ -26,6 +26,7 @@ const freshNames = computed(() => new Set(bricks.filter(brick => freshBrick(worl
 const droneNames = computed(() => world.value?.drones.map(drone => drone.name) ?? ['drone-1'])
 const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name)), new Set(), ['drone-1']))
 const bookSections = computed(() => apiBook(bricks, world.value ?? lockedWorld))
+const catalog = computed(() => shopFor(world.value ?? { cleared: [], bought: [] }))
 const bookOpen = ref(false)
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
@@ -670,7 +671,7 @@ onBeforeUnmount(() => {
             </div>
           </template>
           <ul v-else-if="zone === 'shop'" class="shop-list">
-            <li v-for="item in shop" :key="item.id">
+            <li v-for="item in catalog" :key="item.id">
               <button type="button" :disabled="!world || world.bought.includes(item.id) || world.credits < item.price"
                 @click="send({ kind: 'buy', id: item.id })">
                 <b>{{ item.name }}</b>

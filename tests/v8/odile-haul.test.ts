@@ -33,7 +33,7 @@ export function onTick() {
 test('Odile haul: mixed cargo is refused, ore and coal both unload, and the same error counts once', async () => {
   const session = await createSession(kettlewick)
   try {
-    session.world.level = 2
+    session.world.level = 3
     session.world.xp = 20
     session.world.cleared = ['bram', 'ines']
     expect(session.accept()).toBe(true)

@@ -108,6 +108,9 @@ export class FloorScene {
   private pressArt?: Container
   private pressWork?: Graphics
   private pressMark?: Container
+  private spareArt?: Container
+  private spareWork?: Graphics
+  private spareMark?: Container
   private arrivals = 0
   private lastTick = -1
   private hover = ''
@@ -224,6 +227,7 @@ export class FloorScene {
       { id: 'furnace', pos: world.furnace.pos },
       { id: 'depot', pos: world.depot.pos },
       ...world.press ? [{ id: 'press', pos: world.press.pos }] : [],
+      ...world.spare ? [{ id: 'spare', pos: world.spare.pos }] : [],
     ]
     const spot = spots.find(item => item.id === id)
     if (!spot) return
@@ -270,9 +274,31 @@ export class FloorScene {
     if (this.pressMark) this.pressMark.visible = finished > 0
   }
 
+  private syncSpare(world: FloorWorld) {
+    const press = world.spare
+    if (!press) {
+      if (this.spareArt) this.spareArt.visible = false
+      return
+    }
+    if (!this.spareArt) {
+      this.spareArt = equipment(this.root, press.pos, pressDrawing)
+      caption(this.spareArt, 'Spare', 0, -63)
+      this.spareWork = this.spareArt.addChild(new Graphics())
+      this.spareWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
+      this.spareMark = this.spareArt.addChild(materialArt('steel'))
+      this.spareMark.position.set(18, 8)
+      if (this.ring) this.root.addChild(this.ring)
+    }
+    this.spareArt.visible = true
+    if (this.spareWork) this.spareWork.visible = press.readyAt !== null
+    const finished = (press.bin.qty.grate ?? 0) + (press.bin.qty.plate ?? 0) + (press.bin.qty.blank ?? 0)
+    if (this.spareMark) this.spareMark.visible = finished > 0
+  }
+
   update(world: FloorWorld) {
     this.latest = world
     this.syncPress(world)
+    this.syncSpare(world)
     for (const vein of world.veins) this.placeVein(vein)
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
     const count = world.drones.length

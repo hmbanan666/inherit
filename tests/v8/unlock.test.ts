@@ -68,7 +68,7 @@ test('alloy and prospect name the quest that grants them, and smelt notes steel 
     session.world.bought = []
     await session.deploy({ 'main.ts': 'import { furnace } from "inherit"\nexport function onTick() { furnace.alloy() }' })
     session.step(1)
-    expect(session.world.messages.some(message => message.text.includes('furnace.alloy() unlocks with the quest Steel for the bridge (level 2).'))).toBe(true)
+    expect(session.world.messages.some(message => message.text.includes('furnace.alloy() unlocks with the quest Steel for the bridge (level 3).'))).toBe(true)
 
     await session.deploy({ 'main.ts': 'import { prospect } from "inherit"\nexport function onTick() { prospect() }' })
     session.step(1)

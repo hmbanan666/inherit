@@ -3,7 +3,7 @@ import type { Item } from '@inherit/sim/v8'
 export interface StepQuest {
   from: string
   goal: string
-  item: 'ingot' | 'steel'
+  item: 'ingot' | 'steel' | 'ore' | 'grate'
   qty: number
   trigger?: 'run' | 'events' | 'tick'
 }
@@ -71,8 +71,10 @@ function person(from: string) {
   return from.replace(/^Mayor /, '')
 }
 
-function goods(item: 'ingot' | 'steel', qty: number) {
+function goods(item: StepQuest['item'], qty: number) {
   if (item === 'steel') return `${qty} steel`
+  if (item === 'ore') return `${qty} ore`
+  if (item === 'grate') return qty === 1 ? '1 grate' : `${qty} grates`
   return qty === 1 ? '1 ingot' : `${qty} ingots`
 }
 

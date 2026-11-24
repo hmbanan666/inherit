@@ -1,31 +1,40 @@
 import { readFileSync } from 'node:fs'
 import type { createSession } from '../packages/sandbox/src/v8'
-import { kettlewick, shop } from '../packages/sim/src/v8'
+import { kettlewick, shopFor } from '../packages/sim/src/v8'
 
 export type Session = Awaited<ReturnType<typeof createSession>>
-export type Stage = 'manual' | 'run' | 'steel-loop' | 'two-drones' | 'press-line'
+export type Stage = 'manual' | 'run' | 'survey' | 'steel-loop' | 'grates' | 'two-drones' | 'press-line'
 const source = (name: string) => readFileSync(new URL(`./players/${name}.ts`, import.meta.url), 'utf8')
 const helpers = { 'lib/haul.ts': source('haul') }
 export const players: Record<Stage, Record<string, string>> = {
   manual: kettlewick.files,
   run: { 'main.ts': source('run') },
+  survey: { 'main.ts': source('survey') },
   'steel-loop': { 'main.ts': source('steel-loop'), ...helpers },
+  grates: { 'main.ts': source('grates'), ...helpers },
   'two-drones': { 'main.ts': source('two-drones'), ...helpers },
-  // Uses transfer and the press. The live quest programs stay until the quest retune.
+  // One cart on the press. The quest chain uses grates, which also hauls for the later jobs.
   'press-line': { 'main.ts': source('press-line') },
 }
 
-// Unlisted quests keep the deployed files. A proposed edit after the tutorial
-// is tried only if the previous player fails a separate replay from Take.
+// Unlisted quests keep the deployed files. A proposed edit is tried only
+// when a replay of the previous program fails the new quest.
 export const edits: Record<string, { to: Stage; reason: string; practice?: boolean } | undefined> = {
-  ines: { to: 'run', practice: true, reason: 'Use the newly earned Run to fire the furnace.' },
-  odile: { to: 'steel-loop', reason: 'Loop must fetch coal and alloy steel.' },
-  elsie: { to: 'two-drones', reason: 'Send the second cart for coal and depot deliveries.' },
+  bram: { to: 'run', reason: 'smeltOnce starts the batch. Buttons may fill the hopper and haul.' },
+  ines: { to: 'survey', reason: 'Mine vein D and unload that ore at the depot.' },
+  odile: { to: 'steel-loop', reason: 'Loop fetches coal and alloys steel.' },
+  elsie: { to: 'grates', reason: 'Each cart hauls steel to the press or a grate to the depot.' },
 }
 
 export function act(session: Session, stage: Stage) {
-  if (stage !== 'manual' && stage !== 'run') return
   const { world } = session
+  if (stage === 'survey') {
+    const cart = world.drones[0]
+    if (!cart || cart.task) return
+    session.queue(cart.cargo ? 'bringHome' : 'mineVein')
+    return
+  }
+  if (stage !== 'manual' && stage !== 'run') return
   const { furnace } = world
   if (furnace.readyAt === null && furnace.input >= kettlewick.recipe.ore && !furnace.output) {
     if (stage === 'run') session.queue('smeltOnce')
@@ -50,7 +59,7 @@ export function buyForGoal(session: Session) {
     if (id === 'furnace') return world.furnace.readyAt !== null && world.furnace.input >= kettlewick.recipe.ore
     return id === 'cpu' && world.cpu.used >= world.cpu.limit
   }
-  const item = shop.find(item => !world.bought.includes(item.id) && item.price <= world.credits && useful(item.id))
+  const item = shopFor(world).find(item => !world.bought.includes(item.id) && item.price <= world.credits && useful(item.id))
   if (item && !session.buy(item.id)) throw new Error(`Shop refused ${item.name} at tick ${world.tick}.`)
   return item
 }

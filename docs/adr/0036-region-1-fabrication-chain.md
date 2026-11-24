@@ -6,7 +6,7 @@ Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0
 
 Kettlewick’s eight quests all ask the furnace for ingots or steel. Harrow, Tomas, and Pell take the same ingot program three times. The map, the veins, and the two drones already cover the work. A new region is not required.
 
-Nick chose the fabrication chain from the 24 November 2026 progression audit. The audit stays on `audit/astra-progression-2026-11-24`. This ADR is the decision. The numbers below are the target. The quest list and the shop catalog in `packages/sim/src/v8/quests.ts` stay as they are until that retune lands. Mining stays infinite. There is no efficiency goal, no rate, and no deadline.
+Nick chose the fabrication chain from the 24 November 2026 progression audit. The audit stays on `audit/astra-progression-2026-11-24`. This ADR is the decision. Quests 1–4 and the shop below are live in `packages/sim/src/v8/quests.ts`. Quests 5–8 keep their previous requests. Mining stays infinite. There is no efficiency goal, no rate, and no deadline.
 
 ## Decision
 
@@ -67,6 +67,6 @@ A cart bought after Ines leaves 30. By Tomas that purse is 450, which buys the r
 ## Consequences
 
 - The chain, when it is retuned, stays in `packages/sim/src/v8/quests.ts`. Recipe ticks, machine caps, and the press cell live in one module so a quest file does not keep a second copy.
-- Until that retune, the live jobs are still Bram through Wen as they stand, and the live shop is still the cart, the hopper, the hotter furnace, and CPU at the prices already in `quests.ts`. The press is the one new machine. Odile’s Hand over still places drone-2, and it also places the press. The press runs grate, plate, and blank. The shutter, the lathe, and the assembly table wait for their quests.
+- Quests 1–4 and the six shop conveniences are live. Bram asks for 1 function-started ingot, Ines for 3 ore from vein D, Odile for 2 steel, and Elsie for 2 grates with a haul from each cart. Odile’s Hand over places drone-2 and the press. Elsie’s Take opens the grate die. Plate and blank stay closed. Harrow, Tomas, Pell, and Wen keep their previous requests and take the pays in the table above, including Harrow’s XP. The shutter, the lathe, and the assembly table wait.
 - `takeFromDepot` remains the only count toward a quest. A grate on the press does not ship.
 - Veins stay infinite. Nothing in this chain adds a rate, a par time, or a second region.
