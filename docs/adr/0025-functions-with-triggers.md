@@ -1,6 +1,6 @@
 # Functions with triggers
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and builds on [ADR 0023](0023-quest-unlocks-functions.md) and [ADR 0024](0024-quest-rail-and-status.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md): goods reach a quest only through `takeFromDepot`. `ship()` does not deliver, and a site does not ship from the furnace.
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and builds on [ADR 0023](0023-quest-unlocks-functions.md) and [ADR 0024](0024-quest-rail-and-status.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md): goods reach a quest only through `takeFromDepot`. `ship()` does not deliver, and a site does not ship from the furnace. [ADR 0028](0028-run-to-completion.md) supersedes the trigger order and the one-tick Run in this ADR.
 
 ## Context
 
@@ -8,9 +8,9 @@ The works already tick, and `onTick` is the only way a program runs. A new playe
 
 ## Decision
 
-**Three triggers.** An exported function runs when something asks it to. Run queues one no-argument export for the next tick. `on(event, fn)` runs `fn` once when that event becomes true. `onTick` stays the every-tick loop. The module top level still runs once, at deploy. A manual run spends CPU like any other call. Nothing is instant: a button spends the machine's turn.
+**Three triggers.** An exported function runs when something asks it to. [ADR 0028](0028-run-to-completion.md) is the order and the Run rule: Run plays a function until it returns, Ines grants Loop and `onTick`, and Elsie grants `on()`. The module top level still runs once, at deploy. A manual run spends CPU like any other call. Nothing is instant: a button spends the machine's turn.
 
-**Unlock on take.** The same rule as `furnace.alloy()` and `prospect()`. Taking Ingots for the storehouse grants Run. Taking Steel for the bridge grants `on()`. Taking A grate for the oven grants `onTick`. A later quest keeps the earlier triggers. The shop does not sell them. A fresh world starts with buttons only. A save with no `automation` field keeps Run, `on()`, and `onTick`. Start over is a fresh world. A recovered file whose world could not be read keeps the triggers, so an old loop is not taken away.
+**Unlock on take.** The same rule as `furnace.alloy()` and `prospect()`. A later quest keeps the earlier triggers. The shop does not sell them. A fresh world starts with buttons only. A save with no `automation` field keeps Run, `on()`, and `onTick`. Start over is a fresh world. A recovered file whose world could not be read keeps the triggers, so an old loop is not taken away.
 
 **Events.** `furnace.full`, `furnace.ready`, `drone.idle`, and `drone.full`. Each fires on the edge, once. Veins do not run out, so there is no empty-vein event.
 

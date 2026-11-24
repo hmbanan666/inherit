@@ -14,6 +14,13 @@ export function insertQuestNote(source: string, note: string, id: string, rememb
   return { source: source.length ? `${note}\n${source}` : `${note}\n`, remembered: next }
 }
 
+/** The quantity on the quest rail. One bar, named by the good. */
+export function quantityLabel(item: 'ingot' | 'steel', qty: number, shipped: number) {
+  const name = item === 'steel' ? 'Steel' : 'Ingots'
+  const value = Math.min(shipped, qty)
+  return { text: `${name} ${value}/${qty}`, value, max: qty }
+}
+
 /** One progress line. The delivery count is named by where the goods are handed over. */
 export function goalLabel(checkId: string, item: 'ingot' | 'steel', qty: number, shipped: number, done: boolean, memory = 0) {
   if (checkId === 'done') {

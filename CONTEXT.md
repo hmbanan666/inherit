@@ -10,14 +10,15 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | World | One continuous map, about ten hours when it is finished. New content is a new world. The code calls the map data a site. |
 | Site | The data for one world: depot, drones, veins, furnace, quest list, and starting files. |
 | Inherited code | A fresh world starts from `smeltOnce` in `kettlewick.files`. `uncleMain` is the old loop that mines and never comes home. Old saves can still be running it. |
-| Run | The gutter mark that queues one exported function for the next tick. Taking Ines's quest grants it. |
+| Run | Plays one exported function until it returns. `yield` or `return false` waits one tick. Taking Bram's quest grants it. Stop ends it. |
+| Loop | Runs that function again each time it finishes. `onTick` is the same loop in code. Taking Ines's quest grants it and turns it on. |
 | Depot delivery | A quest takes ingots and steel from the depot. The furnace holds them until a drone carries them there. `takeFromDepot` is the only path that counts them. |
-| Tick | One step of the world, 0.5 s. `onTick` runs once per tick once that trigger is unlocked. The clock does not pause and has no speed control. |
+| Tick | One step of the world, 0.5 s. While Loop is on, and no Run is in progress, `onTick` runs once per tick. The clock does not pause and has no speed control. |
 | CPU | A budget per tick. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it when the tick is spending half the budget or more. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. A new one is granted by taking a quest. |
 | Quest | One villager's ask, a count of goods, taken by hand, one at a time. The order is `questList`. |
-| Check | One progress line on the quest rail. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. |
-| Hint | A comment inserted once at the top of the open file when the quest is taken. It never contains the solution, and it is not put back if the player deletes it. It is not on the rail. |
+| Check | One test of the open quest. It lives beside the code, with a plain line for what it checks. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. The rail shows the quantity, not these rows. |
+| Hint | A comment inserted once at the top of the open file when the quest is taken. A trigger inserts one example the same way. Neither is put back if the player deletes it. Neither is on the rail. |
 | Credits | Paid by Hand over and spent in the shop. Never negative. There is no rent. A tick cannot lower the balance. See ADR 0027. |
 | XP | Paid with the credits on Hand over. There is no speed bonus. |
 | Level | From XP, using `levelFor`. A quest's `needLevel` gates who can be asked. |

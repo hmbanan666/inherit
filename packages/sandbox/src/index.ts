@@ -4,9 +4,14 @@ import { openRuntime, type CpuStats, type FactoryContext } from './runtime'
 export type { JsonObject, JsonValue, ProjectOptions } from './project'
 export type { CpuStats, FactoryContext } from './runtime'
 
+export type StepState = 'missing' | 'yield' | 'again' | 'done'
+
 export interface Program {
   onTick<C extends FactoryContext>(ctx: C): void
   call<C extends FactoryContext>(name: string, ctx: C): boolean
+  /** Resume a generator one yield, or call a function once. return false means call again. */
+  step<C extends FactoryContext>(name: string, ctx: C): StepState
+  release(): void
   emit<C extends FactoryContext>(event: string, ctx: C): void
   prime(used: number, tick: number): void
   exportMemory(): JsonObject
@@ -30,6 +35,8 @@ export async function createProgram(source: string | ProjectOptions, initialFact
         session.dispatch(fn, ctx)
         return true
       },
+      step: (name, ctx) => session.step(name, ctx),
+      release: () => session.release(),
       emit: (event, ctx) => session.emit(event, ctx),
       prime: (used, tickNo) => session.prime(used, tickNo),
       exportMemory: session.exportMemory,

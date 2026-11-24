@@ -10,6 +10,8 @@ export type FactoryCommand =
   | { kind: 'dump'; name: string }
   | { kind: 'manual'; action: 'smelt' | 'alloy' | 'collect' | 'clear' | 'mine' | 'unload' | 'dump'; drone?: string }
   | { kind: 'run-fn'; name: string; file: string; line: number }
+  | { kind: 'stop' }
+  | { kind: 'loop'; on: boolean; name?: string; file?: string; line?: number }
   | { kind: 'clear-console' }
 
 export type FactoryFrame = { world: World; deployed?: Record<string, string> }

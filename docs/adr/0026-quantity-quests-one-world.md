@@ -1,6 +1,6 @@
 # Quantity quests, one map per world
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Supersedes ADR 0022's speed-bonus and par-time clause, ADR 0022's shop-tier schedule, and the "a vein runs out" example in [ADR 0021](0021-v8-inherit-a-factory.md). Does not replace [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0024](0024-quest-rail-and-status.md), or [ADR 0025](0025-functions-with-triggers.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md).
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Supersedes ADR 0022's speed-bonus and par-time clause, ADR 0022's shop-tier schedule, and the "a vein runs out" example in [ADR 0021](0021-v8-inherit-a-factory.md). Does not replace [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0024](0024-quest-rail-and-status.md), or [ADR 0025](0025-functions-with-triggers.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md) and [ADR 0028](0028-run-to-completion.md).
 
 ## Context
 
@@ -16,7 +16,7 @@ Nick's product vision of 23 November 2026 is the game. #88 and #89 already grant
 
 **One world, one map.** A world is one continuous map. There are no rooms. A world is about ten hours of play. New content ships as a new world. The player's files, credits, and XP are not wiped to start it. ADR 0022's audit, if it is built, is a summary and not a wipe. The Kettlewick grid on screen now is the first slice of a map, not a room and not those ten hours.
 
-**Code is the automation.** Satisfactory is the reference, kept small. The player works the machines by hand first. Code is how the works run after that. The order is the one in [ADR 0025](0025-functions-with-triggers.md): buttons, then a function with Run, then `on(event)`, then `onTick`. This ADR adds no new machine and no new system.
+**Code is the automation.** Satisfactory is the reference, kept small. The player works the machines by hand first. Code is how the works run after that. The order is the one in [ADR 0028](0028-run-to-completion.md): buttons, then Run until the function returns, then Loop and `onTick`, then `on(event)`. This ADR adds no new machine and no new system.
 
 **Depot.** [ADR 0025](0025-functions-with-triggers.md) already decided this, and [ADR 0027](0027-shop-veins-one-delivery.md) keeps one path. A quest takes ingots and steel from the depot. Those goods stay in the furnace until a drone picks them up and unloads them there.
 

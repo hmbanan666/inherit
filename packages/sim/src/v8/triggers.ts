@@ -1,4 +1,5 @@
 import { chargeCpu } from './core/cpu'
+import { onDoc, onExample, onSignature } from './core/bricks'
 import { pushConsole, type Cell, type Site, type World } from './core/world'
 import { dumpCargo, mining } from './modules/mining'
 import { takeFromDepot } from './modules/orders'
@@ -10,11 +11,36 @@ export type WorksEvent = (typeof worksEvents)[number]
 
 export const onApi = {
   name: 'on',
-  signature: "function on(event: 'furnace.full' | 'furnace.ready' | 'drone.idle' | 'drone.full', fn: () => void): void",
-  doc: 'Call fn once when that event happens. A quest unlocks on().',
-  example: "on('drone.idle', haul)",
+  signature: onSignature,
+  doc: onDoc,
+  example: onExample,
   cost: 0,
 }
+
+/** Run, Loop, and on(). The book and the editor types share these lines. */
+export const triggerDocs = [
+  {
+    id: 'run' as const,
+    name: 'Run',
+    signature: 'Run functionName',
+    doc: 'Play an exported function until it returns. yield, or return false, waits one tick.',
+    example: `// Run plays this until it returns. yield waits one tick.\nexport function* once() {\n  // One step of the drone, then the next tick.\n  yield\n}`,
+  },
+  {
+    id: 'tick' as const,
+    name: 'Loop',
+    signature: 'export function onTick(): void',
+    doc: 'Run the function again each time it finishes, until Stop. The Loop switch does this too.',
+    example: `// Loop calls onTick again after it returns, until Stop.\nexport function onTick() {\n  // One step. The works call this again when it finishes.\n}`,
+  },
+  {
+    id: 'events' as const,
+    name: 'on',
+    signature: onSignature,
+    doc: onDoc,
+    example: onExample,
+  },
+]
 
 export type ManualAction = 'smelt' | 'alloy' | 'collect' | 'clear' | 'mine' | 'unload' | 'dump'
 
@@ -37,7 +63,9 @@ export function snapshotSignals(world: World): World['signals'] {
 
 /** A save from before triggers keeps every trigger. Counts and credits stay. */
 export function grantLegacy(world: World) {
-  world.automation = { run: true, events: true, tick: true }
+  world.automation = { run: true, events: true, tick: true, pinned: true }
+  world.loop = true
+  world.holding = false
 }
 
 export function ensureTriggers(world: World) {
@@ -49,7 +77,11 @@ export function ensureTriggers(world: World) {
   world.inbox ??= emptyInbox()
   world.collectAt ??= null
   world.collectSpan ??= 0
-  if (!world.automation) world.automation = { run: true, events: true, tick: true }
+  world.loop ??= false
+  world.holding ??= false
+  world.script ??= null
+  world.pace ??= { mode: 'idle', name: '' }
+  if (!world.automation) world.automation = { run: true, events: true, tick: true, pinned: true }
   if (!world.signals) world.signals = snapshotSignals(world)
   return world
 }
@@ -61,7 +93,37 @@ export function pressManual(world: World, action: ManualAction, drone = 'drone-1
 
 export function queueRun(world: World, name: string, file: string, line: number) {
   if (!triggerUnlocked(world, 'run')) throw new Error('Run is locked. A quest unlocks it.')
-  world.pendingRuns.push({ name, file, line })
+  world.holding = false
+  world.script = { name, file, line, loop: world.loop, phase: 'start' }
+  world.pace = { mode: 'run', name }
+  world.manualRuns = (world.manualRuns ?? 0) + 1
+}
+
+export function stopScript(world: World) {
+  world.holding = true
+  world.loop = false
+  world.script = null
+  world.pace = { mode: 'idle', name: '' }
+}
+
+/** Loop restarts the function when it finishes. Passing a name starts that function. */
+export function setLoop(world: World, on: boolean, name?: string, file = 'main.ts', line = 1) {
+  if (!triggerUnlocked(world, 'tick')) throw new Error('Loop is locked. A quest unlocks it.')
+  if (!on) {
+    world.loop = false
+    if (world.script) world.script.loop = false
+    return
+  }
+  world.holding = false
+  world.loop = true
+  if (world.script) {
+    world.script.loop = true
+    return
+  }
+  if (!name) return
+  world.script = { name, file, line, loop: true, phase: 'start' }
+  world.pace = { mode: 'run', name }
+  world.manualRuns = (world.manualRuns ?? 0) + 1
 }
 
 function distance(a: Cell, b: Cell) {

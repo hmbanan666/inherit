@@ -74,9 +74,17 @@ export async function openRuntime(
     return handle
   }
   let disposed = false
+  let generator: QuickJSHandle | undefined
+  function release() {
+    if (!generator) return
+    const held = generator
+    generator = undefined
+    held.dispose()
+  }
   function dispose() {
     if (disposed) return
     disposed = true
+    release()
     for (const handle of owned.reverse()) handle.dispose()
     vm.dispose()
     runtime.dispose()
@@ -230,6 +238,57 @@ export async function openRuntime(
     current = undefined
     assertSynchronous(namespace)
     runtime.removeModuleLoader()
+    function lookup(name: string) {
+      const cached = handlers.get(name)
+      if (cached !== undefined) return cached ?? undefined
+      const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
+      if (vm.typeof(fn) === 'function') {
+        handlers.set(name, fn)
+        return fn
+      }
+      handlers.set(name, null)
+    }
+    function isGenerator(handle: QuickJSHandle) {
+      if (vm.typeof(handle) !== 'object') return false
+      const next = vm.getProp(handle, 'next')
+      const ret = vm.getProp(handle, 'return')
+      try {
+        return vm.typeof(next) === 'function' && vm.typeof(ret) === 'function'
+      } finally {
+        next.dispose()
+        ret.dispose()
+      }
+    }
+    function resume(): 'yield' | 'done' {
+      const gen = generator
+      if (!gen) return 'done'
+      const next = vm.getProp(gen, 'next')
+      let record: QuickJSHandle | undefined
+      try {
+        record = unwrap(vm.callFunction(next, gen))
+        assertSynchronous(record)
+        const done = vm.getProp(record, 'done')
+        const finished = vm.dump(done) === true
+        done.dispose()
+        if (!finished) return 'yield'
+        generator = undefined
+        gen.dispose()
+        return 'done'
+      } finally {
+        record?.dispose()
+        next.dispose()
+      }
+    }
+    function takeReturn(handle: QuickJSHandle): 'yield' | 'again' | 'done' {
+      assertSynchronous(handle)
+      if (isGenerator(handle)) {
+        generator = handle
+        return resume()
+      }
+      const again = vm.typeof(handle) === 'boolean' && vm.dump(handle) === false
+      handle.dispose()
+      return again ? 'again' : 'done'
+    }
     return {
       dispose,
       stats: () => ({ ...frame }),
@@ -246,14 +305,27 @@ export async function openRuntime(
         if (emitFn) this.dispatch(emitFn, ctx, event)
       },
       handler(name: string) {
-        const cached = handlers.get(name)
-        if (cached !== undefined) return cached ?? undefined
-        const fn = keep(usingHandle(vm.newString(name), (key) => invoke(exported, namespace, key)))
-        if (vm.typeof(fn) === 'function') {
-          handlers.set(name, fn)
-          return fn
+        return lookup(name)
+      },
+      release,
+      step(name: string, ctx: FactoryContext): 'missing' | 'yield' | 'again' | 'done' {
+        if (lastTick !== ctx.tick) {
+          frame = fresh()
+          lastTick = ctx.tick
         }
-        handlers.set(name, null)
+        if (costs && frame.used === budget) throw new Error(`CPU limit (${budget}) hit.`)
+        begin(frame)
+        if (frame.used > budget) throw new Error(`Operation budget (${budget}) exceeded.`)
+        current = ctx
+        try {
+          if (startTick) usingHandle(vm.newNumber(ctx.tick), value => invoke(startTick, value).dispose())
+          if (generator) return resume()
+          const fn = lookup(name)
+          if (!fn) return 'missing'
+          return takeReturn(unwrap(vm.callFunction(fn, vm.undefined)))
+        } finally {
+          current = undefined
+        }
       },
       dispatch(fn: QuickJSHandle, ctx: FactoryContext, arg?: string) {
         if (lastTick !== ctx.tick) {

@@ -16,7 +16,7 @@ The site is Kettlewick Works. Its numbers live on `kettlewick` in `packages/sim/
 - The furnace turns 2 ore into 1 ingot in 4 ticks. The hopper holds 6 ore and 3 coal. Output holds 6 ingots and 6 steel. Unload fills the free hopper space and the drone keeps the rest.
 - A fresh `main.ts` exports `smeltOnce` and does not call it. `uncleMain` is the old loop, with `const home = false`. A fresh world does not start there. Old saves can still be running it.
 - Ingots and steel stay in the furnace until a drone picks them up and unloads them at the depot. `takeFromDepot` moves the open quest's goods from the depot onto the order. That is the only delivery. `ship()` does not move goods. An old file may still import it. The call does nothing, and the file still runs. There is no shipment from the furnace and no half pay.
-- Run, `on()`, and `onTick` unlock when Ines, Odile, and Elsie are taken. `furnace.alloy()` unlocks with Odile. `prospect()` unlocks with Harrow. The shop does not sell those, and it does not sell drone-2. A `bought` list that still contains `alloy`, `prospect`, or `drone` keeps what it already granted. Nothing is refunded. Credits are not reset.
+- Run unlocks with Bram and plays a function until it returns. Loop and `onTick` unlock with Ines. `on()` unlocks with Elsie. `furnace.alloy()` unlocks with Odile. `prospect()` unlocks with Harrow. The shop does not sell those, and it does not sell drone-2. A `bought` list that still contains `alloy`, `prospect`, or `drone` keeps what it already granted. Nothing is refunded. Credits are not reset. A save with no `automation` field keeps every trigger. A save that already recorded them keeps the ones it had.
 - CPU limit 30. Tick 500 ms. Credits 300. Level 1. XP 0. Level thresholds are `levelFor`.
 - `buyUpgrade` refuses an unknown id, an owned item, and an item the player cannot afford, and it does not change the balance when it refuses. A purchase that succeeds subtracts the price.
 
@@ -26,7 +26,7 @@ The worker runs one tick on that interval even when the tab is hidden. The visib
 
 `acceptQuest` opens one order. Its shipped count starts at 0. The order has no due tick.
 
-Checks are the goal lines on the quest rail. They read the live world every tick after accept. They never complete the quest and they never cost anything. Prepare sets the baseline that quest cares about. Those baselines are the `prepare` functions on `questList`. Bram and Odile do not reset the furnace. Their delivery counts still start at zero when the quest is taken. A program that cleared the previous quest does not pass the next one.
+The rail shows the title, the ask, what is needed, and one quantity bar. Checks are the test rows beside the code. They read the live world every tick after accept. They never complete the quest and they never cost anything. Prepare sets the baseline that quest cares about. Those baselines are the `prepare` functions on `questList`. Bram and Odile do not reset the furnace. Their delivery counts still start at zero when the quest is taken. A program that cleared the previous quest does not pass the next one.
 
 **Hand over** pays `pay` and `xp` in full, then clears the quest id. Odile's hand-over also grants drone-2. A tick cannot lower the balance. The shop can. Empty `smelt()` or `alloy()` does not change the balance.
 

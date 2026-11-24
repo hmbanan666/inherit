@@ -4,12 +4,13 @@ import { kettlewick } from '../../packages/sim/src/v8/sites/kettlewick'
 import { inspectMachine, machineList } from '../../packages/sim/src/v8/triggers'
 import { migrateWorld } from '../../packages/sim/src/v8/core/world'
 import { triggerUnlocked } from '../../packages/sim/src/v8/quests'
+import { apiBook, declarations, factoryBricks } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 import { runnableExports } from '../../apps/web/app/lib/runGlyph'
 
 test('the play mark finds a no-argument export and skips the rest', () => {
-  const found = runnableExports('export function smeltOnce() {\n}\nexport function haul(drone) {\n}\nfunction local() {}\n')
-  expect(found).toEqual([{ name: 'smeltOnce', line: 1 }])
+  const found = runnableExports('export function smeltOnce() {\n}\nexport function* bringOne() {\n}\nexport function haul(drone) {\n}\nfunction local() {}\n')
+  expect(found).toEqual([{ name: 'smeltOnce', line: 1 }, { name: 'bringOne', line: 3 }])
 })
 
 test('the inspector names caps, a locked recipe, and dump', () => {
@@ -43,19 +44,21 @@ test('a fresh world stays on buttons until the quest that grants the trigger is 
     expect(session.world.manualRuns).toBe(1)
     session.accept()
     expect(session.world.questId).toBe('bram')
-    expect(triggerUnlocked(session.world, 'run')).toBe(false)
+    expect(triggerUnlocked(session.world, 'run')).toBe(true)
+    expect(triggerUnlocked(session.world, 'tick')).toBe(false)
+    expect(session.world.loop).toBe(false)
     session.world.questId = undefined
     session.world.cleared = ['bram']
     session.world.level = 2
     session.world.orders = []
     expect(session.accept('ines')).toBe(true)
-    expect(triggerUnlocked(session.world, 'run')).toBe(true)
+    expect(triggerUnlocked(session.world, 'tick')).toBe(true)
+    expect(session.world.loop).toBe(true)
     expect(triggerUnlocked(session.world, 'events')).toBe(false)
     session.world.questId = 'odile'
-    expect(triggerUnlocked(session.world, 'events')).toBe(true)
-    expect(triggerUnlocked(session.world, 'tick')).toBe(false)
+    expect(triggerUnlocked(session.world, 'events')).toBe(false)
     session.world.questId = 'elsie'
-    expect(triggerUnlocked(session.world, 'tick')).toBe(true)
+    expect(triggerUnlocked(session.world, 'events')).toBe(true)
   } finally { session.dispose() }
 })
 
@@ -72,7 +75,8 @@ test('an old save with no automation field keeps the tick loop', async () => {
     expect(migrateWorld(createWorld(kettlewick)).automation.tick).toBe(false)
     const bare = createWorld(kettlewick)
     delete (bare as { automation?: unknown }).automation
-    expect(migrateWorld(bare).automation).toEqual({ run: true, events: true, tick: true })
+    expect(migrateWorld(bare).automation).toEqual({ run: true, events: true, tick: true, pinned: true })
+    expect(migrateWorld(bare).loop).toBe(true)
   } finally { session.dispose() }
 })
 
@@ -122,6 +126,7 @@ export function onTick() { furnace.smelt() }`,
     session.world.cleared = ['bram']
     session.world.orders = []
     expect(session.accept('ines')).toBe(true)
+    session.world.loop = false
     session.queue('smeltOnce', 'main.ts', 2)
     session.world.furnace.input = 2
     session.world.furnace.output = 0
@@ -129,4 +134,135 @@ export function onTick() { furnace.smelt() }`,
     expect(session.world.console.some(line => line.text === 'smeltOnce ok' && line.line === 2)).toBe(true)
     expect(session.world.furnace.readyAt).not.toBeNull()
   } finally { session.dispose() }
+})
+
+test('a generator run walks and mines across ticks, then stops', async () => {
+  const session = await createSession(kettlewick, {
+    'main.ts': `import { drones, veins, findPath } from "inherit"
+export function* bringOne() {
+  const vein = veins()[0]
+  while (!drones()[0].isNear(vein)) {
+    const drone = drones()[0]
+    drone.moveAlong(findPath(drone.pos, vein.pos))
+    yield
+  }
+  while (drones()[0].cargo < 1) {
+    drones()[0].mine(vein)
+    yield
+  }
+}`,
+  }, undefined, { fresh: true })
+  try {
+    session.accept()
+    session.queue('bringOne', 'main.ts', 2)
+    session.step(1)
+    expect(session.world.drones[0]!.pos).not.toEqual(kettlewick.drones[0]!.pos)
+    expect(session.world.pace).toEqual({ mode: 'run', name: 'bringOne' })
+    for (let i = 0; i < 40 && session.world.pace.mode === 'run'; i++) session.step(1)
+    expect(session.world.drones[0]!.cargo).toBe(1)
+    expect(session.world.pace.mode).toBe('idle')
+    expect(session.world.manualRuns).toBe(1)
+    expect(session.world.console.some(line => line.text === 'bringOne ok')).toBe(true)
+  } finally { session.dispose() }
+})
+
+test('return false continues the run, and Loop restarts it until Stop', async () => {
+  const session = await createSession(kettlewick, {
+    'main.ts': `import { memory } from "inherit"
+export function keep() {
+  memory.n = (memory.n ?? 0) + 1
+  return false
+}
+export function ping() {
+  memory.ping = (memory.ping ?? 0) + 1
+}`,
+  }, undefined, { fresh: true })
+  try {
+    session.accept()
+    session.queue('keep', 'main.ts', 2)
+    session.step(2)
+    expect(session.world.memory.n).toBe(2)
+    expect(session.world.pace).toEqual({ mode: 'run', name: 'keep' })
+    session.stop()
+    session.step(1)
+    expect(session.world.memory.n).toBe(2)
+    expect(session.world.pace.mode).toBe('idle')
+    session.world.questId = undefined
+    session.world.cleared = ['bram']
+    session.world.level = 2
+    session.world.orders = []
+    expect(session.accept('ines')).toBe(true)
+    session.queue('ping', 'main.ts', 6)
+    session.step(3)
+    expect(session.world.memory.ping).toBe(3)
+    expect(session.world.pace).toEqual({ mode: 'run', name: 'ping' })
+    expect(session.world.console.some(line => line.text === 'ping ok')).toBe(false)
+    expect(session.world.manualRuns).toBe(1)
+    session.setLoop(false)
+    session.step(1)
+    expect(session.world.memory.ping).toBe(4)
+    expect(session.world.pace.mode).toBe('idle')
+  } finally { session.dispose() }
+})
+
+test('Loop calls onTick, and Stop holds it', async () => {
+  const session = await createSession(kettlewick, {
+    'main.ts': `import { memory } from "inherit"
+export function onTick() { memory.n = (memory.n ?? 0) + 1 }`,
+  }, undefined, { fresh: true })
+  try {
+    session.world.level = 2
+    session.world.cleared = ['bram']
+    expect(session.accept('ines')).toBe(true)
+    session.step(2)
+    expect(session.world.memory.n).toBe(2)
+    expect(session.world.pace).toEqual({ mode: 'tick', name: 'onTick' })
+    expect(session.world.manualRuns).toBe(0)
+    session.stop()
+    session.step(2)
+    expect(session.world.memory.n).toBe(2)
+    expect(session.world.holding).toBe(true)
+    session.setLoop(true)
+    session.step(1)
+    expect(session.world.memory.n).toBe(3)
+  } finally { session.dispose() }
+})
+
+test('an Odile save keeps on(), and a save that already had the tick loop keeps Loop on', () => {
+  const mid = createWorld(kettlewick)
+  delete (mid as { loop?: boolean }).loop
+  mid.automation = { run: true, events: false, tick: false }
+  mid.questId = 'odile'
+  migrateWorld(mid)
+  expect(mid.automation).toMatchObject({ run: true, events: true, tick: false, pinned: true })
+  expect(mid.loop).toBe(false)
+  expect(triggerUnlocked(mid, 'events')).toBe(true)
+  expect(triggerUnlocked(mid, 'tick')).toBe(true)
+  const later = createWorld(kettlewick)
+  delete (later as { loop?: boolean }).loop
+  later.automation = { run: true, events: true, tick: true }
+  later.questId = 'elsie'
+  migrateWorld(later)
+  expect(later.loop).toBe(true)
+  expect(later.automation.pinned).toBe(true)
+})
+
+test('the book and the hover share one example, and a locked call names its quest', () => {
+  const world = createWorld(kettlewick)
+  const bricks = factoryBricks(kettlewick)
+  const furnace = apiBook(bricks, world).find(section => section.id === 'furnace')
+  const alloy = furnace?.entries.find(entry => entry.id === 'furnace.alloy')
+  const smelt = furnace?.entries.find(entry => entry.id === 'furnace.smelt')
+  expect(alloy?.locked).toBe('Steel for the bridge')
+  expect(alloy?.example.startsWith('//')).toBe(true)
+  expect(smelt?.locked).toBeUndefined()
+  expect(smelt?.example.startsWith('//')).toBe(true)
+  const events = apiBook(bricks, world).find(section => section.id === 'events')
+  expect(events?.entries.find(entry => entry.id === 'tick')?.locked).toBe('Ingots for the storehouse')
+  const types = declarations(bricks)
+  expect(types).toContain(smelt?.example.split('\n')[0])
+  expect(types).toContain('drone.idle')
+  world.questId = 'odile'
+  const open = apiBook(bricks, world).find(section => section.id === 'furnace')
+  expect(open?.entries.find(entry => entry.id === 'furnace.alloy')).toMatchObject({ locked: undefined, fresh: true })
 })
