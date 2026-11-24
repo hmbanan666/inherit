@@ -1,6 +1,6 @@
 # Quest rail and status
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Amended by [ADR 0031](0031-quest-gift-before-take.md).
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Amended by [ADR 0031](0031-quest-gift-before-take.md). [ADR 0033](0033-quest-card-stays-still.md) moves the live drone task off the quest card and onto one fixed status-bar line.
 
 ## Context
 

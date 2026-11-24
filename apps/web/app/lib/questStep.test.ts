@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { grantHint, grantNote, questNextStep, type CartCue, type QuestStepState } from './questStep'
+import { droneStatusLine, grantHint, grantNote, questNextStep, steadyLine, type CartCue, type QuestStepState } from './questStep'
 
 const empty = { input: 0, coal: 0, output: 0, steel: 0 }
 const none = { ingots: 0, steel: 0 }
@@ -46,13 +46,19 @@ test('a granted trigger adds one line', () => {
   expect(grantHint(undefined)).toBeUndefined()
 })
 
-test('the card follows the cart until the task changes', () => {
+test('a live drone task stays off the card', () => {
   const bram = { from: 'Bram', goal: 'Bring Bram 2 ingots.', item: 'ingot' as const, qty: 2, trigger: 'run' as const }
   const cart: CartCue = { name: 'drone-1', cargo: 0, capacity: 3, carrying: null }
-  expect(questNextStep(state({
-    quest: bram,
+  const mining = state({
+    quest: bram, triggerReady: true, runName: 'smeltOnce',
     cart: { ...cart, task: 'mine', vein: 'A' },
-  }))).toBe('drone-1 is mining Vein A. When the cart is full, open drone-1 and choose Unload.')
+  })
+  const hauling = state({
+    quest: bram, triggerReady: true, runName: 'smeltOnce',
+    cart: { ...cart, cargo: 1, carrying: 'ore', task: 'unload', at: 'furnace' },
+  })
+  expect(questNextStep(mining)).toBe('Bring Bram 2 ingots.')
+  expect(questNextStep(hauling)).toBe(questNextStep(mining))
   expect(questNextStep(state({
     quest: bram,
     cart: { ...cart, cargo: 3, capacity: 3, carrying: 'ore', task: null },
@@ -60,17 +66,48 @@ test('the card follows the cart until the task changes', () => {
   expect(questNextStep(state({
     quest: bram,
     cart: { ...cart, cargo: 3, carrying: 'ore', task: 'unload', at: 'furnace' },
-  }))).toBe('drone-1 is carrying ore to the furnace. Open the furnace and choose Smelt once the hopper has enough ore.')
+  }))).toBe('Open drone-1 and choose Unload.')
   expect(questNextStep(state({
     quest: bram,
     cart: { ...cart, cargo: 2, carrying: 'ingot', task: 'pickup', phase: 'deliver' },
-  }))).toBe('drone-1 is carrying ingots to the depot.')
-  expect(questNextStep(state({ quest: bram, smelting: true, furnace: { ...empty, input: 2 } }))).toBe('The furnace is smelting.')
+    furnace: { ...empty, output: 2 },
+  }))).toBe('Carry the ingots to the depot.')
+  expect(questNextStep(state({
+    quest: bram, smelting: true, furnace: { ...empty, input: 2 },
+    cart: { ...cart, task: 'mine', vein: 'A' },
+  }))).toBe('The furnace is smelting.')
   const odile = { from: 'Mayor Odile', goal: 'Bring Odile 4 steel.', item: 'steel' as const, qty: 4 }
   expect(questNextStep(state({
     quest: odile,
     furnace: { ...empty, input: 2, coal: 1 },
   }))).toBe('Open the furnace and choose Alloy.')
+})
+
+test('the status line names each drone and its task', () => {
+  expect(droneStatusLine([])).toBe('')
+  expect(droneStatusLine([{ name: 'drone-1', task: null }])).toBe('drone-1: idle')
+  expect(droneStatusLine([{ name: 'drone-1', task: 'mine' }])).toBe('drone-1: mining')
+  expect(droneStatusLine([{ name: 'drone-1', task: 'mine', vein: 'A' }])).toBe('drone-1: mining Vein A')
+  expect(droneStatusLine([{ name: 'drone-1', task: 'unload' }])).toBe('drone-1: unloading')
+  expect(droneStatusLine([{ name: 'drone-1', task: 'pickup' }])).toBe('drone-1: hauling')
+  expect(droneStatusLine([
+    { name: 'drone-1', task: 'mine', vein: 'A' },
+    { name: 'drone-2', task: null },
+  ])).toBe('drone-1: mining Vein A · drone-2: idle')
+})
+
+test('a status line waits out a one-tick flicker', () => {
+  let held = steadyLine(undefined, 'drone-1: idle')
+  expect(held.shown).toBe('drone-1: idle')
+  held = steadyLine(held, 'drone-1: mining Vein A')
+  expect(held.shown).toBe('drone-1: idle')
+  held = steadyLine(held, 'drone-1: idle')
+  expect(held.shown).toBe('drone-1: idle')
+  held = steadyLine(held, 'drone-1: mining Vein A')
+  held = steadyLine(held, 'drone-1: mining Vein A')
+  expect(held.shown).toBe('drone-1: mining Vein A')
+  held = steadyLine(held, 'drone-1: mining Vein A')
+  expect(held.shown).toBe('drone-1: mining Vein A')
 })
 
 test('a lit Loop says whether onTick is deployed', () => {
