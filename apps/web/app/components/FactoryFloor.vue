@@ -70,6 +70,7 @@ function pick(clientX: number, clientY: number) {
   const label = buildingLabelHit(px, py, tile, [
     { id: 'depot', title: 'Depot', pos: props.world.depot.pos },
     { id: 'furnace', title: 'Furnace', pos: props.world.furnace.pos },
+    ...props.world.press ? [{ id: 'press', title: 'Press', pos: props.world.press.pos }] : [],
   ])
   if (label) return label
   const drone = scene?.pickDrone(px, py)

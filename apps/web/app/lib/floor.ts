@@ -2,6 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js'
 import type { Cell, World } from '@inherit/sim/v8'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
+import { press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
 
 export type FloorWorld = Omit<World, 'memory'>
@@ -21,8 +22,8 @@ const label = (text: string, size: number, color: number) =>
 
 function loadArt(carrying: FloorWorld['drones'][number]['carrying']): Material {
   if (carrying === 'coal') return 'coal'
-  if (carrying === 'ingot') return 'iron-ingot'
-  if (carrying === 'steel') return 'steel'
+  if (carrying === 'ingot' || carrying === 'plate') return 'iron-ingot'
+  if (carrying === 'steel' || carrying === 'grate' || carrying === 'blank') return 'steel'
   return 'iron-ore'
 }
 
@@ -104,6 +105,9 @@ export class FloorScene {
   private readonly fire: Graphics
   private readonly ingot: Graphics
   private readonly steelMark: Graphics
+  private pressArt?: Container
+  private pressWork?: Graphics
+  private pressMark?: Container
   private arrivals = 0
   private lastTick = -1
   private hover = ''
@@ -126,6 +130,7 @@ export class FloorScene {
     this.steelMark = smelter.addChild(materialArt('steel'))
     this.steelMark.position.set(31, 18)
     this.steelMark.visible = false
+    this.syncPress(world)
     this.ring = this.root.addChild(new Graphics())
     for (const drone of world.drones) this.placeHauler(drone)
   }
@@ -218,6 +223,7 @@ export class FloorScene {
       ...world.veins.filter(vein => !vein.hidden).map(vein => ({ id: `Vein ${vein.name}`, pos: vein.pos })),
       { id: 'furnace', pos: world.furnace.pos },
       { id: 'depot', pos: world.depot.pos },
+      ...world.press ? [{ id: 'press', pos: world.press.pos }] : [],
     ]
     const spot = spots.find(item => item.id === id)
     if (!spot) return
@@ -243,8 +249,30 @@ export class FloorScene {
     this.root.addChild(this.paths)
   }
 
+  private syncPress(world: FloorWorld) {
+    const press = world.press
+    if (!press) {
+      if (this.pressArt) this.pressArt.visible = false
+      return
+    }
+    if (!this.pressArt) {
+      this.pressArt = equipment(this.root, press.pos, pressDrawing)
+      caption(this.pressArt, 'Press', 0, -63)
+      this.pressWork = this.pressArt.addChild(new Graphics())
+      this.pressWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
+      this.pressMark = this.pressArt.addChild(materialArt('steel'))
+      this.pressMark.position.set(18, 8)
+      if (this.ring) this.root.addChild(this.ring)
+    }
+    this.pressArt.visible = true
+    if (this.pressWork) this.pressWork.visible = press.readyAt !== null
+    const finished = (press.bin.qty.grate ?? 0) + (press.bin.qty.plate ?? 0) + (press.bin.qty.blank ?? 0)
+    if (this.pressMark) this.pressMark.visible = finished > 0
+  }
+
   update(world: FloorWorld) {
     this.latest = world
+    this.syncPress(world)
     for (const vein of world.veins) this.placeVein(vein)
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
     const count = world.drones.length

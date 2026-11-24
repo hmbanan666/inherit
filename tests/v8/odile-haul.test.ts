@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import { diagnostics } from './diagnostics'
 import { declarations, factoryBricks, kettlewick, repeatedLabel } from '../../packages/sim/src/v8'
+import { itemType } from '../../packages/sim/src/v8/modules/stock'
 import { createSession } from '../../packages/sandbox/src/v8'
 
 const mine = (index: number) => ({
@@ -14,7 +15,7 @@ export function onTick() { drones()[0].unload(${station}) }`,
 
 test('the editor types name drone.cargoKind and depot coal', () => {
   const types = declarations(factoryBricks(kettlewick))
-  expect(types).toContain("readonly cargoKind: 'ore' | 'coal' | 'ingot' | 'steel' | null")
+  expect(types).toContain(`readonly cargoKind: ${itemType} | null`)
   expect(types).toContain('dump(): void')
   expect(types).toContain('readonly coal: number')
   expect(diagnostics({

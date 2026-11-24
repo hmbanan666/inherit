@@ -4,6 +4,7 @@ import { pushConsole, type Cell, type Site, type World } from './core/world'
 import { dumpCargo, mining, orderMine, orderPickup, orderUnload } from './modules/mining'
 import { takeFromDepot } from './modules/orders'
 import { outputCap, smelting } from './modules/smelting'
+import { ensureBin, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel } from './modules/stock'
 import { functionUnlocked, triggerUnlocked, unlockError } from './quests'
 
 export const worksEvents = ['furnace.full', 'furnace.ready', 'drone.idle', 'drone.full'] as const
@@ -302,7 +303,7 @@ export function settleTriggers(world: World, site: Site) {
 }
 
 export interface InspectLine { label: string; value: string }
-export interface InspectRecipe { id: string; input: string; output: string; locked?: string }
+export interface InspectRecipe { id: string; input: string; output: string; locked?: string; missing?: string }
 export interface InspectAction {
   id: ManualAction
   label: string
@@ -334,6 +335,7 @@ function furnaceDetail(furnace: World['furnace']) {
 export function machineList(world: World) {
   return [
     { id: 'furnace', name: 'Furnace', detail: furnaceDetail(world.furnace) },
+    ...world.press ? [{ id: 'press', name: 'Press', detail: pressStockLabel(world.press) }] : [],
     { id: 'depot', name: 'Depot', detail: `${world.depot.ingots} ingots · ${world.depot.steel} steel` },
     ...world.drones.map(drone => ({
       id: drone.name,
@@ -355,6 +357,7 @@ function bar(label: string, done: number, total: number): InspectProgress {
 
 export function inspectMachine(world: World, site: Site, id: string): InspectView | undefined {
   if (id === 'furnace') return inspectFurnace(world, site)
+  if (id === 'press' && world.press) return inspectPress(world)
   if (id === 'depot') return inspectDepot(world)
   const drone = world.drones.find(item => item.name === id)
   if (drone) return inspectDrone(world, drone)
@@ -410,6 +413,40 @@ function inspectFurnace(world: World, site: Site): InspectView {
   }
 }
 
+function inspectPress(world: World): InspectView {
+  const press = world.press!
+  const view = port(world, 'press')!
+  const active = press.recipe ? recipeById(press.recipe) : undefined
+  const activeText = active ? recipeParts(active) : undefined
+  const span = active?.ticks ?? 1
+  const progress = press.readyAt !== null && active
+    ? bar(active.output, span - (press.readyAt - world.tick), span)
+    : undefined
+  const idleGaps = pressRecipes.flatMap(recipe => {
+    const missing = missingInputs(view, recipe)
+    return missing ? [`${recipe.id} needs ${missing}`] : []
+  })
+  return {
+    id: 'press',
+    name: 'Press',
+    description: 'Forms a grate from steel, a plate from an ingot, or a blank from steel.',
+    lines: [
+      { label: 'Recipe', value: activeText ? `${activeText.input} → ${activeText.output}` : 'Idle' },
+      { label: 'Missing', value: active ? (missingInputs(view, active) ?? 'none') : (idleGaps.join(' · ') || 'none') },
+      { label: 'Reserved', value: reservedLabel(ensureBin(press.bin)) },
+      { label: 'Steel', value: `${view.get('steel')}/${machineSlot}` },
+      { label: 'Ingots', value: `${view.get('ingot')}/${machineSlot}` },
+      { label: 'Finished', value: `${view.get('grate') + view.get('plate') + view.get('blank')}/${machineSlot}` },
+    ],
+    recipes: pressRecipes.map(recipe => {
+      const text = recipeParts(recipe)
+      return { id: recipe.id, input: text.input, output: text.output, missing: missingInputs(view, recipe) }
+    }),
+    actions: [],
+    progress,
+  }
+}
+
 function inspectDepot(world: World): InspectView {
   return {
     id: 'depot',
@@ -430,6 +467,7 @@ function taskLabel(task: World['drones'][number]['task']) {
   if (task?.kind === 'mine') return 'Mining'
   if (task?.kind === 'unload') return 'Unloading'
   if (task?.kind === 'pickup') return 'Hauling'
+  if (task?.kind === 'transfer') return 'Transferring'
   return 'free'
 }
 
@@ -449,6 +487,7 @@ function inspectDrone(world: World, drone: World['drones'][number]): InspectView
       { label: 'Cargo', value: drone.carrying ?? 'empty' },
       { label: 'Load', value: `${drone.cargo}/${drone.capacity}` },
       { label: 'Task', value: taskLabel(task) },
+      { label: 'Reserved', value: task?.kind === 'transfer' ? `${task.qty - task.delivered} ${task.item}` : 'none' },
       { label: 'At', value: `${drone.pos.x},${drone.pos.y}` },
     ],
     recipes: [],

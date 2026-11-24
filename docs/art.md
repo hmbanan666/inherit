@@ -16,6 +16,7 @@ These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `sh
 | --- | --- |
 | `apps/web/app/lib/art/shared.ts` | The machine palette and the elevation helpers (`drawing`, `mountingPlate`). Not a picture on its own. |
 | `apps/web/app/lib/art/floorMachines.ts` | The depot crane and crate, the hauler truck, and the furnace with its charging mouth. |
+| `apps/web/app/lib/art/fabrication.ts` | The press, the cutter, and the assembler. The floor draws the press. The cutter and the assembler stay for the lathe and the assembly table. |
 | `apps/web/app/lib/art/materials.ts` | One lump of iron ore, one iron ingot, one steel bar, and one lump of coal. |
 | `apps/web/app/lib/art/townPaint.ts` | Canvas helpers (box, line, stipple) for the portraits. The comment also names printed scenery. That scenery is in the archive. |
 | `apps/web/app/lib/art/townPortrait.ts` | Cameos of Bram, Elsie, Tomas, Wen, Odile, Harrow, Ines, and Pell, each worried or happy. |
@@ -24,7 +25,7 @@ These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `sh
 | `packages/sim/src/visuals/Villager.vue` | The standing figure. The beginner scenes still use it. [ADR 0030](adr/0030-packs-removed.md) removed the pack that played those scenes. |
 | `packages/sim/src/visuals/AppleTree.vue` | The trees on the village panorama. The panorama stays. |
 
-A drone's load is drawn as the material it carries: ore, coal, ingot, or steel. The furnace draws one ingot whenever it holds ingots or steel. That furnace mark is a gap in the floor, not a missing file.
+A drone's load is drawn as the material it carries: ore, coal, ingot, or steel. A grate or a blank reuses the steel drawing. A plate reuses the ingot drawing. The furnace draws one ingot whenever it holds ingots or steel. That furnace mark is a gap in the floor, not a missing file.
 
 ## Archived
 
@@ -37,7 +38,6 @@ Tag `art-archive`. Each row is a file that `843137c` deleted. The last column is
 | `apps/web/app/lib/art/townPaint.ts` | The same paint helpers as the live file, at the revision that the buildings imported. | Restore only if a building file needs that revision. The live `townPaint.ts` is the one to edit. |
 | `apps/web/app/lib/art/townPortrait.ts` | The cameos at that revision. | Restore only to compare. The live file already has the eight people. |
 | `apps/web/app/lib/art/extraction.ts` | A crawler miner for iron, copper, or coal, and a second furnace. | A vein machine on the map. The live furnace is `floorMachines.ts`. |
-| `apps/web/app/lib/art/fabrication.ts` | A press, a cutter, and an assembler. | Later fabrication, if a quest ever needs it. |
 | `apps/web/app/lib/art/recycling.ts` | A scrap hopper with two toothed drums. | A scrap station. |
 | `apps/web/app/lib/art/routing.ts` | A roller junction that splits or merges, and a sorter. | Belts, if the map ever has them. |
 | `apps/web/app/lib/art/shipping.ts` | A crate, a truck, a depot, a dock, and a storage pile. | A dock or a storehouse. The live depot and truck are `floorMachines.ts`. |

@@ -1,6 +1,6 @@
 # Quantity quests, one map per world
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Supersedes ADR 0022's speed-bonus and par-time clause, ADR 0022's shop-tier schedule, and the "a vein runs out" example in [ADR 0021](0021-v8-inherit-a-factory.md). Does not replace [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0024](0024-quest-rail-and-status.md), or [ADR 0025](0025-functions-with-triggers.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md) and [ADR 0028](0028-run-to-completion.md).
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Supersedes ADR 0022's speed-bonus and par-time clause, ADR 0022's shop-tier schedule, and the "a vein runs out" example in [ADR 0021](0021-v8-inherit-a-factory.md). Does not replace [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0024](0024-quest-rail-and-status.md), or [ADR 0025](0025-functions-with-triggers.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md), [ADR 0028](0028-run-to-completion.md), and [ADR 0036](0036-region-1-fabrication-chain.md).
 
 ## Context
 

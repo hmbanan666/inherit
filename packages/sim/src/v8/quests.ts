@@ -1,5 +1,6 @@
 import type { Site, World } from './core/world'
 import { noteCheckReset, readChecks } from './checkFacts'
+import { createPress, hotFurnaceTicks, normalizePress, smeltRecipe } from './modules/stock'
 
 export interface QuestTest {
   id: string
@@ -40,6 +41,8 @@ export interface QuestDef {
   trigger?: 'run' | 'events' | 'tick'
   /** Named on the reward tiles. Granted on Hand over, not sold. */
   gift?: string
+  /** A machine installed on Hand over. Not sold. */
+  install?: string
   prepare?(world: World): void
   tests: QuestTest[]
 }
@@ -115,6 +118,7 @@ export const questList: QuestDef[] = [
     nudge: 'steel is ore and coal together. Where would they meet?',
     change: 'The bridge stands. Kettlewick can cross the river again.',
     gift: 'drone-2',
+    install: 'press',
     item: 'steel', qty: 4, pay: 100, xp: 20, needLevel: 2,
     tests: [
       { id: 'coal', text: 'Coal reaches the furnace', explain: 'The furnace hopper holds coal, or steel was already made.', pass: world => world.furnace.coal > 0 || world.steelMade > 0 || shipped(world, 'odile') > 0 },
@@ -221,15 +225,30 @@ export const questList: QuestDef[] = [
 export const shop: ShopItem[] = [
   { id: 'cart', name: 'Bigger cart', price: 240, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
   { id: 'hopper', name: 'Bigger hopper', price: 280, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
-  { id: 'furnace', name: 'Hotter furnace', price: 580, detail: 'A batch finishes in 2 ticks instead of 4.', apply: world => { world.batchTicks = 2 } },
+  { id: 'furnace', name: 'Hotter furnace', price: 580, detail: `A batch finishes in ${hotFurnaceTicks} ticks instead of ${smeltRecipe.ticks}.`, apply: world => { world.batchTicks = hotFurnaceTicks } },
   { id: 'cpu', name: 'CPU +10', price: 700, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
 
 const secondDrone = 'drone-2'
 
+/** Odile's Hand over installs drone-2 and the press. A bought drone is only the cart. A later quest adds neither. */
+export function worksGrants(world: Pick<World, 'cleared' | 'bought'>) {
+  const odile = !!world.cleared?.includes('odile')
+  return { 'drone-2': odile || !!world.bought?.includes('drone'), press: odile }
+}
+
 /** Odile's hand-over, or a save that already bought the drone. Being on a later quest does not count. */
 export function secondDroneUnlocked(world: Pick<World, 'cleared' | 'bought'>) {
-  return !!world.cleared?.includes('odile') || !!world.bought?.includes('drone')
+  return worksGrants(world)['drone-2']
+}
+
+/** The press is on the floor only when Odile's Hand over granted it. */
+export function syncPress(world: World) {
+  if (!worksGrants(world).press) {
+    world.press = null
+    return
+  }
+  world.press = world.press ? normalizePress(world.press) : createPress()
 }
 
 /** One drone-2 when the reward is granted, and none when it is not. Map, list, inspector, and API read `world.drones` after this. */
@@ -360,6 +379,7 @@ export function completeQuest(world: World, site: Site) {
   if (!world.cleared.includes(quest.id)) world.cleared.push(quest.id)
   if (!world.growth.includes(quest.change)) world.growth.push(quest.change)
   syncSecondDrone(world)
+  syncPress(world)
   if (armLoop) {
     world.loop = true
     world.holding = false
@@ -382,6 +402,7 @@ export function buyUpgrade(world: World, id: string) {
 
 /** True when no quest owns the brick, the player already bought it, or they have reached the quest that grants it. */
 export function functionUnlocked(world: Pick<World, 'questId' | 'cleared' | 'bought'>, brick: string) {
+  if (brick === 'press' || brick.startsWith('press.')) return worksGrants(world).press
   const quest = questList.find(item => item.unlock?.brick === brick)
   if (!quest?.unlock) return true
   if (quest.unlock.legacy && world.bought.includes(quest.unlock.legacy)) return true

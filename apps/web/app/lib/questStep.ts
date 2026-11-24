@@ -1,3 +1,5 @@
+import type { Item } from '@inherit/sim/v8'
+
 export interface StepQuest {
   from: string
   goal: string
@@ -11,8 +13,8 @@ export interface CartCue {
   name: string
   cargo: number
   capacity: number
-  carrying: 'ore' | 'coal' | 'ingot' | 'steel' | null
-  task?: 'mine' | 'unload' | 'pickup' | null
+  carrying: Item | null
+  task?: 'mine' | 'unload' | 'pickup' | 'transfer' | null
   vein?: string
   at?: 'furnace' | 'depot'
   phase?: 'fetch' | 'deliver'
@@ -21,7 +23,7 @@ export interface CartCue {
 /** One drone, for the status line. */
 export interface DroneCue {
   name: string
-  task?: 'mine' | 'unload' | 'pickup' | null
+  task?: 'mine' | 'unload' | 'pickup' | 'transfer' | null
   vein?: string
 }
 
@@ -115,6 +117,7 @@ function droneVerb(drone: DroneCue) {
   if (drone.task === 'mine') return drone.vein ? `mining Vein ${drone.vein}` : 'mining'
   if (drone.task === 'unload') return 'unloading'
   if (drone.task === 'pickup') return 'hauling'
+  if (drone.task === 'transfer') return 'transferring'
   return 'idle'
 }
 

@@ -661,6 +661,7 @@ onBeforeUnmount(() => {
                 <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}<span class="when">On Take</span></li>
                 <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}<span class="when">On hand-over</span></li>
                 <li v-if="shownQuest.gift" title="Granted when you hand this over."><Unlock />{{ shownQuest.gift }}<span class="when">On hand-over</span></li>
+                <li v-if="shownQuest.install" title="Installed when you hand this over."><Unlock />{{ shownQuest.install }}<span class="when">On hand-over</span></li>
               </ul>
             </article>
             <div v-else class="quest">
@@ -687,6 +688,7 @@ onBeforeUnmount(() => {
                 <li v-for="line in inspected.lines" :key="line.label"><b>{{ line.label }}</b> {{ line.value }}</li>
                 <li v-for="recipe in inspected.recipes" :key="recipe.id">
                   <b>{{ recipe.input }} → {{ recipe.output }}</b>
+                  <template v-if="recipe.missing"> Missing {{ recipe.missing }}.</template>
                   <template v-if="recipe.locked"> {{ recipe.locked }}</template>
                 </li>
               </ul>

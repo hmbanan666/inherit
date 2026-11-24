@@ -1,6 +1,6 @@
 # Rewards land on Hand over
 
-Accepted 24 November 2026. Amends [ADR 0025](0025-functions-with-triggers.md), [ADR 0027](0027-shop-veins-one-delivery.md), [ADR 0028](0028-run-to-completion.md), and [ADR 0031](0031-quest-gift-before-take.md).
+Accepted 24 November 2026. Amends [ADR 0025](0025-functions-with-triggers.md), [ADR 0027](0027-shop-veins-one-delivery.md), [ADR 0028](0028-run-to-completion.md), and [ADR 0031](0031-quest-gift-before-take.md). [ADR 0036](0036-region-1-fabrication-chain.md) adds the press to Odile's Hand over and keeps later machines on Hand over too.
 
 ## Context
 
