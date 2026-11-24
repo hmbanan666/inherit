@@ -1,6 +1,6 @@
 # Functions with triggers
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and builds on [ADR 0023](0023-quest-unlocks-functions.md) and [ADR 0024](0024-quest-rail-and-status.md).
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and builds on [ADR 0023](0023-quest-unlocks-functions.md) and [ADR 0024](0024-quest-rail-and-status.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md): goods reach a quest only through `takeFromDepot`. `ship()` does not deliver, and a site does not ship from the furnace.
 
 ## Context
 

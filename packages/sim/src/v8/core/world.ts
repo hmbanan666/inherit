@@ -1,6 +1,6 @@
-import { updateOrders, type ScheduledOrder, type Order } from '../modules/orders'
+import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
-import { syncQuest, type QuestDef } from '../quests'
+import { grantSecondDrone, syncQuest, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
 export interface Drone {
@@ -55,10 +55,15 @@ export function settleVein(input: {
 /** Old saves stored a finite vein.left. Drop it and fill purity. A furnace without caps keeps 6 and 3. */
 export function migrateWorld(world: World) {
   world.veins = world.veins.map(vein => settleVein(vein))
+  if (!world.veins.some(vein => vein.purity === 'normal' || vein.name === 'D')) {
+    const vein = settleVein({ name: 'D', pos: { x: 8, y: 3 }, kind: 'ore', purity: 'normal' })
+    const rich = world.veins.findIndex(item => item.name === 'C')
+    if (rich >= 0) world.veins.splice(rich, 0, vein)
+    else world.veins.push(vein)
+  }
   world.furnace.oreMax ??= 6
   world.furnace.coalMax ??= 3
   for (const drone of world.drones) if (drone.dig === undefined) drone.dig = null
-  world.coalHold ??= 8
   world.depot.ingots ??= 0
   world.depot.steel ??= 0
   world.manualRuns ??= 0
@@ -68,6 +73,13 @@ export function migrateWorld(world: World) {
   world.collectAt ??= null
   world.collectSpan ??= 0
   if (!world.automation) world.automation = { run: true, events: true, tick: true }
+  if (world.ledger) delete (world.ledger as { waste?: number }).waste
+  for (const order of world.orders ?? []) delete (order as { due?: number }).due
+  delete (world as { holdTicks?: number }).holdTicks
+  delete (world as { coalHold?: number }).coalHold
+  const later = new Set(['elsie', 'harrow', 'tomas', 'pell', 'wen'])
+  if (world.bought?.includes('drone') || world.cleared?.includes('odile') || later.has(world.questId ?? ''))
+    grantSecondDrone(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
     ingotsMade: world.ingotsMade,
@@ -86,12 +98,8 @@ export interface Site {
   veins: Vein[]
   depot: { pos: Cell; ore: number; coal: number; ingots: number; steel: number }
   furnace: { pos: Cell; input: number; output: number; oreMax: number; coalMax: number }
-  recipe: { ore: number; ingots: number; ticks: number; fuel: number }
-  orderSchedule: ScheduledOrder[]
+  recipe: { ore: number; ingots: number; ticks: number }
   questList?: QuestDef[]
-  repeatOrders?: boolean
-  graceTicks: number
-  latePayFraction: number
   credits: number
   tickMs: number
   cpuLimit: number
@@ -117,13 +125,12 @@ export interface World {
   drones: Drone[]
   veins: Vein[]
   depot: Site['depot']
-  orderRoundAt: number
   orders: Order[]
   /** Sentences the village said when a request was paid. One line each, in order. */
   growth: string[]
   status: string
-  ledger: { income: number; waste: number }
-  furnace: Site['furnace'] & { readyAt: number | null; coal: number; steel: number; oreAt: number | null; coalAt: number | null; batch: 'ingot' | 'steel' | null }
+  ledger: { income: number }
+  furnace: Site['furnace'] & { readyAt: number | null; coal: number; steel: number; batch: 'ingot' | 'steel' | null }
   cpu: { used: number; limit: number }
   memory: Record<string, unknown>
   messages: Message[]
@@ -134,9 +141,6 @@ export interface World {
   cleared: string[]
   bought: string[]
   checks: { id: string; text: string; status: 'open' | 'green' }[]
-  holdTicks: number
-  /** Coal waiting in the furnace is cleared after this many ticks. 0 means the ore hold. */
-  coalHold: number
   batchTicks?: number
   ingotsMade: number
   steelMade: number
@@ -168,10 +172,10 @@ export function createWorld(site: Site): World {
     drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null })),
     veins: site.veins.map(vein => settleVein(vein)),
     depot: structuredClone(site.depot),
-    furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, oreAt: null, coalAt: null, batch: null },
-    orderRoundAt: 0, orders: [], growth: [], status: '',
-    ledger: { income: 0, waste: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
-    xp: 0, level: 1, cleared: [], bought: [], checks: [], holdTicks: 0, coalHold: 8,
+    furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null },
+    orders: [], growth: [], status: '',
+    ledger: { income: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
+    xp: 0, level: 1, cleared: [], bought: [], checks: [],
     automation: { run: false, events: false, tick: false },
     manualRuns: 0, pendingRuns: [], jobs: {}, inbox: { smelt: false, alloy: false, collect: false, clear: false, drones: {} },
     collectAt: null, collectSpan: 0,
@@ -190,27 +194,8 @@ export function createWorld(site: Site): World {
       cargo: drone.cargo, capacity: drone.capacity, idle: true,
     }])),
   }
-  if (!site.questList) updateOrders(world, site)
-  world.status = site.questList
-    ? syncQuest(world, site)
-    : describeWorks(world, site, world.drones.map(drone => ({ pos: { ...drone.pos }, cargo: drone.cargo })))
+  world.status = site.questList ? syncQuest(world, site) : (world.growth.at(-1) ?? 'The village is quiet.')
   return world
-}
-
-function describeWorks(world: World, site: Site, before: { pos: Cell; cargo: number }[]) {
-  const ask = world.orders.find(order => order.status === 'open' || order.status === 'overdue')
-  if (!ask) return world.growth.at(-1) ?? 'The village is quiet.'
-  if (ask.status === 'overdue') return `${ask.from} is still waiting, and this request now pays half.`
-  const drone = world.drones[0]
-  const prior = before[0]
-  const wasFull = !!drone && !!prior && prior.cargo >= drone.capacity
-  const stuck = wasFull && drone.cargo >= drone.capacity && prior.pos.x === drone.pos.x && prior.pos.y === drone.pos.y
-  if (stuck) return `${ask.from} is waiting. The cart is full, and the drone never comes back to the furnace. Send it when the cart is full.`
-  if (world.furnace.output > 0) return `${ask.from} is waiting. Ingots are ready. Ship them.`
-  if (world.furnace.readyAt !== null || world.furnace.input >= site.recipe.ore) return `${ask.from} is waiting. The furnace is working.`
-  if (drone && drone.cargo >= drone.capacity) return `${ask.from} is waiting. The cart is full. The drone is heading to the furnace.`
-  if (world.ledger.waste > 0) return `${ask.from} is waiting. Smelting an empty furnace reduces what this request pays. Smelt only when it has ${site.recipe.ore} ore.`
-  return `${ask.from} is waiting. The drone is fetching ore for the furnace.`
 }
 
 interface TickResult { used: number; message?: Omit<Message, 'tick'> }
@@ -218,20 +203,7 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
   if (!Number.isSafeInteger(count) || count < 0) throw new Error('Expected a nonnegative tick count.')
   for (let i = 0; i < count; i++) {
     const balance = world.credits
-    const before = world.drones.map(({ pos, cargo }) => ({ pos: { x: pos.x, y: pos.y }, cargo }))
     world.tick++
-    if (!site.questList) updateOrders(world, site)
-    if (world.holdTicks > 0) {
-      const furnace = world.furnace
-      if (furnace.oreAt !== null && world.tick - furnace.oreAt > world.holdTicks) {
-        furnace.input = 0
-        furnace.oreAt = null
-      }
-      if (furnace.coalAt !== null && world.tick - furnace.coalAt > (world.coalHold || world.holdTicks)) {
-        furnace.coal = 0
-        furnace.coalAt = null
-      }
-    }
     finishBatch(world, site)
     world.cpu.used = 0
     const { used, message } = onTick()
@@ -244,7 +216,7 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
     if (message) world.status = message.text
     else if (used >= world.cpu.limit) world.status = 'CPU is at its limit. Remember a path in memory instead of calling findPath every tick.'
     else if (questStatus) world.status = questStatus
-    else world.status = describeWorks(world, site, before)
+    else world.status = world.growth.at(-1) ?? 'The village is quiet.'
     if (message) noteMessage(world, { ...message, tick: world.tick, count: 1 })
   }
 }

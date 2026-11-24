@@ -20,6 +20,8 @@ export type PackManifest = (
   next?: string
   featured?: boolean
   showcaseNote?: string
+  /** Label of the try-once button. Workshop uses Try so Run stays the v8 gutter. */
+  tryOnce?: string
 }
 export interface Starter { files: Files; edit: { file: string; line: number; column?: number }; placeholder?: string }
 export interface Call {
@@ -111,7 +113,7 @@ export function mainFile(source: string, line = source.split('\n').length, place
   return { files: { 'main.ts': source }, edit: { file: 'main.ts', line, column: 1 }, placeholder }
 }
 
-export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter): readonly string[] {
+export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter, press = 'Press Run'): readonly string[] {
   if (lesson.steps) return lesson.steps
   const { line, file } = starter.edit
   const note = starter.files[file].split('\n')[line - 2]?.trim().match(/^\/\/ TODO:\s*(.+)/)?.[1]
@@ -119,6 +121,6 @@ export function lessonSteps<W>(lesson: Lesson<W>, starter: Starter): readonly st
   return [
     ...(lesson.prediction ? ['Choose a prediction'] : []),
     instruction,
-    'Press Run',
+    press,
   ]
 }

@@ -27,7 +27,7 @@ test('the inspector names caps, a locked recipe, and dump', () => {
   expect(inspectMachine(world, kettlewick, 'Vein C')).toBeUndefined()
   const drone = inspectMachine(world, kettlewick, 'drone-1')
   expect(drone?.actions.map(action => action.api)).toEqual(['drone.mine(vein)', 'drone.unload(station)', 'drone.dump()'])
-  expect(machineList(world).map(row => row.id)).toEqual(['furnace', 'depot', 'drone-1', 'Vein A', 'Vein B'])
+  expect(machineList(world).map(row => row.id)).toEqual(['furnace', 'depot', 'drone-1', 'Vein A', 'Vein B', 'Vein D'])
 })
 
 test('a fresh world stays on buttons until the quest that grants the trigger is taken', async () => {

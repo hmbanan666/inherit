@@ -2,7 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js'
 import type { Cell, World } from '@inherit/sim/v8'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
-import { materialArt } from './art/materials'
+import { materialArt, type Material } from './art/materials'
 
 export type FloorWorld = Omit<World, 'memory'>
 export const tile = 96
@@ -18,6 +18,13 @@ const label = (text: string, size: number, color: number) =>
       letterSpacing: 1.3,
     },
   })
+
+function loadArt(carrying: FloorWorld['drones'][number]['carrying']): Material {
+  if (carrying === 'coal') return 'coal'
+  if (carrying === 'ingot') return 'iron-ingot'
+  if (carrying === 'steel') return 'steel'
+  return 'iron-ore'
+}
 
 function land(scene: Container, grid: World['grid']) {
   const g = scene.addChild(new Graphics())
@@ -80,6 +87,7 @@ export class FloorScene {
   private readonly haulers: {
     art: Container
     cargo: Graphics
+    load: Material
     badge: Text
     bar: Graphics
     offset: number
@@ -140,7 +148,8 @@ export class FloorScene {
     truck(d)
     const art = this.root.addChild(new Container())
     art.addChild(d.g).scale.set(0.54)
-    const cargo = art.addChild(materialArt(drone.carrying === 'coal' ? 'coal' : 'iron-ore'))
+    const load = loadArt(drone.carrying)
+    const cargo = art.addChild(materialArt(load))
     cargo.position.set(-7, -12)
     caption(art, drone.name, 0, 9)
     const badge = art.addChild(label(`${drone.cargo}/${drone.capacity}`, 13, 0xf2ead8))
@@ -149,7 +158,20 @@ export class FloorScene {
     const bar = art.addChild(new Graphics())
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
-    this.haulers.push({ art, cargo, badge, bar, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+    this.haulers.push({ art, cargo, load, badge, bar, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+  }
+
+  private showLoad(item: FloorScene['haulers'][number], drone: FloorWorld['drones'][number]) {
+    const kind = loadArt(drone.carrying)
+    if (item.load !== kind) {
+      const index = item.art.getChildIndex(item.cargo)
+      item.art.removeChild(item.cargo)
+      item.cargo.destroy()
+      item.cargo = item.art.addChildAt(materialArt(kind), index)
+      item.cargo.position.set(-7, -12)
+      item.load = kind
+    }
+    item.cargo.visible = drone.cargo > 0
   }
 
   highlight(id = '') {
@@ -258,7 +280,7 @@ export class FloorScene {
       item.y = pos.y + 20
       item.fromX = restart ? item.x : item.art.x
       item.fromY = restart ? item.y : item.art.y
-      item.cargo.visible = drone.cargo > 0
+      this.showLoad(item, drone)
     }
   }
 

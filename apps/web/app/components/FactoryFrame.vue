@@ -475,6 +475,7 @@ onBeforeUnmount(() => {
                 <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
                 <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}</li>
                 <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}</li>
+                <li v-if="shownQuest.gift" title="Granted when you hand this over."><Unlock />{{ shownQuest.gift }}</li>
               </ul>
             </article>
             <div v-else class="quest">

@@ -9,7 +9,7 @@ const steelNote = 'smelt() makes ingots. Steel comes from furnace.alloy().'
 
 test('taking the quest unlocks the function, and a previous purchase still counts', () => {
   const world = createWorld(kettlewick)
-  expect(shop.some(item => item.id === 'alloy' || item.id === 'prospect')).toBe(false)
+  expect(shop.some(item => item.id === 'alloy' || item.id === 'prospect' || item.id === 'drone')).toBe(false)
   expect(functionUnlocked(world, 'furnace.alloy')).toBe(false)
   expect(functionUnlocked(world, 'prospect')).toBe(false)
   const credits = world.credits

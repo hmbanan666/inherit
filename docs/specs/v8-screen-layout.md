@@ -32,11 +32,11 @@ The bar uses the six steps already in `levelFor`. Past the last step it stays fu
 
 ## Quest rail
 
-One card, two tabs: Quests and Shop. The shop lists the conveniences: hotter furnace, bigger cart, bigger hopper, second drone, and CPU. Each row shows the price in credits, or Owned. A purchase stays on this tab. Functions are not on this list.
+One card, two tabs: Quests and Shop. The shop lists the conveniences: hotter furnace, bigger cart, bigger hopper, and CPU. Each row shows the price in credits, or Owned. A purchase stays on this tab. Functions are not on this list. The second drone is not on this list.
 
 With no quest open, the rail lists the villagers who have a request. A row is an initial, the name, and one line. Clicking it opens that request.
 
-The open card is three parts. The header is the portrait, the name, and one in-character line that says what they need. The goal block is one progress line per check, with a bar, phrased with a place, such as `Steel at the depot 0/4`. Pending, passing, and failed keep their colours. The stuck check shows its reason under that line. There is no second copy of the count and no second check list. The reward is tiles: credits, XP, and an unlock such as `furnace.alloy()` when the quest grants one. There is no Next list and no shop-tier line. Level and XP stay in the header.
+The open card is three parts. The header is the portrait, the name, and one in-character line that says what they need. The goal block is one progress line per check, with a bar, phrased with a place, such as `Steel at the depot 0/4`. Pending, passing, and failed keep their colours. The stuck check shows its reason under that line. There is no second copy of the count and no second check list. The reward is tiles: credits, XP, an unlock such as `furnace.alloy()` when the quest grants one, and `drone-2` on Odile's card. There is no Next list and no shop-tier line. Level and XP stay in the header.
 
 Take quest sits in the footer once a request is open. After Take, the footer says `In progress` until every goal is met, then a Hand over button. It is not a disabled count.
 

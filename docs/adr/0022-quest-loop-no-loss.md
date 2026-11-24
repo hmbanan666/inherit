@@ -2,7 +2,7 @@
 
 Accepted 23 November 2026. Amends [ADR 0021](0021-v8-inherit-a-factory.md). Supersedes ADR 0002, 0003, 0005, 0007, 0010, 0011, 0013, 0014 and 0017.
 
-> Amended by [ADR 0023](0023-quest-unlocks-functions.md) (functions come from quests, veins do not run out), [ADR 0024](0024-quest-rail-and-status.md) (the rail and the status bar), [ADR 0025](0025-functions-with-triggers.md) (triggers and depot delivery), and [ADR 0026](0026-quantity-quests-one-world.md). ADR 0026 withdraws the speed bonus, the par time, and the shop-tier schedule in "Decided by architect" below. Those paragraphs stay as the record of what was decided that day. They are not in force.
+> Amended by [ADR 0023](0023-quest-unlocks-functions.md) (functions come from quests, veins do not run out), [ADR 0024](0024-quest-rail-and-status.md) (the rail and the status bar), [ADR 0025](0025-functions-with-triggers.md) (triggers and depot delivery), [ADR 0026](0026-quantity-quests-one-world.md), and [ADR 0027](0027-shop-veins-one-delivery.md). ADR 0026 withdraws the speed bonus, the par time, and the shop-tier schedule in "Decided by architect" below. ADR 0027 withdraws the `order.due` note in that same list. Those paragraphs stay as the record of what was decided that day. They are not in force.
 
 [ADR 0023](0023-quest-unlocks-functions.md) amends the shop clause and the vein clause: a function is granted by taking the quest that needs it, veins do not run out, and quests stay quantities with no rate and no deadline. [ADR 0024](0024-quest-rail-and-status.md) moves the hint into the editor and the goals onto the rail.
 

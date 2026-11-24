@@ -96,6 +96,8 @@ test('the generated inherit declarations typecheck both controllers and require 
   const types = declarations(factoryBricks(kettlewick))
   expect(diagnostics(kettlewick.files, types)).toEqual([])
   expect(diagnostics({ 'main.ts': uncleMain }, types)).toEqual([])
+  expect(types).not.toContain('function ship')
+  expect(types).not.toContain('readonly due')
   expect(diagnostics(cached, types)).toEqual([])
   expect(diagnostics({ 'main.ts': 'import { findPath } from "inherit"; findPath(1, 2)' }, types))
     .toHaveLength(1)

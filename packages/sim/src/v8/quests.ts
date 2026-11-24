@@ -32,6 +32,8 @@ export interface QuestDef {
   unlock?: { brick: string; signature: string; legacy?: string }
   /** Run, on(), or onTick. Granted on Take, by the same rule as unlock. */
   trigger?: 'run' | 'events' | 'tick'
+  /** Named on the reward tiles. Granted on Hand over, not sold. */
+  gift?: string
   prepare?(world: World): void
   tests: QuestTest[]
 }
@@ -103,6 +105,7 @@ export const questList: QuestDef[] = [
     ask: 'Two banks, and no way across. I need steel for the bridge.',
     nudge: 'steel is ore and coal together. Where would they meet?',
     change: 'The bridge stands. Kettlewick can cross the river again.',
+    gift: 'drone-2',
     item: 'steel', qty: 4, pay: 100, xp: 20, needLevel: 2,
     tests: [
       { id: 'coal', text: 'Coal reaches the furnace', pass: world => world.furnace.coal > 0 || world.steelMade > 0 || shipped(world, 'odile') > 0 },
@@ -113,21 +116,15 @@ export const questList: QuestDef[] = [
   {
     id: 'elsie', from: 'Elsie', who: 'elsie', role: 'Baker', building: 'bakery',
     title: 'A grate for the oven',
-    goal: 'Bring Elsie 6 steel before the ore cools.',
-    why: 'One cart cannot fetch coal before the ore cools. One cart cannot be in two places.',
+    goal: 'Bring Elsie 6 steel.',
+    why: 'One cart cannot be in two places.',
     quote: 'The oven has been cold since dawn.',
-    ask: 'The oven has been cold since dawn. I need a grate before the ore cools.',
-    nudge: 'ore cools if the coal is late. One cart cannot be in two places.',
+    ask: 'The oven has been cold since dawn. I need a grate.',
+    nudge: 'one cart cannot be in two places.',
     change: 'The bakery is warm again.',
     item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
     trigger: 'tick',
-    prepare: world => {
-      // Poor veins are slow. Ore lasts 48 ticks and coal 24, long enough for two drones
-      // working at once, and shorter than one drone fetching both.
-      world.holdTicks = 48
-      world.coalHold = 24
-      world.steelMark = world.steelMade
-    },
+    prepare: world => { world.steelMark = world.steelMade },
     tests: [
       { id: 'drone', text: 'drone-2 leaves the depot', pass: world => {
         const drone = world.drones.find(item => item.name === 'drone-2')
@@ -209,16 +206,21 @@ export const questList: QuestDef[] = [
 export const shop: ShopItem[] = [
   { id: 'furnace', name: 'Hotter furnace', price: 60, detail: 'A batch finishes in 2 ticks instead of 4.', apply: world => { world.batchTicks = 2 } },
   { id: 'cart', name: 'Bigger cart', price: 40, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
-  {
-    id: 'drone', name: 'Second drone', price: 120, detail: 'drone-2 waits at the depot.',
-    apply: world => {
-      if (world.drones.some(drone => drone.name === 'drone-2')) return
-      world.drones.push({ name: 'drone-2', pos: { ...world.depot.pos }, cargo: 0, capacity: world.drones[0]?.capacity ?? 3, carrying: null, source: '' })
-    },
-  },
   { id: 'hopper', name: 'Bigger hopper', price: 50, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
   { id: 'cpu', name: 'CPU +10', price: 80, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
+
+/** Odile's reward. A save that already bought drone-2, or has passed Odile, keeps a single drone-2. */
+export function grantSecondDrone(world: World) {
+  if (world.drones.some(drone => drone.name === 'drone-2')) return
+  const home = world.depot.pos
+  const capacity = world.drones[0]?.capacity ?? 3
+  world.drones.push({
+    name: 'drone-2', pos: { x: home.x, y: home.y }, cargo: 0,
+    capacity, carrying: null, source: '', dig: null,
+  })
+  if (world.signals?.drones) world.signals.drones['drone-2'] = { cargo: 0, capacity, idle: true }
+}
 
 export function nextQuest(world: World, site: Site) {
   const quest = site.questList?.find(item => !world.cleared.includes(item.id) && world.level >= item.needLevel)
@@ -248,7 +250,7 @@ export function acceptQuest(world: World, site: Site, id?: string) {
   quest.prepare?.(world)
   noteCheckReset(world)
   world.orders.push({
-    id: quest.id, at: world.tick, item: quest.item, qty: quest.qty, due: world.tick + 100000, pay: quest.pay,
+    id: quest.id, at: world.tick, item: quest.item, qty: quest.qty, pay: quest.pay,
     from: quest.from, who: quest.who, role: quest.role, title: quest.title, text: quest.goal,
     building: quest.building, change: quest.change, shipped: 0, status: 'open',
   })
@@ -265,6 +267,7 @@ export function completeQuest(world: World, site: Site) {
   world.level = levelFor(world.xp)
   if (!world.cleared.includes(quest.id)) world.cleared.push(quest.id)
   if (!world.growth.includes(quest.change)) world.growth.push(quest.change)
+  if (quest.gift === 'drone-2') grantSecondDrone(world)
   const order = world.orders.find(item => item.id === quest.id)
   if (order) order.status = 'on time'
   world.questId = undefined

@@ -68,8 +68,9 @@ for (const m of manifests) test(m.id+' starters and solutions play from the same
     const label = m.id+'/'+lesson.id
     const checkpoint = adapter?.checkpoint(lesson.id)
     const starter = lesson.starter()
-    const steps = lessonSteps(lesson, starter)
-    expect(steps.at(-1), label).toBe('Press Run')
+    const press = m.tryOnce ? 'Press ' + m.tryOnce : 'Press Run'
+    const steps = lessonSteps(lesson, starter, press)
+    expect(steps.at(-1), label).toBe(press)
     steps.forEach(text)
     const column = starter.edit.column ?? 1
     expect(Number.isInteger(column) && column >= 1, label).toBe(true)

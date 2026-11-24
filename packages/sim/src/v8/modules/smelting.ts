@@ -51,27 +51,22 @@ export function smelting(site: Site): Brick[] {
     }),
     brick('furnace.input', 'readonly input: number', 'Ore waiting to smelt.', 'furnace.input', read,
       ({ world }) => world.furnace.input),
-    brick('furnace.output', 'readonly output: number', 'Ingots ready to ship.', 'furnace.output', read,
+    brick('furnace.output', 'readonly output: number', 'Ingots waiting in the furnace.', 'furnace.output', read,
       ({ world }) => world.furnace.output),
     brick('furnace.coal', 'readonly coal: number', 'Coal waiting to alloy.', 'furnace.coal', read, ({ world }) => world.furnace.coal),
     brick('furnace.inputMax', 'readonly inputMax: number', 'Ore the hopper can hold.', 'furnace.inputMax', read, ({ world }) => world.furnace.oreMax ?? 6),
     brick('furnace.coalMax', 'readonly coalMax: number', 'Coal the hopper can hold.', 'furnace.coalMax', read, ({ world }) => world.furnace.coalMax ?? 3),
-    brick('furnace.steel', 'readonly steel: number', 'Steel ready to ship.', 'furnace.steel', read, ({ world }) => world.furnace.steel),
+    brick('furnace.steel', 'readonly steel: number', 'Steel waiting in the furnace.', 'furnace.steel', read, ({ world }) => world.furnace.steel),
     brick('furnace.clear', 'clear(): void', 'Drop ore and coal from the hopper. Ingots and steel stay.', 'furnace.clear()', action, ({ world }) => {
       world.furnace.input = 0
       world.furnace.coal = 0
-      world.furnace.oreAt = null
-      world.furnace.coalAt = null
     }),
     brick('furnace.smelt', 'smelt(): void', 'Smelt 2 ore into 1 ingot.', 'furnace.smelt()', action, ({ world }) => {
       noteSteel(world)
       const furnace = world.furnace
       if (furnace.readyAt !== null) return
       if (furnace.output >= outputCap) throw new Error(`furnace output is full (${outputCap}). Carry ingots to the depot.`)
-      if (furnace.input < site.recipe.ore) {
-        world.ledger.waste += site.recipe.fuel
-        return
-      }
+      if (furnace.input < site.recipe.ore) return
       furnace.input -= site.recipe.ore
       furnace.batch = 'ingot'
       furnace.readyAt = world.tick + (world.batchTicks ?? site.recipe.ticks)
@@ -81,10 +76,7 @@ export function smelting(site: Site): Brick[] {
       const furnace = world.furnace
       if (furnace.readyAt !== null) return
       if (furnace.steel >= outputCap) throw new Error(`furnace steel is full (${outputCap}). Carry steel to the depot.`)
-      if (furnace.input < site.recipe.ore || furnace.coal < 1) {
-        world.ledger.waste += site.recipe.fuel
-        return
-      }
+      if (furnace.input < site.recipe.ore || furnace.coal < 1) return
       furnace.input -= site.recipe.ore
       furnace.coal -= 1
       furnace.batch = 'steel'

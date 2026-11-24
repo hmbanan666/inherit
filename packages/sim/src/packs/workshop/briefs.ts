@@ -21,10 +21,10 @@ interface Brief {
 export const briefs: Record<ChallengeId, Brief> = {
   'dispatch-batch': {
     goal: "Dispatch the waiting batch",
-    steps: ["Move parcels from belt to cart until the belt is empty", "Press Run"],
+    steps: ["Move parcels from belt to cart until the belt is empty", "Press Try"],
     placeholder: "Write your transfer here",
     practice: "Writing a helper that tells its caller when the belt is empty",
-    condition: "Move the whole batch from the belt to the cart in one Run. Keep arrival order. Leave the arm empty and stop on the first empty pickup.",
+    condition: "Move the whole batch from the belt to the cart in one try. Keep arrival order. Leave the arm empty and stop on the first empty pickup.",
     examples: [
       "A,B,C → cart A,B,C",
       "Empty belt → empty cart after one pickup attempt.",
@@ -281,7 +281,7 @@ export const briefs: Record<ChallengeId, Brief> = {
     ],
     title: "Who calls my function?",
     body: [
-      "Run reads your file once, from the first line to the last.",
+      "Try reads your file once, from the first line to the last.",
       "Deploy reads it once to set things up. Then the floor clock calls onTick once each tick.",
       "Writing export lets the clock find your function. Lines inside its braces run again on each call.",
       "Watch onTick #1 become #2. Stop loop ends those calls.",

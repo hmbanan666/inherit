@@ -11,4 +11,5 @@ export default {
   estimatedMinutes: { min: 60, max: 180 },
   cover: 'cover.svg',
   showcaseNote: 'Choose a challenge',
+  tryOnce: 'Try',
 } satisfies PackManifest

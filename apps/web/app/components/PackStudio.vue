@@ -9,6 +9,7 @@ import { usePlaybackClock } from '../lib/playback-clock'
 import { useContrast } from '../lib/contrast'
 import { editorKey } from '../lib/editor'
 const props = defineProps<{manifest: PackManifest; view: Component}>()
+const tryOnce = computed(() => props.manifest.tryOnce ?? 'Run')
 const frame = shallowRef<PackFrame>()
 const displayWorld = shallowRef<unknown>()
 const calls = shallowRef<Call[]>([])
@@ -285,16 +286,16 @@ onBeforeUnmount(() => {
       </PackNav>
       <a v-if="complete" class="deploy primary-run" :href="manifest.next ? '?pack=' + manifest.next : '/?packs'">{{ manifest.next ? 'Next pack →' : 'Showcase' }}</a>
       <button v-else class="deploy primary-run" data-testid="primary-button" :data-ready="!!frame && !busy && currentStep === frame.steps.length - 1" :disabled="(busy && !frame?.save.clockActive) || blocked || !!solved" @click="run">
-        <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : 'Run' }} <kbd>Ctrl+Enter</kbd>
+        <Play />{{ frame?.save.clockActive ? 'Stop loop' : watching ? 'Playing your run' : frame?.mode === 'deploy' && setupTried ? 'Deploy' : tryOnce }} <kbd>Ctrl+Enter</kbd>
       </button>
     </template>
     <template #floor>
         <component :is="view" v-if="displayWorld" :world="displayWorld" :scene="frame?.scene" :inputs="frame?.inputs" :calls="calls" :next-call="nextCall" :reach="reach" />
         <div v-if="frame?.mode === 'deploy' && setupTried" class="world-controls">
           <PlaybackBar v-if="frame.save.clockActive || tickCount" :live="frame.save.clockActive" v-model:paused="paused" v-model:speed="speed" :inert="stoppingLoop" :tick-count="tickCount" @stop="stopLoop" />
-          <button v-if="(!frame.save.clockActive || paused || previewingTick) && !solved" :disabled="busy" @click="runOnce">{{ previewingTick ? 'Return to paused floor' : 'Run once' }}</button>
+          <button v-if="(!frame.save.clockActive || paused || previewingTick) && !solved" :disabled="busy" @click="runOnce">{{ previewingTick ? 'Return to paused floor' : tryOnce + ' once' }}</button>
         </div>
-        <SideDrawer v-if="drawer && frame" :tab="drawer"
+        <SideDrawer v-if="drawer && frame" :tab="drawer" :try-once="tryOnce"
           :clock="frame.mode === 'deploy'" :theory="frame.theory" :task="frame.task"
           :hints="frame.hints" :rung="frame.save.hints[frame.save.lessonId!] ?? 0" :entries="frame.reference" :types="frame.types"
           :busy="busy" :logs="frame.logs" @tab="drawer = $event" @close="closeDrawer()" @edit="closeDrawer(true)"
