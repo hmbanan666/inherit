@@ -102,6 +102,7 @@ export class FloorScene {
   private readonly ring: Graphics
   private readonly fire: Graphics
   private readonly ingot: Graphics
+  private readonly steelMark: Graphics
   private arrivals = 0
   private lastTick = -1
   private hover = ''
@@ -121,6 +122,9 @@ export class FloorScene {
     this.fire.ellipse(3, -22, 9, 2.6).fill(0xffdb80)
     this.ingot = smelter.addChild(materialArt('iron-ingot'))
     this.ingot.position.set(31, 18)
+    this.steelMark = smelter.addChild(materialArt('steel'))
+    this.steelMark.position.set(31, 18)
+    this.steelMark.visible = false
     this.ring = this.root.addChild(new Graphics())
     for (const drone of world.drones) this.placeHauler(drone)
   }
@@ -272,7 +276,9 @@ export class FloorScene {
     this.lastTick = world.tick
     this.arrivals = performance.now()
     this.fire.visible = world.furnace.readyAt !== null
-    this.ingot.visible = world.furnace.output > 0 || world.furnace.steel > 0
+    this.ingot.visible = world.furnace.output > 0
+    this.steelMark.visible = world.furnace.steel > 0
+    this.steelMark.position.set(world.furnace.output > 0 ? 46 : 31, 18)
     for (const [i, drone] of world.drones.entries()) {
       const item = this.haulers[i]!
       const pos = center(drone.pos)

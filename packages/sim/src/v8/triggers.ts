@@ -322,9 +322,17 @@ export interface InspectView {
   progress?: InspectProgress
 }
 
+function furnaceDetail(furnace: World['furnace']) {
+  const parts = [`${furnace.input} ore`]
+  if (furnace.coal > 0) parts.push(`${furnace.coal} coal`)
+  parts.push(`${furnace.output} ingots`)
+  if (furnace.steel > 0) parts.push(`${furnace.steel} steel`)
+  return parts.join(' · ')
+}
+
 export function machineList(world: World) {
   return [
-    { id: 'furnace', name: 'Furnace', detail: `${world.furnace.input} ore · ${world.furnace.output} ingots` },
+    { id: 'furnace', name: 'Furnace', detail: furnaceDetail(world.furnace) },
     { id: 'depot', name: 'Depot', detail: `${world.depot.ingots} ingots · ${world.depot.steel} steel` },
     ...world.drones.map(drone => ({
       id: drone.name,
@@ -359,6 +367,10 @@ function inspectFurnace(world: World, site: Site): InspectView {
   let progress: InspectProgress | undefined
   if (furnace.readyAt !== null) progress = bar(furnace.batch === 'steel' ? 'Alloying' : 'Smelting', span - (furnace.readyAt - world.tick), span)
   const alloy = functionUnlocked(world, 'furnace.alloy')
+  const ore = site.recipe.ore
+  const smelting = furnace.readyAt !== null
+  const canSmelt = !smelting && furnace.input >= ore
+  const canAlloy = alloy && !smelting && furnace.input >= ore && furnace.coal >= 1
   return {
     id: 'furnace',
     name: 'Furnace',
@@ -370,18 +382,27 @@ function inspectFurnace(world: World, site: Site): InspectView {
       { label: 'Steel', value: `${furnace.steel}/${outputCap}` },
     ],
     recipes: [
-      { id: 'ingot', input: `${site.recipe.ore} ore`, output: `${site.recipe.ingots} ingot` },
+      { id: 'ingot', input: `${ore} ore`, output: `${site.recipe.ingots} ingot` },
       {
         id: 'steel',
-        input: `${site.recipe.ore} ore + 1 coal`,
+        input: `${ore} ore + 1 coal`,
         output: '1 steel',
         locked: alloy ? undefined : 'Steel for the bridge unlocks furnace.alloy()',
       },
     ],
     actions: [
-      { id: 'smelt', label: 'Smelt', api: 'furnace.smelt()', enabled: furnace.readyAt === null },
-      { id: 'alloy', label: 'Alloy', api: 'furnace.alloy()', enabled: alloy && furnace.readyAt === null, reason: alloy ? undefined : 'Unlocks with Steel for the bridge' },
-      { id: 'collect', label: 'Collect', api: 'drone.pickup(furnace)', enabled: furnace.output > 0 || furnace.steel > 0, drone: 'drone-1', reason: 'The drone picks up at the furnace and unloads at the depot' },
+      {
+        id: 'smelt', label: 'Smelt', api: 'furnace.smelt()', enabled: canSmelt,
+        reason: smelting ? 'The furnace is smelting.' : canSmelt ? undefined : `Needs ${ore} ore`,
+      },
+      {
+        id: 'alloy', label: 'Alloy', api: 'furnace.alloy()', enabled: canAlloy,
+        reason: !alloy ? 'Unlocks with Steel for the bridge' : smelting ? 'The furnace is smelting.' : canAlloy ? undefined : `Needs ${ore} ore and 1 coal`,
+      },
+      {
+        id: 'collect', label: 'Collect', api: 'drone.pickup(furnace)', enabled: furnace.output > 0 || furnace.steel > 0,
+        drone: 'drone-1', reason: 'Collect with drone-1',
+      },
       { id: 'clear', label: 'Clear hopper', api: 'furnace.clear()', enabled: furnace.input > 0 || furnace.coal > 0, reason: 'Drops ore and coal. Ingots and steel stay' },
     ],
     progress,
@@ -404,14 +425,21 @@ function inspectDepot(world: World): InspectView {
   }
 }
 
+function taskLabel(task: World['drones'][number]['task']) {
+  if (task?.kind === 'mine') return 'Mining'
+  if (task?.kind === 'unload') return 'Unloading'
+  if (task?.kind === 'pickup') return 'Hauling'
+  return 'free'
+}
+
 function inspectDrone(world: World, drone: World['drones'][number]): InspectView {
   const task = drone.task
   let progress: InspectProgress | undefined
-  if (task?.kind === 'mine' && drone.dig) {
+  if (task?.kind === 'mine' && drone.dig && drone.dig.ticks > 0) {
     const vein = world.veins.find(item => item.name === drone.dig?.vein)
     if (vein) progress = bar('Mining', drone.dig.ticks, vein.ticksPerUnit)
-  } else if (task?.kind === 'unload') progress = bar('Unloading', 0, 1)
-  else if (task?.kind === 'pickup') progress = bar('Hauling', 0, 1)
+  }
+  const dest = drone.carrying === 'ingot' || drone.carrying === 'steel' ? 'depot' : 'furnace'
   return {
     id: drone.name,
     name: drone.name,
@@ -419,13 +447,16 @@ function inspectDrone(world: World, drone: World['drones'][number]): InspectView
     lines: [
       { label: 'Cargo', value: drone.carrying ?? 'empty' },
       { label: 'Load', value: `${drone.cargo}/${drone.capacity}` },
-      { label: 'Task', value: task?.kind ?? 'free' },
+      { label: 'Task', value: taskLabel(task) },
       { label: 'At', value: `${drone.pos.x},${drone.pos.y}` },
     ],
     recipes: [],
     actions: [
       { id: 'mine', label: 'Mine', api: 'drone.mine(vein)', enabled: true, drone: drone.name, reason: task?.kind === 'mine' ? 'Same vein keeps going. Another vein replaces it' : undefined },
-      { id: 'unload', label: 'Unload', api: 'drone.unload(station)', enabled: drone.cargo > 0, drone: drone.name },
+      {
+        id: 'unload', label: 'Unload', api: 'drone.unload(station)', enabled: drone.cargo > 0, drone: drone.name,
+        reason: drone.cargo > 0 ? `Unload at ${dest}` : undefined,
+      },
       { id: 'dump', label: 'Dump', api: 'drone.dump()', enabled: drone.cargo > 0 || !!task, drone: drone.name, reason: 'Drops ore and coal and cancels the task. Ingots and steel stay' },
     ],
     progress,

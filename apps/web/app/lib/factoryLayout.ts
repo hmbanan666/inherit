@@ -72,8 +72,29 @@ export function readPaneWidth(stored: string | null, min: number, max: number, f
   return Math.min(max, Math.max(min, Math.round(value)))
 }
 
-/** Drop a leading `main.ts:18 · ` the console already shows in its own column. */
-export function consoleBody(text: string) {
+/** Below this code width, Tests stacks under the editor. Saved splitter widths stay. */
+export const codeStackPx = 360
+
+/** The Deploy shortcut hides before API, Loop, and Deploy leave the header. */
+export const codeTightPx = 520
+
+/** The code column after the file tree and the checks pane take their widths. */
+export function codeColumnPx(bay: number, tree: number, checks: number) {
+  if (!Number.isFinite(bay) || bay <= 0) return 0
+  return Math.max(0, bay - Math.max(0, tree) - Math.max(0, checks))
+}
+
+export function stackCodeColumn(codePx: number) {
+  return codePx > 0 && codePx < codeStackPx
+}
+
+export function tightCodeColumn(codePx: number) {
+  return codePx > 0 && codePx < codeTightPx
+}
+
+/** Drop a leading `main.ts:18 · ` only when that place is already its own column. */
+export function consoleBody(text: string, located = false) {
+  if (!located) return text
   return text.replace(/^[\w./-]+\.ts:\d+ · /, '')
 }
 

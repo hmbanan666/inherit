@@ -3,6 +3,7 @@ import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
+import { buildingLabelHit } from '../lib/floorPick'
 import { inspectAt } from '@inherit/sim/v8'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean; selected?: string }>()
@@ -66,6 +67,11 @@ function pick(clientX: number, clientY: number) {
   if (!rect || scale.value === 0) return
   const px = (clientX - rect.left - camera.value.x) / scale.value
   const py = (clientY - rect.top - camera.value.y) / scale.value
+  const label = buildingLabelHit(px, py, tile, [
+    { id: 'depot', title: 'Depot', pos: props.world.depot.pos },
+    { id: 'furnace', title: 'Furnace', pos: props.world.furnace.pos },
+  ])
+  if (label) return label
   const drone = scene?.pickDrone(px, py)
   if (drone) return drone
   const x = Math.floor(px / tile)

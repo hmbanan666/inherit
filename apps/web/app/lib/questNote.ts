@@ -14,11 +14,22 @@ export function insertQuestNote(source: string, note: string, id: string, rememb
   return { source: source.length ? `${note}\n${source}` : `${note}\n`, remembered: next }
 }
 
-/** The quantity on the quest rail. One bar, named by the good. */
-export function quantityLabel(item: 'ingot' | 'steel', qty: number, shipped: number) {
-  const name = item === 'steel' ? 'Steel' : 'Ingots'
+/** The quantity on the quest rail. The count is what the villager has received. */
+export function quantityLabel(from: string, item: 'ingot' | 'steel', qty: number, shipped: number) {
+  const who = from.replace(/^Mayor /, '')
   const value = Math.min(shipped, qty)
-  return { text: `${name} ${value}/${qty}`, value, max: qty }
+  const good = item === 'steel' ? 'steel' : qty === 1 ? 'ingot' : 'ingots'
+  return { text: `Delivered to ${who} · ${value}/${qty} ${good}`, value, max: qty }
+}
+
+/** How finished goods leave the furnace. Shown on the need line. */
+export function deliveryNote(need: string) {
+  return `${need} Collect sends a drone from the furnace to the depot.`
+}
+
+/** The first test that is not passing. The footer uses it to open Tests. */
+export function firstOpenTest(rows: readonly { id: string; state: string }[]) {
+  return rows.find(row => row.state !== 'passing')?.id
 }
 
 /** One progress line. The delivery count is named by where the goods are handed over. */

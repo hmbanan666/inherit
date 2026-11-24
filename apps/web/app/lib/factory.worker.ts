@@ -1,6 +1,7 @@
 import { clearConsole, kettlewick, noteCheckReset, pressManual, pushConsole } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
+import { scriptFailure } from './hostNotice'
 
 let session: Awaited<ReturnType<typeof createSession>> | undefined
 let timer: ReturnType<typeof setInterval> | undefined
@@ -84,7 +85,8 @@ async function act(command: FactoryCommand) {
         publish()
       }
     } catch (error) {
-      self.postMessage({ error: error instanceof Error ? error.message : String(error) } satisfies FactoryFrame)
+      const failure = scriptFailure(error)
+      self.postMessage({ error: failure.text, file: failure.file, line: failure.line } satisfies FactoryFrame)
     }
   }
   schedule()
