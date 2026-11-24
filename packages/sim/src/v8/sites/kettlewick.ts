@@ -1,5 +1,6 @@
 import type { Site } from '../core/world'
 import { questList } from '../quests'
+import { smeltRecipe } from '../modules/stock'
 
 const depot = { x: 1, y: 1 }
 
@@ -16,7 +17,7 @@ export const kettlewick: Site = {
     { name: 'C', pos: { x: 10, y: 4 }, kind: 'ore', purity: 'rich', ticksPerUnit: 1, yield: 2, hidden: true },
   ],
   furnace: { pos: { x: 2, y: 1 }, input: 0, output: 0, oreMax: 6, coalMax: 3 },
-  recipe: { ore: 2, ingots: 1, ticks: 4 },
+  recipe: { ore: smeltRecipe.inputs[0]!.qty, ingots: smeltRecipe.qty, ticks: smeltRecipe.ticks },
   questList,
   credits: 300,
   tickMs: 500,

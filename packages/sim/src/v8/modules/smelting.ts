@@ -1,8 +1,9 @@
 import { brick, type Brick } from '../core/bricks'
 import type { Site, World } from '../core/world'
 import { functionUnlocked, questList, unlockError } from '../quests'
+import { alloyRecipe, ensureBin, furnaceFullMessage, furnaceOutputCap, furnaceRecipeType, release, releaseTransfer, smeltRecipe, startRecipe } from './stock'
 
-export const outputCap = 6
+export const outputCap = furnaceOutputCap
 
 const steelNote = 'smelt() makes ingots. Steel comes from furnace.alloy().'
 
@@ -21,15 +22,25 @@ function noteSteel(world: World) {
 
 export function finishBatch(world: World, site: Site) {
   if (world.furnace.readyAt !== world.tick) return
-  if (world.furnace.batch === 'steel') {
-    world.furnace.steel += 1
+  const steel = world.furnace.batch === 'steel'
+  const qty = steel ? alloyRecipe.qty : site.recipe.ingots
+  world.furnace.bin = ensureBin(world.furnace.bin)
+  release(world.furnace.bin.reservedIn, steel ? 'steel' : 'ingot', qty)
+  if (steel) {
+    world.furnace.steel += qty
     world.steelMade += 1
   } else {
-    world.furnace.output += site.recipe.ingots
+    world.furnace.output += qty
     world.ingotsMade += 1
   }
   world.furnace.batch = null
   world.furnace.readyAt = null
+}
+
+function beginFurnace(world: World, id: string) {
+  if (id === alloyRecipe.id && !functionUnlocked(world, 'furnace.alloy')) throw new Error(unlockError('furnace.alloy'))
+  const result = startRecipe(world, 'furnace', id)
+  if (result === 'full') throw new Error(furnaceFullMessage(id === alloyRecipe.id ? 'steel' : 'ingot'))
 }
 
 export function smelting(site: Site): Brick[] {
@@ -46,6 +57,7 @@ export function smelting(site: Site): Brick[] {
         get coalMax() { return api.furnace_coalMax() },
         smelt: api.furnace_smelt,
         alloy: api.furnace_alloy,
+        start: api.furnace_start,
         clear: api.furnace_clear
       })`,
     }),
@@ -58,29 +70,31 @@ export function smelting(site: Site): Brick[] {
     brick('furnace.coalMax', 'readonly coalMax: number', 'Coal the hopper can hold.', 'furnace.coalMax', read, ({ world }) => world.furnace.coalMax ?? 3),
     brick('furnace.steel', 'readonly steel: number', 'Steel waiting in the furnace.', 'furnace.steel', read, ({ world }) => world.furnace.steel),
     brick('furnace.clear', 'clear(): void', 'Drop ore and coal from the hopper. Ingots and steel stay.', 'furnace.clear()', action, ({ world }) => {
+      world.furnace.bin = ensureBin(world.furnace.bin)
+      for (const drone of world.drones) {
+        const task = drone.task
+        if (task?.kind === 'transfer' && task.from === 'furnace' && (task.item === 'ore' || task.item === 'coal')) {
+          releaseTransfer(world, drone)
+          drone.task = null
+          drone.route = undefined
+        }
+      }
       world.furnace.input = 0
       world.furnace.coal = 0
+      release(world.furnace.bin.reservedOut, 'ore', world.furnace.bin.reservedOut.ore ?? 0)
+      release(world.furnace.bin.reservedOut, 'coal', world.furnace.bin.reservedOut.coal ?? 0)
+      release(world.furnace.bin.reservedIn, 'ore', world.furnace.bin.reservedIn.ore ?? 0)
+      release(world.furnace.bin.reservedIn, 'coal', world.furnace.bin.reservedIn.coal ?? 0)
     }),
     brick('furnace.smelt', 'smelt(): void', 'Start smelting 2 ore into 1 ingot. The furnace finishes the batch on its own.', `// The hopper needs 2 ore. This starts one ingot.\nfurnace.smelt()`, action, ({ world }) => {
       noteSteel(world)
-      const furnace = world.furnace
-      if (furnace.readyAt !== null) return
-      if (furnace.output >= outputCap) throw new Error(`furnace output is full (${outputCap}). Carry ingots to the depot.`)
-      if (furnace.input < site.recipe.ore) return
-      furnace.input -= site.recipe.ore
-      furnace.batch = 'ingot'
-      furnace.readyAt = world.tick + (world.batchTicks ?? site.recipe.ticks)
+      beginFurnace(world, smeltRecipe.id)
     }),
     brick('furnace.alloy', 'alloy(): void', 'Start alloying 2 ore and 1 coal into 1 steel. The furnace finishes the batch on its own.', `// 2 ore and 1 coal in the hopper become 1 steel.\nfurnace.alloy()`, action, ({ world }) => {
-      if (!functionUnlocked(world, 'furnace.alloy')) throw new Error(unlockError('furnace.alloy'))
-      const furnace = world.furnace
-      if (furnace.readyAt !== null) return
-      if (furnace.steel >= outputCap) throw new Error(`furnace steel is full (${outputCap}). Carry steel to the depot.`)
-      if (furnace.input < site.recipe.ore || furnace.coal < 1) return
-      furnace.input -= site.recipe.ore
-      furnace.coal -= 1
-      furnace.batch = 'steel'
-      furnace.readyAt = world.tick + (world.batchTicks ?? site.recipe.ticks)
+      beginFurnace(world, alloyRecipe.id)
+    }),
+    brick('furnace.start', `start(recipe: ${furnaceRecipeType}): void`, 'Start a furnace batch. smelt() and alloy() call this. The furnace finishes it on its own.', `// Same batch as smelt().\nfurnace.start("smelt")`, action, ({ world }, id) => {
+      beginFurnace(world, String(id))
     }),
   ]
 }

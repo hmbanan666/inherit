@@ -154,7 +154,7 @@ export function readChecks(world: World, quest: QuestDef): CheckReading[] {
   })
 }
 
-export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'depot'>, x: number, y: number): { id: string; fields: string[]; dump?: string } | undefined {
+export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'depot' | 'press'>, x: number, y: number): { id: string; fields: string[]; dump?: string } | undefined {
   const drone = world.drones.find(item => item.pos.x === x && item.pos.y === y)
   if (drone) return {
     id: drone.name,
@@ -169,6 +169,10 @@ export function inspectAt(world: Pick<World, 'drones' | 'veins' | 'furnace' | 'd
   if (world.furnace.pos.x === x && world.furnace.pos.y === y) return {
     id: 'furnace',
     fields: [`pos ${world.furnace.pos.x},${world.furnace.pos.y}`, `input ${world.furnace.input}/${world.furnace.oreMax ?? 6}`, `coal ${world.furnace.coal}/${world.furnace.coalMax ?? 3}`],
+  }
+  if (world.press && world.press.pos.x === x && world.press.pos.y === y) return {
+    id: 'press',
+    fields: [`pos ${world.press.pos.x},${world.press.pos.y}`, `recipe ${world.press.recipe ?? 'idle'}`],
   }
   if (world.depot.pos.x === x && world.depot.pos.y === y) return {
     id: 'depot',

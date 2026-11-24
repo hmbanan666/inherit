@@ -1,6 +1,7 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
-import { pinLegacyTriggers, repairHarrow, syncQuest, syncSecondDrone, triggerUnlocked, type QuestDef } from '../quests'
+import { emptyBin, ensureBin, finishPress, type Bin, type Item, type Press, type StationId } from '../modules/stock'
+import { pinLegacyTriggers, repairHarrow, syncPress, syncQuest, syncSecondDrone, triggerUnlocked, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
 /** One machine command. The drone keeps it across ticks. `since` is the tick it was given. */
@@ -8,13 +9,14 @@ export type DroneTask =
   | { kind: 'mine'; vein: string; since: number }
   | { kind: 'unload'; at: 'furnace' | 'depot'; since: number }
   | { kind: 'pickup'; phase: 'fetch' | 'deliver'; since: number }
+  | { kind: 'transfer'; item: Item; from: StationId; to: StationId; qty: number; picked: number; delivered: number; phase: 'fetch' | 'deliver'; since: number }
 
 export interface Drone {
   name: string
   pos: Cell
   cargo: number
   capacity: number
-  carrying: 'ore' | 'coal' | 'ingot' | 'steel' | null
+  carrying: Item | null
   source: string
   route?: Cell[]
   /** Ticks spent on the current rock. Null when the drone is not mining. */
@@ -117,7 +119,10 @@ export function migrateWorld(world: World) {
   for (const order of world.orders ?? []) delete (order as { due?: number }).due
   delete (world as { holdTicks?: number }).holdTicks
   delete (world as { coalHold?: number }).coalHold
+  world.furnace.bin = ensureBin(world.furnace.bin)
+  world.depot.bin = ensureBin(world.depot.bin)
   syncSecondDrone(world)
+  syncPress(world)
   repairHarrow(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
@@ -135,7 +140,7 @@ export interface Site {
   grid: { width: number; height: number }
   drones: Drone[]
   veins: Vein[]
-  depot: { pos: Cell; ore: number; coal: number; ingots: number; steel: number }
+  depot: { pos: Cell; ore: number; coal: number; ingots: number; steel: number; bin?: Bin }
   furnace: { pos: Cell; input: number; output: number; oreMax: number; coalMax: number }
   recipe: { ore: number; ingots: number; ticks: number }
   questList?: QuestDef[]
@@ -176,13 +181,15 @@ export interface World {
   grid: Site['grid']
   drones: Drone[]
   veins: Vein[]
-  depot: Site['depot']
+  depot: Site['depot'] & { bin: Bin }
   orders: Order[]
   /** Sentences the village said when a request was paid. One line each, in order. */
   growth: string[]
   status: string
   ledger: { income: number }
-  furnace: Site['furnace'] & { readyAt: number | null; coal: number; steel: number; batch: 'ingot' | 'steel' | null }
+  furnace: Site['furnace'] & { readyAt: number | null; coal: number; steel: number; batch: 'ingot' | 'steel' | null; bin: Bin }
+  /** The press Odile installs. Null until that Hand over. */
+  press: Press | null
   cpu: { used: number; limit: number }
   memory: Record<string, unknown>
   messages: Message[]
@@ -239,8 +246,9 @@ export function createWorld(site: Site): World {
     tick: 0, seed: site.seed, credits: site.credits, grid: structuredClone(site.grid),
     drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null, task: null })),
     veins: site.veins.map(vein => settleVein(vein)),
-    depot: structuredClone(site.depot),
-    furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null },
+    depot: { ...structuredClone(site.depot), bin: emptyBin() },
+    furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null, bin: emptyBin() },
+    press: null,
     orders: [], growth: [], status: '',
     ledger: { income: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [],
@@ -255,6 +263,7 @@ export function createWorld(site: Site): World {
   world.depot.coal ??= 0
   world.depot.ingots ??= 0
   world.depot.steel ??= 0
+  world.depot.bin = ensureBin(world.depot.bin)
   world.signals = {
     output: world.furnace.output,
     ingotsMade: world.ingotsMade,
@@ -264,6 +273,7 @@ export function createWorld(site: Site): World {
     }])),
   }
   syncSecondDrone(world)
+  syncPress(world)
   world.status = site.questList ? syncQuest(world, site) : (world.growth.at(-1) ?? 'The village is quiet.')
   return world
 }
@@ -275,6 +285,7 @@ export function runTicks(world: World, site: Site, count: number, onTick: () => 
     const balance = world.credits
     world.tick++
     finishBatch(world, site)
+    finishPress(world)
     world.cpu.used = 0
     const { used, message } = onTick()
     world.cpu.used = used

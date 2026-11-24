@@ -2,6 +2,7 @@ import { brick, type Brick, type TickContext } from '../core/bricks'
 import { chargeCpu } from '../core/cpu'
 import { pushConsole, type Cell, type Drone, type Site, type Vein, type World } from '../core/world'
 import { functionUnlocked, unlockError } from '../quests'
+import { isItem, itemType, port, release, releaseTransfer, reserve, stationAt as stationIdAt, stationLabel } from './stock'
 
 export type OrderResult = 'started' | 'same' | 'full'
 
@@ -53,8 +54,7 @@ export function dumpCargo(world: World, name: string) {
     if (!rawCargo(held))
       throw new Error(`${d.name} carries ${held} ${d.cargo}/${d.capacity}. Only ore and coal can be dumped.`)
   }
-  d.task = null
-  d.route = undefined
+  clearTask(world, d)
   d.dig = null
   if (!d.cargo) return
   d.cargo = 0
@@ -63,8 +63,8 @@ export function dumpCargo(world: World, name: string) {
 }
 
 function stationAt(world: World, pos: Cell) {
-  if (distance(pos, world.furnace.pos) === 0) return 'Furnace'
-  if (distance(pos, world.depot.pos) === 0) return 'Depot'
+  const id = stationIdAt(world, pos)
+  if (id === 'furnace' || id === 'depot') return stationLabel[id]
 }
 
 function findPath({ world }: TickContext, from: unknown, to: unknown) {
@@ -99,13 +99,19 @@ function bindings(site: Site): Brick[] {
       get coal() { return api.depot_coal() },
       get ingots() { return api.depot_ingots() },
       get steel() { return api.depot_steel() },
+      count: api.depot_count,
     })`),
   ]
 }
 
-function clearTask(d: Drone) {
+function clearTask(world: World, d: Drone) {
+  releaseTransfer(world, d)
   d.task = null
   d.route = undefined
+}
+
+export function cancelDroneTask(world: World, drone: Drone) {
+  clearTask(world, drone)
 }
 
 /** Walk one cell toward target and stop `stopAt` cells away. The rest of the walk stays on `route` for the map. */
@@ -171,8 +177,7 @@ function unloadOnce(world: World, d: Drone, target: Cell) {
   if (!rawCargo(held)) {
     if (station !== 'Depot')
       throw new Error(`${who(d)}; cart holds ${held}. Unload ingots and steel at the depot.`)
-    if (held === 'steel') depot.steel += d.cargo
-    else depot.ingots += d.cargo
+    if (held) port(world, 'depot')?.add(held, d.cargo)
     d.cargo = 0
     d.carrying = null
     d.source = ''
@@ -199,18 +204,18 @@ function unloadOnce(world: World, d: Drone, target: Cell) {
 }
 
 function pickupOnce(world: World, d: Drone) {
-  const furnace = world.furnace
+  const furnace = port(world, 'furnace')
+  if (!furnace) throw new Error(`${who(d)}; the furnace has no ingots or steel.`)
   const kind = heldKind(d)
-  const want = furnace.output > 0 ? 'ingot' : furnace.steel > 0 ? 'steel' : null
+  const want = furnace.free('ingot') > 0 ? 'ingot' : furnace.free('steel') > 0 ? 'steel' : null
   if (!want) throw new Error(`${who(d)}; the furnace has no ingots or steel.`)
   if (kind && kind !== want)
     throw new Error(`${who(d)}; unload ${kind} first`)
   if (d.cargo >= d.capacity)
     throw new Error(`${who(d)}; cart is full (${d.cargo}/${d.capacity}).`)
   const room = d.capacity - d.cargo
-  const moved = Math.min(room, want === 'ingot' ? furnace.output : furnace.steel)
-  if (want === 'ingot') furnace.output -= moved
-  else furnace.steel -= moved
+  const moved = Math.min(room, furnace.free(want))
+  furnace.take(want, moved)
   d.cargo += moved
   d.carrying = want
   d.source = 'furnace'
@@ -225,15 +230,16 @@ export function orderMine(world: World, name: string, veinName: string, since: n
   if (d.cargo > 0 && held && !rawCargo(held))
     throw new Error(`${who(d)}; cart holds ${held}. Only ore and coal can be dumped.`)
   if (d.cargo >= d.capacity && held === vein.kind) {
-    if (d.task?.kind === 'mine') clearTask(d)
+    if (d.task?.kind === 'mine') clearTask(world, d)
     return 'full'
   }
   if (d.task?.kind === 'mine' && d.task.vein === vein.name) return 'same'
   if (d.dig && d.dig.vein !== vein.name) d.dig = null
+  releaseTransfer(world, d)
   d.task = { kind: 'mine', vein: vein.name, since }
   if (distance(d.pos, vein.pos) <= 1 && since >= world.tick) {
     digOnce(world, d, vein)
-    if (d.cargo >= d.capacity) clearTask(d)
+    if (d.cargo >= d.capacity) clearTask(world, d)
     else d.route = undefined
   }
   return 'started'
@@ -252,11 +258,12 @@ export function orderUnload(world: World, name: string, target: Cell, since: num
   const at = station === 'Furnace' ? 'furnace' : 'depot'
   if (d.task?.kind === 'unload' && d.task.at === at) return 'same'
   if (distance(d.pos, target) <= 1 && since >= world.tick) {
-    clearTask(d)
+    clearTask(world, d)
     unloadOnce(world, d, target)
     return 'started'
   }
   d.dig = null
+  releaseTransfer(world, d)
   d.task = { kind: 'unload', at, since }
   return 'started'
 }
@@ -264,21 +271,24 @@ export function orderUnload(world: World, name: string, target: Cell, since: num
 export function orderPickup(world: World, name: string, since: number): OrderResult {
   const d = drone(world, name)
   const held = heldKind(d)
-  if (d.cargo > 0 && held && rawCargo(held))
+  if (d.cargo > 0 && held && held !== 'ingot' && held !== 'steel')
     throw new Error(`${who(d)}; unload ${held} first`)
-  const finished = world.furnace.output > 0 || world.furnace.steel > 0
+  const hopper = port(world, 'furnace')
+  const finished = !!hopper && (hopper.free('ingot') > 0 || hopper.free('steel') > 0)
   if (!finished && held !== 'ingot' && held !== 'steel')
     throw new Error(`${who(d)}; the furnace has no ingots or steel.`)
   if (d.task?.kind === 'pickup') return 'same'
   const adjacent = distance(d.pos, world.furnace.pos) <= 1
   if (adjacent && since >= world.tick && finished && d.cargo < d.capacity) {
+    releaseTransfer(world, d)
     pickupOnce(world, d)
     d.dig = null
     if (d.cargo > 0) d.task = { kind: 'pickup', phase: 'deliver', since }
-    else clearTask(d)
+    else clearTask(world, d)
     return 'started'
   }
   d.dig = null
+  releaseTransfer(world, d)
   const phase = (held === 'ingot' || held === 'steel') && (!finished || d.cargo >= d.capacity) ? 'deliver' : 'fetch'
   d.task = { kind: 'pickup', phase, since }
   return 'started'
@@ -303,9 +313,10 @@ export function stepDroneTasks(world: World, site: Site, used: number) {
     try {
       if (task.kind === 'mine') stepMine(world, site, d, task.vein, spend)
       else if (task.kind === 'unload') stepUnload(world, site, d, task.at, spend)
-      else stepPickup(world, site, d, task, spend)
+      else if (task.kind === 'pickup') stepPickup(world, site, d, task, spend)
+      else stepTransfer(world, site, d, task, spend)
     } catch (error) {
-      clearTask(d)
+      clearTask(world, d)
       noteTask(world, error instanceof Error ? error.message : String(error))
     }
   }
@@ -315,7 +326,7 @@ export function stepDroneTasks(world: World, site: Site, used: number) {
 function stepMine(world: World, site: Site, d: Drone, veinName: string, spend: (cost: number) => boolean) {
   const vein = world.veins.find(item => item.name === veinName && !item.hidden)
   if (!vein) {
-    clearTask(d)
+    clearTask(world, d)
     noteTask(world, `${d.name} has no vein to mine.`)
     return
   }
@@ -326,18 +337,18 @@ function stepMine(world: World, site: Site, d: Drone, veinName: string, spend: (
   }
   const held = heldKind(d)
   if (d.cargo >= d.capacity && held === vein.kind) {
-    clearTask(d)
+    clearTask(world, d)
     return
   }
   if (!spend(site.costs.action)) return
   d.route = undefined
   digOnce(world, d, vein)
-  if (d.cargo >= d.capacity) clearTask(d)
+  if (d.cargo >= d.capacity) clearTask(world, d)
 }
 
 function stepUnload(world: World, site: Site, d: Drone, at: 'furnace' | 'depot', spend: (cost: number) => boolean) {
   if (!d.cargo) {
-    clearTask(d)
+    clearTask(world, d)
     return
   }
   const target = at === 'furnace' ? world.furnace.pos : world.depot.pos
@@ -348,7 +359,7 @@ function stepUnload(world: World, site: Site, d: Drone, at: 'furnace' | 'depot',
   }
   if (!spend(site.costs.action)) return
   unloadOnce(world, d, target)
-  clearTask(d)
+  clearTask(world, d)
 }
 
 function stepPickup(world: World, site: Site, d: Drone, task: Extract<NonNullable<Drone['task']>, { kind: 'pickup' }>, spend: (cost: number) => boolean) {
@@ -358,9 +369,10 @@ function stepPickup(world: World, site: Site, d: Drone, task: Extract<NonNullabl
       stepToward(d, world.furnace.pos, 1)
       return
     }
-    const finished = world.furnace.output > 0 || world.furnace.steel > 0
+    const hopper = port(world, 'furnace')
+    const finished = !!hopper && (hopper.free('ingot') > 0 || hopper.free('steel') > 0)
     if (!finished && d.cargo === 0) {
-      clearTask(d)
+      clearTask(world, d)
       noteTask(world, `${d.name} found no ingots or steel.`)
       return
     }
@@ -375,7 +387,7 @@ function stepPickup(world: World, site: Site, d: Drone, task: Extract<NonNullabl
     return
   }
   if (!d.cargo) {
-    clearTask(d)
+    clearTask(world, d)
     return
   }
   if (distance(d.pos, world.depot.pos) > 1) {
@@ -385,7 +397,100 @@ function stepPickup(world: World, site: Site, d: Drone, task: Extract<NonNullabl
   }
   if (!spend(site.costs.action)) return
   unloadOnce(world, d, world.depot.pos)
-  clearTask(d)
+  clearTask(world, d)
+}
+
+type TransferTask = Extract<NonNullable<Drone['task']>, { kind: 'transfer' }>
+
+function actTransfer(world: World, d: Drone, task: TransferTask, walk: boolean, spend?: (cost: number) => boolean, cost = 1) {
+  const place = task.phase === 'fetch' ? task.from : task.to
+  const view = port(world, place)
+  if (!view) {
+    clearTask(world, d)
+    noteTask(world, `${d.name} lost the ${stationLabel[place]}.`)
+    return
+  }
+  if (distance(d.pos, view.pos) > 1) {
+    if (!walk) return
+    if (spend && !spend(cost)) return
+    stepToward(d, view.pos, 1)
+    return
+  }
+  if (task.phase === 'fetch') {
+    const need = task.qty - task.picked
+    const room = d.capacity - d.cargo
+    if (need <= 0 || room <= 0) {
+      task.phase = 'deliver'
+      return
+    }
+    if (walk && spend && !spend(cost)) return
+    const reserved = view.bin.reservedOut[task.item] ?? 0
+    const moved = Math.min(need, room, view.get(task.item), reserved)
+    if (moved <= 0) throw new Error(`${who(d)}; ${stationLabel[place]} has no ${task.item} reserved.`)
+    view.set(task.item, view.get(task.item) - moved)
+    release(view.bin.reservedOut, task.item, moved)
+    d.cargo += moved
+    d.carrying = task.item
+    d.source = place
+    task.picked += moved
+    task.phase = 'deliver'
+    d.route = undefined
+    return
+  }
+  if (!d.cargo) {
+    if (task.picked >= task.qty) clearTask(world, d)
+    else task.phase = 'fetch'
+    return
+  }
+  if (walk && spend && !spend(cost)) return
+  const dropped = d.cargo
+  release(view.bin.reservedIn, task.item, dropped)
+  view.add(task.item, dropped)
+  task.delivered += dropped
+  d.cargo = 0
+  d.carrying = null
+  d.source = ''
+  d.route = undefined
+  if (task.delivered >= task.qty) clearTask(world, d)
+  else task.phase = 'fetch'
+}
+
+function stepTransfer(world: World, site: Site, d: Drone, task: TransferTask, spend: (cost: number) => boolean) {
+  actTransfer(world, d, task, true, spend, site.costs.action)
+}
+
+/** Reserve qty at `from` and space at `to`, then carry it. A new command releases both. */
+export function orderTransfer(world: World, name: string, item: unknown, from: Cell, to: Cell, qty: unknown, since: number): OrderResult {
+  const d = drone(world, name)
+  if (!isItem(item)) throw new Error(`${who(d)}; unknown good ${String(item)}.`)
+  if (typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1)
+    throw new Error(`${who(d)}; qty needs a whole number of goods.`)
+  const sourceId = stationIdAt(world, from)
+  const destId = stationIdAt(world, to)
+  if (!sourceId || !destId)
+    throw new Error(`${who(d)}; transfer runs between the depot, the furnace, and a machine.`)
+  if (sourceId === destId) throw new Error(`${who(d)}; transfer needs two stations.`)
+  if (d.task?.kind === 'transfer' && d.task.item === item && d.task.from === sourceId && d.task.to === destId && d.task.qty === qty)
+    return 'same'
+  const held = heldKind(d)
+  if (d.cargo > 0) throw new Error(`${who(d)}; unload ${held} first`)
+  const source = port(world, sourceId)
+  const dest = port(world, destId)
+  if (!source || !dest) throw new Error(`${who(d)}; ${stationLabel[sourceId === 'press' || destId === 'press' ? 'press' : sourceId]} is not installed.`)
+  const returning = d.task?.kind === 'transfer' && d.task.item === item && d.task.from === sourceId ? d.task.qty - d.task.picked : 0
+  const freeing = d.task?.kind === 'transfer' && d.task.item === item && d.task.to === destId ? d.task.qty - d.task.delivered : 0
+  const available = source.free(item) + returning
+  const space = Number.isFinite(dest.room(item)) ? dest.room(item) + freeing : dest.room(item)
+  if (available < qty) throw new Error(`${who(d)}; ${stationLabel[sourceId]} has ${available} ${item} free.`)
+  if (space < qty) throw new Error(`${who(d)}; ${stationLabel[destId]} has room for ${Math.max(0, space)} ${item}.`)
+  releaseTransfer(world, d)
+  reserve(source.bin.reservedOut, item, qty)
+  reserve(dest.bin.reservedIn, item, qty)
+  d.dig = null
+  const task: TransferTask = { kind: 'transfer', item, from: sourceId, to: destId, qty, picked: 0, delivered: 0, phase: 'fetch', since }
+  d.task = task
+  if (since >= world.tick) actTransfer(world, d, task, false)
+  return 'started'
 }
 
 export function mining(site: Site): Brick[] {
@@ -408,7 +513,7 @@ export function mining(site: Site): Brick[] {
     brick('drone.moveAlong', 'moveAlong(path: Cell[]): void', 'Walk one step along a saved route. Cancels the current task.',
       `// One cell along the path. The next call walks the next cell.\ndrone.moveAlong(memory.route)`, action, (ctx, name, path) => {
         const d = drone(ctx.world, name)
-        d.task = null
+        clearTask(ctx.world, d)
         d.dig = null
         if (!Array.isArray(path)) throw new Error(`${who(d)}; moveAlong path is not an array of cells.`)
         const index = path.findIndex(p => distance(cell(ctx.world, p), d.pos) === 0)
@@ -421,9 +526,9 @@ export function mining(site: Site): Brick[] {
         d.pos = pos
         d.route = cells.slice(index + 1)
       }),
-    brick('drone.cargoKind', "readonly cargoKind: 'ore' | 'coal' | 'ingot' | 'steel' | null", 'What the cart holds. ore, coal, ingot, steel, or null when cargo is 0.', 'drone.cargoKind', read, { guest: '' }),
+    brick('drone.cargoKind', `readonly cargoKind: ${itemType} | null`, 'What the cart holds. Null when cargo is 0.', 'drone.cargoKind', read, { guest: '' }),
     brick('drone.busy', 'readonly busy: boolean', 'True while the drone is carrying out a task.', 'drone.busy', read, { guest: '' }),
-    brick('drone.task', "readonly task: 'mine' | 'unload' | 'pickup' | null", 'mine, unload, pickup, or null when the drone is free.', 'drone.task', read, { guest: '' }),
+    brick('drone.task', "readonly task: 'mine' | 'unload' | 'pickup' | 'transfer' | null", 'mine, unload, pickup, transfer, or null when the drone is free.', 'drone.task', read, { guest: '' }),
     brick('drone.dump', 'dump(): void', 'Empty ore or coal onto the ground and cancel the task. Ingots and steel stay in the cart. An empty cart only cancels the task.', 'drone.dump()', action, ({ world }, name) => {
       dumpCargo(world, String(name))
     }),
@@ -442,6 +547,12 @@ export function mining(site: Site): Brick[] {
         if (distance(pos, ctx.world.furnace.pos) !== 0)
           throw new Error(`${who(d)}; pickup takes ingots or steel from the furnace.`)
         orderPickup(ctx.world, String(name), ctx.world.tick)
+      }),
+    brick('drone.transfer', `transfer(item: ${itemType}, from: Target, to: Target, qty: number): void`, 'Carry this many of one good from one station to another. Reserves the goods and the receiving space until the task ends.', `// Take 2 steel from the furnace to the press.\nif (!drone.busy) drone.transfer("steel", furnace, press, 2)`, action,
+      (ctx, name, item, from, packed) => {
+        // The guest call is limited to four host arguments, so the destination and qty travel together.
+        const spec = Array.isArray(packed) ? packed : []
+        orderTransfer(ctx.world, String(name), item, cell(ctx.world, from), cell(ctx.world, spec[0]), spec[1], ctx.world.tick)
       }),
   ]
 }
@@ -466,6 +577,7 @@ export function miningModule(bricks: Brick[]) {
           dump: () => api.drone_dump(name),
           unload: target => api.drone_unload(name, target.pos),
           pickup: target => api.drone_pickup(name, target.pos),
+          transfer: (item, from, to, qty) => api.drone_transfer(name, item, from && from.pos, to && [to.pos, qty]),
         })
       })
     }`].join('\n')

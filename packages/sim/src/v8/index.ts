@@ -1,8 +1,8 @@
 export * from './core/world'
 export * from './core/bricks'
-export { mining, miningModule, dumpCargo, stepDroneTasks } from './modules/mining'
+export { mining, miningModule, dumpCargo, stepDroneTasks, cancelDroneTask, orderTransfer } from './modules/mining'
 export { kettlewick, uncleMain } from './sites/kettlewick'
-export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, canTake, questHold, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, rewardGranted, rewardFresh, secondDroneUnlocked, syncSecondDrone, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
+export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, canTake, questHold, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, rewardGranted, rewardFresh, secondDroneUnlocked, syncSecondDrone, syncPress, worksGrants, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
 export { outputCap } from './modules/smelting'
 export {
   worksEvents, onApi, triggerDocs, pressManual, queueRun, stopScript, setLoop, grantLegacy, ensureTriggers, actManual, dueEvents, settleTriggers,
@@ -12,14 +12,17 @@ export {
 export { readChecks, inspectAt, noteCheckReset, stallTicks } from './checkFacts'
 export { apiBook, type ApiEntry, type ApiSection } from './apiBook'
 
+export type { Item } from './modules/stock'
+
 import type { Brick } from './core/bricks'
 import { mining, miningModule } from './modules/mining'
 import { orderBricks } from './modules/orders'
 import { smelting } from './modules/smelting'
+import { pressBricks } from './modules/stock'
 import type { Site } from './core/world'
 
 export function factoryBricks(site: Site) {
-  return [...mining(site), ...smelting(site), ...orderBricks(site)]
+  return [...mining(site), ...smelting(site), ...pressBricks(site), ...orderBricks(site)]
 }
 
 export function factoryModule(bricks: Brick[]) {

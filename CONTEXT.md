@@ -12,7 +12,9 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | Inherited code | A fresh world starts from `smeltOnce` in `kettlewick.files`. `uncleMain` is the old loop that mines and never comes home. Old saves can still be running it. |
 | Run | Calls one exported function once, on one tick. The function reads the works and gives commands. Handing over Bram's quest grants it. Stop ends player code. A drone task already given keeps going. |
 | Loop | Calls `onTick` every tick until Stop. Handing over Ines's quest grants it and turns it on. |
-| Depot delivery | A quest takes ingots and steel from the depot. The furnace holds them until a drone picks them up and unloads them there. `takeFromDepot` is the only path that counts them. |
+| Depot delivery | A quest counts goods only when they arrive at the depot. The furnace and the press hold them until a drone unloads them there. `takeFromDepot` is the only path that counts them. |
+| Press | The machine Odile installs on Hand over. It forms a grate, a plate, or a blank. See [ADR 0036](docs/adr/0036-region-1-fabrication-chain.md). |
+| Transfer | A drone task that carries one kind of goods from one station to another. It reserves the goods and the receiving space until it finishes or is cancelled. |
 | Tick | One step of the world, 0.5 s. While Loop is on, and no Run is in progress, `onTick` runs once per tick. The clock does not pause and has no speed control. |
 | CPU | A budget per tick, stored on the world as spent and limit. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it on every tick. CPU +10 in the shop raises the limit. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. A new one is granted by taking a quest. |

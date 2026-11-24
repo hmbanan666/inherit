@@ -3,7 +3,7 @@ import type { createSession } from '../packages/sandbox/src/v8'
 import { kettlewick, shop } from '../packages/sim/src/v8'
 
 export type Session = Awaited<ReturnType<typeof createSession>>
-export type Stage = 'manual' | 'run' | 'steel-loop' | 'two-drones'
+export type Stage = 'manual' | 'run' | 'steel-loop' | 'two-drones' | 'press-line'
 const source = (name: string) => readFileSync(new URL(`./players/${name}.ts`, import.meta.url), 'utf8')
 const helpers = { 'lib/haul.ts': source('haul') }
 export const players: Record<Stage, Record<string, string>> = {
@@ -11,6 +11,8 @@ export const players: Record<Stage, Record<string, string>> = {
   run: { 'main.ts': source('run') },
   'steel-loop': { 'main.ts': source('steel-loop'), ...helpers },
   'two-drones': { 'main.ts': source('two-drones'), ...helpers },
+  // Uses transfer and the press. The live quest programs stay until the quest retune.
+  'press-line': { 'main.ts': source('press-line') },
 }
 
 // Unlisted quests keep the deployed files. A proposed edit after the tutorial

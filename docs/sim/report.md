@@ -78,7 +78,7 @@ Each proposed edit gets a separate replay from Take with the same purchase polic
 
 | Tick | Minute | Event | Detail | Credits | XP | Level |
 |---:|---:|---|---|---:|---:|---:|
-| 0 | 0.00 | unlock | tick, memory, depot, cpu.used, cpu.limit, drones, veins, findPath, drone.isNear, drone.moveAlong, drone.cargoKind, drone.busy, drone.task, drone.dump, depot.ore, depot.coal, depot.ingots, depot.steel, drone.mine, drone.unload, drone.pickup, furnace, furnace.input, furnace.output, furnace.coal, furnace.inputMax, furnace.coalMax, furnace.steel, furnace.clear, furnace.smelt, credits, orders, Machine · furnace, Machine · depot, Machine · drone-1, Machine · Vein A, Machine · Vein B, Machine · Vein D, Shop · Bigger cart, Shop · Bigger hopper, Shop · Hotter furnace, Shop · CPU +10 | 300 | 0 | 1 |
+| 0 | 0.00 | unlock | tick, memory, depot, cpu.used, cpu.limit, drones, veins, findPath, drone.isNear, drone.moveAlong, drone.cargoKind, drone.busy, drone.task, drone.dump, depot.ore, depot.coal, depot.ingots, depot.steel, drone.mine, drone.unload, drone.pickup, drone.transfer, furnace, furnace.input, furnace.output, furnace.coal, furnace.inputMax, furnace.coalMax, furnace.steel, furnace.clear, furnace.smelt, furnace.start, depot.count, credits, orders, Machine · furnace, Machine · depot, Machine · drone-1, Machine · Vein A, Machine · Vein B, Machine · Vein D, Shop · Bigger cart, Shop · Bigger hopper, Shop · Hotter furnace, Shop · CPU +10 | 300 | 0 | 1 |
 | 0 | 0.00 | start | Horseshoes for the mail horse | 300 | 0 | 1 |
 | 0 | 0.00 | purchase | Bigger cart (−240) | 60 | 0 | 1 |
 | 47 | 0.39 | finish | Horseshoes for the mail horse | 140 | 20 | 2 |
@@ -91,7 +91,7 @@ Each proposed edit gets a separate replay from Take with the same purchase polic
 | 382 | 3.18 | unlock | furnace.alloy | 230 | 40 | 3 |
 | 382 | 3.18 | code change | run → steel-loop. Loop must fetch coal and alloy steel. | 230 | 40 | 3 |
 | 593 | 4.94 | finish | Steel for the bridge | 330 | 60 | 3 |
-| 593 | 4.94 | unlock | Machine · drone-2 | 330 | 60 | 3 |
+| 593 | 4.94 | unlock | press, press.installed, press.count, press.start, Machine · press, Machine · drone-2 | 330 | 60 | 3 |
 | 593 | 4.94 | start | A grate for the oven | 330 | 60 | 3 |
 | 593 | 4.94 | purchase | Bigger hopper (−280) | 50 | 60 | 3 |
 | 593 | 4.94 | code change | steel-loop → two-drones. Send the second cart for coal and depot deliveries. | 50 | 60 | 3 |

@@ -61,6 +61,9 @@ export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new S
   export interface Furnace extends Target {
 ${members('furnace.')}
   }
+  export interface Press extends Target {
+${members('press.')}
+  }
   export interface Depot extends Target {
 ${members('depot.')}
   }

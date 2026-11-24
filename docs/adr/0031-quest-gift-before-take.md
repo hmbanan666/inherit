@@ -1,6 +1,6 @@
 # A gift blocks the quest that needs it
 
-Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and [ADR 0024](0024-quest-rail-and-status.md). [ADR 0032](0032-rewards-on-hand-over.md) supersedes the save repair that grants drone-2 for being on a later quest. The drone is granted only by Odile's Hand over, or by a save that already bought it. A quest already taken still stays taken.
+Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and [ADR 0024](0024-quest-rail-and-status.md). [ADR 0032](0032-rewards-on-hand-over.md) supersedes the save repair that grants drone-2 for being on a later quest. The drone is granted only by Odile's Hand over, or by a save that already bought it. A quest already taken still stays taken. [ADR 0036](0036-region-1-fabrication-chain.md) installs the press on that same Hand over. Buying the drone does not install it.
 
 ## Context
 

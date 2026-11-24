@@ -20,6 +20,7 @@ export interface ApiSection {
 
 const groups: { id: string; title: string; match(name: string): boolean }[] = [
   { id: 'furnace', title: 'Furnace', match: name => name === 'furnace' || name.startsWith('furnace.') },
+  { id: 'press', title: 'Press', match: name => name === 'press' || name.startsWith('press.') },
   { id: 'drone', title: 'Drone', match: name => name === 'drones' || name.startsWith('drone.') },
   { id: 'depot', title: 'Depot', match: name => name === 'depot' || name.startsWith('depot.') },
   { id: 'veins', title: 'Veins', match: name => name === 'veins' || name === 'prospect' || name === 'findPath' },
@@ -33,6 +34,7 @@ function shownSignature(name: string, signature: string) {
 }
 
 function lockTitle(brick: string) {
+  if (brick === 'press' || brick.startsWith('press.')) return questList.find(quest => quest.install === 'press')?.title
   return questList.find(quest => quest.unlock?.brick === brick)?.title
 }
 
@@ -49,7 +51,9 @@ export function apiBook(bricks: readonly Brick[], world: Pick<World, 'questId' |
         doc: brick.doc,
         example: exampleText(brick.doc, brick.example),
         locked: functionUnlocked(world, brick.name) ? undefined : title,
-        fresh: freshBrick(world, brick.name),
+        fresh: brick.name === 'press' || brick.name.startsWith('press.')
+          ? rewardFresh(world, 'odile')
+          : freshBrick(world, brick.name),
       }
     })
     return { id: group.id, title: group.title, entries }

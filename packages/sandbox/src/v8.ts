@@ -1,4 +1,4 @@
-import { acceptQuest, actManual, buyUpgrade, completeQuest, createWorld, dueEvents, dumpCargo, factoryBricks, factoryModule, grantLegacy, migrateWorld, operationName, pressManual, pushConsole, queueRun, runTicks, setLoop, settleTriggers, stepDroneTasks, stopScript, triggerUnlocked, type ManualAction, type Site, type TickContext, type World } from '@inherit/sim/v8'
+import { acceptQuest, actManual, buyUpgrade, cancelDroneTask, completeQuest, createWorld, dueEvents, dumpCargo, factoryBricks, factoryModule, grantLegacy, migrateWorld, operationName, pressManual, pushConsole, queueRun, runTicks, setLoop, settleTriggers, stepDroneTasks, stopScript, triggerUnlocked, type ManualAction, type Site, type TickContext, type World } from '@inherit/sim/v8'
 import { createProgram, type JsonObject, type Program } from './index'
 import { PlayerRunError } from './plain-error'
 
@@ -35,10 +35,7 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
     files = nextFiles
     if (world.script) world.script.phase = 'start'
     if (replacing) {
-      for (const drone of world.drones) {
-        drone.task = null
-        drone.route = undefined
-      }
+      for (const drone of world.drones) cancelDroneTask(world, drone)
     }
   }
   await deploy(files)
