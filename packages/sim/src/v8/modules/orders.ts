@@ -1,11 +1,11 @@
 import { brick, type Brick } from '../core/bricks'
 import type { Site, World } from '../core/world'
-import { freeAt } from './stock'
+import { freeAt, port } from './stock'
 
 export interface Order {
   id: string
   at: number
-  item: 'ingot' | 'steel'
+  item: 'ingot' | 'steel' | 'ore' | 'grate'
   qty: number
   pay: number
   from: string
@@ -27,11 +27,11 @@ export function takeFromDepot(world: World, site: Site) {
   if (!site.questList || !world.questId) return
   const order = world.orders.find(item => item.id === world.questId && canTake(item))
   if (!order) return
-  const stock = freeAt(world, 'depot', order.item === 'steel' ? 'steel' : 'ingot')
+  if (order.item === 'ore') return
+  const stock = freeAt(world, 'depot', order.item)
   const amount = Math.min(order.qty - order.shipped, stock)
   if (amount <= 0) return
-  if (order.item === 'steel') world.depot.steel -= amount
-  else world.depot.ingots -= amount
+  port(world, 'depot')?.take(order.item, amount)
   order.shipped += amount
   if (order.shipped >= order.qty) order.status = 'ready'
 }

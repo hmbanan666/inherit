@@ -64,7 +64,7 @@ export function report(run: Run) {
     rows.push(`| ${entry.id} | ${entry.tick} | ${entry.credits} | ${entry.price} | ${entry.ratio.toFixed(2)}× |`)
 
   rows.push('', '## Previous program trials', '',
-    'Each proposed edit gets a separate replay from Take with the same purchase policy. Trial ticks are excluded from player time. Ines practices Run even when the manual player succeeds. After the tutorial, a successful previous program stays deployed.', '',
+    'Each proposed edit gets a separate replay from Take with the same purchase policy. Trial ticks are excluded from player time. A failed trial deploys the next program. A successful previous program stays deployed.', '',
     '| Quest | Previous program | Trial ticks | Checks still open |', '|---|---|---:|---|')
   for (const p of run.probes) rows.push(`| ${p.quest} | ${p.stage} | ${p.ticks} | ${p.remaining.join(' · ') || 'Cleared'} |`)
 

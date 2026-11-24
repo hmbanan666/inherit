@@ -1,6 +1,6 @@
 # Kettlewick balance report
 
-The reference player handed over 8 quests in **1461 ticks (12.18 minutes)** and finished with **570 credits, 165 XP, level 7**.
+The reference player handed over 8 quests in **1139 ticks (9.49 minutes)** and finished with **180 credits, 170 XP, level 7**.
 
 Each tick represents 500 ms on the [worker clock](../../apps/web/app/lib/factory.worker.ts), using [the site interval](../../packages/sim/src/v8/sites/kettlewick.ts). Actions are immediate. Reading, editing, and thinking time are outside the estimate.
 
@@ -8,18 +8,21 @@ Each tick represents 500 ms on the [worker clock](../../apps/web/app/lib/factory
 
 | Status | Check | Measurement | Reason on record |
 |---|---|---|---|
-| Expected failure | `milestone/harrow` | 4.76 min (ticks 688–1259), above 3 min. | After prospect opens on Take, deliveries fill the order without another milestone. |
-| Expected failure | `xp/tomas` | 5.42 min (ticks 688–1339), above 5 min. | Harrow pays no XP. Progress resumes when Tomas is paid. |
-| Expected failure | `duration/harrow` | 4.76 min, outside 0.15–4 min. | The long ingot order keeps the pair hauling past the quest duration target. |
-| Expected failure | `code/harrow` | Cleared with the unchanged two-drones program. | The hauler can fill the order from a visible vein without calling prospect(). |
-| Expected failure | `code/tomas` | Cleared with the unchanged two-drones program. | The pair already smelts and delivers ingots. |
-| Expected failure | `code/pell` | Cleared with the unchanged two-drones program. | The same smelting loop makes the required fresh ingots. |
-| Expected failure | `code/wen` | Cleared with the unchanged two-drones program. | Persistent machine tasks use no findPath calls and meet the path check unchanged. |
-| Expected failure | `shop/shortfall/furnace` | 300 credits / 580 price = 0.52× at tick 0 (target 1–2×). | The whole catalog opens on arrival. The starting purse cannot cover the hotter furnace. |
-| Expected failure | `shop/shortfall/cpu` | 300 credits / 700 price = 0.43× at tick 0 (target 1–2×). | CPU is listed on arrival above the starting balance. |
-| Expected failure | `shop/shortfall/cart+cpu+furnace+hopper` | 300 credits / 1800 price = 0.17× at tick 0 (target 1–2×). | The starting purse covers one of the four conveniences on simultaneous offer. |
-| Exempt | `code/bram` | Tutorial | Manual controls introduce mining, smelting and depot delivery. |
-| Exempt | `code/ines` | Tutorial | The tutorial practices Run. The same ingots can still be made by hand. |
+| Expected failure | `milestone/harrow` | 5.28 min (ticks 306–939), above 3 min. | After prospect opens on Take, deliveries fill the order without another milestone. |
+| Expected failure | `xp/harrow` | 5.28 min (ticks 306–939), above 5 min. | The 60 ingot order runs longer than the XP plateau bound. The pay lands at hand-over, so the wait is the job itself. Step 3 replaces this request. |
+| Expected failure | `duration/harrow` | 5.28 min, outside 0.15–4 min. | The long ingot order keeps the pair hauling past the quest duration target. |
+| Expected failure | `code/harrow` | Cleared with the unchanged grates program. | The hauler can fill the order from a visible vein without calling prospect(). |
+| Expected failure | `code/tomas` | Cleared with the unchanged grates program. | The pair already smelts and delivers ingots. |
+| Expected failure | `code/pell` | Cleared with the unchanged grates program. | The same smelting loop makes the required fresh ingots. |
+| Expected failure | `code/wen` | Cleared with the unchanged grates program. | Persistent machine tasks use no findPath calls and meet the path check unchanged. |
+| Expected failure | `shop/shortfall/cart` | 80 credits / 150 price = 0.53× at tick 0 (target 1–2×). | The four opening conveniences are listed above the starting purse. |
+| Expected failure | `shop/shortfall/hopper` | 80 credits / 240 price = 0.33× at tick 0 (target 1–2×). | The bigger hopper is listed on arrival above the starting purse. |
+| Expected failure | `shop/shortfall/furnace` | 80 credits / 350 price = 0.23× at tick 0 (target 1–2×). | The hotter furnace is listed on arrival above the starting purse. |
+| Expected failure | `shop/shortfall/cpu` | 80 credits / 580 price = 0.14× at tick 0 (target 1–2×). | CPU is listed on arrival above the starting purse. |
+| Expected failure | `shop/shortfall/cart+cpu+furnace+hopper` | 80 credits / 1320 price = 0.06× at tick 0 (target 1–2×). | The starting purse covers none of the four conveniences on simultaneous offer. |
+| Expected failure | `shop/shortfall/racks` | 110 credits / 450 price = 0.24× at tick 202 (target 1–2×). | Output racks open with the press, above the purse after Odile. |
+| Expected failure | `shop/shortfall/spare` | 110 credits / 720 price = 0.15× at tick 202 (target 1–2×). | The spare press opens with the press, above the purse after Odile. |
+| Expected failure | `shop/shortfall/racks+spare` | 110 credits / 1170 price = 0.09× at tick 202 (target 1–2×). | Racks and the spare press open together, above the purse after Odile. |
 
 ## Quests
 
@@ -27,98 +30,103 @@ Balances at Take precede any purchase for that quest. Hand-over includes its rew
 
 | Quest | Take tick (min) | Hand-over tick (min) | Duration (min) | Credits | XP | Level | Program | Longest idle (ticks) |
 |---|---:|---:|---:|---:|---:|---:|---|---|
-| bram | 0 (0.00) | 47 (0.39) | 0.39 | 300 → 140 | 20 | 2 | manual | 0–34 |
-| ines | 47 (0.39) | 382 (3.18) | 2.79 | 140 → 230 | 40 | 3 | run | 47–88 |
-| odile | 382 (3.18) | 593 (4.94) | 1.76 | 230 → 330 | 60 | 3 | steel-loop | 441–500 |
-| elsie | 593 (4.94) | 688 (5.73) | 0.79 | 330 → 190 | 85 | 4 | two-drones | 621–674 |
-| harrow | 688 (5.73) | 1259 (10.49) | 4.76 | 190 → 270 | 85 | 4 | two-drones | 759–779 |
-| tomas | 1259 (10.49) | 1339 (11.16) | 0.67 | 270 → 370 | 110 | 5 | two-drones | 1309–1329 |
-| pell | 1339 (11.16) | 1384 (11.53) | 0.38 | 370 → 450 | 135 | 6 | two-drones | 1359–1379 |
-| wen | 1384 (11.53) | 1461 (12.18) | 0.64 | 450 → 570 | 165 | 7 | two-drones | 1392–1452 |
+| bram | 0 (0.00) | 32 (0.27) | 0.27 | 80 → 120 | 10 | 2 | run | 0–24 |
+| ines | 32 (0.27) | 55 (0.46) | 0.19 | 120 → 180 | 20 | 3 | survey | 32–55 |
+| odile | 55 (0.46) | 202 (1.68) | 1.23 | 180 → 110 | 40 | 4 | steel-loop | 55–106 |
+| elsie | 202 (1.68) | 306 (2.55) | 0.87 | 110 → 210 | 60 | 4 | grates | 202–295 |
+| harrow | 306 (2.55) | 939 (7.83) | 5.28 | 210 → 320 | 85 | 5 | grates | 322–375 |
+| tomas | 939 (7.83) | 1025 (8.54) | 0.72 | 320 → 450 | 110 | 5 | grates | 957–975 |
+| pell | 1025 (8.54) | 1053 (8.78) | 0.23 | 450 → 250 | 140 | 6 | grates | 1037–1048 |
+| wen | 1053 (8.78) | 1139 (9.49) | 0.72 | 250 → 180 | 170 | 7 | grates | 1083–1139 |
 
-Longest gap between unlocks, quest boundaries, or edits was 4.76 min (ticks 688–1259). Including quest progress, the longest idle stretch was 0.50 min (ticks 1392–1452) on wen. The longest XP/level plateau was 5.42 min (ticks 688–1339).
+Longest gap between unlocks, quest boundaries, or edits was 5.28 min (ticks 306–939). Including quest progress, the longest idle stretch was 0.78 min (ticks 202–295) on elsie. The longest XP/level plateau was 5.28 min (ticks 306–939).
 
 ## Quest timeline and balances at hand-over
 
-The time column spans 0–12.18 minutes. Credit bars share a scale. Each level block represents one level.
+The time column spans 0–9.49 minutes. Credit bars share a scale. Each level block represents one level.
 
 ```text
 Quest     Time along run                    Credits at hand-over       Level
-bram      ━                                 ████             140   ██ 2
-ines       ━━━━━━━                          ██████           230   ███ 3
-odile             ━━━━━                     █████████        330   ███ 3
-elsie                  ━━                   █████            190   ████ 4
-harrow                   ━━━━━━━━━━━━━      ████████         270   ████ 4
-tomas                                 ━     ██████████       370   █████ 5
-pell                                   ━    █████████████    450   ██████ 6
-wen                                     ━━  ████████████████ 570   ███████ 7
+bram      ━                                 ████             120   ██ 2
+ines       ━                                ██████           180   ███ 3
+odile       ━━━━                            ████             110   ████ 4
+elsie           ━━━                         ███████          210   ████ 4
+harrow             ━━━━━━━━━━━━━━━━━        ███████████      320   █████ 5
+tomas                               ━━━     ████████████████ 450   █████ 5
+pell                                   ━    █████████        250   ██████ 6
+wen                                     ━━  ██████           180   ███████ 7
 ```
 
 ## Shop on first listing
 
 | Item | Tick | Credits before spending | Price | Purse / price |
 |---|---:|---:|---:|---:|
-| cart | 0 | 300 | 240 | 1.25× |
-| hopper | 0 | 300 | 280 | 1.07× |
-| furnace | 0 | 300 | 580 | 0.52× |
-| cpu | 0 | 300 | 700 | 0.43× |
-| cart+cpu+furnace+hopper | 0 | 300 | 1800 | 0.17× |
+| cart | 0 | 80 | 150 | 0.53× |
+| hopper | 0 | 80 | 240 | 0.33× |
+| furnace | 0 | 80 | 350 | 0.23× |
+| cpu | 0 | 80 | 580 | 0.14× |
+| cart+cpu+furnace+hopper | 0 | 80 | 1320 | 0.06× |
+| racks | 202 | 110 | 450 | 0.24× |
+| spare | 202 | 110 | 720 | 0.15× |
+| racks+spare | 202 | 110 | 1170 | 0.09× |
 
 ## Previous program trials
 
-Each proposed edit gets a separate replay from Take with the same purchase policy. Trial ticks are excluded from player time. Ines practices Run even when the manual player succeeds. After the tutorial, a successful previous program stays deployed.
+Each proposed edit gets a separate replay from Take with the same purchase policy. Trial ticks are excluded from player time. A failed trial deploys the next program. A successful previous program stays deployed.
 
 | Quest | Previous program | Trial ticks | Checks still open |
 |---|---|---:|---|
-| ines | manual | 335 | Cleared |
-| odile | run | 960 | Coal reaches the furnace · The furnace makes steel · Odile receives 4 steel |
-| elsie | steel-loop | 960 | drone-2 leaves the depot |
+| bram | manual | 960 | smeltOnce starts a batch · Bram receives 1 ingot |
+| ines | run | 960 | Vein D ore reaches the depot · Ines receives 3 ore from vein D |
+| odile | survey | 960 | Coal reaches the furnace · The furnace makes steel · Odile receives 2 steel |
+| elsie | steel-loop | 960 | Each cart hauls steel or a grate · Elsie receives 2 grates |
 
 ## Event ledger
 
 | Tick | Minute | Event | Detail | Credits | XP | Level |
 |---:|---:|---|---|---:|---:|---:|
-| 0 | 0.00 | unlock | tick, memory, depot, cpu.used, cpu.limit, drones, veins, findPath, drone.isNear, drone.moveAlong, drone.cargoKind, drone.busy, drone.task, drone.dump, depot.ore, depot.coal, depot.ingots, depot.steel, drone.mine, drone.unload, drone.pickup, drone.transfer, furnace, furnace.input, furnace.output, furnace.coal, furnace.inputMax, furnace.coalMax, furnace.steel, furnace.clear, furnace.smelt, furnace.start, depot.count, credits, orders, Machine · furnace, Machine · depot, Machine · drone-1, Machine · Vein A, Machine · Vein B, Machine · Vein D, Shop · Bigger cart, Shop · Bigger hopper, Shop · Hotter furnace, Shop · CPU +10 | 300 | 0 | 1 |
-| 0 | 0.00 | start | Horseshoes for the mail horse | 300 | 0 | 1 |
-| 0 | 0.00 | purchase | Bigger cart (−240) | 60 | 0 | 1 |
-| 47 | 0.39 | finish | Horseshoes for the mail horse | 140 | 20 | 2 |
-| 47 | 0.39 | unlock | Run | 140 | 20 | 2 |
-| 47 | 0.39 | start | Ingots for the storehouse | 140 | 20 | 2 |
-| 47 | 0.39 | code change | manual → run. Use the newly earned Run to fire the furnace. | 140 | 20 | 2 |
-| 382 | 3.18 | finish | Ingots for the storehouse | 230 | 40 | 3 |
-| 382 | 3.18 | unlock | Loop | 230 | 40 | 3 |
-| 382 | 3.18 | start | Steel for the bridge | 230 | 40 | 3 |
-| 382 | 3.18 | unlock | furnace.alloy | 230 | 40 | 3 |
-| 382 | 3.18 | code change | run → steel-loop. Loop must fetch coal and alloy steel. | 230 | 40 | 3 |
-| 593 | 4.94 | finish | Steel for the bridge | 330 | 60 | 3 |
-| 593 | 4.94 | unlock | press, press.installed, press.count, press.start, Machine · press, Machine · drone-2 | 330 | 60 | 3 |
-| 593 | 4.94 | start | A grate for the oven | 330 | 60 | 3 |
-| 593 | 4.94 | purchase | Bigger hopper (−280) | 50 | 60 | 3 |
-| 593 | 4.94 | code change | steel-loop → two-drones. Send the second cart for coal and depot deliveries. | 50 | 60 | 3 |
-| 688 | 5.73 | finish | A grate for the oven | 190 | 85 | 4 |
-| 688 | 5.73 | unlock | on | 190 | 85 | 4 |
-| 688 | 5.73 | start | Iron from the hill | 190 | 85 | 4 |
-| 688 | 5.73 | unlock | prospect | 190 | 85 | 4 |
-| 1259 | 10.49 | finish | Iron from the hill | 270 | 85 | 4 |
-| 1259 | 10.49 | start | Iron for the mill wheel | 270 | 85 | 4 |
-| 1339 | 11.16 | finish | Iron for the mill wheel | 370 | 110 | 5 |
-| 1339 | 11.16 | start | Hinges for the barrels | 370 | 110 | 5 |
-| 1384 | 11.53 | finish | Hinges for the barrels | 450 | 135 | 6 |
-| 1384 | 11.53 | start | Steel for the lamps | 450 | 135 | 6 |
-| 1461 | 12.18 | finish | Steel for the lamps | 570 | 165 | 7 |
+| 0 | 0.00 | unlock | tick, memory, depot, cpu.used, cpu.limit, drones, veins, findPath, drone.isNear, drone.moveAlong, drone.cargoKind, drone.busy, drone.task, drone.dump, depot.ore, depot.coal, depot.ingots, depot.steel, drone.mine, drone.unload, drone.pickup, drone.transfer, furnace, furnace.input, furnace.output, furnace.coal, furnace.inputMax, furnace.coalMax, furnace.steel, furnace.clear, furnace.smelt, furnace.start, depot.count, credits, orders, Run, Machine · furnace, Machine · depot, Machine · drone-1, Machine · Vein A, Machine · Vein B, Machine · Vein D, Shop · Bigger cart, Shop · Bigger hopper, Shop · Hotter furnace, Shop · CPU +10 | 80 | 0 | 1 |
+| 0 | 0.00 | start | Horseshoes for the mail horse | 80 | 0 | 1 |
+| 0 | 0.00 | code change | manual → run. smeltOnce starts the batch. Buttons may fill the hopper and haul. | 80 | 0 | 1 |
+| 32 | 0.27 | finish | Horseshoes for the mail horse | 120 | 10 | 2 |
+| 32 | 0.27 | start | Ore from the normal cut | 120 | 10 | 2 |
+| 32 | 0.27 | code change | run → survey. Mine vein D and unload that ore at the depot. | 120 | 10 | 2 |
+| 55 | 0.46 | finish | Ore from the normal cut | 180 | 20 | 3 |
+| 55 | 0.46 | unlock | Loop | 180 | 20 | 3 |
+| 55 | 0.46 | start | Steel for the bridge | 180 | 20 | 3 |
+| 55 | 0.46 | unlock | furnace.alloy | 180 | 20 | 3 |
+| 55 | 0.46 | purchase | Bigger cart (−150) | 30 | 20 | 3 |
+| 55 | 0.46 | code change | survey → steel-loop. Loop fetches coal and alloys steel. | 30 | 20 | 3 |
+| 202 | 1.68 | finish | Steel for the bridge | 110 | 40 | 4 |
+| 202 | 1.68 | unlock | press, press.installed, press.count, press.start, Machine · press, Machine · drone-2, Shop · Output racks, Shop · Spare press | 110 | 40 | 4 |
+| 202 | 1.68 | start | A grate for the oven | 110 | 40 | 4 |
+| 202 | 1.68 | code change | steel-loop → grates. Each cart hauls steel to the press or a grate to the depot. | 110 | 40 | 4 |
+| 306 | 2.55 | finish | A grate for the oven | 210 | 60 | 4 |
+| 306 | 2.55 | unlock | on | 210 | 60 | 4 |
+| 306 | 2.55 | start | Iron from the hill | 210 | 60 | 4 |
+| 306 | 2.55 | unlock | prospect | 210 | 60 | 4 |
+| 939 | 7.83 | finish | Iron from the hill | 320 | 85 | 5 |
+| 939 | 7.83 | start | Iron for the mill wheel | 320 | 85 | 5 |
+| 1025 | 8.54 | finish | Iron for the mill wheel | 450 | 110 | 5 |
+| 1025 | 8.54 | start | Hinges for the barrels | 450 | 110 | 5 |
+| 1025 | 8.54 | purchase | Hotter furnace (−350) | 100 | 110 | 5 |
+| 1053 | 8.78 | finish | Hinges for the barrels | 250 | 140 | 6 |
+| 1053 | 8.78 | start | Steel for the lamps | 250 | 140 | 6 |
+| 1053 | 8.78 | purchase | Bigger hopper (−240) | 10 | 140 | 6 |
+| 1139 | 9.49 | finish | Steel for the lamps | 180 | 170 | 7 |
 
 <details>
 <summary>All intervals between quest progress or milestones</summary>
 
 | Quest | Tick ranges |
 |---|---|
-| bram | 0–34, 34–39, 39–42, 42–47 |
-| ines | 47–88, 88–93, 93–99, 99–140, 140–145, 145–186, 186–191, 191–197, 197–238, 238–243, 243–284, 284–289, 289–295, 295–336, 336–341, 341–382 |
-| odile | 382–433, 433–438, 438–441, 441–500, 500–534, 534–593 |
-| elsie | 593–597, 597–602, 602–621, 621–674, 674–678, 678–683, 683–688 |
-| harrow | 688–689, 689–697, 697–702, 702–707, 707–712, 712–729, 729–734, 734–739, 739–754, 754–759, 759–779, 779–784, 784–789, 789–804, 804–809, 809–829, 829–834, 834–839, 839–854, 854–859, 859–879, 879–884, 884–889, 889–904, 904–909, 909–929, 929–934, 934–939, 939–954, 954–959, 959–979, 979–984, 984–989, 989–1004, 1004–1009, 1009–1029, 1029–1034, 1034–1039, 1039–1054, 1054–1059, 1059–1079, 1079–1084, 1084–1089, 1089–1104, 1104–1109, 1109–1129, 1129–1134, 1134–1139, 1139–1154, 1154–1159, 1159–1179, 1179–1184, 1184–1189, 1189–1204, 1204–1209, 1209–1229, 1229–1234, 1234–1239, 1239–1254, 1254–1259 |
-| tomas | 1259–1278, 1278–1279, 1279–1284, 1284–1289, 1289–1304, 1304–1309, 1309–1329, 1329–1334, 1334–1339 |
-| pell | 1339–1353, 1353–1354, 1354–1359, 1359–1379, 1379–1384 |
-| wen | 1384–1385, 1385–1392, 1392–1452, 1452–1456, 1456–1461 |
+| bram | 0–24, 24–25, 25–32 |
+| ines | 32–55 |
+| odile | 55–106, 106–140, 140–168, 168–202 |
+| elsie | 202–295, 295–306 |
+| harrow | 306–315, 315–322, 322–375, 375–382, 382–389, 389–400, 400–407, 407–425, 425–432, 432–439, 439–450, 450–457, 457–475, 475–482, 482–489, 489–500, 500–507, 507–525, 525–532, 532–539, 539–550, 550–557, 557–575, 575–582, 582–589, 589–600, 600–607, 607–625, 625–632, 632–639, 639–650, 650–657, 657–675, 675–682, 682–689, 689–700, 700–707, 707–725, 725–732, 732–739, 739–750, 750–757, 757–775, 775–782, 782–789, 789–800, 800–807, 807–825, 825–832, 832–839, 839–850, 850–857, 857–875, 875–882, 882–889, 889–900, 900–907, 907–925, 925–932, 932–939 |
+| tomas | 939–946, 946–950, 950–957, 957–975, 975–982, 982–989, 989–1000, 1000–1007, 1007–1025 |
+| pell | 1025–1028, 1028–1032, 1032–1037, 1037–1048, 1048–1053 |
+| wen | 1053–1061, 1061–1073, 1073–1078, 1078–1083, 1083–1139 |
 
 </details>

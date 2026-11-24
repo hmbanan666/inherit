@@ -1,7 +1,7 @@
 import { createSession } from '../packages/sandbox/src/v8'
 import {
   canTake, factoryBricks, functionUnlocked, kettlewick, machineList, nextQuest, noteCheckReset,
-  questList, shop, triggerDocs, triggerUnlocked, type World,
+  questList, shopFor, triggerDocs, triggerUnlocked, type World,
 } from '../packages/sim/src/v8'
 import { balance } from './config'
 import { act, buyForGoal, edits, players, type Stage } from './policy'
@@ -37,7 +37,7 @@ function capabilities(world: World) {
     ...bricks.filter(b => functionUnlocked(world, b.name)).map(b => ({ detail: b.name })),
     ...triggerDocs.filter(t => triggerUnlocked(world, t.id)).map(t => ({ detail: t.name })),
     ...machineList(world).map(machine => ({ detail: 'Machine · ' + machine.id })),
-    ...shop.map(item => ({ detail: 'Shop · ' + item.name, listing: { id: item.id, price: item.price } })),
+    ...shopFor(world).map(item => ({ detail: 'Shop · ' + item.name, listing: { id: item.id, price: item.price } })),
   ]
 }
 

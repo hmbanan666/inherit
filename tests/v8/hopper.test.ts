@@ -41,6 +41,7 @@ test('Bigger hopper raises both caps and the depot stays unlimited', async () =>
   try {
     expect(session.world.furnace.oreMax).toBe(6)
     expect(session.world.furnace.coalMax).toBe(3)
+    session.world.credits = 1000
     const credits = session.world.credits
     expect(session.buy('hopper')).toBe(true)
     expect(session.world.furnace.oreMax).toBe(12)

@@ -22,6 +22,7 @@ test('Elsie stays listed until Odile hands over drone-2, and an open Elsie save 
 
   world.questId = undefined
   world.cleared = ['bram', 'ines', 'odile']
+  world.level = 4
   const saved = migrateWorld(structuredClone(world))
   expect(saved.drones.map(drone => drone.name)).toContain('drone-2')
   expect(questHold(saved, elsie)).toBeUndefined()
@@ -102,10 +103,10 @@ test('an old save keeps drone-2 only after Odile or a bought drone', () => {
 })
 
 test('level span uses the same steps as the quest chain', () => {
-  expect(levelSpan(0)).toEqual({ level: 1, start: 0, next: 20 })
-  expect(levelSpan(20)).toEqual({ level: 2, start: 20, next: 40 })
-  expect(levelSpan(144)).toEqual({ level: 6, start: 115, next: 145 })
-  expect(levelSpan(145)).toEqual({ level: 7, start: 145, next: null })
+  expect(levelSpan(0)).toEqual({ level: 1, start: 0, next: 10 })
+  expect(levelSpan(10)).toEqual({ level: 2, start: 10, next: 20 })
+  expect(levelSpan(139)).toEqual({ level: 5, start: 85, next: 140 })
+  expect(levelSpan(170)).toEqual({ level: 7, start: 170, next: null })
 })
 
 const haul = `import { drones, veins, furnace, depot, orders, findPath } from "inherit"
@@ -140,6 +141,44 @@ export function onTick() {
 
 const ingots = haul.replace('if (order && order.shipped >= 2) return', '')
 
+const survey = `import { drones, veins, depot } from "inherit"
+export function onTick() {
+  const cart = drones()[0]
+  if (!cart || cart.busy) return
+  if (cart.cargo) { cart.unload(depot); return }
+  const vein = veins().find(item => item.name === "D")
+  if (vein) cart.mine(vein)
+}`
+
+const grates = `import { drones, veins, furnace, press, depot } from "inherit"
+export function onTick() {
+  if (!press.installed) return
+  if (press.count("grate") < 2) press.start("grate")
+  if (!furnace.steel) furnace.start("alloy")
+  const [feeder, hauler] = drones()
+  const ore = veins().find(vein => vein.kind === "ore")
+  const coal = veins().find(vein => vein.kind === "coal")
+  for (const [cart, role] of [[feeder, "steel"], [hauler, "grate"]]) {
+    if (!cart || cart.busy) continue
+    if (cart.cargo) {
+      const raw = cart.cargoKind === "ore" || cart.cargoKind === "coal"
+      cart.unload(raw ? furnace : depot)
+      continue
+    }
+    if (role === "grate" && press.count("grate") > 0) {
+      cart.transfer("grate", press, depot, 1)
+      continue
+    }
+    if (role === "steel" && furnace.steel > 0 && press.count("steel") < 2) {
+      cart.transfer("steel", furnace, press, Math.min(furnace.steel, 2, cart.capacity))
+      continue
+    }
+    const vein = role === "steel" && furnace.coal < 1 ? coal : ore
+    if (!vein) continue
+    cart.mine(vein)
+  }
+}`
+
 const bring = `function bringHome(drone) {
   const kind = drone.cargoKind
   if (kind === "ingot" || kind === "steel") {
@@ -170,30 +209,6 @@ ${bring}export function onTick() {
   if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
   else if (home) drone.unload(furnace)
   else drone.mine(vein)
-  if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
-}`
-
-const pair = `import { drones, veins, furnace, depot, findPath } from "inherit"
-${bring}export function onTick() {
-  const ore = veins().find(vein => vein.kind === "ore")
-  const coal = veins().find(vein => vein.kind === "coal")
-  for (const drone of drones()) {
-    if (bringHome(drone)) continue
-    const vein = drone.name === "drone-2" ? coal : ore
-    if (!vein) continue
-    if (drone.cargo > 0 && drone.carrying && drone.carrying !== vein.kind) {
-      if (drone.isNear(furnace)) drone.unload(furnace)
-      else drone.moveAlong(findPath(drone.pos, furnace.pos))
-      continue
-    }
-    const home = drone.cargo >= drone.capacity
-    const target = home ? furnace : vein
-    if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
-    else if (home) {
-      const room = vein.kind === "coal" ? furnace.coalMax - furnace.coal : furnace.inputMax - furnace.input
-      if (room > 0) drone.unload(furnace)
-    } else drone.mine(vein)
-  }
   if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
 }`
 
@@ -291,30 +306,30 @@ test('each quest pays on completion and the previous program does not pass the n
   const session = await createSession(kettlewick, kettlewick.files)
   try {
     session.step(20)
-    expect(session.world.credits).toBe(300)
+    expect(session.world.credits).toBe(kettlewick.credits)
     expect(session.accept()).toBe(true)
     session.step(40)
     expect(open(session.world)).toBe(true)
-    expect(session.world.credits).toBe(300)
+    expect(session.world.credits).toBe(kettlewick.credits)
     expect(session.complete()).toBe(false)
 
     await session.deploy({ 'main.ts': haul })
     await reach(session, 1200)
     expect(open(session.world)).toBe(false)
-    expect(session.world.credits).toBe(300)
+    expect(session.world.credits).toBe(kettlewick.credits)
     expect(session.complete()).toBe(true)
-    expect(session.world.credits).toBe(380)
+    expect(session.world.credits).toBe(kettlewick.credits + 40)
     expect(session.world.questId).toBeUndefined()
 
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('ines')
     session.step(200)
     expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
-    await session.deploy({ 'main.ts': ingots })
+    await session.deploy({ 'main.ts': survey })
     await reach(session, session.world.tick + 6000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
-    expect(session.world.credits).toBe(470)
+    expect(session.world.credits).toBe(kettlewick.credits + 40 + 60)
 
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('odile')
@@ -338,7 +353,7 @@ test('each quest pays on completion and the previous program does not pass the n
     expect(session.accept()).toBe(true)
     session.step(180)
     expect(open(session.world)).toBe(true)
-    await session.deploy({ 'main.ts': pair })
+    await session.deploy({ 'main.ts': grates })
     await reach(session, session.world.tick + 2000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)

@@ -68,9 +68,15 @@ function blockingFact(world: World, quest: QuestDef, id: string) {
   const furnace = world.furnace
   if (id === 'ore') return fullStillAtVein(world) ?? miningFact(world) ?? (furnace.input >= (furnace.oreMax ?? 6) ? 'furnace full' : 'furnace input 0')
   if (id === 'ingot' || id === 'smelt') {
+    if (!world.codedBatch) return 'smeltOnce has not started a batch'
     if (furnace.input >= (furnace.oreMax ?? 6) && furnace.output === 0 && world.ingotsMade === 0) return 'furnace full'
     if (furnace.output === 0 && world.ingotsMade === 0) return 'furnace output 0'
     return `ingots made ${world.ingotsMade}`
+  }
+  if (id === 'vein') return `vein D ore at the depot ${shipped(world, quest.id)}/${quest.qty}`
+  if (id === 'haul') {
+    const waiting = world.drones.filter(drone => !world.hauled?.[drone.name]).map(drone => drone.name)
+    return waiting.length ? `${waiting.join(' and ')} has not hauled steel or a grate` : 'both carts hauled'
   }
   if (id === 'coal') return fullStillAtVein(world, 'coal') ?? miningFact(world) ?? (furnace.coal >= (furnace.coalMax ?? 3) ? 'furnace full' : 'furnace coal 0')
   if (id === 'steel' || id === 'both') {
@@ -82,6 +88,8 @@ function blockingFact(world: World, quest: QuestDef, id: string) {
   }
   if (id === 'hands') return `shipped ${shipped(world, quest.id)}/${quest.qty}`
   if (id === 'done') {
+    if (quest.item === 'ore') return `vein D ore unloaded ${shipped(world, quest.id)}/${quest.qty}`
+    if (quest.item === 'grate') return `${world.depot.bin?.qty.grate ?? 0} grate at the depot; carry grates to the depot`
     const held = quest.item === 'steel' ? world.furnace.steel : world.furnace.output
     const at = quest.item === 'steel' ? world.depot.steel : world.depot.ingots
     const noun = quest.item === 'ingot' ? (held === 1 ? 'ingot' : 'ingots') : 'steel'
@@ -104,7 +112,9 @@ function motionKey(world: World, quest: QuestDef, id: string) {
   const drones = world.drones.map(drone => `${drone.name}:${drone.pos.x},${drone.pos.y}:${drone.cargo}`).join(';')
   const furnace = world.furnace
   if (id === 'ingot' || id === 'smelt' || id === 'steel')
-    return `${furnace.input}|${furnace.output}|${furnace.steel}|${furnace.readyAt}|${world.ingotsMade}|${world.steelMade}`
+    return `${furnace.input}|${furnace.output}|${furnace.steel}|${furnace.readyAt}|${world.ingotsMade}|${world.steelMade}|${world.codedBatch ? 1 : 0}`
+  if (id === 'vein' || id === 'haul')
+    return `${shipped(world, quest.id)}|${Object.keys(world.hauled ?? {}).sort().join(',')}`
   if (id === 'done' || id === 'hands') return `${shipped(world, quest.id)}|${world.depot.ingots}|${world.depot.steel}|${furnace.output}|${furnace.steel}|${world.manualRuns}|${drones}`
   if (id === 'memory') return world.pathWindow.join(',')
   return `${drones}|${furnace.input}|${furnace.coal}|${furnace.output}`

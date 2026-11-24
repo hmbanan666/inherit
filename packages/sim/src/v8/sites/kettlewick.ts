@@ -19,7 +19,7 @@ export const kettlewick: Site = {
   furnace: { pos: { x: 2, y: 1 }, input: 0, output: 0, oreMax: 6, coalMax: 3 },
   recipe: { ore: smeltRecipe.inputs[0]!.qty, ingots: smeltRecipe.qty, ticks: smeltRecipe.ticks },
   questList,
-  credits: 300,
+  credits: 80,
   tickMs: 500,
   cpuLimit: 30,
   costs: { read: 0, action: 1, findPath: 3 },

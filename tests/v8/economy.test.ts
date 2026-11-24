@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createWorld, kettlewick, levelFor, migrateWorld, questList, shop } from '../../packages/sim/src/v8'
+import { completeQuest, createWorld, kettlewick, migrateWorld, questList, shop, shopFor } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 
 test('a nearby drone supplies the furnace and one batch finishes four ticks after ignition', async () => {
@@ -29,15 +29,15 @@ export function onTick() { for (const order of orders()) ship(order) }`,
     session.world.depot.ingots = 1
     session.world.furnace.output = 8
     session.step(1)
-    expect(session.world.orders[0]).toMatchObject({ shipped: 1, status: 'open' })
+    expect(session.world.orders[0]).toMatchObject({ shipped: 1, status: 'ready' })
     expect(session.world.depot.ingots).toBe(0)
     expect(session.world.furnace.output).toBe(8)
     expect(session.world.ledger.income).toBe(0)
     expect(session.world.credits).toBe(kettlewick.credits)
     session.world.depot.ingots = 5
     session.step(1)
-    expect(session.world.orders[0]).toMatchObject({ shipped: 2, status: 'ready' })
-    expect(session.world.depot.ingots).toBe(4)
+    expect(session.world.orders[0]).toMatchObject({ shipped: 1, status: 'ready' })
+    expect(session.world.depot.ingots).toBe(5)
     expect(session.world.credits).toBe(kettlewick.credits)
     expect(session.world.messages).toEqual([])
   } finally { session.dispose() }
@@ -84,37 +84,40 @@ test('an old save keeps its credits, drops waste and due, and gains drone-2 afte
   expect(world.credits).toBe(140)
 })
 
-/** How many catalog items fit if the purse always takes the cheapest one still unpaid. */
-function itemsWithin(credits: number) {
-  const prices = shop.map(item => item.price).sort((a, b) => a - b)
-  let spent = 0
-  let count = 0
-  for (const price of prices) {
-    if (spent + price > credits) break
-    spent += price
-    count += 1
-  }
-  return count
-}
+test('an open order from the previous contract still hands over', () => {
+  const world = createWorld(kettlewick)
+  world.credits = 140
+  world.xp = 20
+  world.level = 2
+  world.questId = 'bram'
+  world.codedBatch = false
+  world.orders = [{
+    id: 'bram', at: 1, item: 'ingot', qty: 2, pay: 80, from: 'Bram', who: 'bram',
+    role: 'Blacksmith', title: 'Horseshoes for the mail horse', text: 'Two ingots.',
+    building: 'forge', change: 'The forge is lit.', shipped: 2, status: 'open',
+  }]
+  migrateWorld(world)
+  expect(world.credits).toBe(140)
+  expect(world.xp).toBe(20)
+  expect(world.level).toBe(2)
+  expect(completeQuest(world, kettlewick)).toBe(true)
+  expect(world.credits).toBe(180)
+  expect(world.xp).toBe(30)
+  expect(world.level).toBe(3)
+})
 
-test('each quest purse buys one or two shop items', () => {
-  let credits = kettlewick.credits
-  let xp = 0
-  const cleared: string[] = []
-  const catalog = shop.reduce((sum, item) => sum + item.price, 0)
-  for (const quest of questList) {
-    const next = questList.find(item => !cleared.includes(item.id) && levelFor(xp) >= item.needLevel)
-    expect(next?.id).toBe(quest.id)
-    const affordable = shop.filter(item => item.price <= credits)
-    const within = itemsWithin(credits)
-    expect(affordable.length, quest.id).toBeGreaterThanOrEqual(1)
-    expect(within, quest.id).toBeGreaterThanOrEqual(1)
-    expect(within, quest.id).toBeLessThanOrEqual(2)
-    if (within === 1) expect(affordable.length, quest.id).toBeGreaterThanOrEqual(2)
-    expect(credits, quest.id).toBeLessThan(catalog)
-    credits += quest.pay
-    xp += quest.xp
-    cleared.push(quest.id)
-  }
-  expect(itemsWithin(credits)).toBeLessThanOrEqual(2)
+test('the opening purse buys nothing, and racks wait for the press', () => {
+  expect(kettlewick.credits).toBe(80)
+  expect(shop.map(item => [item.id, item.price])).toEqual([
+    ['cart', 150], ['hopper', 240], ['furnace', 350], ['racks', 450], ['cpu', 580], ['spare', 720],
+  ])
+  const world = createWorld(kettlewick)
+  expect(shopFor(world).map(item => item.id)).toEqual(['cart', 'hopper', 'furnace', 'cpu'])
+  expect(shopFor(world).every(item => item.price > world.credits)).toBe(true)
+  world.credits = 180
+  expect(shopFor(world).some(item => item.id === 'cart' && item.price <= world.credits)).toBe(true)
+  world.cleared = ['bram', 'ines', 'odile']
+  expect(shopFor(world).map(item => item.id)).toEqual(['cart', 'hopper', 'furnace', 'racks', 'cpu', 'spare'])
+  const pays = questList.map(quest => quest.pay)
+  expect(pays).toEqual([40, 60, 80, 100, 110, 130, 150, 170])
 })

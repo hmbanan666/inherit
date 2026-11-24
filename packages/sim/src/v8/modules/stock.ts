@@ -16,6 +16,10 @@ export const furnaceOutputCap = 6
 export const machineSlot = 3
 /** Odile installs the press here, between the furnace and the cuts. */
 export const pressAt: Cell = { x: 5, y: 1 }
+/** The spare press, a shop convenience, sits south of the first one. */
+export const spareAt: Cell = { x: 5, y: 4 }
+/** Quests from Elsie onward. Taking Elsie opens the grate die. */
+const grateDieQuests = ['elsie', 'harrow', 'tomas', 'pell', 'wen']
 /** The hotter furnace finishes a furnace batch in this many ticks. */
 export const hotFurnaceTicks = 2
 
@@ -84,6 +88,27 @@ export function createPress(): Press {
   return { pos: { x: pressAt.x, y: pressAt.y }, bin: emptyBin(), readyAt: null, recipe: null }
 }
 
+export function createSpare(): Press {
+  return { pos: { x: spareAt.x, y: spareAt.y }, bin: emptyBin(), readyAt: null, recipe: null }
+}
+
+export function normalizeSpare(press: Press) {
+  press.pos = { x: spareAt.x, y: spareAt.y }
+  press.bin = ensureBin(press.bin)
+  press.readyAt ??= null
+  press.recipe ??= null
+  return press
+}
+
+/** Finished pieces on a press. Racks double the slot. Inputs stay at one slot. */
+export function finishedCap(world: { outputRacks?: boolean }) {
+  return world.outputRacks ? machineSlot * 2 : machineSlot
+}
+
+export function grateDieOpen(world: { questId?: string; cleared?: string[] }) {
+  return grateDieQuests.some(id => world.questId === id || world.cleared?.includes(id))
+}
+
 export function normalizePress(press: Press) {
   press.pos = { x: pressAt.x, y: pressAt.y }
   press.bin = ensureBin(press.bin)
@@ -92,8 +117,8 @@ export function normalizePress(press: Press) {
   return press
 }
 
-export type StationId = 'depot' | 'furnace' | 'press'
-export const stationLabel: Record<StationId, string> = { depot: 'Depot', furnace: 'Furnace', press: 'Press' }
+export type StationId = 'depot' | 'furnace' | 'press' | 'spare'
+export const stationLabel: Record<StationId, string> = { depot: 'Depot', furnace: 'Furnace', press: 'Press', spare: 'Spare press' }
 
 function tally(map: Partial<Record<Item, number>>, item: Item) {
   return map[item] ?? 0
@@ -170,11 +195,11 @@ function depotSet(world: World, item: Item, qty: number) {
   else world.depot.bin.qty[item] = qty
 }
 
-function pressRoom(bin: Bin, item: Item) {
+function pressRoom(bin: Bin, item: Item, cap: number) {
   if (pressOutputs.has(item)) {
     let used = 0
     for (const output of pressOutputs) used += tally(bin.qty, output) + tally(bin.reservedIn, output)
-    return Math.max(0, machineSlot - used)
+    return Math.max(0, cap - used)
   }
   return Math.max(0, machineSlot - tally(bin.qty, item) - tally(bin.reservedIn, item))
 }
@@ -207,19 +232,21 @@ export function port(world: World, id: StationId): Port | undefined {
       (item, qty) => depotSet(world, item, qty),
       () => Number.POSITIVE_INFINITY)
   }
-  const press = world.press
-  if (!press) return
-  press.bin = ensureBin(press.bin)
-  return portFrom(id, press.pos, press.bin,
-    item => tally(press.bin.qty, item),
-    (item, qty) => { if (qty <= 0) delete press.bin.qty[item]; else press.bin.qty[item] = qty },
-    item => pressRoom(press.bin, item))
+  const cap = finishedCap(world)
+  const machine = id === 'spare' ? world.spare : world.press
+  if (!machine) return
+  machine.bin = ensureBin(machine.bin)
+  return portFrom(id, machine.pos, machine.bin,
+    item => tally(machine.bin.qty, item),
+    (item, qty) => { if (qty <= 0) delete machine.bin.qty[item]; else machine.bin.qty[item] = qty },
+    item => pressRoom(machine.bin, item, cap))
 }
 
 export function stationAt(world: World, pos: Cell): StationId | undefined {
   if (pos.x === world.furnace.pos.x && pos.y === world.furnace.pos.y) return 'furnace'
   if (pos.x === world.depot.pos.x && pos.y === world.depot.pos.y) return 'depot'
   if (world.press && pos.x === world.press.pos.x && pos.y === world.press.pos.y) return 'press'
+  if (world.spare && pos.x === world.spare.pos.x && pos.y === world.spare.pos.y) return 'spare'
 }
 
 export function freeAt(world: World, id: StationId, item: Item) {
@@ -227,18 +254,25 @@ export function freeAt(world: World, id: StationId, item: Item) {
 }
 
 export type StartResult = 'started' | 'busy' | 'short' | 'full'
+export type MachineId = 'furnace' | 'press' | 'spare'
 
-function machineBusy(world: World, machine: Recipe['machine']) {
+function machineBusy(world: World, machine: MachineId) {
   if (machine === 'furnace') return world.furnace.readyAt !== null
+  if (machine === 'spare') return world.spare?.readyAt != null
   return world.press?.readyAt != null
 }
 
 /** Consume inputs, reserve the output slot, and let the machine finish the batch. */
-export function startRecipe(world: World, machine: Recipe['machine'], id: string): StartResult {
+export function startRecipe(world: World, machine: MachineId, id: string): StartResult {
+  const host = machine === 'spare' ? 'press' : machine
   const recipe = recipeById(id)
-  if (!recipe || recipe.machine !== machine) throw new Error(`The ${machine} does not run ${id}.`)
+  if (!recipe || recipe.machine !== host) throw new Error(`The ${machine} does not run ${id}.`)
+  if (host === 'press' && recipe.id === 'grate' && !grateDieOpen(world))
+    throw new Error('The grate die opens when Elsie is taken.')
+  if (host === 'press' && recipe.id !== 'grate')
+    throw new Error(`The ${recipe.id} die opens on a later quest.`)
   const view = port(world, machine)
-  if (!view) throw new Error('The press is not installed.')
+  if (!view) throw new Error(machine === 'spare' ? 'The spare press is not installed.' : 'The press is not installed.')
   if (machineBusy(world, machine)) return 'busy'
   if (view.room(recipe.output) < recipe.qty) return 'full'
   for (const input of recipe.inputs) if (view.free(input.item) < input.qty) return 'short'
@@ -249,9 +283,12 @@ export function startRecipe(world: World, machine: Recipe['machine'], id: string
   if (machine === 'furnace') {
     world.furnace.batch = recipe.output === 'steel' ? 'steel' : 'ingot'
     world.furnace.readyAt = readyAt
-  } else if (world.press) {
-    world.press.recipe = recipe.id
-    world.press.readyAt = readyAt
+  } else {
+    const press = machine === 'spare' ? world.spare : world.press
+    if (press) {
+      press.recipe = recipe.id
+      press.readyAt = readyAt
+    }
   }
   return 'started'
 }
@@ -268,8 +305,8 @@ export function releaseTransfer(world: World, drone: World['drones'][number]) {
   task.delivered = task.qty
 }
 
-export function finishPress(world: World) {
-  const press = world.press
+function finishOne(world: World, id: 'press' | 'spare') {
+  const press = id === 'spare' ? world.spare : world.press
   if (!press?.recipe || press.readyAt !== world.tick) return
   const recipe = recipeById(press.recipe)
   press.readyAt = null
@@ -277,8 +314,12 @@ export function finishPress(world: World) {
   if (!recipe) return
   press.bin = ensureBin(press.bin)
   release(press.bin.reservedIn, recipe.output, recipe.qty)
-  const view = port(world, 'press')
-  view?.add(recipe.output, recipe.qty)
+  port(world, id)?.add(recipe.output, recipe.qty)
+}
+
+export function finishPress(world: World) {
+  finishOne(world, 'press')
+  finishOne(world, 'spare')
 }
 
 export function recipeParts(recipe: Recipe) {
@@ -339,7 +380,27 @@ export function pressBricks(site: Site): Brick[] {
       `// 2 steel on the press become 1 grate.\npress.start("grate")`, action, ({ world }, id) => {
         const recipe = String(id)
         const result = startRecipe(world, 'press', recipe)
-        if (result === 'full') throw new Error(`press output is full (${machineSlot}). Carry parts off the press.`)
+        if (result === 'full') throw new Error(`press output is full (${finishedCap(world)}). Carry parts off the press.`)
+      }),
+    brick('spare', 'const spare: Press', 'The second press. The shop sells it once the first press is installed.', 'spare.start("grate")', read, {
+      guest: `export const spare = Object.freeze({
+        pos: Object.freeze(${JSON.stringify(spareAt)}),
+        get installed() { return api.spare_installed() },
+        count: api.spare_count,
+        start: api.spare_start,
+      })`,
+    }),
+    brick('spare.installed', 'readonly installed: boolean', 'True after the spare press is bought.', 'spare.installed', read,
+      ({ world }) => world.spare != null),
+    brick('spare.count', `count(item: ${itemType}): number`, 'How many of that good are sitting on the spare press.', 'spare.count("grate")', read,
+      ({ world }, item) => {
+        if (!isItem(item)) throw new Error(`Unknown good ${String(item)}.`)
+        return port(world, 'spare')?.get(item) ?? 0
+      }),
+    brick('spare.start', `start(recipe: ${pressRecipeType}): void`, 'Start one batch on the spare press. The grate die opens with Elsie.',
+      `spare.start("grate")`, action, ({ world }, id) => {
+        const result = startRecipe(world, 'spare', String(id))
+        if (result === 'full') throw new Error(`spare output is full (${finishedCap(world)}). Carry parts off the press.`)
       }),
     brick('depot.count', `count(item: ${itemType}): number`, 'How many of that good are at the depot. A quest counts them only here.', 'depot.count("grate")', read,
       ({ world }, item) => {

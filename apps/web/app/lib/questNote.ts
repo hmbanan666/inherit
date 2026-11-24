@@ -15,10 +15,10 @@ export function insertQuestNote(source: string, note: string, id: string, rememb
 }
 
 /** The quantity on the quest rail. The count is what the villager has received. */
-export function quantityLabel(from: string, item: 'ingot' | 'steel', qty: number, shipped: number) {
+export function quantityLabel(from: string, item: 'ingot' | 'steel' | 'ore' | 'grate', qty: number, shipped: number) {
   const who = from.replace(/^Mayor /, '')
   const value = Math.min(shipped, qty)
-  const good = item === 'steel' ? 'steel' : qty === 1 ? 'ingot' : 'ingots'
+  const good = item === 'steel' || item === 'ore' ? item : item === 'grate' ? (qty === 1 ? 'grate' : 'grates') : qty === 1 ? 'ingot' : 'ingots'
   return { text: `Delivered to ${who} · ${value}/${qty} ${good}`, value, max: qty }
 }
 
@@ -33,9 +33,9 @@ export function firstOpenTest(rows: readonly { id: string; state: string }[]) {
 }
 
 /** One progress line. The delivery count is named by where the goods are handed over. */
-export function goalLabel(checkId: string, item: 'ingot' | 'steel', qty: number, shipped: number, done: boolean, memory = 0) {
+export function goalLabel(checkId: string, item: 'ingot' | 'steel' | 'ore' | 'grate', qty: number, shipped: number, done: boolean, memory = 0) {
   if (checkId === 'done') {
-    const name = item === 'steel' ? 'Steel' : 'Ingots'
+    const name = item === 'steel' ? 'Steel' : item === 'ore' ? 'Ore' : item === 'grate' ? 'Grates' : 'Ingots'
     return { text: `${name} at the depot ${shipped}/${qty}`, value: Math.min(shipped, qty), max: qty }
   }
   if (checkId === 'memory') {
@@ -50,6 +50,8 @@ export function goalLabel(checkId: string, item: 'ingot' | 'steel', qty: number,
     both: 'Ore and coal at the furnace',
     drone: 'drone-2 past the depot',
     smelt: 'An ingot smelted',
+    vein: 'Vein D ore at the depot',
+    haul: 'A haul of steel or a grate',
   }
   const value = done ? 1 : 0
   return { text: `${places[checkId] ?? checkId} ${value}/1`, value, max: 1 }

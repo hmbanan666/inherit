@@ -6,7 +6,7 @@ Where an older milestone mentioned rent, pause, speeds, bankruptcy, deadlines, a
 
 ## Playable now
 
-Nick opens `/`. Nobody is asking until he takes a quest. Bram is first, at level 1: buttons on the furnace and the drone, and two ingots taken from the depot. **Hand over** pays that quest's credits and XP when every goal line passes. Shipping does not pay. The next villager waits until this one is handed over and the level is high enough. The clock keeps ticking while the tab is hidden. There is no pause and no speed button.
+Nick opens `/`. Nobody is asking until he takes a quest. Bram is first, at level 1: buttons may fill the hopper and haul, and `smeltOnce` starts one ingot. **Hand over** pays that quest's credits and XP when every goal line passes. Shipping does not pay. The next villager waits until this one is handed over and the level is high enough. The clock keeps ticking while the tab is hidden. There is no pause and no speed button.
 
 `/` is the game. Packs were removed ([ADR 0030](../adr/0030-packs-removed.md)). The logo opens this page and the current save.
 
@@ -16,8 +16,8 @@ The site is Kettlewick Works. Its numbers live on `kettlewick` in `packages/sim/
 - The furnace turns 2 ore into 1 ingot in 4 ticks. The hopper holds 6 ore and 3 coal. Output holds 6 ingots and 6 steel. Unload fills the free hopper space and the drone keeps the rest.
 - A fresh `main.ts` exports `smeltOnce` and does not call it. `uncleMain` is the old loop, with `const home = false`. A fresh world does not start there. Old saves can still be running it.
 - Ingots and steel stay in the furnace until a drone picks them up and unloads them at the depot. Collect is that pickup. `takeFromDepot` moves the open quest's goods from the depot onto the order. That is the only delivery. `ship()` does not move goods. An old file may still import it. The call does nothing, and the file still runs. There is no shipment from the furnace and no half pay.
-- Run unlocks when Bram is handed over and calls one exported function once. The drone keeps the command. Loop and `onTick` unlock when Ines is handed over and call `onTick` every tick. `on()` unlocks when Elsie is handed over. `furnace.alloy()` unlocks when Odile is taken. `prospect()` unlocks when Harrow is taken. The shop does not sell those, and it does not sell drone-2. A `bought` list that still contains `alloy`, `prospect`, or `drone` keeps what it already granted. Nothing is refunded. Credits are not reset. A save with no `automation` field keeps every trigger. A save that already recorded them keeps the ones it had. A Harrow save that already delivered 60 ingots can still be handed over.
-- CPU limit 30. Tick 500 ms. Credits 300. Level 1. XP 0. Level thresholds are `levelFor`.
+- Run is in the starter file and calls one exported function once. The drone keeps the command. Loop and `onTick` unlock when Ines is handed over and call `onTick` every tick. `on()` unlocks when Elsie is handed over. `furnace.alloy()` unlocks when Odile is taken. The grate die and `transfer` open when Elsie is taken. `prospect()` unlocks when Harrow is taken. The shop does not sell those, and it does not sell drone-2. A `bought` list that still contains `alloy`, `prospect`, or `drone` keeps what it already granted. Nothing is refunded. Credits are not reset. A save with no `automation` field keeps every trigger. A save that already recorded them keeps the ones it had. A Harrow save that already delivered 60 ingots can still be handed over. An open order whose item or quantity is the previous contract stays finishable on that saved count.
+- CPU limit 30. Tick 500 ms. Credits 80. Level 1. XP 0. Level thresholds are `levelFor`: 10, 20, 40, 85, 140, 170.
 - `buyUpgrade` refuses an unknown id, an owned item, and an item the player cannot afford, and it does not change the balance when it refuses. A purchase that succeeds subtracts the price.
 
 The worker runs one tick on that interval even when the tab is hidden. The visibility message does nothing. The sim has no UI and no clock of its own.
@@ -39,10 +39,10 @@ The frame is the standing shell, arranged in [the screen layout](v8-screen-layou
 ## Standing rules
 
 - Game rules live in `packages/sim/src/v8/`. Player code runs only in QuickJS. The worker owns the session. The page renders snapshots.
-- Do not edit pack content for a v8 change. Shared sandbox changes must keep pack tests green.
+- Packs are gone ([ADR 0030](../adr/0030-packs-removed.md)). Do not add a pack test back as a gate for a v8 change.
 - Do not rebuild the frame. Adapt the components that are already there.
 - Before a PR: `pnpm test`, `pnpm typecheck`, and `pnpm build`. Nick playtests. No browser suite and no screenshots.
 
 ## Not settled
 
-[ADR 0027](../adr/0027-shop-veins-one-delivery.md) leaves three things open: the level curve after this chain, what fills the ten-hour world, and Harrow's no-manual-runs check with its zero XP. Do not invent a deadline, a rent charge, a par time, a key, or a wipe in their place. Audit and the next world are not in the code.
+[ADR 0027](../adr/0027-shop-veins-one-delivery.md) leaves the ten-hour world open. [ADR 0036](../adr/0036-region-1-fabrication-chain.md) sets the level steps and pays Harrow XP. There is no check that the ingots arrived with no manual runs. Do not invent a deadline, a rent charge, a par time, a key, or a wipe in their place. Quests 5–8 still ask for the previous ingot and steel counts. The lathe and the assembly table are not in the code.

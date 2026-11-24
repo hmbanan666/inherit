@@ -28,7 +28,7 @@ Nick's product vision of 23 November 2026 is the game. #88 and #89 already grant
 
 - The level curve after this chain. The steps in `levelFor` stay as they are.
 - What fills the ten-hour world. The map on screen is still a 16 by 6 grid, the first slice.
-- Harrow's quest checks that the goods arrived with no manual runs, and it pays no XP.
+- Harrow's quest checks that the goods arrived with no manual runs, and it pays no XP. [ADR 0036](0036-region-1-fabrication-chain.md) retires that lock and pays the quest XP. A save that already shipped 60 still hands over.
 
 ## Consequences
 

@@ -1,6 +1,6 @@
 import type { Site, World } from './core/world'
 import { noteCheckReset, readChecks } from './checkFacts'
-import { createPress, hotFurnaceTicks, normalizePress, smeltRecipe } from './modules/stock'
+import { createPress, createSpare, hotFurnaceTicks, machineSlot, normalizePress, normalizeSpare, smeltRecipe } from './modules/stock'
 
 export interface QuestTest {
   id: string
@@ -28,7 +28,7 @@ export interface QuestDef {
   /** Inserted once at the top of the open file. A nudge, never a solution or a shop. */
   nudge: string
   change: string
-  item: 'ingot' | 'steel'
+  item: 'ingot' | 'steel' | 'ore' | 'grate'
   qty: number
   pay: number
   xp: number
@@ -55,7 +55,7 @@ export interface ShopItem {
   apply(world: World): void
 }
 
-const steps = [20, 40, 65, 90, 115, 145]
+const steps = [10, 20, 40, 85, 140, 170]
 export function levelFor(xp: number) {
   return 1 + steps.filter(step => xp >= step).length
 }
@@ -73,80 +73,76 @@ export const questList: QuestDef[] = [
   {
     id: 'bram', from: 'Bram', who: 'bram', role: 'Blacksmith', building: 'forge',
     title: 'Horseshoes for the mail horse',
-    goal: 'Bring Bram 2 ingots.',
-    why: 'The drone is empty at the depot. Buttons send it to a vein. Run calls a function once, and the drone keeps the task.',
+    goal: 'Bring Bram 1 ingot from a batch smeltOnce started.',
+    why: 'Buttons can fill the hopper and haul. smeltOnce has to start the batch. The furnace finishes it after the function returns.',
     quote: 'The mail horse throws a shoe on every hill.',
-    ask: 'The mail horse throws a shoe on every hill. I need two ingots.',
-    need: 'Need 2 ingots. An ingot is smelted from ore.',
-    nudge: 'the drone is empty at the depot, and the furnace is cold.',
+    ask: 'The mail horse throws a shoe on every hill. I need one ingot, from your own batch.',
+    need: 'Need 1 ingot. smeltOnce starts the batch. Buttons may fill the hopper and haul.',
+    nudge: 'smeltOnce is empty. The furnace finishes the batch after it returns.',
     change: 'The forge is lit. The mail horse has shoes.',
-    item: 'ingot', qty: 2, pay: 80, xp: 20, needLevel: 1,
-    trigger: 'run',
+    item: 'ingot', qty: 1, pay: 40, xp: 10, needLevel: 1,
+    prepare: world => { world.codedBatch = false },
     tests: [
       { id: 'ore', text: 'Ore reaches the furnace', explain: 'The furnace has taken in ore, or an ingot was already made from it.', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
-      { id: 'ingot', text: 'The furnace makes an ingot', explain: 'The furnace has finished at least one ingot.', pass: world => world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
-      { id: 'done', text: 'Bram receives 2 ingots', explain: 'Two ingots have been handed over from the depot.', pass: world => shipped(world, 'bram') >= 2 },
+      { id: 'ingot', text: 'smeltOnce starts a batch', explain: 'A function called smelt() or furnace.start("smelt"). The Smelt button does not count.', pass: world => world.codedBatch },
+      { id: 'done', text: 'Bram receives 1 ingot', explain: 'One ingot from that batch has been handed over from the depot.', pass: world => world.codedBatch && shipped(world, 'bram') >= 1 },
     ],
   },
   {
     id: 'ines', from: 'Ines', who: 'ines', role: 'Warden', building: 'town-hall',
-    title: 'Ingots for the storehouse',
-    goal: 'Bring Ines 16 ingots.',
-    why: 'Sixteen ingots is a long shift of buttons. Loop calls a function every tick. onTick is that loop.',
-    quote: 'The storehouse shelves have been bare all winter.',
-    ask: 'The storehouse shelves have been bare all winter. I need sixteen ingots.',
-    need: 'Need 16 ingots. An ingot is smelted from ore.',
-    nudge: 'loop calls the function every tick. onTick is that loop.',
-    change: 'The storehouse has iron again.',
-    item: 'ingot', qty: 16, pay: 90, xp: 20, needLevel: 2,
+    title: 'Ore from the normal cut',
+    goal: 'Bring Ines 3 ore from vein D.',
+    why: 'Vein D is the normal ore. One Run sends the empty cart to mine. The next Run unloads that ore at the depot. Loop is the hand-over, not this job.',
+    quote: 'The old cut is a poor teacher. I want the new one counted.',
+    ask: 'The old cut is a poor teacher. I want three rocks from the normal cut, at the depot.',
+    need: 'Need 3 ore from vein D, unloaded at the depot.',
+    nudge: 'vein D is the normal ore. Unload it at the depot.',
+    change: 'The new cut is on the map.',
+    item: 'ore', qty: 3, pay: 60, xp: 10, needLevel: 2,
     trigger: 'tick',
     tests: [
-      { id: 'ore', text: 'Ore reaches the furnace', explain: 'The furnace has taken in ore, or an ingot was already made from it.', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
-      { id: 'ingot', text: 'The furnace makes an ingot', explain: 'The furnace has finished at least one ingot.', pass: world => world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
-      { id: 'done', text: 'Ines receives 16 ingots', explain: 'Sixteen ingots have been handed over from the depot.', pass: world => shipped(world, 'ines') >= 16 },
+      { id: 'vein', text: 'Vein D ore reaches the depot', explain: 'Ore mined at vein D was unloaded at the depot. Ore from another vein does not count.', pass: world => shipped(world, 'ines') > 0 },
+      { id: 'done', text: 'Ines receives 3 ore from vein D', explain: 'Three rocks from vein D have been unloaded at the depot.', pass: world => shipped(world, 'ines') >= 3 },
     ],
   },
   {
     id: 'odile', from: 'Mayor Odile', who: 'odile', role: 'Mayor', building: 'bridge',
     title: 'Steel for the bridge',
-    goal: 'Bring Odile 4 steel.',
+    goal: 'Bring Odile 2 steel.',
     why: 'Steel is 2 ore and 1 coal alloyed together. Vein B is coal. furnace.alloy() makes steel.',
     unlock: { brick: 'furnace.alloy', signature: 'furnace.alloy(): 2 ore + 1 coal -> 1 steel', legacy: 'alloy' },
     quote: 'Two banks, and no way across.',
     ask: 'Two banks, and no way across. I need steel for the bridge.',
-    need: 'Need 4 steel. Steel is smelted from ore and coal.',
+    need: 'Need 2 steel. Steel is smelted from ore and coal.',
     nudge: 'steel is ore and coal together. Where would they meet?',
     change: 'The bridge stands. Kettlewick can cross the river again.',
     gift: 'drone-2',
     install: 'press',
-    item: 'steel', qty: 4, pay: 100, xp: 20, needLevel: 2,
+    item: 'steel', qty: 2, pay: 80, xp: 20, needLevel: 3,
     tests: [
       { id: 'coal', text: 'Coal reaches the furnace', explain: 'The furnace hopper holds coal, or steel was already made.', pass: world => world.furnace.coal > 0 || world.steelMade > 0 || shipped(world, 'odile') > 0 },
       { id: 'steel', text: 'The furnace makes steel', explain: 'The furnace has finished at least one steel.', pass: world => world.steelMade > 0 || shipped(world, 'odile') > 0 },
-      { id: 'done', text: 'Odile receives 4 steel', explain: 'Four steel have been handed over from the depot.', pass: world => shipped(world, 'odile') >= 4 },
+      { id: 'done', text: 'Odile receives 2 steel', explain: 'Two steel have been handed over from the depot.', pass: world => shipped(world, 'odile') >= 2 },
     ],
   },
   {
     id: 'elsie', from: 'Elsie', who: 'elsie', role: 'Baker', building: 'bakery',
     title: 'A grate for the oven',
-    goal: 'Bring Elsie 6 steel.',
-    why: 'One cart cannot be in two places. on() runs a function once when the cart is idle or the furnace is ready.',
+    goal: 'Bring Elsie 2 grates. Each cart hauls steel or a grate.',
+    why: 'The press turns 2 steel into a grate. One cart carries steel to the press. The other carries the grate to the depot. A cart that never hauls does not count. on() is the hand-over, not this job.',
     quote: 'The oven has been cold since dawn.',
-    ask: 'The oven has been cold since dawn. I need a grate.',
-    need: 'Need 6 steel. Steel is smelted from ore and coal.',
-    nudge: 'one cart cannot be in two places. on() can run a function when the cart is idle.',
+    ask: 'The oven has been cold since dawn. I need two grates, and both carts have to carry something.',
+    need: 'Need 2 grates. The press makes a grate from 2 steel. Each cart hauls steel or a grate.',
+    nudge: 'one cart carries steel to the press. The other carries the grate to the depot.',
     change: 'The bakery is warm again.',
-    item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
+    item: 'grate', qty: 2, pay: 100, xp: 20, needLevel: 4,
     needs: 'drone-2',
+    unlock: { brick: 'press.grate', signature: 'press.start("grate"): 2 steel -> 1 grate' },
     trigger: 'events',
-    prepare: world => { world.steelMark = world.steelMade },
+    prepare: world => { world.hauled = {} },
     tests: [
-      { id: 'drone', text: 'drone-2 leaves the depot', explain: 'The second cart has moved off the depot.', pass: world => {
-        const drone = world.drones.find(item => item.name === 'drone-2')
-        return !!drone && (drone.pos.x !== world.depot.pos.x || drone.pos.y !== world.depot.pos.y)
-      } },
-      { id: 'both', text: 'Ore and coal are in the furnace together', explain: 'The hopper holds 2 ore and 1 coal at the same time, or steel was made after this quest was taken.', pass: world => world.steelMade > world.steelMark || (world.furnace.input >= 2 && world.furnace.coal >= 1) },
-      { id: 'done', text: 'Elsie receives 6 steel', explain: 'Six steel have been handed over from the depot.', pass: world => shipped(world, 'elsie') >= 6 },
+      { id: 'haul', text: 'Each cart hauls steel or a grate', explain: 'Every cart finished a haul of steel or a grate during this quest. Leaving the depot is not a haul.', pass: world => world.drones.length >= 2 && world.drones.every(drone => world.hauled?.[drone.name]) },
+      { id: 'done', text: 'Elsie receives 2 grates', explain: 'Two grates have been handed over from the depot.', pass: world => shipped(world, 'elsie') >= 2 },
     ],
   },
   {
@@ -159,7 +155,7 @@ export const questList: QuestDef[] = [
     need: 'Need 60 ingots. A richer vein yields ore faster.',
     nudge: 'the old cut is slow. A richer vein is still hidden.',
     change: 'The hill is open.',
-    item: 'ingot', qty: 60, pay: 80, xp: 0, needLevel: 4,
+    item: 'ingot', qty: 60, pay: 110, xp: 25, needLevel: 4,
     unlock: { brick: 'prospect', signature: 'prospect(): reveals the next hidden vein', legacy: 'prospect' },
     tests: [
       { id: 'done', text: 'Harrow receives 60 ingots', explain: 'Sixty ingots have been handed over from the depot.', pass: world => shipped(world, 'harrow') >= 60 },
@@ -176,7 +172,7 @@ export const questList: QuestDef[] = [
     need: 'Need 8 ingots. An ingot is smelted from ore.',
     nudge: 'the wheel needs iron. Ore will not turn it.',
     change: 'The mill wheel turns.',
-    item: 'ingot', qty: 8, pay: 100, xp: 25, needLevel: 4,
+    item: 'ingot', qty: 8, pay: 130, xp: 25, needLevel: 5,
     prepare: world => { world.ingotsMade = 0 },
     tests: [
       { id: 'smelt', text: 'An ingot is smelted this quest', explain: 'An ingot was smelted after this quest was taken.', pass: world => world.ingotsMade > 0 },
@@ -193,7 +189,7 @@ export const questList: QuestDef[] = [
     need: 'Need 4 ingots. Plain ingots, not steel.',
     nudge: 'the barrels want plain ingots. Steel will not do.',
     change: 'The barrels have hinges.',
-    item: 'ingot', qty: 4, pay: 80, xp: 25, needLevel: 5,
+    item: 'ingot', qty: 4, pay: 150, xp: 30, needLevel: 5,
     prepare: world => { world.ingotsMade = 0 },
     tests: [
       { id: 'smelt', text: 'An ingot is smelted this quest', explain: 'An ingot was smelted after this quest was taken.', pass: world => world.ingotsMade > 0 },
@@ -210,7 +206,7 @@ export const questList: QuestDef[] = [
     need: 'Need 4 steel. Steel is smelted from ore and coal.',
     nudge: 'a fresh path every tick spends the oil. A road can be remembered.',
     change: 'The lamps are lit.',
-    item: 'steel', qty: 4, pay: 120, xp: 30, needLevel: 6,
+    item: 'steel', qty: 4, pay: 170, xp: 30, needLevel: 6,
     prepare: world => {
       world.cpu.limit = world.bought.includes('cpu') ? 18 : 8
       world.pathWindow = []
@@ -223,10 +219,12 @@ export const questList: QuestDef[] = [
 ]
 
 export const shop: ShopItem[] = [
-  { id: 'cart', name: 'Bigger cart', price: 240, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
-  { id: 'hopper', name: 'Bigger hopper', price: 280, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
-  { id: 'furnace', name: 'Hotter furnace', price: 580, detail: `A batch finishes in ${hotFurnaceTicks} ticks instead of ${smeltRecipe.ticks}.`, apply: world => { world.batchTicks = hotFurnaceTicks } },
-  { id: 'cpu', name: 'CPU +10', price: 700, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
+  { id: 'cart', name: 'Bigger cart', price: 150, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
+  { id: 'hopper', name: 'Bigger hopper', price: 240, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
+  { id: 'furnace', name: 'Hotter furnace', price: 350, detail: `A batch finishes in ${hotFurnaceTicks} ticks instead of ${smeltRecipe.ticks}.`, apply: world => { world.batchTicks = hotFurnaceTicks } },
+  { id: 'racks', name: 'Output racks', price: 450, detail: `The press holds ${machineSlot * 2} finished parts.`, apply: world => { world.outputRacks = true } },
+  { id: 'cpu', name: 'CPU +10', price: 580, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
+  { id: 'spare', name: 'Spare press', price: 720, detail: 'A second press at (5, 4).', apply: world => { world.spare = world.spare ? normalizeSpare(world.spare) : createSpare() } },
 ]
 
 const secondDrone = 'drone-2'
@@ -242,6 +240,27 @@ export function secondDroneUnlocked(world: Pick<World, 'cleared' | 'bought'>) {
   return worksGrants(world)['drone-2']
 }
 
+/** Racks and the spare press wait until the base press is installed. The other four are listed from the start. */
+export function shopFor(world: Pick<World, 'cleared' | 'bought'>) {
+  const press = worksGrants(world).press
+  return shop.filter(item => (item.id !== 'racks' && item.id !== 'spare') || press)
+}
+
+/** A finished haul of steel or a grate during Elsie's job. */
+export function notePartHaul(world: World, name: string) {
+  if (world.questId !== 'elsie') return
+  world.hauled ??= {}
+  world.hauled[name] = true
+}
+
+/** An open order saved before this contract. Delivery still uses the saved item and quantity. */
+export function savedContract(world: World, quest: QuestDef) {
+  if (world.questId !== quest.id) return
+  const order = world.orders.find(item => item.id === quest.id && item.status !== 'on time')
+  if (!order || (order.item === quest.item && order.qty === quest.qty)) return
+  return order
+}
+
 /** The press is on the floor only when Odile's Hand over granted it. */
 export function syncPress(world: World) {
   if (!worksGrants(world).press) {
@@ -249,6 +268,15 @@ export function syncPress(world: World) {
     return
   }
   world.press = world.press ? normalizePress(world.press) : createPress()
+}
+
+/** The spare press is on the floor only after it is bought, and only while the base press stands. */
+export function syncSpare(world: World) {
+  if (!world.bought.includes('spare') || !worksGrants(world).press) {
+    world.spare = null
+    return
+  }
+  world.spare = world.spare ? normalizeSpare(world.spare) : createSpare()
 }
 
 /** One drone-2 when the reward is granted, and none when it is not. Map, list, inspector, and API read `world.drones` after this. */
@@ -328,6 +356,13 @@ export function syncQuest(world: World, site: Site) {
     const offer = nextQuest(world, site)
     return offer ? offer.why : 'More is coming.'
   }
+  const saved = savedContract(world, quest)
+  if (saved) {
+    const text = `${quest.from} receives the saved order`
+    world.checks = [{ id: 'done', text, status: saved.shipped >= saved.qty ? 'green' as const : 'open' as const }]
+    readChecks(world, quest)
+    return world.checks.find(check => check.status !== 'green')?.text ?? 'Every test passes. Complete the quest.'
+  }
   world.checks = quest.tests.map(test => ({ id: test.id, text: test.text, status: test.pass(world) ? 'green' as const : 'open' as const }))
   readChecks(world, quest)
   return world.checks.find(check => check.status !== 'green')?.text ?? 'Every test passes. Complete the quest.'
@@ -370,7 +405,9 @@ export function acceptQuest(world: World, site: Site, id?: string) {
 
 export function completeQuest(world: World, site: Site) {
   const quest = site.questList?.find(item => item.id === world.questId)
-  if (!quest || quest.tests.some(test => !test.pass(world))) return false
+  if (!quest) return false
+  const saved = savedContract(world, quest)
+  if (saved ? saved.shipped < saved.qty : quest.tests.some(test => !test.pass(world))) return false
   world.credits += quest.pay
   world.ledger.income += quest.pay
   world.xp += quest.xp
@@ -392,7 +429,7 @@ export function completeQuest(world: World, site: Site) {
 }
 
 export function buyUpgrade(world: World, id: string) {
-  const item = shop.find(entry => entry.id === id)
+  const item = shopFor(world).find(entry => entry.id === id)
   if (!item || world.bought.includes(id) || world.credits < item.price) return false
   world.credits -= item.price
   world.bought.push(id)
@@ -402,6 +439,14 @@ export function buyUpgrade(world: World, id: string) {
 
 /** True when no quest owns the brick, the player already bought it, or they have reached the quest that grants it. */
 export function functionUnlocked(world: Pick<World, 'questId' | 'cleared' | 'bought'>, brick: string) {
+  if (brick === 'spare' || brick.startsWith('spare.')) return !!world.bought?.includes('spare')
+  if (brick === 'press.grate') {
+    const quest = questList.find(item => item.unlock?.brick === brick)
+    if (!quest) return false
+    if (world.questId === quest.id || world.cleared.includes(quest.id)) return true
+    const index = questList.findIndex(item => item.id === quest.id)
+    return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
+  }
   if (brick === 'press' || brick.startsWith('press.')) return worksGrants(world).press
   const quest = questList.find(item => item.unlock?.brick === brick)
   if (!quest?.unlock) return true

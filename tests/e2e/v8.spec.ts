@@ -39,7 +39,7 @@ test('Bram offers a quest, the checks sit beside the editor, and credits stay pu
   await expect(page.getByTestId('checks')).toContainText('Ore at the furnace 0/1')
   await page.getByTestId('take-quest').click()
   await expect(page.getByTestId('checks')).toContainText('Ore at the furnace')
-  await expect(page.getByTestId('credits')).toContainText('300')
+  await expect(page.getByTestId('credits')).toContainText('80')
   await expect(page.getByText('In progress')).toBeVisible()
   await expect(page.getByTestId('complete-quest')).toHaveCount(0)
   const request = page.getByLabel('Current request')

@@ -61,7 +61,7 @@ test('the inspector names caps, a locked recipe, and dump', () => {
 test('a fresh world stays on buttons until the quest that grants the trigger is handed over', async () => {
   const session = await createSession(kettlewick, kettlewick.files, undefined, { fresh: true })
   try {
-    expect(triggerUnlocked(session.world, 'run')).toBe(false)
+    expect(triggerUnlocked(session.world, 'run')).toBe(true)
     expect(triggerUnlocked(session.world, 'events')).toBe(false)
     expect(triggerUnlocked(session.world, 'tick')).toBe(false)
     session.world.furnace.input = 2
@@ -69,12 +69,15 @@ test('a fresh world stays on buttons until the quest that grants the trigger is 
     session.step(1)
     expect(session.world.furnace.readyAt).toBe(session.world.tick + kettlewick.recipe.ticks)
     expect(session.world.manualRuns).toBe(1)
+    expect(session.world.codedBatch).toBe(false)
     session.accept()
     expect(session.world.questId).toBe('bram')
-    expect(triggerUnlocked(session.world, 'run')).toBe(false)
+    expect(triggerUnlocked(session.world, 'run')).toBe(true)
     expect(session.world.loop).toBe(false)
-    session.world.orders.find(order => order.id === 'bram')!.shipped = 2
+    session.world.orders.find(order => order.id === 'bram')!.shipped = 1
     session.world.ingotsMade = 1
+    expect(session.complete()).toBe(false)
+    session.world.codedBatch = true
     expect(session.complete()).toBe(true)
     expect(triggerUnlocked(session.world, 'run')).toBe(true)
     expect(triggerUnlocked(session.world, 'tick')).toBe(false)
@@ -84,7 +87,7 @@ test('a fresh world stays on buttons until the quest that grants the trigger is 
     expect(triggerUnlocked(session.world, 'tick')).toBe(false)
     expect(session.world.loop).toBe(false)
     expect(triggerUnlocked(session.world, 'events')).toBe(false)
-    session.world.orders.find(order => order.id === 'ines')!.shipped = 16
+    session.world.orders.find(order => order.id === 'ines')!.shipped = 3
     expect(session.complete()).toBe(true)
     expect(triggerUnlocked(session.world, 'tick')).toBe(true)
     expect(session.world.loop).toBe(true)
@@ -155,8 +158,8 @@ export function onTick() { furnace.smelt() }`,
     session.world.furnace.output = 4
     session.world.depot.ingots = 4
     session.step(1)
-    expect(session.world.orders.find(order => order.id === 'bram')?.shipped).toBe(2)
-    expect(session.world.depot.ingots).toBe(2)
+    expect(session.world.orders.find(order => order.id === 'bram')?.shipped).toBe(1)
+    expect(session.world.depot.ingots).toBe(3)
     expect(session.world.furnace.output).toBe(4)
     session.world.level = 2
     session.world.questId = undefined
@@ -316,7 +319,7 @@ test('the book and the hover share one example, and a locked call names its ques
   expect(smelt?.locked).toBeUndefined()
   expect(smelt?.example.startsWith('//')).toBe(true)
   const events = apiBook(bricks, world).find(section => section.id === 'events')
-  expect(events?.entries.find(entry => entry.id === 'tick')?.locked).toBe('Ingots for the storehouse')
+  expect(events?.entries.find(entry => entry.id === 'tick')?.locked).toBe('Ore from the normal cut')
   const types = declarations(bricks)
   expect(types).toContain(smelt?.example.split('\n')[0])
   expect(types).toContain('drone.idle')
@@ -382,7 +385,7 @@ test('sixty ingots open Harrow hand over after a Run, and a finished save is rep
     session.step(1)
     expect(session.world.manualRuns).toBe(1)
     expect(session.complete()).toBe(true)
-    expect(session.world.credits).toBe(220)
+    expect(session.world.credits).toBe(250)
   } finally { session.dispose() }
   const saved = createWorld(kettlewick)
   saved.credits = 140

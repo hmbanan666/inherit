@@ -24,7 +24,7 @@ test('a new quest stays pending until the works have been still', () => {
   const readings = readChecks(bramWorld(), questList[0]!)
   expect(readings.every(check => check.state === 'pending')).toBe(true)
   expect(readings.every(check => check.reason === undefined)).toBe(true)
-  expect(readings.find(check => check.id === 'done')?.text).toBe('Bram receives 2 ingots 0/2')
+  expect(readings.find(check => check.id === 'done')?.text).toBe('Bram receives 1 ingot 0/1')
 })
 
 test('the first stuck check names the blocking fact and the rest wait on it', () => {
@@ -74,10 +74,10 @@ test('counts advance and a passing check has no reason', () => {
   const order = world.orders.find(item => item.id === 'bram')!
   order.shipped = 1
   const midway = afterStill(world).find(check => check.id === 'done')
-  expect(midway?.text).toBe('Bram receives 2 ingots 1/2')
+  expect(midway?.text).toBe('Bram receives 1 ingot 1/1')
   expect(midway?.state).toBe('failed')
-  expect(midway?.reason).toBe('1 ingot in the furnace, 0 at the depot; carry them to the depot')
-  order.shipped = 2
+  expect(midway?.reason).toBe('waits on: smeltOnce starts a batch')
+  world.codedBatch = true
   const done = readChecks(world, questList[0]!)
   expect(done.every(check => check.state === 'passing')).toBe(true)
   expect(done.every(check => check.reason === undefined)).toBe(true)
@@ -101,8 +101,8 @@ test('a full hopper is named when it blocks the ingot', () => {
   const world = bramWorld()
   world.furnace.input = world.furnace.oreMax
   const readings = afterStill(world)
-  expect(readings.find(check => check.id === 'ingot')?.reason).toBe('furnace full')
-  expect(readings.find(check => check.id === 'done')?.reason).toBe('waits on: The furnace makes an ingot')
+  expect(readings.find(check => check.id === 'ingot')?.reason).toBe('smeltOnce has not started a batch')
+  expect(readings.find(check => check.id === 'done')?.reason).toBe('waits on: smeltOnce starts a batch')
 })
 
 test('a click reads the fields on that cell', () => {
