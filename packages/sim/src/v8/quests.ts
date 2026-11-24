@@ -1,4 +1,5 @@
 import type { Site, World } from './core/world'
+import { separateDrones } from './occupancy'
 import { noteCheckReset, readChecks } from './checkFacts'
 import { createBench, createLathe, createPress, createSpare, hotFurnaceTicks, machineSlot, normalizeBench, normalizeLathe, normalizePress, normalizeSpare, smeltRecipe, type Item } from './modules/stock'
 
@@ -345,8 +346,9 @@ export function grantSecondDrone(world: World) {
   const capacity = world.drones[0]?.capacity ?? 3
   world.drones.push({
     name: secondDrone, pos: { x: home.x, y: home.y }, cargo: 0,
-    capacity, carrying: null, source: '', dig: null, task: null,
+    capacity, carrying: null, source: '', dig: null, task: null, wait: null, avoid: null, waited: 0,
   })
+  separateDrones(world)
   if (world.signals?.drones) world.signals.drones[secondDrone] = { cargo: 0, capacity, idle: true }
 }
 

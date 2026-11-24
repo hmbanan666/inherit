@@ -6,6 +6,8 @@ Run `pnpm sim` for the gameplay gate. Run `pnpm sim:report` to regenerate [the M
 
 [The harness](../sim/playthrough.ts) opens the worker's `createSession` with `{ fresh: true }`. Omitting that option grants legacy automation. Each iteration advances the same works by one tick with no timer. Take, deploy, Run, buttons, shop purchases, and Hand over use the session methods. [The worker](../apps/web/app/lib/factory.worker.ts) schedules one tick per [site interval](../packages/sim/src/v8/sites/kettlewick.ts). Multiply ticks by `kettlewick.tickMs / 60_000` for minutes. The reference player acts immediately. The tick timeline is the works. [Human time](#human-time) adds reading and editing.
 
+Wait ticks in the report are drone-ticks a cart stood still because its next cell held another drone. They are already included in that quest's duration.
+
 [The policy](../sim/policy.ts) takes the first eligible request. Bram's buttons fill and haul, and `smeltOnce` starts the batch. Ines mines vein D and unloads that ore at the depot. Odile uses a one-cart Loop to alloy steel. Elsie's two carts haul steel to the press and a grate to the depot. Harrow switches the press between a plate and a blank. Tomas cuts blanks into gears. Pell joins plates and pins into hinges. Wen sends a plate to the lathe and the cut plate back to the press. Odile's last contract packs a winch crate and then a lamp crate. The press-line program is typechecked and is not a proposed edit. The reference run does not buy. The shop check prices each convenience against the unspent purse at the hand-over that can first afford it.
 
 ## Human time

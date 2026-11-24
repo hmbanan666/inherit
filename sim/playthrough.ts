@@ -23,6 +23,7 @@ export interface QuestRun {
   start: State
   finish: State
   stage: Stage
+  waits: number
 }
 export interface Run {
   events: Event[]
@@ -109,6 +110,7 @@ export async function playthrough(): Promise<Run> {
         }
       }
       const order = world.orders.find(item => item.id === quest)!
+      const waitsAt = world.drones.reduce((sum, drone) => sum + (drone.waited ?? 0), 0)
       let delivered = order.shipped
       const passed = new Set(world.checks.filter(c => c.status === 'green').map(c => c.id))
       while (!ready(world)) {
@@ -130,7 +132,8 @@ export async function playthrough(): Promise<Run> {
       if (!session.complete() || !world.cleared.includes(quest)) throw new Error(`Hand-over refused for ${quest} at tick ${world.tick}`)
       record({ kind: 'finish', detail: offer.title })
       unlocks()
-      quests.push({ id: quest, start, finish: state(world), stage })
+      const waits = world.drones.reduce((sum, drone) => sum + (drone.waited ?? 0), 0) - waitsAt
+      quests.push({ id: quest, start, finish: state(world), stage, waits })
     }
     return { events, quests, probes, cleared: [...world.cleared] }
   } finally { session.dispose() }

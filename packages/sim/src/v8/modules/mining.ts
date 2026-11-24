@@ -1,6 +1,7 @@
 import { brick, type Brick, type TickContext } from '../core/bricks'
 import { chargeCpu } from '../core/cpu'
 import { pushConsole, type Cell, type Drone, type Site, type Vein, type World } from '../core/world'
+import { aroundStep, cellOpen, claimCell, greedyStep, settleOccupancy, takeStep } from '../occupancy'
 import { functionUnlocked, notePartHaul, unlockError } from '../quests'
 import { isItem, itemType, port, release, releaseTransfer, reserve, stationAt as stationIdAt, stationLabel } from './stock'
 
@@ -114,25 +115,16 @@ export function cancelDroneTask(world: World, drone: Drone) {
   clearTask(world, drone)
 }
 
-/** Walk one cell toward target and stop `stopAt` cells away. The rest of the walk stays on `route` for the map. */
-function stepToward(d: Drone, target: Cell, stopAt: number) {
+/** Walk one cell toward target and stop `stopAt` cells away. An occupied cell waits. */
+function stepToward(world: World, d: Drone, target: Cell, stopAt: number) {
   if (distance(d.pos, target) <= stopAt) {
-    d.route = undefined
+    d.avoid = null
+    takeStep(world, d, d.pos, target, stopAt, false)
     return false
   }
-  const dx = Math.sign(target.x - d.pos.x)
-  const dy = dx === 0 ? Math.sign(target.y - d.pos.y) : 0
-  d.pos = { x: d.pos.x + dx, y: d.pos.y + dy }
-  const rest: Cell[] = []
-  let cursor = { x: d.pos.x, y: d.pos.y }
-  while (distance(cursor, target) > stopAt) {
-    const sx = Math.sign(target.x - cursor.x)
-    const sy = sx === 0 ? Math.sign(target.y - cursor.y) : 0
-    cursor = { x: cursor.x + sx, y: cursor.y + sy }
-    rest.push({ x: cursor.x, y: cursor.y })
-  }
-  d.route = rest.length ? rest : undefined
-  return true
+  const next = aroundStep(world, d, target, stopAt, greedyStep(world, d.pos, target))
+  if (!next) return false
+  return takeStep(world, d, next, target, stopAt, false)
 }
 
 function digOnce(world: World, d: Drone, vein: Vein) {
@@ -333,6 +325,8 @@ export function stepDroneTasks(world: World, site: Site, used: number) {
       noteTask(world, error instanceof Error ? error.message : String(error))
     }
   }
+  for (const text of settleOccupancy(world))
+    pushConsole(world, { tick: world.tick, text, level: 'info' })
   return used
 }
 
@@ -345,7 +339,7 @@ function stepMine(world: World, site: Site, d: Drone, veinName: string, spend: (
   }
   if (distance(d.pos, vein.pos) > 1) {
     if (!spend(site.costs.action)) return
-    stepToward(d, vein.pos, 1)
+    stepToward(world, d, vein.pos, 1)
     return
   }
   const held = heldKind(d)
@@ -367,7 +361,7 @@ function stepUnload(world: World, site: Site, d: Drone, at: 'furnace' | 'depot',
   const target = at === 'furnace' ? world.furnace.pos : world.depot.pos
   if (distance(d.pos, target) > 1) {
     if (!spend(site.costs.action)) return
-    stepToward(d, target, 1)
+    stepToward(world, d, target, 1)
     return
   }
   if (!spend(site.costs.action)) return
@@ -379,7 +373,7 @@ function stepPickup(world: World, site: Site, d: Drone, task: Extract<NonNullabl
   if (task.phase === 'fetch') {
     if (distance(d.pos, world.furnace.pos) > 1) {
       if (!spend(site.costs.action)) return
-      stepToward(d, world.furnace.pos, 1)
+      stepToward(world, d, world.furnace.pos, 1)
       return
     }
     const hopper = port(world, 'furnace')
@@ -405,7 +399,7 @@ function stepPickup(world: World, site: Site, d: Drone, task: Extract<NonNullabl
   }
   if (distance(d.pos, world.depot.pos) > 1) {
     if (!spend(site.costs.action)) return
-    stepToward(d, world.depot.pos, 1)
+    stepToward(world, d, world.depot.pos, 1)
     return
   }
   if (!spend(site.costs.action)) return
@@ -426,7 +420,7 @@ function actTransfer(world: World, d: Drone, task: TransferTask, walk: boolean, 
   if (distance(d.pos, view.pos) > 1) {
     if (!walk) return
     if (spend && !spend(cost)) return
-    stepToward(d, view.pos, 1)
+    stepToward(world, d, view.pos, 1)
     return
   }
   if (task.phase === 'fetch') {
@@ -522,23 +516,43 @@ export function mining(site: Site): Brick[] {
     }),
     brick('findPath', 'function findPath(from: Cell, to: Cell): Cell[]', 'Cells to walk from here to the target.',
       `// The cells from the drone to the depot. Remember the array if you walk it again.\nfindPath(drone.pos, depot.pos)`, site.costs.findPath, findPath),
+    brick('isFree', 'function isFree(cell: Cell): boolean', 'True when the cell is on the map, no drone is standing on it, and nobody has reserved it.',
+      `// True when the next cell is empty.\nisFree({ x: drone.pos.x + 1, y: drone.pos.y })`, read,
+      ({ world }, pos) => cellOpen(world, cell(world, pos))),
+    brick('reserve', 'function reserve(cell: Cell): boolean', 'Claim a free cell so other drones leave it alone. The claim lasts a few ticks, or until a drone steps on it. A quest never requires it.',
+      `// Hold the next cell for this cart.\nif (isFree({ x: drone.pos.x + 1, y: drone.pos.y })) reserve({ x: drone.pos.x + 1, y: drone.pos.y })`, read,
+      ({ world }, pos) => claimCell(world, cell(world, pos))),
     brick('drone.isNear', 'isNear(target: Target): boolean', 'Within one cell of a target.', 'drone.isNear(depot)', read,
       ({ world }, name, pos) => distance(drone(world, name).pos, cell(world, pos)) <= 1),
-    brick('drone.moveAlong', 'moveAlong(path: Cell[]): void', 'Walk one step along a saved route. Cancels the current task.',
+    brick('drone.moveAlong', 'moveAlong(path: Cell[]): void', 'Walk one step along a saved route. Cancels the current task. An occupied cell waits.',
       `// One cell along the path. The next call walks the next cell.\ndrone.moveAlong(memory.route)`, action, (ctx, name, path) => {
         const d = drone(ctx.world, name)
         clearTask(ctx.world, d)
         d.dig = null
         if (!Array.isArray(path)) throw new Error(`${who(d)}; moveAlong path is not an array of cells.`)
-        const index = path.findIndex(p => distance(cell(ctx.world, p), d.pos) === 0)
-        const next = path[index + 1]
-        if (!next) return
-        const pos = cell(ctx.world, next)
-        const away = distance(d.pos, pos)
-        if (away !== 1) throw new Error(`${who(d)}; next path cell (${pos.x},${pos.y}) is ${away} away.`)
         const cells = path.map(step => cell(ctx.world, step))
-        d.pos = pos
-        d.route = cells.slice(index + 1)
+        const goal = cells[cells.length - 1]
+        if (!goal) return
+        const index = cells.findIndex(step => distance(step, d.pos) === 0)
+        let next: Cell | undefined
+        if (index >= 0) {
+          next = cells[index + 1]
+          if (!next) {
+            d.route = undefined
+            d.wait = null
+            d.avoid = null
+            return
+          }
+          const away = distance(d.pos, next)
+          if (away !== 1) throw new Error(`${who(d)}; next path cell (${next.x},${next.y}) is ${away} away.`)
+        } else if (cells[0] && distance(d.pos, cells[0]) === 1) next = cells[0]
+        else next = greedyStep(ctx.world, d.pos, cells.reduce((best, step) => distance(d.pos, step) < distance(d.pos, best) ? step : best)) ?? undefined
+        next = aroundStep(ctx.world, d, goal, 0, next ?? null) ?? undefined
+        if (!next) return
+        const before = { ...d.pos }
+        takeStep(ctx.world, d, next, goal, 0, true)
+        if (distance(d.pos, before) === 0) d.route = cells.slice(index >= 0 ? index + 1 : 0)
+        else if (distance(d.pos, next) === 0) d.route = cells.slice(index + 1)
       }),
     brick('drone.cargoKind', `readonly cargoKind: ${itemType} | null`, 'What the cart holds. Null when cargo is 0.', 'drone.cargoKind', read, { guest: '' }),
     brick('drone.busy', 'readonly busy: boolean', 'True while the drone is carrying out a task.', 'drone.busy', read, { guest: '' }),
@@ -577,7 +591,7 @@ export function miningModule(bricks: Brick[]) {
   const source = bricks.flatMap(b => typeof b.handler === 'object' ? [b.handler.guest] : [])
   return [...source, `
     export const cpu = Object.freeze({ used: api.cpu_used, get limit() { return api.cpu_limit() } })
-    export const veins = api.veins, findPath = api.findPath
+    export const veins = api.veins, findPath = api.findPath, isFree = api.isFree, reserve = api.reserve
     export function drones() {
       return api.drones().map(d => {
         const name = d.name

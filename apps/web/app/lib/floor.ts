@@ -401,6 +401,10 @@ export class FloorScene {
       item.name.text = drone.name
       item.badge.text = `${drone.cargo}/${drone.capacity}`
       item.bar.clear()
+      if (drone.wait && drone.wait.ticks > 0) {
+        item.bar.roundRect(-6, -54, 3, 8, 1).fill(0xe7c56a)
+        item.bar.roundRect(1, -54, 3, 8, 1).fill(0xe7c56a)
+      }
       const dig = drone.dig
       const vein = dig && world.veins.find(entry => entry.name === dig.vein)
       if (dig && vein && dig.ticks > 0) {

@@ -48,6 +48,11 @@ export function report(run: Run) {
   if (widest && still && flat) rows.push('',
     `Longest gap between unlocks, quest boundaries, or edits was ${span(widest)}. Including quest progress, the longest idle stretch was ${span(still)} on ${still.quest}. The longest XP/level plateau was ${span(flat)}.`)
 
+  rows.push('', '## Waiting', '',
+    'A wait tick is one drone standing for one tick because its next cell held another drone. The pause is already included in the quest duration above.', '',
+    '| Quest | Wait ticks |', '|---|---:|')
+  for (const q of quests) rows.push(`| ${q.id} | ${q.waits} |`)
+
   rows.push('', ...humanMarkdown(run))
 
   rows.push('', '## Quest timeline and balances at hand-over', '',

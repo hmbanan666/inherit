@@ -41,14 +41,20 @@ export function onTick() {
 
 test('a cached route moves every drone and stays under 15 CPU on every tick', async () => {
   const site = { ...kettlewick, drones: [1, 3, 4].map(i => ({ ...kettlewick.drones[0], name: 'drone-' + i })) }
-  const first = await runSession(site, cached, 1)
-  for (const [i, drone] of first.drones.entries()) expect(drone.pos).not.toEqual(site.drones[i].pos)
-  const world = await runSession(site, cached, 32)
+  const session = await createSession(site, cached)
+  try {
+    const starts = session.world.drones.map(drone => ({ ...drone.pos }))
+    session.step(1)
+    for (const [i, drone] of session.world.drones.entries()) expect(drone.pos).not.toEqual(starts[i])
+    const cells = session.world.drones.map(drone => `${drone.pos.x},${drone.pos.y}`)
+    expect(new Set(cells).size).toBe(cells.length)
+  } finally { session.dispose() }
+  const world = await runSession(site, cached, 48)
   expect(world.messages).toEqual([])
   expect(world.depot.ore).toBeGreaterThanOrEqual(9)
-  expect(world.memory.lastTick).toBe(32)
+  expect(world.memory.lastTick).toBe(48)
   const costs = world.memory.costs as number[]
-  expect(costs).toHaveLength(32)
+  expect(costs).toHaveLength(48)
   expect(costs.slice(0, 2)).toEqual([6, 3])
   expect(Math.max(...costs)).toBeLessThan(15)
 })

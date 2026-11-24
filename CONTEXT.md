@@ -15,6 +15,7 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | Depot delivery | A quest counts goods only when they arrive at the depot. The furnace and the press hold them until a drone unloads them there. `takeFromDepot` is the only path that counts them. |
 | Press | The machine Odile installs on Hand over. It forms a grate, a plate, or a blank. See [ADR 0036](docs/adr/0036-region-1-fabrication-chain.md). |
 | Transfer | A drone task that carries one kind of goods from one station to another. It reserves the goods and the receiving space until it finishes or is cancelled. |
+| Soft occupancy | One drone on a cell, including a station. A blocked step waits, then goes around. A head-on yields. See [ADR 0038](docs/adr/0038-soft-occupancy.md). |
 | Tick | One step of the world, 0.5 s. While Loop is on, and no Run is in progress, `onTick` runs once per tick. The clock does not pause and has no speed control. |
 | CPU | A budget per tick, stored on the world as spent and limit. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it on every tick. CPU +10 in the shop raises the limit. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. A new one is granted by taking a quest. |
