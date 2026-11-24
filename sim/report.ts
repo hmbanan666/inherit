@@ -1,6 +1,7 @@
 import { kettlewick } from '../packages/sim/src/v8'
 import { assess, gapMinutes, span, type Gap } from './assessment'
 import { balance } from './config'
+import { humanMarkdown } from './humanEstimate'
 import { minutes, type Event, type Run } from './playthrough'
 
 function longest(gaps: Gap[]) {
@@ -21,7 +22,7 @@ export function report(run: Run) {
   const rows = [
     '# Kettlewick balance report', '',
     `The reference player handed over ${quests.length} quests in **${last.tick} ticks (${number(last.tick)} minutes)** and finished with **${last.credits} credits, ${last.xp} XP, level ${last.level}**.`, '',
-    `Each tick represents ${kettlewick.tickMs} ms on the [worker clock](../../apps/web/app/lib/factory.worker.ts), using [the site interval](../../packages/sim/src/v8/sites/kettlewick.ts). Actions are immediate. Reading, editing, and thinking time are outside the estimate.`, '',
+    `Each tick represents ${kettlewick.tickMs} ms on the [worker clock](../../apps/web/app/lib/factory.worker.ts), using [the site interval](../../packages/sim/src/v8/sites/kettlewick.ts). Actions are immediate. Reading, writing, debugging, and the shop are estimated under Human time.`, '',
     '## Balance findings', '',
     '| Status | Check | Measurement | Reason on record |', '|---|---|---|---|',
   ]
@@ -46,6 +47,8 @@ export function report(run: Run) {
   const flat = longest(plateaus)
   if (widest && still && flat) rows.push('',
     `Longest gap between unlocks, quest boundaries, or edits was ${span(widest)}. Including quest progress, the longest idle stretch was ${span(still)} on ${still.quest}. The longest XP/level plateau was ${span(flat)}.`)
+
+  rows.push('', ...humanMarkdown(run))
 
   rows.push('', '## Quest timeline and balances at hand-over', '',
     `The time column spans 0–${number(last.tick)} minutes. Credit bars share a scale. Each level block represents one level.`,

@@ -1,6 +1,6 @@
 # Balance simulation is the gate for gameplay changes
 
-Proposed 24 November 2026. Builds on [ADR 0026](0026-quantity-quests-one-world.md) and [ADR 0032](0032-rewards-on-hand-over.md).
+Proposed 24 November 2026. Builds on [ADR 0026](0026-quantity-quests-one-world.md) and [ADR 0032](0032-rewards-on-hand-over.md). Amended by [ADR 0037](0037-human-play-time.md): the same run estimates human play time, and those warnings are not this gate.
 
 ## Context
 
@@ -14,4 +14,4 @@ CI checks the resulting quest times, gaps between milestones, shop affordability
 
 ## Consequences
 
-Gameplay changes update the reference players, balance targets, and [checked-in measurements](../sim/report.md) where the new behavior calls for them. The game data and its eligibility checks remain in the core. Nick's playtest measures the experience of learning the API, writing a solution, and deciding what to do next. The simulated clock measures the works while a specified policy plays. See [the balance simulation guide](../sim.md).
+Gameplay changes update the reference players, balance targets, and [checked-in measurements](../sim/report.md) where the new behavior calls for them. The game data and its eligibility checks remain in the core. Nick's playtest measures the experience of learning the API, writing a solution, and deciding what to do next. The simulated clock measures the works while a specified policy plays. [ADR 0037](0037-human-play-time.md) estimates that experience beside the clock. A human-time warning is not a failure of this gate. See [the balance simulation guide](../sim.md).

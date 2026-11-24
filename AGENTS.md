@@ -10,7 +10,7 @@ When changing a quest, keep a test that the previous program fails it and a work
 
 ## Checks
 
-Every gameplay or economy change must pass `pnpm sim`. When content changes, update the reference players and balance invariants as described in [the simulation guide](docs/sim.md).
+Every gameplay or economy change must pass `pnpm sim`. When content changes, update the reference players and balance invariants as described in [the simulation guide](docs/sim.md). Read the human-time estimate in that report. A warning there does not fail the gate. It is a reason to look at the quest's length for the average player and at any long wait with no code change.
 
 Nick playtests. Agents do not run browser suites or screenshots. Before a PR, on the final commit:
 
