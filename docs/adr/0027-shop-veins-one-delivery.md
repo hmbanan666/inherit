@@ -1,6 +1,6 @@
 # Shop, veins, and one delivery
 
-Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0025](0025-functions-with-triggers.md), and [ADR 0026](0026-quantity-quests-one-world.md). [ADR 0028](0028-run-to-completion.md) supersedes the sentence that Elsie grants `onTick`.
+Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0025](0025-functions-with-triggers.md), and [ADR 0026](0026-quantity-quests-one-world.md). [ADR 0028](0028-run-to-completion.md) supersedes the sentence that Elsie grants `onTick`. [ADR 0032](0032-rewards-on-hand-over.md) supersedes the sentence that a later quest gains drone-2. The drone arrives on Odile's Hand over, or stays when the save already bought it.
 
 ## Context
 

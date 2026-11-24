@@ -1,6 +1,6 @@
 # Run to completion, then Loop
 
-Accepted 24 November 2026. Supersedes the trigger order in [ADR 0025](0025-functions-with-triggers.md): buttons, then Run, then Loop and `onTick`, then `on()`. [ADR 0029](0029-pure-functions-machine-tasks.md) supersedes the Run rule below: a function finishes in one tick, and `yield` does not continue it. Amends [ADR 0026](0026-quantity-quests-one-world.md) and [ADR 0027](0027-shop-veins-one-delivery.md) where they repeat that order. [ADR 0014](0014-watched-runs-then-the-loop.md) stays the pack history.
+Accepted 24 November 2026. Supersedes the trigger order in [ADR 0025](0025-functions-with-triggers.md): buttons, then Run, then Loop and `onTick`, then `on()`. [ADR 0029](0029-pure-functions-machine-tasks.md) supersedes the Run rule below: a function finishes in one tick, and `yield` does not continue it. Amends [ADR 0026](0026-quantity-quests-one-world.md) and [ADR 0027](0027-shop-veins-one-delivery.md) where they repeat that order. [ADR 0014](0014-watched-runs-then-the-loop.md) stays the pack history. [ADR 0032](0032-rewards-on-hand-over.md) supersedes the sentences that grant Run, Loop, or `on()` on Take. Those triggers land on Hand over.
 
 ## Context
 

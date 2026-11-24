@@ -89,6 +89,7 @@ export class FloorScene {
     cargo: Graphics
     load: Material
     badge: Text
+    name: Text
     bar: Graphics
     offset: number
     fromX: number
@@ -155,14 +156,14 @@ export class FloorScene {
     const load = loadArt(drone.carrying)
     const cargo = art.addChild(materialArt(load))
     cargo.position.set(-7, -12)
-    caption(art, drone.name, 0, 9)
+    const name = caption(art, drone.name, 0, 9)
     const badge = art.addChild(label(`${drone.cargo}/${drone.capacity}`, 13, 0xf2ead8))
     badge.anchor.set(0.5, 1)
     badge.position.set(0, -30)
     const bar = art.addChild(new Graphics())
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
-    this.haulers.push({ art, cargo, load, badge, bar, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+    this.haulers.push({ art, cargo, load, badge, name, bar, offset: 0, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
   }
 
   private showLoad(item: FloorScene['haulers'][number], drone: FloorWorld['drones'][number]) {
@@ -195,6 +196,7 @@ export class FloorScene {
     const radius = 56
     for (let i = this.haulers.length - 1; i >= 0; i--) {
       const art = this.haulers[i]!.art
+      if (!art.visible) continue
       const dx = x - art.x
       const dy = y - art.y
       if (dx * dx + dy * dy <= radius * radius) return this.latest.drones[i]?.name
@@ -246,9 +248,16 @@ export class FloorScene {
     for (const vein of world.veins) this.placeVein(vein)
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
     const count = world.drones.length
-    for (const [i, item] of this.haulers.entries()) item.offset = (i - (count - 1) / 2) * 25
+    const snap = new Set<number>()
+    for (const [i, item] of this.haulers.entries()) {
+      if (i >= count) item.art.visible = false
+      item.offset = (i - (count - 1) / 2) * 25
+    }
     for (const [i, drone] of world.drones.entries()) {
       const item = this.haulers[i]!
+      if (!item.art.visible) snap.add(i)
+      item.art.visible = true
+      item.name.text = drone.name
       item.badge.text = `${drone.cargo}/${drone.capacity}`
       item.bar.clear()
       const dig = drone.dig
@@ -271,6 +280,17 @@ export class FloorScene {
     }
     this.paintRoutes(world)
     this.paintRing(world)
+    for (const i of snap) {
+      const item = this.haulers[i]!
+      const drone = world.drones[i]!
+      const pos = center(drone.pos)
+      item.x = pos.x + item.offset
+      item.y = pos.y + 20
+      item.fromX = item.x
+      item.fromY = item.y
+      item.art.position.set(item.x, item.y)
+      this.showLoad(item, drone)
+    }
     if (world.tick === this.lastTick) return
     const restart = world.tick < this.lastTick
     this.lastTick = world.tick

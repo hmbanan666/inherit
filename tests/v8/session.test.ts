@@ -40,7 +40,7 @@ export function onTick() {
 }
 
 test('a cached route moves every drone and stays under 15 CPU on every tick', async () => {
-  const site = { ...kettlewick, drones: [1, 2, 3].map(i => ({ ...kettlewick.drones[0], name: 'drone-' + i })) }
+  const site = { ...kettlewick, drones: [1, 3, 4].map(i => ({ ...kettlewick.drones[0], name: 'drone-' + i })) }
   const first = await runSession(site, cached, 1)
   for (const [i, drone] of first.drones.entries()) expect(drone.pos).not.toEqual(site.drones[i].pos)
   const world = await runSession(site, cached, 32)
