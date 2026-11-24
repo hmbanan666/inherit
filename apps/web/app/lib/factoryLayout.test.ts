@@ -14,13 +14,10 @@ import {
   mapHeightMin,
   questRailPx,
   readFilesOpen,
-  codeColumnPx,
+  editorColumns,
   codeStackPx,
-  codeTightPx,
   consoleBody,
   readMapHeight,
-  stackCodeColumn,
-  tightCodeColumn,
   readPaneWidth,
   readSideTab,
   sideWidthMax,
@@ -75,16 +72,26 @@ test('the checks pane and the file tree remember a width inside a sane range', (
   expect(consoleBody('smelt() makes ingots.', true)).toBe('smelt() makes ingots.')
 })
 
-test('a narrow code column stacks the checks and hides the shortcut first', () => {
-  const room = codeColumnPx(900, 36, 300)
-  expect(room).toBe(564)
-  expect(stackCodeColumn(room)).toBe(false)
-  expect(tightCodeColumn(400)).toBe(true)
-  expect(stackCodeColumn(400)).toBe(false)
-  expect(stackCodeColumn(codeStackPx - 1)).toBe(true)
-  expect(tightCodeColumn(codeTightPx)).toBe(false)
-  expect(stackCodeColumn(0)).toBe(false)
-  expect(codeColumnPx(0, 36, 300)).toBe(0)
+test('an unmeasured bay uses the saved columns until its first measurement', () => {
+  expect(editorColumns(undefined, treeWidthMax, sideWidthMax)).toEqual({ tree: treeWidthMax, stackChecks: false })
+})
+
+test('a measured bay stacks Tests even when the saved panes leave zero code room', () => {
+  expect(editorColumns(treeWidthMax + sideWidthMax, treeWidthMax, sideWidthMax))
+    .toEqual({ tree: treeWidthMax, stackChecks: true })
+  expect(editorColumns(0, treeWidthMax, sideWidthMax)).toEqual({ tree: 0, stackChecks: true })
+})
+
+test('at 801px the displayed tree leaves room for the active file and actions', () => {
+  const bay = worksWidth(801) - 2 // The observer measures inside the two 1px borders.
+  const narrow = editorColumns(bay, treeWidthMax, sideWidthMax)
+  expect(narrow.stackChecks).toBe(true)
+  expect(bay - narrow.tree).toBe(codeStackPx)
+  expect(editorColumns(bay, 36, sideWidthMax)).toEqual({ tree: 36, stackChecks: true })
+
+  const wide = treeWidthMax + sideWidthMax + codeStackPx
+  expect(editorColumns(wide - 1, treeWidthMax, sideWidthMax)).toEqual({ tree: treeWidthMax, stackChecks: true })
+  expect(editorColumns(wide, treeWidthMax, sideWidthMax)).toEqual({ tree: treeWidthMax, stackChecks: false })
 })
 
 test('the file tree starts collapsed on a narrow window and open on a wide one', () => {

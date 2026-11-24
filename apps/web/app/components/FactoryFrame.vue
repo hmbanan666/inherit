@@ -6,9 +6,9 @@ import { CircleAlert, Coins, Cpu, Sparkles, TextCursor, Timer, TriangleAlert, Un
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
-  checksPanePx, clampMapHeight, codeColumnPx, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
+  checksPanePx, clampMapHeight, editorColumns, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
   questRailPx, readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
-  stackCodeColumn, tightCodeColumn, treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
+  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { insertQuestNote, questCard, questComment } from '../lib/questNote'
@@ -76,8 +76,9 @@ const mapHeight = ref(defaultMapHeight())
 const treeWidth = ref(fileTreePx)
 const sideWidth = ref(checksPanePx)
 const editorBay = ref<HTMLElement | null>(null)
-const bayWidth = ref(0)
-const treeColumnCss = computed(() => (filesOpen.value ? treeWidth.value : treeRailPx) + 'px')
+const bayWidth = ref<number>()
+const columns = computed(() => editorColumns(bayWidth.value, filesOpen.value ? treeWidth.value : treeRailPx, sideWidth.value))
+const treeColumnCss = computed(() => columns.value.tree + 'px')
 const mapRowCss = computed(() => mapHeight.value + '%')
 let filesReady = false
 let sideReady = false
@@ -126,19 +127,13 @@ function onSide(event: PointerEvent) {
   setSideWidth(rect.right - event.clientX)
 }
 function nudgeTree(direction: -1 | 1) {
+  const from = filesOpen.value && direction < 0 ? columns.value.tree : treeWidth.value
   filesOpen.value = true
-  setTreeWidth(treeWidth.value + direction * 16)
+  setTreeWidth(from + direction * 16)
 }
 function nudgeSide(direction: -1 | 1) {
   setSideWidth(sideWidth.value - direction * 16)
 }
-const codeRoom = computed(() => codeColumnPx(
-  bayWidth.value,
-  filesOpen.value ? treeWidth.value : treeRailPx,
-  sideWidth.value,
-))
-const stackChecks = computed(() => stackCodeColumn(codeRoom.value))
-const tightEditor = computed(() => tightCodeColumn(codeRoom.value))
 const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
 const available = computed(() => {
   const current = world.value
@@ -487,7 +482,7 @@ onMounted(async () => {
   filesReady = true
   sideReady = true
   bayObserver = new ResizeObserver(entries => {
-    bayWidth.value = entries[0]?.contentRect.width ?? 0
+    bayWidth.value = entries[0]?.contentRect.width
   })
   if (editorBay.value) bayObserver.observe(editorBay.value)
   worker = new Worker(new URL('../lib/factory.worker.ts', import.meta.url), { type: 'module' })
@@ -699,10 +694,10 @@ onBeforeUnmount(() => {
           <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="openMachine" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
-        <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': stackChecks }">
+        <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': columns.stackChecks }">
           <FileTree id="project-files" v-model:open="filesOpen" v-model:files="files" v-model:active-file="activeFile" />
           <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
-          <div class="editor-column" :class="{ tight: tightEditor }">
+          <div class="editor-column">
             <div class="editor-pane"><div class="editor-host">
               <LazyCodeEditor @reference="bookOpen = true">
                 <template #actions>
@@ -1160,6 +1155,7 @@ onBeforeUnmount(() => {
 }
 .xp-bar i { display: block; height: 100%; background: var(--gold) }
 .editor-column {
+  container: editor / inline-size;
   --editor-header: v-bind(headerCss);
   grid-column: 3;
   grid-row: 1;
@@ -1222,8 +1218,10 @@ onBeforeUnmount(() => {
   border: 1px solid currentColor;
   border-radius: 3px;
 }
-.editor-column.tight :deep(.deploy kbd) { display: none }
-@media (min-width: 801px) {
+@container editor (width < 520px) {
+  .editor-column :deep(.deploy kbd) { display: none }
+}
+@media (width > 800px) {
   .editor-bay.stack-checks {
     grid-template-columns: v-bind(treeColumnCss) 0 minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) minmax(72px, 28%);
