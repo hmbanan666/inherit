@@ -8,3 +8,13 @@ export function runnableExports(source: string) {
   }
   return found
 }
+
+/** The no-argument export the caret is in. The gutter and the command menu share it. */
+export function exportAtCursor(source: string, line: number) {
+  let chosen: { name: string; line: number } | undefined
+  for (const item of runnableExports(source)) {
+    if (item.line > line) break
+    chosen = item
+  }
+  return chosen
+}

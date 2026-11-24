@@ -6,11 +6,15 @@ import { migrateWorld } from '../../packages/sim/src/v8/core/world'
 import { triggerUnlocked } from '../../packages/sim/src/v8/quests'
 import { apiBook, declarations, factoryBricks } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
-import { runnableExports } from '../../apps/web/app/lib/runGlyph'
+import { exportAtCursor, runnableExports } from '../../apps/web/app/lib/runGlyph'
 
 test('the play mark finds a no-argument export and skips the rest', () => {
   const found = runnableExports('export function smeltOnce() {\n}\nexport function* bringOne() {\n}\nexport function haul(drone) {\n}\nfunction local() {}\n')
   expect(found).toEqual([{ name: 'smeltOnce', line: 1 }])
+  const source = 'export function haul() {\n  return\n}\nexport function smeltOnce() {\n}\n'
+  expect(exportAtCursor(source, 2)?.name).toBe('haul')
+  expect(exportAtCursor(source, 4)?.name).toBe('smeltOnce')
+  expect(exportAtCursor(source, 1)?.name).toBe('haul')
 })
 
 test('the inspector names caps, a locked recipe, and dump', () => {
@@ -20,7 +24,12 @@ test('the inspector names caps, a locked recipe, and dump', () => {
   expect(furnace?.recipes.find(recipe => recipe.id === 'steel')?.locked).toContain('Steel for the bridge')
   expect(furnace?.actions.find(action => action.id === 'dump')).toBeUndefined()
   expect(furnace?.actions.find(action => action.id === 'clear')?.api).toBe('furnace.clear()')
-  expect(furnace?.actions.find(action => action.id === 'collect')?.api).toBe('drone.pickup(furnace)')
+  expect(furnace?.actions.find(action => action.id === 'smelt')).toMatchObject({ enabled: false, reason: 'Needs 2 ore' })
+  expect(furnace?.actions.find(action => action.id === 'collect')).toMatchObject({ api: 'drone.pickup(furnace)', reason: 'Collect with drone-1', drone: 'drone-1' })
+  expect(machineList(world).find(row => row.id === 'furnace')?.detail).toBe('0 ore · 0 ingots')
+  world.furnace.coal = 1
+  world.furnace.steel = 2
+  expect(machineList(world).find(row => row.id === 'furnace')?.detail).toBe('0 ore · 1 coal · 0 ingots · 2 steel')
   const depot = inspectMachine(world, kettlewick, 'depot')
   expect(depot?.actions).toEqual([])
   const vein = inspectMachine(world, kettlewick, 'Vein A')
@@ -29,6 +38,23 @@ test('the inspector names caps, a locked recipe, and dump', () => {
   expect(inspectMachine(world, kettlewick, 'Vein C')).toBeUndefined()
   const drone = inspectMachine(world, kettlewick, 'drone-1')
   expect(drone?.actions.map(action => action.api)).toEqual(['drone.mine(vein)', 'drone.unload(station)', 'drone.dump()'])
+  expect(drone?.lines.find(line => line.label === 'Task')?.value).toBe('free')
+  expect(drone?.progress).toBeUndefined()
+  world.drones[0]!.cargo = 2
+  world.drones[0]!.carrying = 'ore'
+  expect(inspectMachine(world, kettlewick, 'drone-1')?.actions.find(action => action.id === 'unload')?.reason).toBe('Unload at furnace')
+  world.drones[0]!.carrying = 'ingot'
+  expect(inspectMachine(world, kettlewick, 'drone-1')?.actions.find(action => action.id === 'unload')?.reason).toBe('Unload at depot')
+  world.drones[0]!.task = { kind: 'pickup', phase: 'fetch', since: 0 }
+  const hauling = inspectMachine(world, kettlewick, 'drone-1')
+  expect(hauling?.progress).toBeUndefined()
+  expect(hauling?.lines.find(line => line.label === 'Task')?.value).toBe('Hauling')
+  world.drones[0]!.task = { kind: 'mine', vein: 'A', since: 0 }
+  world.drones[0]!.dig = { vein: 'A', ticks: 2 }
+  const mining = inspectMachine(world, kettlewick, 'drone-1')
+  expect(mining?.lines.find(line => line.label === 'Task')?.value).toBe('Mining')
+  expect(mining?.progress?.label).toBe('Mining')
+  expect(mining?.progress?.pct).toBe(40)
   expect(machineList(world).map(row => row.id)).toEqual(['furnace', 'depot', 'drone-1', 'Vein A', 'Vein B', 'Vein D'])
 })
 

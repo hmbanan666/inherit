@@ -32,6 +32,8 @@ export interface QuestDef {
   pay: number
   xp: number
   needLevel: number
+  /** Another quest's gift. Take stays closed until that machine is in the world. */
+  needs?: string
   /** A function this quest grants on Take. The signature is a recipe, not a solution. */
   unlock?: { brick: string; signature: string; legacy?: string }
   /** Run, on(), or onTick. Granted on Take, by the same rule as unlock. */
@@ -131,6 +133,7 @@ export const questList: QuestDef[] = [
     nudge: 'one cart cannot be in two places. on() can run a function when the cart is idle.',
     change: 'The bakery is warm again.',
     item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
+    needs: 'drone-2',
     trigger: 'events',
     prepare: world => { world.steelMark = world.steelMade },
     tests: [
@@ -241,9 +244,24 @@ export function repairHarrow(world: World) {
   if (shipped >= 60) world.manualRuns = 0
 }
 
+/** Why Take stays closed. The gift name lives on the quest that hands it over. */
+export function questHold(world: Pick<World, 'drones'>, quest: QuestDef) {
+  const gift = quest.needs
+  if (!gift || world.drones.some(drone => drone.name === gift)) return
+  const giver = questList.find(item => item.gift === gift)
+  if (!giver) return
+  const who = giver.from.replace(/^Mayor /, '')
+  const place = giver.building.includes('-') ? giver.title : giver.building
+  return `Finish ${who}'s ${place} for ${gift}`
+}
+
+/** The list and Accept share this. Level, an open chain, and a gift already in the world. */
+export function canTake(world: Pick<World, 'cleared' | 'level' | 'drones'>, quest: QuestDef) {
+  return !world.cleared.includes(quest.id) && world.level >= quest.needLevel && !questHold(world, quest)
+}
+
 export function nextQuest(world: World, site: Site) {
-  const quest = site.questList?.find(item => !world.cleared.includes(item.id) && world.level >= item.needLevel)
-  return quest
+  return site.questList?.find(item => canTake(world, item))
 }
 
 export function syncQuest(world: World, site: Site) {
@@ -277,7 +295,7 @@ export function pinLegacyTriggers(world: Pick<World, 'automation' | 'questId' | 
 export function acceptQuest(world: World, site: Site, id?: string) {
   if (world.questId) return false
   const quest = id
-    ? site.questList?.find(item => item.id === id && !world.cleared.includes(item.id) && world.level >= item.needLevel)
+    ? site.questList?.find(item => item.id === id && canTake(world, item))
     : nextQuest(world, site)
   if (!quest) return false
   const grantsLoop = quest.trigger === 'tick' && !triggerUnlocked(world, 'tick')

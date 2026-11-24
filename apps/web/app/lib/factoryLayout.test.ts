@@ -14,8 +14,13 @@ import {
   mapHeightMin,
   questRailPx,
   readFilesOpen,
+  codeColumnPx,
+  codeStackPx,
+  codeTightPx,
   consoleBody,
   readMapHeight,
+  stackCodeColumn,
+  tightCodeColumn,
   readPaneWidth,
   readSideTab,
   sideWidthMax,
@@ -65,8 +70,21 @@ test('the checks pane and the file tree remember a width inside a sane range', (
   expect(readPaneWidth('10', treeWidthMin, treeWidthMax, 140)).toBe(treeWidthMin)
   expect(readPaneWidth('900', sideWidthMin, sideWidthMax, 300)).toBe(sideWidthMax)
   expect(readPaneWidth('nope', sideWidthMin, sideWidthMax, 300)).toBe(300)
-  expect(consoleBody('main.ts:18 · drone-1 keeps 2 ore')).toBe('drone-1 keeps 2 ore')
-  expect(consoleBody('smelt() makes ingots.')).toBe('smelt() makes ingots.')
+  expect(consoleBody('main.ts:18 · drone-1 keeps 2 ore')).toBe('main.ts:18 · drone-1 keeps 2 ore')
+  expect(consoleBody('main.ts:18 · drone-1 keeps 2 ore', true)).toBe('drone-1 keeps 2 ore')
+  expect(consoleBody('smelt() makes ingots.', true)).toBe('smelt() makes ingots.')
+})
+
+test('a narrow code column stacks the checks and hides the shortcut first', () => {
+  const room = codeColumnPx(900, 36, 300)
+  expect(room).toBe(564)
+  expect(stackCodeColumn(room)).toBe(false)
+  expect(tightCodeColumn(400)).toBe(true)
+  expect(stackCodeColumn(400)).toBe(false)
+  expect(stackCodeColumn(codeStackPx - 1)).toBe(true)
+  expect(tightCodeColumn(codeTightPx)).toBe(false)
+  expect(stackCodeColumn(0)).toBe(false)
+  expect(codeColumnPx(0, 36, 300)).toBe(0)
 })
 
 test('the file tree starts collapsed on a narrow window and open on a wide one', () => {

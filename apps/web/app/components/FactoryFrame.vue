@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { apiBook, declarations, inspectMachine, kettlewick, factoryBricks, machineList, shop, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shop, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
-import { CircleAlert, Coins, Cpu, Play, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
+import { CircleAlert, Coins, Cpu, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
-  checksPanePx, clampMapHeight, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
+  checksPanePx, clampMapHeight, codeColumnPx, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
   questRailPx, readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
-  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
+  stackCodeColumn, tightCodeColumn, treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
-import { quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
-import { grantHint, questNextStep } from '../lib/questStep'
+import { deliveryNote, firstOpenTest, quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
+import { grantNote, questNextStep, type CartCue } from '../lib/questStep'
+import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { reduceApiBook } from '../lib/apiBookState'
 import { insertTriggerExample } from '../lib/triggerNote'
 
@@ -35,9 +36,9 @@ const notesKey = 'inherit.v8.notes'
 const notes = ref<string[]>([])
 const world = shallowRef<World>()
 watch([visibleBricks, freshNames], () => { api.value = declarations(visibleBricks.value, freshNames.value) })
-const error = ref('')
-const saveError = ref('')
-const floorError = ref('')
+const scriptNotice = ref<HostNotice>()
+const saveNotice = ref<HostNotice>()
+const floorNotice = ref<HostNotice>()
 const pending = ref(true)
 const panels = ['Charts'] as const
 const tool = ref<typeof panels[number]>()
@@ -72,6 +73,7 @@ const mapHeight = ref(defaultMapHeight())
 const treeWidth = ref(fileTreePx)
 const sideWidth = ref(checksPanePx)
 const editorBay = ref<HTMLElement | null>(null)
+const bayWidth = ref(0)
 const treeColumnCss = computed(() => (filesOpen.value ? treeWidth.value : treeRailPx) + 'px')
 const mapRowCss = computed(() => mapHeight.value + '%')
 let filesReady = false
@@ -127,14 +129,27 @@ function nudgeTree(direction: -1 | 1) {
 function nudgeSide(direction: -1 | 1) {
   setSideWidth(sideWidth.value - direction * 16)
 }
+const codeRoom = computed(() => codeColumnPx(
+  bayWidth.value,
+  filesOpen.value ? treeWidth.value : treeRailPx,
+  sideWidth.value,
+))
+const stackChecks = computed(() => stackCodeColumn(codeRoom.value))
+const tightEditor = computed(() => tightCodeColumn(codeRoom.value))
 const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
 const available = computed(() => {
   const current = world.value
   if (!current || current.questId) return []
   return kettlewick.questList?.filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel) ?? []
 })
+const offers = computed(() => available.value.map(quest => ({
+  quest,
+  hold: world.value ? questHold(world.value, quest) : undefined,
+})))
 const readingId = ref<string>()
 const reading = computed(() => available.value.find(quest => quest.id === readingId.value))
+const readingHold = computed(() => reading.value && world.value ? questHold(world.value, reading.value) : undefined)
+const readingTake = computed(() => !!reading.value && !!world.value && canTake(world.value, reading.value))
 const shownQuest = computed(() => activeQuest.value ?? reading.value)
 const ready = computed(() => !!activeQuest.value && !!world.value?.checks.length && world.value.checks.every(check => check.status === 'green'))
 const shippedCount = computed(() => {
@@ -146,8 +161,9 @@ const shippedCount = computed(() => {
 const quantity = computed(() => {
   const quest = shownQuest.value
   if (!quest) return undefined
-  return quantityLabel(quest.item, quest.qty, shippedCount.value)
+  return quantityLabel(quest.from, quest.item, quest.qty, shippedCount.value)
 })
+const needText = computed(() => shownQuest.value ? deliveryNote(shownQuest.value.need) : '')
 const testRows = computed(() => {
   const quest = shownQuest.value
   const current = world.value
@@ -193,23 +209,37 @@ watch(world, (next, previous) => {
   window.clearTimeout(gainTimer)
   gainTimer = window.setTimeout(() => { gains.value = [] }, 1200)
 })
-const hostError = computed(() => error.value || saveError.value || floorError.value)
+const hostError = computed(() => [saveNotice.value?.text, floorNotice.value?.text].filter(Boolean).join(' '))
+function hostLine(notice: HostNotice | undefined, seq: number): ConsoleLine | undefined {
+  if (!notice) return
+  return {
+    seq, tick: notice.tick, text: notice.text, level: 'error', count: 1,
+    file: notice.file, line: notice.line,
+  }
+}
 const hostLines = computed((): ConsoleLine[] => {
-  const tick = world.value?.tick ?? 0
-  return [error.value, saveError.value, floorError.value].filter((text): text is string => !!text).map((text, index) => ({
-    seq: -(index + 1), tick, text, level: 'error', count: 1,
-  }))
+  return [hostLine(scriptNotice.value, -1), hostLine(saveNotice.value, -2), hostLine(floorNotice.value, -3)]
+    .filter((line): line is ConsoleLine => !!line)
 })
+function rememberHost(current: HostNotice | undefined, text: string, file?: string, line?: number) {
+  return noteHost(current, { text, tick: world.value?.tick ?? 0, file, line })
+}
+function readHostNotices() {
+  scriptNotice.value = markHostRead(scriptNotice.value)
+  saveNotice.value = markHostRead(saveNotice.value)
+  floorNotice.value = markHostRead(floorNotice.value)
+}
 const consoleLines = computed(() => [...hostLines.value, ...(blankConsole.value ? [] : (world.value?.console ?? []))])
 const unseen = computed(() => {
   if (side.value === 'console') return { count: 0, error: false }
   const fresh = blankConsole.value ? [] : (world.value?.console ?? []).filter(line => line.seq > seenSeq.value)
-  const host = hostLines.value.length
-  return { count: fresh.length + host, error: host > 0 || fresh.some(line => line.level === 'error') }
+  const unread = [scriptNotice.value, saveNotice.value, floorNotice.value].filter(notice => notice && !notice.read)
+  return { count: fresh.length + unread.length, error: unread.length > 0 || fresh.some(line => line.level === 'error') }
 })
-watch([side, world], () => {
+watch([side, world, scriptNotice, saveNotice, floorNotice], () => {
   if (blankConsole.value && (world.value?.console.length ?? 0) === 0) blankConsole.value = false
   if (side.value !== 'console') return
+  readHostNotices()
   const last = world.value?.console?.at(-1)?.seq ?? 0
   if (last > seenSeq.value) seenSeq.value = last
 })
@@ -241,6 +271,24 @@ function rememberNotes(ids: string[]) {
   notes.value = ids
   try { localStorage.setItem(notesKey, JSON.stringify(ids)) } catch { /* The save still carries the ids. */ }
 }
+function cartCue(current: World | undefined): CartCue | undefined {
+  const drone = current?.drones.find(item => item.task) ?? current?.drones.find(item => item.cargo > 0) ?? current?.drones[0]
+  if (!drone) return
+  const task = drone.task
+  return {
+    name: drone.name,
+    cargo: drone.cargo,
+    capacity: drone.capacity,
+    carrying: drone.carrying,
+    task: task?.kind ?? null,
+    vein: task?.kind === 'mine' ? task.vein : undefined,
+    at: task?.kind === 'unload' ? task.at : undefined,
+    phase: task?.kind === 'pickup' ? task.phase : undefined,
+  }
+}
+function exportsOnTick(source: string) {
+  return runnableExports(source).some(item => item.name === 'onTick')
+}
 function runCommand(name: string, file: string, line: number) {
   send({ kind: 'run-fn', name, file, line, files: dirty.value ? files.value : undefined })
 }
@@ -252,7 +300,9 @@ function toggleLoop() {
   })
 }
 function take(id: string) {
+  const current = world.value
   const quest = kettlewick.questList?.find(item => item.id === id)
+  if (!current || !quest || !canTake(current, quest)) return
   const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
   if (quest) {
     let source = files.value[file] ?? ''
@@ -290,7 +340,9 @@ const canLoop = computed(() => !!world.value && triggerUnlocked(world.value, 'ti
 const loopOn = computed(() => !!world.value?.loop)
 const loopable = computed(() => runnableExports(files.value['main.ts'] ?? '').some(item => item.name === 'onTick'))
 const runName = computed(() => runnableExports(files.value['main.ts'] ?? '')[0]?.name)
-const nextStep = computed(() => questNextStep({
+const nextStep = computed(() => {
+  if (!activeQuest.value && readingHold.value) return readingHold.value
+  return questNextStep({
   quest: activeQuest.value ? {
     from: activeQuest.value.from, goal: activeQuest.value.goal, item: activeQuest.value.item,
     qty: activeQuest.value.qty, trigger: activeQuest.value.trigger,
@@ -308,14 +360,43 @@ const nextStep = computed(() => questNextStep({
   },
   made: { ingots: world.value?.ingotsMade ?? 0, steel: world.value?.steelMade ?? 0 },
   runName: runName.value,
+  cart: cartCue(world.value),
+  oreNeed: kettlewick.recipe.ore,
+  smelting: world.value?.furnace.readyAt != null,
+})
+})
+const loopReady = computed(() => ({
+  on: loopOn.value,
+  deployed: exportsOnTick(deployed.value['main.ts'] ?? ''),
+  draft: exportsOnTick(files.value['main.ts'] ?? ''),
+  helper: Object.keys(files.value).find(file => file !== 'main.ts' && exportsOnTick(files.value[file] ?? '')),
 }))
 const granted = computed(() => {
-  const line = grantHint(activeQuest.value?.trigger)
-  return line && line !== nextStep.value ? line : undefined
+  const note = grantNote(activeQuest.value?.trigger, activeQuest.value?.trigger === 'tick' ? loopReady.value : undefined)
+  if (!note || note.text === nextStep.value) return
+  return note
 })
+const shipmentFull = computed(() => {
+  const quest = activeQuest.value
+  return !!quest && shippedCount.value >= quest.qty && !ready.value
+})
+function showOpenTest() {
+  side.value = 'tests'
+  const id = firstOpenTest(testRows.value)
+  if (id) pickedTest.value = id
+}
+function testMark(state: string) {
+  if (state === 'passing') return '✓'
+  if (state === 'failed') return '!'
+  return '·'
+}
+function testLabel(state: string, text: string) {
+  const name = state === 'passing' ? 'Passing' : state === 'failed' ? 'Failed' : 'Open'
+  return `${name}: ${text}`
+}
 const scriptState = computed<'running' | 'error' | 'stopped'>(() => {
   if (!world.value) return 'stopped'
-  if (error.value || saveError.value || floorError.value || world.value.status.startsWith('CPU')) return 'error'
+  if (scriptNotice.value || world.value.status.startsWith('CPU')) return 'error'
   if (world.value.pace.mode === 'idle') return 'stopped'
   return 'running'
 })
@@ -336,6 +417,7 @@ function openProblems() {
 const saveKey = 'inherit.v8.' + kettlewick.id
 let worker: Worker | undefined
 let resetting = false
+let bayObserver: ResizeObserver | undefined
 
 provide(editorKey, {
   id: kettlewick.id, label: 'Player TypeScript', files, deployed, activeFile, api,
@@ -357,15 +439,15 @@ function persist() {
     localStorage.setItem(saveKey, JSON.stringify({
       version: 3, world: world.value, deployed: deployed.value, files: files.value, activeFile: activeFile.value, notes: notes.value,
     } satisfies FactorySave))
-    saveError.value = ''
-  } catch { saveError.value = 'Could not save the works in this browser.' }
+    saveNotice.value = undefined
+  } catch { saveNotice.value = rememberHost(saveNotice.value, 'Could not save the works in this browser.') }
 }
 watch([files, activeFile, world, deployed], persist)
 
 function deploy() {
   if (!world.value || pending.value || !dirty.value) return
   pending.value = true
-  error.value = ''
+  scriptNotice.value = undefined
   send({ kind: 'run', files: files.value })
 }
 function startOver() {
@@ -374,7 +456,9 @@ function startOver() {
   rememberNotes([])
   resetting = true
   pending.value = true
-  error.value = ''
+  scriptNotice.value = undefined
+  saveNotice.value = undefined
+  floorNotice.value = undefined
   send({ kind: 'restart', files: kettlewick.files, fresh: true })
 }
 function shortcut(event: KeyboardEvent) {
@@ -405,10 +489,15 @@ onMounted(async () => {
   sideWidth.value = readPaneWidth(storedChecks, sideWidthMin, sideWidthMax, checksPanePx)
   filesReady = true
   sideReady = true
+  bayObserver = new ResizeObserver(entries => {
+    bayWidth.value = entries[0]?.contentRect.width ?? 0
+  })
+  if (editorBay.value) bayObserver.observe(editorBay.value)
   worker = new Worker(new URL('../lib/factory.worker.ts', import.meta.url), { type: 'module' })
   worker.onmessage = ({ data }: MessageEvent<FactoryFrame>) => {
     if ('error' in data) {
-      error.value = data.error
+      const place = knownLocation(files.value, data.file, data.line)
+      scriptNotice.value = rememberHost(scriptNotice.value, data.error, place?.file, place?.line)
       pending.value = resetting = false
       return
     }
@@ -427,7 +516,7 @@ onMounted(async () => {
   }
   worker.onerror = () => {
     pending.value = false
-    error.value = 'Could not load the factory. Reload to try again.'
+    scriptNotice.value = rememberHost(scriptNotice.value, 'Could not load the factory. Reload to try again.')
   }
   try {
     const stored = localStorage.getItem(saveKey)
@@ -448,17 +537,17 @@ onMounted(async () => {
         rememberNotes(notesFromBrowser())
         activeFile.value = recovery.activeFile
         navigation.value = { file: activeFile.value, line: 1 }
-        saveError.value = 'The saved works could not be restored. Your files are still here.'
+        saveNotice.value = rememberHost(saveNotice.value, 'The saved works could not be restored. Your files are still here.')
         send({ kind: 'restart', files: recovery.deployed })
       } else {
         preserveSlot = true
-        error.value = 'Could not restore the saved works. Use Start over in Settings to reset them.'
+        saveNotice.value = rememberHost(saveNotice.value, 'Could not restore the saved works. Use Start over in Settings to reset them.')
         pending.value = false
       }
     }
   } catch {
     preserveSlot = true
-    error.value = 'Could not restore the saved works. Use Start over in Settings to reset them.'
+    saveNotice.value = rememberHost(saveNotice.value, 'Could not restore the saved works. Use Start over in Settings to reset them.')
     pending.value = false
   }
   visibility()
@@ -472,6 +561,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', visibility)
   window.removeEventListener('pagehide', persist)
   window.removeEventListener('keydown', shortcut, true)
+  bayObserver?.disconnect()
 })
 </script>
 
@@ -510,33 +600,38 @@ onBeforeUnmount(() => {
         <div class="quest-scroll">
           <template v-if="zone === 'quests'">
             <p v-if="!shownQuest" class="goal">{{ nextStep }}</p>
-            <ul v-if="!shownQuest && available.length" class="requests">
-              <li v-for="quest in available" :key="quest.id">
-                <button type="button" @click="readingId = quest.id">
-                  <span class="initial" aria-hidden="true">{{ initial(quest.from) }}</span>
+            <ul v-if="!shownQuest && offers.length" class="requests">
+              <li v-for="offer in offers" :key="offer.quest.id">
+                <button type="button" @click="readingId = offer.quest.id">
+                  <span class="initial" aria-hidden="true">{{ initial(offer.quest.from) }}</span>
                   <span>
-                    <b>{{ quest.from.replace(/^Mayor /, '') }}</b>
-                    <small>{{ quest.ask }}</small>
+                    <b>{{ offer.quest.from.replace(/^Mayor /, '') }}</b>
+                    <small>{{ offer.quest.ask }}</small>
+                    <small v-if="offer.hold">{{ offer.hold }}</small>
                   </span>
                 </button>
               </li>
             </ul>
             <article v-else-if="shownQuest" class="quest">
+              <button v-if="reading" type="button" class="hint" @click="readingId = undefined">All requests</button>
               <h2>{{ shownQuest.title }}</h2>
               <p class="goal">{{ nextStep }}</p>
-              <p v-if="granted" class="goal">{{ granted }}</p>
+              <p v-if="granted" class="goal">
+                {{ granted.text }}
+                <button v-if="granted.file" type="button" class="hint" @click="activeFile = granted.file">{{ granted.file }}</button>
+              </p>
               <VillageAsk :who="shownQuest.who" :name="shownQuest.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="shownQuest.ask" />
               <div v-if="quantity" class="need">
-                <p>{{ shownQuest.need }}</p>
+                <p>{{ needText }}</p>
                 <span class="goal-line">{{ quantity.text }}</span>
                 <progress :value="quantity.value" :max="quantity.max" :aria-label="quantity.text" />
               </div>
               <ul class="rewards">
                 <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
                 <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
-                <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}</li>
-                <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}</li>
-                <li v-if="shownQuest.gift" title="Granted when you hand this over."><Unlock />{{ shownQuest.gift }}</li>
+                <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}<span class="when">On Take</span></li>
+                <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}<span class="when">On Take</span></li>
+                <li v-if="shownQuest.gift" title="Granted when you hand this over."><Unlock />{{ shownQuest.gift }}<span class="when">On hand-over</span></li>
               </ul>
             </article>
             <div v-else class="quest">
@@ -561,19 +656,15 @@ onBeforeUnmount(() => {
               <p>{{ inspected.description }}</p>
               <ul class="facts">
                 <li v-for="line in inspected.lines" :key="line.label"><b>{{ line.label }}</b> {{ line.value }}</li>
+                <li v-for="recipe in inspected.recipes" :key="recipe.id">
+                  <b>{{ recipe.input }} → {{ recipe.output }}</b>
+                  <template v-if="recipe.locked"> {{ recipe.locked }}</template>
+                </li>
               </ul>
               <div v-if="inspected.progress" class="xp">
                 <span>{{ inspected.progress.label }}</span>
                 <span class="bar"><i :style="{ width: inspected.progress.pct + '%' }" /></span>
               </div>
-              <ul v-if="inspected.recipes.length" class="shop-list">
-                <li v-for="recipe in inspected.recipes" :key="recipe.id">
-                  <button type="button" disabled :class="{ locked: !!recipe.locked }">
-                    <b>{{ recipe.input }} → {{ recipe.output }}</b>
-                    <small v-if="recipe.locked">{{ recipe.locked }}</small>
-                  </button>
-                </li>
-              </ul>
               <ul v-if="inspected.actions.length" class="shop-list">
                 <li v-for="action in inspected.actions" :key="action.id">
                   <button type="button" :disabled="!action.enabled" @click="send({ kind: 'manual', action: action.id, drone: action.drone, vein: action.vein })">
@@ -595,20 +686,24 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div v-if="zone === 'quests' && (activeQuest || reading)" class="quest-action">
-          <button v-if="reading" class="gold" type="button" data-testid="take-quest" @click="take(reading.id)">Take quest</button>
+          <template v-if="reading">
+            <button class="gold" type="button" data-testid="take-quest" :disabled="!readingTake" @click="take(reading.id)">Take quest</button>
+            <p v-if="readingHold" class="calm">{{ readingHold }}</p>
+          </template>
+          <button v-else-if="shipmentFull" type="button" class="calm link" @click="showOpenTest">View remaining test</button>
           <p v-else-if="!ready" class="calm">In progress</p>
           <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" @click="send({ kind: 'complete' })">Hand over</button>
         </div>
       </section>
       <div class="stage">
         <div class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorError = $event" @select="openMachine" />
+          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="openMachine" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
-        <div ref="editorBay" class="editor-bay">
+        <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': stackChecks }">
           <FileTree id="project-files" v-model:open="filesOpen" v-model:files="files" v-model:active-file="activeFile" />
           <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
-          <div class="editor-column">
+          <div class="editor-column" :class="{ tight: tightEditor }">
             <div class="editor-pane"><div class="editor-host">
               <LazyCodeEditor @reference="bookOpen = true">
                 <template #actions>
@@ -617,8 +712,9 @@ onBeforeUnmount(() => {
                     :disabled="pending || !world || (!loopOn && !loopable)"
                     :title="loopable || loopOn ? 'calls onTick every tick' : 'Export onTick in main.ts to loop it.'"
                     @click="toggleLoop">Loop: onTick {{ loopOn ? '■' : '▶' }}</button>
-                  <button class="deploy" type="button" aria-label="Deploy" :data-dirty="dirty ? 'true' : 'false'" :disabled="pending || !world" @click="deploy">
-                    <Play /> Deploy <kbd>Ctrl+Enter</kbd>
+                  <button class="deploy" type="button" :aria-label="dirty ? 'Deploy' : 'Deployed'" :data-dirty="dirty ? 'true' : 'false'"
+                    :disabled="pending || !world || !dirty" :title="dirty ? 'Deploying clears current drone tasks.' : 'Deployed'" @click="deploy">
+                    {{ dirty ? 'Deploy' : 'Deployed' }} <kbd v-if="dirty">Ctrl+Enter</kbd>
                   </button>
                 </template>
               </LazyCodeEditor>
@@ -643,8 +739,8 @@ onBeforeUnmount(() => {
             <p v-if="hostError" class="host-error">{{ hostError }}</p>
             <section v-if="side === 'tests'" class="tests" aria-label="Quest tests">
               <p v-if="!testRows.length" class="empty">Take a quest to see its tests.</p>
-              <button v-for="row in testRows" :key="row.id" type="button" class="test" :data-mark="row.state" :aria-pressed="pickedTest === row.id" @click="pickedTest = row.id">
-                <b>{{ row.text }}</b>
+              <button v-for="row in testRows" :key="row.id" type="button" class="test" :data-mark="row.state" :aria-pressed="pickedTest === row.id" :aria-label="testLabel(row.state, row.text)" @click="pickedTest = row.id">
+                <b><span class="state-mark" aria-hidden="true">{{ testMark(row.state) }}</span> {{ row.text }}</b>
                 <span>{{ row.explain }}</span>
                 <small v-if="row.reason">{{ row.reason }}</small>
               </button>
@@ -655,12 +751,12 @@ onBeforeUnmount(() => {
               <template v-for="line in shownConsole" :key="line.seq">
                 <button v-if="line.file && line.line" type="button" class="line" :class="line.level" @click="openLine({ file: line.file, line: line.line })">
                   <span class="when">{{ line.tick }}</span>
-                  <span class="text"><span class="body">{{ consoleBody(line.text) }}</span><span v-if="(line.count ?? 1) > 1" class="count">x {{ line.count }}</span></span>
+                  <span class="text"><span class="body">{{ consoleBody(line.text, true) }}</span><span v-if="(line.count ?? 1) > 1" class="count">x {{ line.count }}</span></span>
                   <span class="where">{{ line.file }}:{{ line.line }}</span>
                 </button>
                 <p v-else class="line" :class="line.level">
                   <span class="when">{{ line.tick }}</span>
-                  <span class="text"><span class="body">{{ consoleBody(line.text) }}</span><span v-if="(line.count ?? 1) > 1" class="count">x {{ line.count }}</span></span>
+                  <span class="text"><span class="body">{{ consoleBody(line.text, false) }}</span><span v-if="(line.count ?? 1) > 1" class="count">x {{ line.count }}</span></span>
                 </p>
               </template>
             </section>
@@ -670,9 +766,10 @@ onBeforeUnmount(() => {
     </template>
     <template #status>
       <div class="context">
-        <button type="button" class="item" :data-state="scriptState" :title="scriptTip" :aria-label="scriptTip">
-          <i class="lamp" />
-        </button>
+        <span class="item" role="status" :data-state="scriptState" :title="scriptTip" :aria-label="scriptTip">
+          <i class="lamp" aria-hidden="true" />
+          Script
+        </span>
         <button type="button" class="item" title="Errors and warnings in the console. Click to open that list." @click="openProblems">
           <CircleAlert />{{ problems.errors }}
           <TriangleAlert />{{ problems.warnings }}
@@ -830,6 +927,15 @@ onBeforeUnmount(() => {
 .quest-action .gold { width: 100%; height: 34px }
 .quest-action .gold.pulse { animation: quest-ready 0.7s ease-out 1 }
 .quest-action .calm { margin: 0; text-align: center; color: var(--sub); font-size: 13px }
+.quest-action .link {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  text-decoration: underline;
+  cursor: pointer;
+}
 @keyframes quest-ready {
   0% { transform: scale(1) }
   40% { transform: scale(1.04) }
@@ -885,6 +991,7 @@ onBeforeUnmount(() => {
   color: var(--text);
 }
 .rewards svg { width: 13px; height: 13px; color: var(--gold) }
+.rewards .when { color: var(--soft); font-size: 10px }
 .pills { display: flex; align-items: center; gap: 8px; margin-inline: auto }
 .pill {
   position: relative;
@@ -1041,6 +1148,21 @@ onBeforeUnmount(() => {
   border: 1px solid currentColor;
   border-radius: 3px;
 }
+.editor-column.tight :deep(.deploy kbd) { display: none }
+@media (min-width: 801px) {
+  .editor-bay.stack-checks {
+    grid-template-columns: v-bind(treeColumnCss) 0 minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(72px, 28%);
+  }
+  .editor-bay.stack-checks :deep(.side-split) { display: none }
+  .editor-bay.stack-checks .editor-column { grid-column: 3; grid-row: 1 }
+  .editor-bay.stack-checks .checks-pane {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
 .editor-column :deep(.finder) { top: v-bind(headerCss) }
 .checks-pane {
   grid-column: 5;
@@ -1140,6 +1262,7 @@ onBeforeUnmount(() => {
 .tests .test[aria-pressed='true'] { border-color: var(--gold) }
 .tests .test b { font: 12px var(--mono); font-weight: 600 }
 .tests .test span, .tests .test small { color: var(--soft); font: 12px/1.4 var(--mono) }
+.tests .test .state-mark { display: inline-block; width: 1em }
 .tests .test[data-mark='passing'] b { color: var(--mint) }
 .tests .test[data-mark='failed'] b { color: var(--alert) }
 .console {

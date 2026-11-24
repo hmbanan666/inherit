@@ -1,7 +1,39 @@
 import { expect, test } from 'vitest'
 import { kettlewick, uncleMain } from '../../packages/sim/src/v8'
-import { levelSpan } from '../../packages/sim/src/v8/quests'
+import { createWorld, migrateWorld } from '../../packages/sim/src/v8/core/world'
+import { acceptQuest, canTake, levelSpan, questHold, questList } from '../../packages/sim/src/v8/quests'
 import { createSession } from '../../packages/sandbox/src/v8'
+
+test('Elsie stays listed until Odile hands over drone-2, and an open Elsie save keeps the quest', () => {
+  const world = createWorld(kettlewick)
+  world.level = 3
+  world.xp = 40
+  world.cleared = ['bram', 'ines']
+  const elsie = questList.find(quest => quest.id === 'elsie')!
+  const odile = questList.find(quest => quest.id === 'odile')!
+  const ines = questList.find(quest => quest.id === 'ines')!
+  expect(questHold(world, elsie)).toBe("Finish Odile's bridge for drone-2")
+  expect(canTake(world, elsie)).toBe(false)
+  expect(canTake(world, odile)).toBe(true)
+  expect(canTake(world, ines)).toBe(false)
+  expect(acceptQuest(world, kettlewick, 'elsie')).toBe(false)
+  expect(world.questId).toBeUndefined()
+  expect(acceptQuest(world, kettlewick, 'odile')).toBe(true)
+
+  world.questId = undefined
+  world.cleared = ['bram', 'ines', 'odile']
+  const saved = migrateWorld(structuredClone(world))
+  expect(saved.drones.map(drone => drone.name)).toContain('drone-2')
+  expect(questHold(saved, elsie)).toBeUndefined()
+  expect(acceptQuest(saved, kettlewick, 'elsie')).toBe(true)
+
+  const open = createWorld(kettlewick)
+  open.questId = 'elsie'
+  open.level = 3
+  migrateWorld(open)
+  expect(open.questId).toBe('elsie')
+  expect(open.drones.map(drone => drone.name)).toContain('drone-2')
+})
 
 test('level span uses the same steps as the quest chain', () => {
   expect(levelSpan(0)).toEqual({ level: 1, start: 0, next: 20 })

@@ -1,6 +1,6 @@
 # Quest rail and status
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md).
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Amended by [ADR 0031](0031-quest-gift-before-take.md).
 
 ## Context
 

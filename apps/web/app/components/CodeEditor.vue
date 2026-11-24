@@ -10,7 +10,7 @@ import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
 import { SuggestAdapter } from 'monaco-editor/esm/vs/language/typescript/tsMode.js'
 import { editorKey, rankApiSuggestions, type PlainError, type Starter } from '../lib/editor'
-import { runnableExports } from '../lib/runGlyph'
+import { exportAtCursor, runnableExports } from '../lib/runGlyph'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
 const game = inject(editorKey)!
@@ -79,6 +79,7 @@ function showPlaceholder() {
 function markRuns() {
   if (!editor || !runMarks) return
   const on = !!game.canRun?.value
+  canRunKey?.set(on)
   editor.updateOptions({ glyphMargin: on })
   if (!on) {
     runMarks.clear()
@@ -89,7 +90,7 @@ function markRuns() {
     return
   }
   const source = files.value['main.ts'] ?? ''
-  const pending = source !== (deployed.value['main.ts'] ?? '')
+  const pending = !!game.dirty.value
   runMarks.set(runnableExports(source).map(item => ({
     range: new monaco.Range(item.line, 1, item.line, 1),
     options: {
@@ -237,6 +238,8 @@ function keys(e: KeyboardEvent) {
 }
 let errorZone: string | undefined
 let errorMarks: monaco.editor.IEditorDecorationsCollection | undefined
+let canRunKey: monaco.editor.IContextKey<boolean> | undefined
+let runAction: monaco.IDisposable | undefined
 const feedback = ref<HTMLElement>()
 const feedbackTop = ref(0)
 let zoneResize: ResizeObserver | undefined
@@ -345,6 +348,23 @@ onMounted(() => {
   lineLight = editor.createDecorationsCollection()
   tickMarks = editor.createDecorationsCollection()
   runMarks = editor.createDecorationsCollection()
+  canRunKey = editor.createContextKey('inheritCanRun', !!game.canRun?.value)
+  runAction = editor.addAction({
+    id: 'inherit.runFunctionAtCursor',
+    label: 'Run function at cursor',
+    precondition: 'inheritCanRun',
+    run(ed) {
+      if (!game.canRun?.value) return
+      const line = ed.getPosition()?.lineNumber ?? 1
+      const file = activeFile.value
+      if (file !== 'main.ts') {
+        game.runAt?.('', file, line)
+        return
+      }
+      const hit = exportAtCursor(files.value['main.ts'] ?? '', line)
+      if (hit) game.runAt?.(hit.name, 'main.ts', hit.line)
+    },
+  })
   suggestions = monaco.languages.registerCompletionItemProvider('typescript', {
     triggerCharacters: ['"', "'"],
     provideCompletionItems(model, pos) {
@@ -422,7 +442,7 @@ onMounted(() => {
   emit('ready')
 })
 watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLines, { flush: 'post' })
-watch([() => game.canRun?.value, activeFile, files, deployed], markRuns, { flush: 'post' })
+watch([() => game.canRun?.value, () => game.dirty.value, activeFile, files, deployed], markRuns, { flush: 'post' })
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)
@@ -437,6 +457,7 @@ onBeforeUnmount(() => {
   rankedSuggestions?.dispose()
   suggestions?.dispose()
   highlight.reset()
+  runAction?.dispose()
   opener?.dispose()
   editor?.dispose()
   for (const model of models.values()) model.dispose()
@@ -448,36 +469,39 @@ onBeforeUnmount(() => {
   <section class="project-editor" aria-label="Controller files">
     <Teleport :to="shellTabs ?? 'body'" :disabled="!shellTabs">
       <nav v-if="multiFile" class="project-tabs" aria-label="Open files">
-        <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: activeFile === file }">
+        <div class="tab-scroll">
+          <span v-for="file in otherTabs" :key="file" class="tab" :class="{ chosen: activeFile === file }">
+            <button
+              :aria-label="file"
+              :aria-current="activeFile === file ? 'page' : undefined"
+              @click="shellTabs ? game.openFile(file) : open(file)"
+            >
+              {{ file
+              }}<i v-if="files[file] !== deployed[file]" title="Undeployed edits"> ●</i>
+            </button>
+            <button v-if="file !== 'main.ts'" :aria-label="'Close ' + file" @click="close(file)">
+              <X :size="11" />
+            </button>
+          </span>
+        </div>
+        <div class="tab-actions">
+          <slot name="actions" />
+          <template v-if="multiFile">
+            <button title="Quick open (Ctrl/Cmd+P)" aria-label="Quick open" @click="find('open')">
+              <FolderSearch :size="14" />
+            </button>
+            <button title="Search files (Ctrl/Cmd+Shift+F)" aria-label="Search files" @click="find('search')">
+              <FileSearch :size="14" />
+            </button>
+          </template>
           <button
-            :aria-label="file"
-            :aria-current="activeFile === file ? 'page' : undefined"
-            @click="shellTabs ? game.openFile(file) : open(file)"
+            v-if="shellTabs && activeFile !== 'main.ts'"
+            :aria-label="'Close ' + activeFile"
+            @click="close(activeFile)"
           >
-            {{ file
-            }}<i v-if="files[file] !== deployed[file]" title="Undeployed edits"> ●</i>
-          </button>
-          <button v-if="file !== 'main.ts'" :aria-label="'Close ' + file" @click="close(file)">
             <X :size="11" />
           </button>
-        </span>
-        <span class="space" />
-        <slot name="actions" />
-        <template v-if="multiFile">
-          <button title="Quick open (Ctrl/Cmd+P)" aria-label="Quick open" @click="find('open')">
-            <FolderSearch :size="14" />
-          </button>
-          <button title="Search files (Ctrl/Cmd+Shift+F)" aria-label="Search files" @click="find('search')">
-            <FileSearch :size="14" />
-          </button>
-        </template>
-        <button
-          v-if="shellTabs && activeFile !== 'main.ts'"
-          :aria-label="'Close ' + activeFile"
-          @click="close(activeFile)"
-        >
-          <X :size="11" />
-        </button>
+        </div>
       </nav>
     </Teleport>
     <div
@@ -534,11 +558,24 @@ onBeforeUnmount(() => {
 .project-tabs {
   display: flex;
   align-items: stretch;
-  overflow-x: auto;
+  overflow: hidden;
   flex: none;
+  min-width: 0;
   min-height: 29px;
   border-bottom: 1px solid var(--line);
   background: var(--base);
+}
+.tab-scroll {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+}
+.tab-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
 }
 .project-tabs button {
   padding: 3px 7px;

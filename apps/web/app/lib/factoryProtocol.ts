@@ -15,7 +15,7 @@ export type FactoryCommand =
   | { kind: 'clear-console' }
 
 export type FactoryFrame = { world: World; deployed?: Record<string, string> }
-  | { error: string }
+  | { error: string; file?: string; line?: number }
 
 export interface FactorySave {
   version: 3
