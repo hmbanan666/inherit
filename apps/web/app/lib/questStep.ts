@@ -1,3 +1,4 @@
+import { shallowRef, watch, type Ref } from 'vue'
 import { outputCap, type Item, type World } from '@inherit/sim/v8'
 import { furnaceOutput, orderGoods } from './questNote'
 
@@ -141,6 +142,22 @@ export function steadyLine(state: SteadyLine | undefined, next: string, hold = 2
     return { shown: state.shown, pending: next, ticks }
   }
   return { shown: state.shown, pending: next, ticks: 1 }
+}
+
+export function useDroneStatus(world: Ref<World | undefined>) {
+  const line = shallowRef('')
+  let held: SteadyLine | undefined
+  watch(() => world.value?.tick, (tick, previous) => {
+    if (tick === undefined || (previous !== undefined && tick < previous)) held = undefined
+    const next = droneStatusLine((world.value?.drones ?? []).map(drone => ({
+      name: drone.name,
+      task: drone.task?.kind,
+      vein: drone.task?.kind === 'mine' ? drone.task.vein : undefined,
+    })))
+    held = steadyLine(held, next)
+    line.value = held.shown
+  }, { immediate: true, flush: 'sync' })
+  return line
 }
 
 /** The one line for a trigger this quest just granted. */

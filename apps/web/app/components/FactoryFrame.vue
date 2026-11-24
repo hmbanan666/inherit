@@ -13,7 +13,7 @@ import {
 import { runnableExports } from '../lib/runGlyph'
 import { insertQuestNote, questCard, questComment } from '../lib/questNote'
 import { cpuTitle, readCpu, steadyCpu, type CpuHold, type CpuMeter } from '../lib/cpuMeter'
-import { droneStatusLine, grantNote, questNextStep, steadyLine, type CartCue, type SteadyLine } from '../lib/questStep'
+import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook } from '../lib/apiBookState'
 import { insertTriggerExample } from '../lib/triggerNote'
@@ -324,13 +324,7 @@ const canLoop = computed(() => !!world.value && triggerUnlocked(world.value, 'ti
 const loopOn = computed(() => !!world.value?.loop)
 const loopable = computed(() => runnableExports(files.value['main.ts'] ?? '').some(item => item.name === 'onTick'))
 const runName = computed(() => runnableExports(files.value['main.ts'] ?? '')[0]?.name)
-const droneLive = computed(() => droneStatusLine((world.value?.drones ?? []).map(drone => ({
-  name: drone.name,
-  task: drone.task?.kind ?? null,
-  vein: drone.task?.kind === 'mine' ? drone.task.vein : undefined,
-}))))
-const droneHold = shallowRef<SteadyLine>({ shown: '', pending: '', ticks: 0 })
-watch(droneLive, line => { droneHold.value = steadyLine(droneHold.value, line) }, { immediate: true })
+const droneLine = useDroneStatus(world)
 const cpuHold = shallowRef<CpuHold>()
 const cpuMeter = shallowRef<CpuMeter>(readCpu({ used: 0, limit: kettlewick.cpuLimit }))
 watch(world, (current) => {
@@ -727,10 +721,7 @@ onBeforeUnmount(() => {
                 Console
                 <span v-if="unseen.count" class="badge" :class="{ bad: unseen.error }">{{ unseen.count }}</span>
               </button>
-              <template v-if="side === 'console'">
-                <button type="button" class="clear" @click="clearLog">Clear</button>
-                <span class="tick-now"><span>Tick</span><b data-testid="tick">{{ world?.tick ?? 0 }}</b></span>
-              </template>
+              <button v-if="side === 'console'" type="button" class="clear" @click="clearLog">Clear</button>
             </div>
             <p v-if="hostError" class="host-error">{{ hostError }}</p>
             <section v-if="side === 'tests'" class="tests" aria-label="Quest tests">
@@ -771,7 +762,7 @@ onBeforeUnmount(() => {
           <TriangleAlert />{{ problems.warnings }}
         </button>
         <span class="grow">
-          <div class="drone-now" title="What the drone is doing now.">{{ droneHold.shown }}</div>
+          <div class="drone-now" title="What the drone is doing now.">{{ droneLine }}</div>
         </span>
         <span
           class="item cpu-meter"
@@ -791,7 +782,7 @@ onBeforeUnmount(() => {
         <span class="item" title="The caret in the open file.">
           <TextCursor />Ln {{ cursor.line }}, Col {{ cursor.column }}
         </span>
-        <span v-if="world" class="item" title="The sim tick. The works advance twice a second.">
+        <span v-if="world" class="item" data-testid="tick" title="The sim tick. The works advance twice a second.">
           <Timer />{{ world.tick }}
         </span>
       </div>
@@ -1296,15 +1287,6 @@ onBeforeUnmount(() => {
   font: 11px var(--mono);
   padding: 0 8px;
 }
-.checks-head .tick-now {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-right: 8px;
-  color: var(--sub);
-  font: 11px var(--mono);
-  font-weight: 500;
-}
 .checks-pane :deep(.checks) {
   flex: 1;
   min-height: 0;
@@ -1349,6 +1331,7 @@ onBeforeUnmount(() => {
 .tests .test[data-mark='passing'] b { color: var(--mint) }
 .tests .test[data-mark='failed'] b { color: var(--alert) }
 .console {
+  container-type: inline-size;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -1358,7 +1341,7 @@ onBeforeUnmount(() => {
 .console .empty { margin: 0; color: var(--sub) }
 .console .line {
   display: grid;
-  grid-template-columns: 4.6em minmax(0, 1fr) auto;
+  grid-template-columns: 4.6em minmax(0, 1fr) fit-content(40%);
   gap: 8px;
   align-items: start;
   width: 100%;
@@ -1371,10 +1354,15 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 .console .when, .console .where { color: var(--sub) }
-.console .where { white-space: nowrap }
+.console .where { overflow-wrap: anywhere }
+@container (max-width: 360px) {
+  .console .line { grid-template-columns: minmax(4ch, max-content) minmax(0, 1fr); row-gap: 2px }
+  .console .where { grid-column: 2 }
+}
 .console .text { display: flex; gap: 6px; align-items: flex-start; min-width: 0 }
 .console .body { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere }
-.console .line.error .body, .console .line.warn .body { color: var(--alert) }
+.console .line.warn .text::before { content: '▲' / 'Warning'; color: var(--gold) }
+.console .line.error .text::before { content: '!' / 'Error'; color: var(--alert); font-weight: bold }
 .console .count {
   flex: none;
   margin-top: 1px;
