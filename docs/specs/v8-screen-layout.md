@@ -1,6 +1,6 @@
 # v8 quest screen
 
-Governs the arrangement of Kettlewick Works. The rules are [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
+Governs the arrangement of Kettlewick Works. The rules are [ADR 0033](../adr/0033-quest-card-stays-still.md), [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
 
 The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The quest rail is a fixed 280px column on the left, the same panel surface as the rest of the desk. To its right, the map is the top row and the editor is the bottom row. One splitter component divides the map from the editor, the file tree from the code, and the code from the tests. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px ask, a 34px gold button, and a 48px portrait.
 
@@ -36,7 +36,7 @@ One card, two tabs: Quests and Shop. The shop lists the conveniences: hotter fur
 
 With no quest open, the rail lists the villagers who have a request. A row is an initial, the name, and one line. Clicking it opens that request.
 
-The open card is the title, one next step, the portrait, and one in-character line. The next step is one sentence from the quest state, such as `Talk to Ines`, `Press ▶ next to smeltOnce`, `drone-1 is mining Vein A`, or `Hand over 16 ingots`. A quest that grants Run, Loop, or `on()` adds one more line for that grant. Under the ask, one sentence says what is needed and how it is made, including that Collect sends a drone from the furnace to the depot, then one quantity bar, such as `Delivered to Bram · 0/2 ingots`. Test rows are not on this card. The tests panel and the card background stay as they are. The reward is tiles: credits, XP, an unlock such as `furnace.alloy()` when the quest grants one, Run, Loop, or Events when the quest grants that, and `drone-2` on Odile's card. An unlock is marked On Take. A trigger or a gift is marked On hand-over. There is no Next list and no shop-tier line. Level and XP stay in the header.
+The open card is the title, one next step, the portrait, and one in-character line. The next step is one sentence from the quest state, such as `Talk to Ines`, `Press ▶ next to smeltOnce`, `Open the furnace and choose Smelt.`, or `Hand over 16 ingots`. It names what the player does next. It does not follow the drone. The goal keeps two lines of height, and the quantity line is one line with tabular figures, so a change does not move the portrait. A quest that grants Run, Loop, or `on()` adds one more line for that grant. Under the ask, one sentence says what is needed and how it is made, including that Collect sends a drone from the furnace to the depot, then one quantity bar, such as `Delivered to Bram · 0/2 ingots`. Test rows are not on this card. The tests panel and the card background stay as they are. The reward is tiles: credits, XP, an unlock such as `furnace.alloy()` when the quest grants one, Run, Loop, or Events when the quest grants that, and `drone-2` on Odile's card. An unlock is marked On Take. A trigger or a gift is marked On hand-over. There is no Next list and no shop-tier line. Level and XP stay in the header.
 
 Take quest sits in the footer once a request is open. A preview has All requests back to the list. A held request stays on the list and Take stays closed, with the sentence from [ADR 0031](../adr/0031-quest-gift-before-take.md). After Take, the footer says `In progress` until every goal is met, then a Hand over button. When the order is full and a check is still open, the footer says `View remaining test` and that click opens the first open row. It is not a disabled count.
 
@@ -66,7 +66,7 @@ The API book is a modal. Its sections are Furnace, Drone, Depot, Veins, Events, 
 
 ## Status bar
 
-A quiet strip, every item the same height, an icon and a short label, each with a tooltip. From the left: one lamp for the script, running, error, or stopped; then the error count and the warning count, which open the Console filtered to those lines. On the right: the caret as `Ln 12, Col 4`, the tick, and CPU only when the tick has spent at least half its budget or has already hit the limit. Depot, furnace, and drone quantities stay on the map and the machine inspector.
+A quiet strip, every item the same height, an icon and a short label, each with a tooltip. From the left: one lamp for the script, running, error, or stopped; then the error count and the warning count, which open the Console filtered to those lines. In the spare middle, one line names what each drone is doing, such as `drone-1: mining Vein A`. That line is a single row with an ellipsis and a fixed height. A new task is shown after the same words have held for two ticks, so a one-tick flicker stays off the bar. On the right: the caret as `Ln 12, Col 4`, the tick, and CPU only when the tick has spent at least half its budget or has already hit the limit. Depot, furnace, and drone quantities stay on the map and the machine inspector. The inspector still names the task on the drone.
 
 ## One home each
 
@@ -78,7 +78,7 @@ A quiet strip, every item the same height, an icon and a short label, each with 
 | Files, code, API, Loop, Deploy, gutter Run | Editor header and the code under it |
 | Pass and fail | Test rows beside the code |
 | Errors and sim events | Console tab |
-| Script, problems, caret, tick, CPU | Status bar |
+| Script, problems, drone task, caret, tick, CPU | Status bar |
 | Player console.log | Console tab, beside Tests |
 | API book | Modal from the editor toolbar |
 | Charts | One slot under the code |

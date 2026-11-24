@@ -6,7 +6,7 @@ export interface StepQuest {
   trigger?: 'run' | 'events' | 'tick'
 }
 
-/** The drone's task, not its position. The sentence stays put until the task changes. */
+/** Cargo for the next action. A live task does not become the sentence on the card. */
 export interface CartCue {
   name: string
   cargo: number
@@ -16,6 +16,20 @@ export interface CartCue {
   vein?: string
   at?: 'furnace' | 'depot'
   phase?: 'fetch' | 'deliver'
+}
+
+/** One drone, for the status line. */
+export interface DroneCue {
+  name: string
+  task?: 'mine' | 'unload' | 'pickup' | null
+  vein?: string
+}
+
+/** The words on the status bar, and how many updates the candidate has held. */
+export interface SteadyLine {
+  shown: string
+  pending: string
+  ticks: number
 }
 
 export interface QuestStepState {
@@ -68,36 +82,11 @@ function untouched(state: QuestStepState) {
   return sitting(state) && state.furnace.input === 0 && state.furnace.coal === 0 && state.made.ingots === 0 && state.made.steel === 0
 }
 
-function goodName(carrying: CartCue['carrying'], item: 'ingot' | 'steel') {
-  if (carrying === 'steel' || (carrying !== 'ingot' && item === 'steel')) return 'steel'
-  return 'ingots'
+function droneBusy(cart: CartCue | undefined) {
+  return !!cart && (!!cart.task || cart.cargo > 0)
 }
 
-function taskSentence(cart: CartCue, quest: StepQuest) {
-  const name = cart.name
-  if (cart.task === 'mine') {
-    const vein = cart.vein ? `Vein ${cart.vein}` : 'the vein'
-    return `${name} is mining ${vein}. When the cart is full, open ${name} and choose Unload.`
-  }
-  if (cart.task === 'unload' && cart.at === 'depot') {
-    return `${name} is carrying ${goodName(cart.carrying, quest.item)} to the depot.`
-  }
-  if (cart.task === 'unload') {
-    const load = cart.carrying === 'coal' ? 'coal' : 'ore'
-    const next = quest.item === 'steel'
-      ? 'Open the furnace and choose Alloy once the hopper has ore and coal.'
-      : 'Open the furnace and choose Smelt once the hopper has enough ore.'
-    return `${name} is carrying ${load} to the furnace. ${next}`
-  }
-  if (cart.task === 'pickup') {
-    const delivering = cart.phase === 'deliver' || cart.carrying === 'ingot' || cart.carrying === 'steel'
-    if (delivering) return `${name} is carrying ${goodName(cart.carrying, quest.item)} to the depot.`
-    return `${name} is going to the furnace for ${quest.item === 'steel' ? 'steel' : 'ingots'}.`
-  }
-  return quest.goal
-}
-
-/** One sentence for the quest card. It names the next thing to do. */
+/** One sentence for the quest card. It names the next thing to do, not the live task. */
 export function questNextStep(state: QuestStepState) {
   const quest = state.quest
   if (!quest) {
@@ -107,7 +96,7 @@ export function questNextStep(state: QuestStepState) {
   }
   if (state.ready) return `Hand over ${goods(quest.item, quest.qty)}`
   const cart = state.cart
-  if (cart?.task) return taskSentence(cart, quest)
+  const busy = droneBusy(cart)
   if (cart && cart.cargo >= cart.capacity && cart.cargo > 0) return `Open ${cart.name} and choose Unload.`
   if (quest.item === 'ingot' && state.furnace.output > 0) return 'Carry the ingots to the depot.'
   if (quest.item === 'steel' && state.furnace.steel > 0) return 'Carry the steel to the depot.'
@@ -116,10 +105,37 @@ export function questNextStep(state: QuestStepState) {
   if (!state.smelting && quest.item === 'steel' && state.furnace.input >= oreNeed && state.furnace.coal >= 1)
     return 'Open the furnace and choose Alloy.'
   if (state.smelting) return 'The furnace is smelting.'
-  if (state.triggerReady && quest.trigger === 'run' && untouched(state)) return `Press ▶ next to ${state.runName || 'smeltOnce'}`
-  if (state.triggerReady && quest.trigger === 'tick' && !state.loop && sitting(state)) return 'Turn on Loop: onTick'
-  if (state.triggerReady && quest.trigger === 'events' && sitting(state)) return 'on() runs a function when the works change.'
+  if (!busy && state.triggerReady && quest.trigger === 'run' && untouched(state)) return `Press ▶ next to ${state.runName || 'smeltOnce'}`
+  if (!busy && state.triggerReady && quest.trigger === 'tick' && !state.loop && sitting(state)) return 'Turn on Loop: onTick'
+  if (!busy && state.triggerReady && quest.trigger === 'events' && sitting(state)) return 'on() runs a function when the works change.'
   return quest.goal
+}
+
+function droneVerb(drone: DroneCue) {
+  if (drone.task === 'mine') return drone.vein ? `mining Vein ${drone.vein}` : 'mining'
+  if (drone.task === 'unload') return 'unloading'
+  if (drone.task === 'pickup') return 'hauling'
+  return 'idle'
+}
+
+/** `drone-1: mining Vein A`. One clause per drone. */
+export function droneStatusLine(drones: readonly DroneCue[]) {
+  return drones.map(drone => `${drone.name}: ${droneVerb(drone)}`).join(' · ')
+}
+
+/**
+ * Keep the shown line until the next one has held for `hold` updates.
+ * The first line shows at once. A one-update flicker never replaces it.
+ */
+export function steadyLine(state: SteadyLine | undefined, next: string, hold = 2): SteadyLine {
+  if (!state?.shown) return { shown: next, pending: next, ticks: 0 }
+  if (state.shown === next) return { shown: next, pending: next, ticks: 0 }
+  if (state.pending === next) {
+    const ticks = state.ticks + 1
+    if (ticks >= hold) return { shown: next, pending: next, ticks: 0 }
+    return { shown: state.shown, pending: next, ticks }
+  }
+  return { shown: state.shown, pending: next, ticks: 1 }
 }
 
 /** The one line for a trigger this quest just granted. */

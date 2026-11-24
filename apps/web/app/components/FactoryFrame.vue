@@ -12,7 +12,7 @@ import {
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { deliveryNote, firstOpenTest, quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
-import { grantNote, questNextStep, type CartCue } from '../lib/questStep'
+import { droneStatusLine, grantNote, questNextStep, steadyLine, type CartCue, type SteadyLine } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { reduceApiBook } from '../lib/apiBookState'
 import { insertTriggerExample } from '../lib/triggerNote'
@@ -353,6 +353,13 @@ const canLoop = computed(() => !!world.value && triggerUnlocked(world.value, 'ti
 const loopOn = computed(() => !!world.value?.loop)
 const loopable = computed(() => runnableExports(files.value['main.ts'] ?? '').some(item => item.name === 'onTick'))
 const runName = computed(() => runnableExports(files.value['main.ts'] ?? '')[0]?.name)
+const droneLive = computed(() => droneStatusLine((world.value?.drones ?? []).map(drone => ({
+  name: drone.name,
+  task: drone.task?.kind ?? null,
+  vein: drone.task?.kind === 'mine' ? drone.task.vein : undefined,
+}))))
+const droneHold = shallowRef<SteadyLine>({ shown: '', pending: '', ticks: 0 })
+watch(droneLive, line => { droneHold.value = steadyLine(droneHold.value, line) }, { immediate: true })
 const nextStep = computed(() => {
   if (!activeQuest.value && readingHold.value) return readingHold.value
   return questNextStep({
@@ -633,7 +640,7 @@ onBeforeUnmount(() => {
             <article v-else-if="shownQuest" class="quest">
               <button v-if="reading" type="button" class="hint" @click="readingId = undefined">All requests</button>
               <h2>{{ shownQuest.title }}</h2>
-              <p class="goal">{{ nextStep }}</p>
+              <p class="goal step">{{ nextStep }}</p>
               <p v-if="granted" class="goal">
                 {{ granted.text }}
                 <button v-if="granted.file" type="button" class="hint" @click="activeFile = granted.file">{{ granted.file }}</button>
@@ -792,7 +799,9 @@ onBeforeUnmount(() => {
           <CircleAlert />{{ problems.errors }}
           <TriangleAlert />{{ problems.warnings }}
         </button>
-        <span class="grow" />
+        <span class="grow">
+          <div class="drone-now" title="What the drone is doing now.">{{ droneHold.shown }}</div>
+        </span>
         <span class="item" title="The caret in the open file.">
           <TextCursor />Ln {{ cursor.line }}, Col {{ cursor.column }}
         </span>
@@ -915,6 +924,7 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 .goal { font-size: 13px; line-height: 1.4 }
+.quest > .goal.step { min-height: calc(2 * 1.4em) }
 .lesson {
   border-top: 1px solid var(--accent-line);
   padding-top: 9px;
@@ -938,15 +948,26 @@ onBeforeUnmount(() => {
   padding: 10px 12px 12px;
   border-top: 1px solid var(--line);
 }
-.need { display: grid; gap: 6px }
+.need { display: grid; gap: 6px; min-width: 0 }
 .need p { margin: 0; font-size: 13px; line-height: 1.4 }
-.need progress { width: 100%; height: 4px; border: 0; background: var(--line); accent-color: var(--mint) }
+.need progress { width: 100%; height: 4px; margin: 0; border: 0; background: var(--line); accent-color: var(--mint) }
 .need progress::-webkit-progress-bar { background: var(--line) }
 .quest-action .gold { width: 100%; height: 34px }
 .quest-action .gold.pulse { animation: quest-ready 0.7s ease-out 1 }
-.quest-action .calm { margin: 0; text-align: center; color: var(--sub); font-size: 13px }
+.quest-action .calm {
+  margin: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--sub);
+  font-size: 13px;
+}
 .quest-action .link {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   background: transparent;
   border: 0;
@@ -987,7 +1008,16 @@ onBeforeUnmount(() => {
 }
 .goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px }
 .goals li { display: grid; gap: 3px; min-width: 0 }
-.goal-line { font-size: 13px; line-height: 1.3 }
+.goal-line {
+  min-width: 0;
+  min-height: 1.3em;
+  font-size: 13px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .goals progress { width: 100%; height: 4px; border: 0; background: var(--line); accent-color: var(--mint) }
 .goals progress::-webkit-progress-bar { background: var(--line) }
 .goals [data-mark=passing] { color: var(--mint) }
@@ -1050,7 +1080,18 @@ onBeforeUnmount(() => {
 @keyframes rise { to { transform: translateY(-14px); opacity: 0 } }
 @media (prefers-reduced-motion: reduce) { .float { animation: none } }
 .context { display: flex; align-items: center; width: 100%; height: 100%; gap: 2px }
-.context .grow { flex: 1 }
+.context .grow { flex: 1; min-width: 0; overflow: hidden }
+.drone-now {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding-left: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+}
 .context .item {
   display: inline-flex;
   align-items: center;
@@ -1062,6 +1103,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--sub);
   font: 11px var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 .context button.item { cursor: pointer }
 .context button.item:hover { background: var(--surface-low); color: var(--text) }
@@ -1090,6 +1132,13 @@ onBeforeUnmount(() => {
 .shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
 .shop-list button:disabled, .shop-list button.locked { opacity: 0.45 }
 .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font: 12px var(--mono); color: var(--soft) }
+.facts li {
+  height: 1.45em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
 .facts b { color: var(--text); font-weight: 600 }
 .quest .bar { display: block; height: 5px; border-radius: 3px; background: var(--accent-shadow); overflow: hidden }
 .quest .bar i { display: block; height: 100%; background: var(--gold) }
