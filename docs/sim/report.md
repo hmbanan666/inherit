@@ -31,7 +31,7 @@ Longest gap between unlocks, quest boundaries, or edits was 2.76 min (ticks 646�
 
 The tick clock is the works. These minutes add reading, writing, debugging, and the shop. The rates and the profiles are [sim/human.ts](../../sim/human.ts). Average is the default. A warning here does not fail the balance gate.
 
-Writing counts non-blank lines inserted or deleted between the previous reference project and the next, plus a one-time cost for each works API call and each concept the first time it appears. A library is charged on the quest that deploys it. Debugging is the expected failed runs, higher when a concept is new, times the time to run and inspect. The successful run is the bot column.
+Writing counts non-blank lines inserted or deleted when the reference program gains a function, a branch, a loop, or an API call. A swapped literal or job name, and a token diff at or below the configured count, is not new code: it charges no lines, no new calls, and no debug runs. Each quest keeps the previous files and adds the step it teaches. Debugging is the expected failed runs, higher when a concept is new, times the time to run and inspect. The successful run is the bot column.
 
 ### Average
 
@@ -41,12 +41,12 @@ Writing counts non-blank lines inserted or deleted between the previous referenc
 | ines | 0.19 | 0.75 | 7.67 | 2.80 | 0.67 | 12.08 | 18.83 |
 | odile | 0.93 | 0.70 | 9.93 | 2.40 | 1.83 | 15.79 | 34.62 |
 | elsie | 0.77 | 0.91 | 16.33 | 3.00 | 0.67 | 21.68 | 56.30 |
-| harrow | 0.52 | 0.70 | 77.07 | 2.40 | 1.33 | 82.02 | 138.32 |
-| tomas | 0.82 | 0.55 | 0.80 | 1.00 | 1.00 | 4.17 | 142.49 |
-| pell | 1.43 | 0.57 | 0.80 | 1.00 | 0.67 | 4.47 | 146.96 |
-| wen | 0.47 | 0.58 | 0.80 | 1.00 | 0.00 | 2.85 | 149.81 |
-| crew | 2.76 | 0.73 | 0.80 | 1.00 | 0.00 | 5.29 | 155.10 |
-| **Total** | **8.16** | **6.30** | **115.67** | **15.80** | **9.17** | **155.10** | **155.10** |
+| harrow | 0.52 | 0.70 | 31.33 | 1.40 | 1.33 | 35.28 | 91.58 |
+| tomas | 0.82 | 0.55 | 9.53 | 1.40 | 1.00 | 13.30 | 104.88 |
+| pell | 1.43 | 0.57 | 11.53 | 1.40 | 0.67 | 15.60 | 120.48 |
+| wen | 0.47 | 0.58 | 14.00 | 1.00 | 0.00 | 16.05 | 136.53 |
+| crew | 2.76 | 0.73 | 21.27 | 1.20 | 0.00 | 25.96 | 162.49 |
+| **Total** | **8.16** | **6.30** | **123.06** | **15.80** | **9.17** | **162.49** | **162.49** |
 
 ### Profiles
 
@@ -54,15 +54,16 @@ Bot minutes are the same run. The other columns scale with the profile.
 
 | Profile | Bot | Reading | Writing | Debugging | Shop | Human |
 |---|---:|---:|---:|---:|---:|---:|
-| Fast | 8.16 | 3.78 | 55.03 | 7.11 | 5.50 | 79.58 |
-| Average | 8.16 | 6.30 | 115.67 | 15.80 | 9.17 | 155.10 |
-| New to TypeScript | 8.16 | 7.26 | 221.27 | 34.76 | 12.83 | 284.28 |
+| Fast | 8.16 | 3.78 | 58.74 | 7.11 | 5.50 | 83.29 |
+| Average | 8.16 | 6.30 | 123.06 | 15.80 | 9.17 | 162.49 |
+| New to TypeScript | 8.16 | 7.26 | 234.58 | 34.76 | 12.83 | 297.59 |
 
 ### Warnings
 
 | Warning | Measurement |
 |---|---|
-| `human/quest/harrow` | 82.02 min for the average player, above 25 min. |
+| `human/quest/harrow` | 35.28 min for the average player, above 25 min. |
+| `human/quest/crew` | 25.96 min for the average player, above 25 min. |
 
 Longest machine stretch with no code change was 2.76 min on crew (ticks 646–977). The warning line is 15 min.
 
@@ -77,12 +78,12 @@ Longest machine stretch with no code change was 2.76 min on crew (ticks 646–97
 | ines | 0.19 | 0.45 | 3.13 | 1.26 | 0.40 | 5.43 | 9.16 |
 | odile | 0.93 | 0.42 | 4.47 | 1.08 | 1.10 | 8.00 | 17.16 |
 | elsie | 0.77 | 0.54 | 7.37 | 1.35 | 0.40 | 10.43 | 27.59 |
-| harrow | 0.52 | 0.42 | 37.83 | 1.08 | 0.80 | 40.65 | 68.24 |
-| tomas | 0.82 | 0.33 | 0.40 | 0.45 | 0.60 | 2.60 | 70.84 |
-| pell | 1.43 | 0.34 | 0.40 | 0.45 | 0.40 | 3.02 | 73.86 |
-| wen | 0.47 | 0.35 | 0.40 | 0.45 | 0.00 | 1.67 | 75.53 |
-| crew | 2.76 | 0.44 | 0.40 | 0.45 | 0.00 | 4.05 | 79.58 |
-| **Total** | **8.16** | **3.78** | **55.03** | **7.11** | **5.50** | **79.58** | **79.58** |
+| harrow | 0.52 | 0.42 | 15.47 | 0.63 | 0.80 | 17.84 | 45.43 |
+| tomas | 0.82 | 0.33 | 4.57 | 0.63 | 0.60 | 6.95 | 52.38 |
+| pell | 1.43 | 0.34 | 5.57 | 0.63 | 0.40 | 8.37 | 60.75 |
+| wen | 0.47 | 0.35 | 7.00 | 0.45 | 0.00 | 8.27 | 69.02 |
+| crew | 2.76 | 0.44 | 10.53 | 0.54 | 0.00 | 14.27 | 83.29 |
+| **Total** | **8.16** | **3.78** | **58.74** | **7.11** | **5.50** | **83.29** | **83.29** |
 
 ### New to TypeScript
 
@@ -92,37 +93,37 @@ Longest machine stretch with no code change was 2.76 min on crew (ticks 646–97
 | ines | 0.19 | 0.86 | 17.07 | 6.16 | 0.93 | 25.21 | 36.37 |
 | odile | 0.93 | 0.81 | 20.21 | 5.28 | 2.57 | 29.80 | 66.17 |
 | elsie | 0.77 | 1.04 | 33.13 | 6.60 | 0.93 | 42.47 | 108.64 |
-| harrow | 0.52 | 0.81 | 141.99 | 5.28 | 1.87 | 150.47 | 259.11 |
-| tomas | 0.82 | 0.63 | 1.44 | 2.20 | 1.40 | 6.49 | 265.60 |
-| pell | 1.43 | 0.66 | 1.44 | 2.20 | 0.93 | 6.66 | 272.26 |
-| wen | 0.47 | 0.67 | 1.44 | 2.20 | 0.00 | 4.78 | 277.04 |
-| crew | 2.76 | 0.84 | 1.44 | 2.20 | 0.00 | 7.24 | 284.28 |
-| **Total** | **8.16** | **7.26** | **221.27** | **34.76** | **12.83** | **284.28** | **284.28** |
+| harrow | 0.52 | 0.81 | 57.33 | 3.08 | 1.87 | 63.61 | 172.25 |
+| tomas | 0.82 | 0.63 | 18.09 | 3.08 | 1.40 | 24.02 | 196.27 |
+| pell | 1.43 | 0.66 | 21.69 | 3.08 | 0.93 | 27.79 | 224.06 |
+| wen | 0.47 | 0.67 | 25.20 | 2.20 | 0.00 | 28.54 | 252.60 |
+| crew | 2.76 | 0.84 | 38.75 | 2.64 | 0.00 | 44.99 | 297.59 |
+| **Total** | **8.16** | **7.26** | **234.58** | **34.76** | **12.83** | **297.59** | **297.59** |
 
 Counts are shared by every profile. Debug runs are the expectation before a profile scales the minutes.
 
-| Quest | Words | Lines | New APIs | New concepts | Debug runs | Listings | Decisions | Machines |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| bram | 122 | 4 | 1 | 0 | 1.2 | 4 | 0 | 6 |
-| ines | 112 | 15 | 4 | 1 | 2.8 | 0 | 1 | 0 |
-| odile | 105 | 33 | 2 | 1 | 2.4 | 2 | 1 | 2 |
-| elsie | 136 | 55 | 5 | 1 | 3 | 0 | 1 | 0 |
-| harrow | 105 | 362 | 7 | 0 | 2.4 | 0 | 1 | 2 |
-| tomas | 82 | 4 | 0 | 0 | 1 | 0 | 1 | 1 |
-| pell | 86 | 4 | 0 | 0 | 1 | 0 | 1 | 0 |
-| wen | 87 | 4 | 0 | 0 | 1 | 0 | 0 | 0 |
-| crew | 109 | 4 | 0 | 0 | 1 | 0 | 0 | 0 |
+| Quest | Words | Lines | New logic | New APIs | New concepts | Debug runs | Listings | Decisions | Machines |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| bram | 122 | 4 | yes | 1 | 0 | 1.2 | 4 | 0 | 6 |
+| ines | 112 | 15 | yes | 4 | 1 | 2.8 | 0 | 1 | 0 |
+| odile | 105 | 33 | yes | 2 | 1 | 2.4 | 2 | 1 | 2 |
+| elsie | 136 | 55 | yes | 5 | 1 | 3 | 0 | 1 | 0 |
+| harrow | 105 | 150 | yes | 2 | 0 | 1.4 | 0 | 1 | 2 |
+| tomas | 82 | 41 | yes | 2 | 0 | 1.4 | 0 | 1 | 1 |
+| pell | 86 | 51 | yes | 2 | 0 | 1.4 | 0 | 1 | 0 |
+| wen | 87 | 70 | yes | 0 | 0 | 1 | 0 | 0 | 0 |
+| crew | 109 | 103 | yes | 1 | 0 | 1.2 | 0 | 0 | 0 |
 
 First-time API calls and concepts:
 - bram: furnace.smelt. Concepts: none.
 - ines: drone.mine, drone.unload, drones, veins. Concepts: Loop.
 - odile: drone.pickup, furnace.alloy. Concepts: Multiple inputs.
 - elsie: drone.transfer, furnace.start, orders, press.count, press.start. Concepts: Routing.
-- harrow: bench.count, bench.start, depot.count, lathe.count, lathe.start, manifest, prospect. Concepts: none.
-- tomas: none. Concepts: none.
-- pell: none. Concepts: none.
+- harrow: depot.count, prospect. Concepts: none.
+- tomas: lathe.count, lathe.start. Concepts: none.
+- pell: bench.count, bench.start. Concepts: none.
 - wen: none. Concepts: none.
-- crew: none. Concepts: none.
+- crew: manifest. Concepts: none.
 
 </details>
 

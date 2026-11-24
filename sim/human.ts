@@ -47,7 +47,12 @@ export const humanTime = {
   },
   writing: {
     // One non-blank line inserted or deleted, including a comment. Thinking is in this rate.
+    // Charged only when the diff is new logic. A trivial edit charges nothing.
     secondsPerLine: 12,
+    // Token insertions plus deletions at or below this are not new code.
+    // A new function, branch, loop, or API call has to clear this count as well.
+    // A swapped job name or number is a literal change and does not count at any size.
+    trivialTokenEdits: 2,
     // The first time a works API call appears in the reference program.
     secondsPerApi: 40,
     // The first time a concept below appears. Later quests pay the line rate only.

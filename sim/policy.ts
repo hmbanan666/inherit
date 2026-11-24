@@ -6,7 +6,12 @@ export type Session = Awaited<ReturnType<typeof createSession>>
 export type Stage = 'manual' | 'run' | 'survey' | 'steel-loop' | 'grates' | 'two-drones' | 'press-line' | 'dies' | 'gears' | 'hinges' | 'shutters' | 'kits'
 const source = (name: string) => readFileSync(new URL(`./players/${name}.ts`, import.meta.url), 'utf8')
 const helpers = { 'lib/haul.ts': source('haul') }
-const mill = { ...helpers, 'lib/mill.ts': source('mill') }
+const floor = { ...helpers, 'lib/mill-floor.ts': source('mill-floor') }
+const diesLib = { ...floor, 'lib/dies.ts': source('mill-dies') }
+const gearsLib = { ...diesLib, 'lib/gears.ts': source('mill-gears') }
+const hingesLib = { ...gearsLib, 'lib/hinges.ts': source('mill-hinges') }
+const shuttersLib = { ...hingesLib, 'lib/shutters.ts': source('mill-shutters') }
+const kitsLib = { ...shuttersLib, 'lib/kits.ts': source('mill-kits') }
 export const players: Record<Stage, Record<string, string>> = {
   manual: kettlewick.files,
   run: { 'main.ts': source('run') },
@@ -16,11 +21,12 @@ export const players: Record<Stage, Record<string, string>> = {
   'two-drones': { 'main.ts': source('two-drones'), ...helpers },
   // One cart on the press. Typechecked, and not a proposed edit.
   'press-line': { 'main.ts': source('press-line') },
-  dies: { 'main.ts': source('dies'), ...mill },
-  gears: { 'main.ts': source('gears'), ...mill },
-  hinges: { 'main.ts': source('hinges'), ...mill },
-  shutters: { 'main.ts': source('shutters'), ...mill },
-  kits: { 'main.ts': source('kits'), ...mill },
+  // Each later quest keeps the previous files and adds the step it teaches.
+  dies: { 'main.ts': source('dies'), ...diesLib },
+  gears: { 'main.ts': source('gears'), ...gearsLib },
+  hinges: { 'main.ts': source('hinges'), ...hingesLib },
+  shutters: { 'main.ts': source('shutters'), ...shuttersLib },
+  kits: { 'main.ts': source('kits'), ...kitsLib },
 }
 
 // Unlisted quests keep the deployed files. A proposed edit is tried only

@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest'
 import { humanTime } from '../../sim/human'
 import {
-  apiCallsIn, apiCatalog, changedLines, conceptsIn, countWords, estimateHuman, humanWarnings, stripComments,
+  apiCallsIn, apiCatalog, changedLines, conceptsIn, countWords, estimateHuman, humanWarnings, isNewLogic, stripComments,
   waitingStretches,
 } from '../../sim/humanEstimate'
 import type { Event, Run } from '../../sim/playthrough'
-import type { Stage } from '../../sim/policy'
+import { players, type Stage } from '../../sim/policy'
 
 const catalog = apiCatalog()
 
@@ -102,6 +102,42 @@ test('a machine unlocked before Take belongs to the first quest', () => {
   const bram = estimateHuman(run).profiles.find(profile => profile.id === 'average')!.quests[0]
   expect(bram.machines).toBe(1)
   expect(bram.shop).toBeGreaterThan(0)
+})
+
+test('a literal swap or a short token edit is not new code', () => {
+  const dies = "export function onTick() {\n  tick('dies')\n}\n"
+  const gears = "export function onTick() {\n  tick('gears')\n}\n"
+  const renamed = "export function onTick() {\n  step('dies')\n}\n"
+  expect(isNewLogic({ 'main.ts': dies }, { 'main.ts': gears }, catalog)).toBe(false)
+  expect(isNewLogic({ 'main.ts': 'const qty = 2\n' }, { 'main.ts': 'const qty = 8\n' }, catalog)).toBe(false)
+  expect(isNewLogic({ 'main.ts': dies }, { 'main.ts': renamed }, catalog)).toBe(false)
+  const added = "export function onTick() {\n  orders()\n}\n"
+  expect(isNewLogic({ 'main.ts': 'export function onTick() {\n}\n' }, { 'main.ts': added }, catalog)).toBe(true)
+  const branched = "export function onTick() {\n  if (ready) return\n}\n"
+  expect(isNewLogic({ 'main.ts': 'export function onTick() {\n}\n' }, { 'main.ts': branched }, catalog)).toBe(true)
+  expect(humanWarnings([{ id: 'tomas', total: 1, logic: false }], []).map(warning => warning.id)).toEqual(['human/code/tomas'])
+  expect(humanWarnings([{ id: 'bram', total: 1 }], []).some(warning => warning.id.startsWith('human/code/'))).toBe(false)
+})
+
+test('each fabrication quest adds its own step', () => {
+  expect(players.dies['lib/gears.ts']).toBeUndefined()
+  expect(players.dies['lib/dies.ts']).not.toContain('lathe.start')
+  expect(players.gears['lib/dies.ts']).toBe(players.dies['lib/dies.ts'])
+  expect(players.gears['lib/gears.ts']).toContain('lathe.start')
+  expect(players.hinges['lib/hinges.ts']).toContain('bench.start')
+  expect(players.shutters['lib/shutters.ts']).toContain('cargoKind')
+  expect(players.kits['lib/kits.ts']).toContain('manifest()')
+  expect(isNewLogic(players.dies, players.gears, catalog)).toBe(true)
+  const run = sample([
+    { id: 'harrow', from: 'grates', to: 'dies', start: 0, end: 10 },
+    { id: 'tomas', from: 'dies', to: 'gears', start: 10, end: 20 },
+  ])
+  const quests = estimateHuman(run).profiles.find(profile => profile.id === 'average')!.quests
+  expect(quests[0]?.logic).toBe(true)
+  expect(quests[1]?.logic).toBe(true)
+  expect(quests[1]?.apis).toContain('lathe.start')
+  expect(quests[1]?.apis).not.toContain('press.start')
+  expect(quests[0]?.lines).toBeGreaterThan(quests[1]?.lines ?? 0)
 })
 
 test('the quest cap and the wait cap are warnings', () => {
