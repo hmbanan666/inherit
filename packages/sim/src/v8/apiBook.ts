@@ -1,6 +1,6 @@
 import { exampleText, type Brick } from './core/bricks'
 import type { World } from './core/world'
-import { freshBrick, functionUnlocked, questList, triggerUnlocked, type WorksTrigger } from './quests'
+import { freshBrick, functionUnlocked, questList, rewardFresh, triggerUnlocked, type WorksTrigger } from './quests'
 import { triggerDocs } from './triggers'
 
 export interface ApiEntry {
@@ -71,7 +71,7 @@ export function apiBook(bricks: readonly Brick[], world: Pick<World, 'questId' |
       doc: entry.doc,
       example: entry.example,
       locked: open ? undefined : quest?.title,
-      fresh: !!quest && world.questId === quest.id,
+      fresh: !!quest && rewardFresh(world, quest.id),
     }
   })
   return [

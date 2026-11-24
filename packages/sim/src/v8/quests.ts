@@ -36,7 +36,7 @@ export interface QuestDef {
   needs?: string
   /** A function this quest grants on Take. The signature is a recipe, not a solution. */
   unlock?: { brick: string; signature: string; legacy?: string }
-  /** Run, on(), or onTick. Granted on Take, by the same rule as unlock. */
+  /** Run, on(), or onTick. Granted on Hand over, with the gift. */
   trigger?: 'run' | 'events' | 'tick'
   /** Named on the reward tiles. Granted on Hand over, not sold. */
   gift?: string
@@ -225,16 +225,54 @@ export const shop: ShopItem[] = [
   { id: 'cpu', name: 'CPU +10', price: 700, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
 
-/** Odile's reward. A save that already bought drone-2, or has passed Odile, keeps a single drone-2. */
+const secondDrone = 'drone-2'
+
+/** Odile's hand-over, or a save that already bought the drone. Being on a later quest does not count. */
+export function secondDroneUnlocked(world: Pick<World, 'cleared' | 'bought'>) {
+  return !!world.cleared?.includes('odile') || !!world.bought?.includes('drone')
+}
+
+/** One drone-2 when the reward is granted, and none when it is not. Map, list, inspector, and API read `world.drones` after this. */
+export function syncSecondDrone(world: World) {
+  if (!secondDroneUnlocked(world)) {
+    if (world.drones.some(drone => drone.name === secondDrone))
+      world.drones = world.drones.filter(drone => drone.name !== secondDrone)
+    if (world.signals?.drones) delete world.signals.drones[secondDrone]
+    if (world.inbox?.drones) delete world.inbox.drones[secondDrone]
+    if (world.jobs) delete world.jobs[secondDrone]
+    return
+  }
+  const keep = world.drones.findIndex(drone => drone.name === secondDrone)
+  if (keep >= 0)
+    world.drones = world.drones.filter((drone, index) => drone.name !== secondDrone || index === keep)
+  grantSecondDrone(world)
+}
+
+/** Odile's reward. A save that already bought drone-2 keeps that single drone. */
 export function grantSecondDrone(world: World) {
-  if (world.drones.some(drone => drone.name === 'drone-2')) return
+  if (world.drones.some(drone => drone.name === secondDrone)) return
   const home = world.depot.pos
   const capacity = world.drones[0]?.capacity ?? 3
   world.drones.push({
-    name: 'drone-2', pos: { x: home.x, y: home.y }, cargo: 0,
+    name: secondDrone, pos: { x: home.x, y: home.y }, cargo: 0,
     capacity, carrying: null, source: '', dig: null, task: null,
   })
-  if (world.signals?.drones) world.signals.drones['drone-2'] = { cargo: 0, capacity, idle: true }
+  if (world.signals?.drones) world.signals.drones[secondDrone] = { cargo: 0, capacity, idle: true }
+}
+
+/** True once the quest is handed over, or a later quest is open or handed over. The open quest itself does not count. */
+export function rewardGranted(world: Pick<World, 'questId' | 'cleared'>, id: string) {
+  if (world.cleared.includes(id)) return true
+  const index = questList.findIndex(item => item.id === id)
+  if (index < 0) return false
+  return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
+}
+
+/** The reward tile stays marked new until a later quest is handed over. */
+export function rewardFresh(world: Pick<World, 'cleared'>, id: string) {
+  if (!world.cleared.includes(id)) return false
+  const index = questList.findIndex(item => item.id === id)
+  return !questList.some((item, i) => i > index && world.cleared.includes(item.id))
 }
 
 /** A Harrow save that already delivered 60 ingots is not locked by an earlier Run. Credits stay. */
@@ -298,12 +336,7 @@ export function acceptQuest(world: World, site: Site, id?: string) {
     ? site.questList?.find(item => item.id === id && canTake(world, item))
     : nextQuest(world, site)
   if (!quest) return false
-  const grantsLoop = quest.trigger === 'tick' && !triggerUnlocked(world, 'tick')
   world.questId = quest.id
-  if (grantsLoop) {
-    world.loop = true
-    world.holding = false
-  }
   world.manualRuns = 0
   quest.prepare?.(world)
   noteCheckReset(world)
@@ -323,9 +356,14 @@ export function completeQuest(world: World, site: Site) {
   world.ledger.income += quest.pay
   world.xp += quest.xp
   world.level = levelFor(world.xp)
+  const armLoop = quest.trigger === 'tick' && !triggerUnlocked(world, 'tick')
   if (!world.cleared.includes(quest.id)) world.cleared.push(quest.id)
   if (!world.growth.includes(quest.change)) world.growth.push(quest.change)
-  if (quest.gift === 'drone-2') grantSecondDrone(world)
+  syncSecondDrone(world)
+  if (armLoop) {
+    world.loop = true
+    world.holding = false
+  }
   const order = world.orders.find(item => item.id === quest.id)
   if (order) order.status = 'on time'
   world.questId = undefined
@@ -360,14 +398,12 @@ export function freshBrick(world: Pick<World, 'questId'> | undefined, brick: str
 
 export type WorksTrigger = 'run' | 'events' | 'tick'
 
-/** True when a save already had the trigger, or the player has reached the quest that grants it. */
+/** True when a save already had the trigger, or the quest that grants it has been handed over. */
 export function triggerUnlocked(world: Pick<World, 'questId' | 'cleared' | 'automation'>, name: WorksTrigger) {
   if (world.automation?.[name]) return true
   const quest = questList.find(item => item.trigger === name)
   if (!quest) return false
-  if (world.questId === quest.id || world.cleared.includes(quest.id)) return true
-  const index = questList.findIndex(item => item.id === quest.id)
-  return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
+  return rewardGranted(world, quest.id)
 }
 
 export function unlockError(brick: string) {

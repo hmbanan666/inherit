@@ -2,7 +2,7 @@ export * from './core/world'
 export * from './core/bricks'
 export { mining, miningModule, dumpCargo, stepDroneTasks } from './modules/mining'
 export { kettlewick, uncleMain } from './sites/kettlewick'
-export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, canTake, questHold, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
+export { questList, shop, acceptQuest, completeQuest, buyUpgrade, nextQuest, canTake, questHold, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, rewardGranted, rewardFresh, secondDroneUnlocked, syncSecondDrone, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
 export { outputCap } from './modules/smelting'
 export {
   worksEvents, onApi, triggerDocs, pressManual, queueRun, stopScript, setLoop, grantLegacy, ensureTriggers, actManual, dueEvents, settleTriggers,

@@ -32,6 +32,8 @@ export interface QuestStepState {
   /** Ore a smelt or alloy consumes. The site recipe is 2. */
   oreNeed?: number
   smelting?: boolean
+  /** The quest's trigger is already granted. A locked trigger is not the next step. */
+  triggerReady?: boolean
 }
 
 export interface LoopReadiness {
@@ -114,9 +116,9 @@ export function questNextStep(state: QuestStepState) {
   if (!state.smelting && quest.item === 'steel' && state.furnace.input >= oreNeed && state.furnace.coal >= 1)
     return 'Open the furnace and choose Alloy.'
   if (state.smelting) return 'The furnace is smelting.'
-  if (quest.trigger === 'run' && untouched(state)) return `Press ▶ next to ${state.runName || 'smeltOnce'}`
-  if (quest.trigger === 'tick' && !state.loop && sitting(state)) return 'Turn on Loop: onTick'
-  if (quest.trigger === 'events' && sitting(state)) return 'on() runs a function when the works change.'
+  if (state.triggerReady && quest.trigger === 'run' && untouched(state)) return `Press ▶ next to ${state.runName || 'smeltOnce'}`
+  if (state.triggerReady && quest.trigger === 'tick' && !state.loop && sitting(state)) return 'Turn on Loop: onTick'
+  if (state.triggerReady && quest.trigger === 'events' && sitting(state)) return 'on() runs a function when the works change.'
   return quest.goal
 }
 

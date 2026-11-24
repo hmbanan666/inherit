@@ -104,12 +104,13 @@ export function ensureTriggers(world: World) {
   return world
 }
 
-export function pressManual(world: World, action: ManualAction, drone = 'drone-1', vein?: string) {
+export function pressManual(world: World, action: ManualAction, drone?: string, vein?: string) {
+  const name = drone || world.drones[0]?.name || 'drone-1'
   if (action === 'mine' || action === 'unload' || action === 'dump') {
-    world.inbox.drones[drone] = action
+    world.inbox.drones[name] = action
     if (vein) world.inbox.vein = vein
   } else world.inbox[action] = true
-  if (action === 'collect') world.inbox.collectDrone = drone
+  if (action === 'collect') world.inbox.collectDrone = name
 }
 
 export function queueRun(world: World, name: string, file: string, line: number) {
@@ -175,7 +176,7 @@ export function actManual(world: World, site: Site) {
   const ctx = { world, cpuUsed: () => used }
   const inbox = world.inbox
   const vein = inbox.vein
-  const collectDrone = inbox.collectDrone ?? 'drone-1'
+  const collectDrone = inbox.collectDrone ?? world.drones[0]?.name ?? 'drone-1'
   world.inbox = emptyInbox()
   if (inbox.smelt) trySmelt(world, site, ctx, spend)
   if (inbox.alloy) tryAlloy(world, site, ctx, spend)
@@ -400,8 +401,8 @@ function inspectFurnace(world: World, site: Site): InspectView {
         reason: !alloy ? 'Unlocks with Steel for the bridge' : smelting ? 'The furnace is smelting.' : canAlloy ? undefined : `Needs ${ore} ore and 1 coal`,
       },
       {
-        id: 'collect', label: 'Collect', api: 'drone.pickup(furnace)', enabled: furnace.output > 0 || furnace.steel > 0,
-        drone: 'drone-1', reason: 'Collect with drone-1',
+        id: 'collect', label: 'Collect', api: 'drone.pickup(furnace)', enabled: (furnace.output > 0 || furnace.steel > 0) && !!world.drones[0],
+        drone: world.drones[0]?.name, reason: world.drones[0] ? `Collect with ${world.drones[0].name}` : undefined,
       },
       { id: 'clear', label: 'Clear hopper', api: 'furnace.clear()', enabled: furnace.input > 0 || furnace.coal > 0, reason: 'Drops ore and coal. Ingots and steel stay' },
     ],

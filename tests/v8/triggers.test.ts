@@ -58,7 +58,7 @@ test('the inspector names caps, a locked recipe, and dump', () => {
   expect(machineList(world).map(row => row.id)).toEqual(['furnace', 'depot', 'drone-1', 'Vein A', 'Vein B', 'Vein D'])
 })
 
-test('a fresh world stays on buttons until the quest that grants the trigger is taken', async () => {
+test('a fresh world stays on buttons until the quest that grants the trigger is handed over', async () => {
   const session = await createSession(kettlewick, kettlewick.files, undefined, { fresh: true })
   try {
     expect(triggerUnlocked(session.world, 'run')).toBe(false)
@@ -71,20 +71,29 @@ test('a fresh world stays on buttons until the quest that grants the trigger is 
     expect(session.world.manualRuns).toBe(1)
     session.accept()
     expect(session.world.questId).toBe('bram')
+    expect(triggerUnlocked(session.world, 'run')).toBe(false)
+    expect(session.world.loop).toBe(false)
+    session.world.orders.find(order => order.id === 'bram')!.shipped = 2
+    session.world.ingotsMade = 1
+    expect(session.complete()).toBe(true)
     expect(triggerUnlocked(session.world, 'run')).toBe(true)
     expect(triggerUnlocked(session.world, 'tick')).toBe(false)
     expect(session.world.loop).toBe(false)
-    session.world.questId = undefined
-    session.world.cleared = ['bram']
     session.world.level = 2
-    session.world.orders = []
     expect(session.accept('ines')).toBe(true)
+    expect(triggerUnlocked(session.world, 'tick')).toBe(false)
+    expect(session.world.loop).toBe(false)
+    expect(triggerUnlocked(session.world, 'events')).toBe(false)
+    session.world.orders.find(order => order.id === 'ines')!.shipped = 16
+    expect(session.complete()).toBe(true)
     expect(triggerUnlocked(session.world, 'tick')).toBe(true)
     expect(session.world.loop).toBe(true)
-    expect(triggerUnlocked(session.world, 'events')).toBe(false)
-    session.world.questId = 'odile'
-    expect(triggerUnlocked(session.world, 'events')).toBe(false)
+    session.world.level = 3
+    expect(session.accept('elsie')).toBe(false)
     session.world.questId = 'elsie'
+    expect(triggerUnlocked(session.world, 'events')).toBe(false)
+    session.world.cleared.push('elsie')
+    session.world.questId = undefined
     expect(triggerUnlocked(session.world, 'events')).toBe(true)
   } finally { session.dispose() }
 })
@@ -175,6 +184,7 @@ export function* bringOne() {
   }, undefined, { fresh: true })
   try {
     session.accept()
+    session.world.automation.run = true
     session.queue('bringOne', 'main.ts', 2)
     session.step(3)
     expect(session.world.memory.n).toBe(1)
@@ -194,6 +204,7 @@ export function keep() {
   }, undefined, { fresh: true })
   try {
     session.accept()
+    session.world.automation.run = true
     session.queue('keep', 'main.ts', 2)
     session.step(3)
     expect(session.world.memory.n).toBe(1)
@@ -255,6 +266,9 @@ export function onTick() { memory.n = (memory.n ?? 0) + 1 }`,
     session.world.level = 2
     session.world.cleared = ['bram']
     expect(session.accept('ines')).toBe(true)
+    expect(triggerUnlocked(session.world, 'tick')).toBe(false)
+    session.world.automation.tick = true
+    session.world.loop = true
     session.step(2)
     expect(session.world.memory.n).toBe(2)
     expect(session.world.pace).toEqual({ mode: 'tick', name: 'onTick' })

@@ -1,6 +1,6 @@
 # Functions with triggers
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and builds on [ADR 0023](0023-quest-unlocks-functions.md) and [ADR 0024](0024-quest-rail-and-status.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md): goods reach a quest only through `takeFromDepot`. `ship()` does not deliver, and a site does not ship from the furnace. [ADR 0028](0028-run-to-completion.md) supersedes the trigger order and the one-tick Run in this ADR.
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md) and builds on [ADR 0023](0023-quest-unlocks-functions.md) and [ADR 0024](0024-quest-rail-and-status.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md): goods reach a quest only through `takeFromDepot`. `ship()` does not deliver, and a site does not ship from the furnace. [ADR 0028](0028-run-to-completion.md) supersedes the trigger order and the one-tick Run in this ADR. [ADR 0032](0032-rewards-on-hand-over.md) supersedes "Unlock on take" for Run, Loop, and `on()`: those land on Hand over.
 
 ## Context
 

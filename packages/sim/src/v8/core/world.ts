@@ -1,6 +1,6 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
-import { grantSecondDrone, pinLegacyTriggers, repairHarrow, syncQuest, type QuestDef } from '../quests'
+import { pinLegacyTriggers, repairHarrow, syncQuest, syncSecondDrone, triggerUnlocked, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
 /** One machine command. The drone keeps it across ticks. `since` is the tick it was given. */
@@ -112,13 +112,12 @@ export function migrateWorld(world: World) {
   if (!hadAutomation) world.loop = true
   else if (rememberedLoop === undefined) world.loop = !!world.automation.tick
   else world.loop = rememberedLoop
+  if (!triggerUnlocked(world, 'tick')) world.loop = false
   if (world.ledger) delete (world.ledger as { waste?: number }).waste
   for (const order of world.orders ?? []) delete (order as { due?: number }).due
   delete (world as { holdTicks?: number }).holdTicks
   delete (world as { coalHold?: number }).coalHold
-  const later = new Set(['elsie', 'harrow', 'tomas', 'pell', 'wen'])
-  if (world.bought?.includes('drone') || world.cleared?.includes('odile') || later.has(world.questId ?? ''))
-    grantSecondDrone(world)
+  syncSecondDrone(world)
   repairHarrow(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
@@ -264,6 +263,7 @@ export function createWorld(site: Site): World {
       cargo: drone.cargo, capacity: drone.capacity, idle: true,
     }])),
   }
+  syncSecondDrone(world)
   world.status = site.questList ? syncQuest(world, site) : (world.growth.at(-1) ?? 'The village is quiet.')
   return world
 }

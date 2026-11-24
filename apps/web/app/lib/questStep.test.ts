@@ -23,16 +23,19 @@ test('the card names who to talk to, the quest to take, and the hand-over', () =
 
 test('an open quest says what to press, what to carry, or the bring line', () => {
   const bram = { from: 'Bram', goal: 'Bring Bram 2 ingots.', item: 'ingot' as const, qty: 2, trigger: 'run' as const }
-  expect(questNextStep(state({ quest: bram, runName: 'smeltOnce' }))).toBe('Press ▶ next to smeltOnce')
+  expect(questNextStep(state({ quest: bram, runName: 'smeltOnce' }))).toBe('Bring Bram 2 ingots.')
+  expect(questNextStep(state({ quest: bram, runName: 'smeltOnce', triggerReady: true }))).toBe('Press ▶ next to smeltOnce')
   expect(questNextStep(state({ quest: bram, furnace: { ...empty, output: 2 } }))).toBe('Carry the ingots to the depot.')
   expect(questNextStep(state({ quest: bram, furnace: { ...empty, output: 2, steel: 1 } }))).toBe('Carry the ingots to the depot.')
   expect(questNextStep(state({ quest: bram, furnace: { ...empty, steel: 1 } }))).toBe('Bring Bram 2 ingots.')
   expect(questNextStep(state({ quest: bram, furnace: { ...empty, input: 2 } }))).toBe('Open the furnace and choose Smelt.')
   const ines = { from: 'Ines', goal: 'Bring Ines 16 ingots.', item: 'ingot' as const, qty: 16, trigger: 'tick' as const }
-  expect(questNextStep(state({ quest: ines }))).toBe('Turn on Loop: onTick')
-  expect(questNextStep(state({ quest: ines, loop: true }))).toBe('Bring Ines 16 ingots.')
+  expect(questNextStep(state({ quest: ines }))).toBe('Bring Ines 16 ingots.')
+  expect(questNextStep(state({ quest: ines, triggerReady: true }))).toBe('Turn on Loop: onTick')
+  expect(questNextStep(state({ quest: ines, loop: true, triggerReady: true }))).toBe('Bring Ines 16 ingots.')
   const elsie = { from: 'Elsie', goal: 'Bring Elsie 6 steel.', item: 'steel' as const, qty: 6, trigger: 'events' as const }
-  expect(questNextStep(state({ quest: elsie }))).toBe('on() runs a function when the works change.')
+  expect(questNextStep(state({ quest: elsie }))).toBe('Bring Elsie 6 steel.')
+  expect(questNextStep(state({ quest: elsie, triggerReady: true }))).toBe('on() runs a function when the works change.')
   expect(questNextStep(state({ quest: elsie, furnace: { ...empty, steel: 1 } }))).toBe('Carry the steel to the depot.')
 })
 

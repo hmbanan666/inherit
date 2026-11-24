@@ -22,7 +22,8 @@ const bricks = factoryBricks(kettlewick)
 const lockedWorld = { questId: undefined, cleared: [] as string[], bought: [] as string[], automation: { run: false, events: false, tick: false } }
 const visibleBricks = computed(() => bricks.filter(brick => functionUnlocked(world.value ?? lockedWorld, brick.name)))
 const freshNames = computed(() => new Set(bricks.filter(brick => freshBrick(world.value, brick.name)).map(brick => brick.name)))
-const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name))))
+const droneNames = computed(() => world.value?.drones.map(drone => drone.name) ?? ['drone-1'])
+const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name)), new Set(), ['drone-1']))
 const bookSections = computed(() => apiBook(bricks, world.value ?? lockedWorld))
 const bookOpen = ref(false)
 const files = shallowRef({ ...kettlewick.files })
@@ -35,7 +36,7 @@ const cursor = ref({ line: 1, column: 1 })
 const notesKey = 'inherit.v8.notes'
 const notes = ref<string[]>([])
 const world = shallowRef<World>()
-watch([visibleBricks, freshNames], () => { api.value = declarations(visibleBricks.value, freshNames.value) })
+watch([visibleBricks, freshNames, droneNames], () => { api.value = declarations(visibleBricks.value, freshNames.value, droneNames.value) })
 const scriptNotice = ref<HostNotice>()
 const saveNotice = ref<HostNotice>()
 const floorNotice = ref<HostNotice>()
@@ -299,24 +300,36 @@ function toggleLoop() {
     files: !loopOn.value && dirty.value ? files.value : undefined,
   })
 }
+function offerTrigger(trigger: 'run' | 'events' | 'tick') {
+  const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
+  const added = insertTriggerExample(files.value[file] ?? '', trigger, notes.value)
+  rememberNotes(added.remembered)
+  if (added.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: added.source }
+}
+let grantNotesReady = false
+const grantedNotes = new Set<string>()
+watch(world, current => {
+  if (!current) return
+  if (!grantNotesReady) {
+    for (const id of current.cleared) grantedNotes.add(id)
+    grantNotesReady = true
+    return
+  }
+  for (const quest of kettlewick.questList ?? []) {
+    if (!quest.trigger || !current.cleared.includes(quest.id) || grantedNotes.has(quest.id)) continue
+    grantedNotes.add(quest.id)
+    offerTrigger(quest.trigger)
+  }
+})
 function take(id: string) {
   const current = world.value
   const quest = kettlewick.questList?.find(item => item.id === id)
   if (!current || !quest || !canTake(current, quest)) return
   const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
-  if (quest) {
-    let source = files.value[file] ?? ''
-    let remembered = notes.value
-    if (quest.trigger) {
-      const added = insertTriggerExample(source, quest.trigger, remembered)
-      source = added.source
-      remembered = added.remembered
-    }
-    const note = questComment(quest.from, quest.nudge)
-    const next = insertQuestNote(source, note, quest.id, remembered)
-    rememberNotes(next.remembered)
-    if (next.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: next.source }
-  }
+  const note = questComment(quest.from, quest.nudge)
+  const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value)
+  rememberNotes(next.remembered)
+  if (next.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: next.source }
   send({ kind: 'accept', id })
 }
 const shownConsole = computed(() => {
@@ -363,6 +376,7 @@ const nextStep = computed(() => {
   cart: cartCue(world.value),
   oreNeed: kettlewick.recipe.ore,
   smelting: world.value?.furnace.readyAt != null,
+  triggerReady: !!activeQuest.value?.trigger && !!world.value && triggerUnlocked(world.value, activeQuest.value.trigger),
 })
 })
 const loopReady = computed(() => ({
@@ -372,7 +386,9 @@ const loopReady = computed(() => ({
   helper: Object.keys(files.value).find(file => file !== 'main.ts' && exportsOnTick(files.value[file] ?? '')),
 }))
 const granted = computed(() => {
-  const note = grantNote(activeQuest.value?.trigger, activeQuest.value?.trigger === 'tick' ? loopReady.value : undefined)
+  const trigger = activeQuest.value?.trigger
+  if (!trigger || !world.value || !triggerUnlocked(world.value, trigger)) return
+  const note = grantNote(trigger, trigger === 'tick' ? loopReady.value : undefined)
   if (!note || note.text === nextStep.value) return
   return note
 })
@@ -452,6 +468,8 @@ function deploy() {
 }
 function startOver() {
   if (!window.confirm('Start over at Kettlewick? This replaces your saved works and all project files.')) return
+  grantNotesReady = false
+  grantedNotes.clear()
   preserveSlot = false
   rememberNotes([])
   resetting = true
@@ -630,7 +648,7 @@ onBeforeUnmount(() => {
                 <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
                 <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
                 <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}<span class="when">On Take</span></li>
-                <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}<span class="when">On Take</span></li>
+                <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}<span class="when">On hand-over</span></li>
                 <li v-if="shownQuest.gift" title="Granted when you hand this over."><Unlock />{{ shownQuest.gift }}<span class="when">On hand-over</span></li>
               </ul>
             </article>

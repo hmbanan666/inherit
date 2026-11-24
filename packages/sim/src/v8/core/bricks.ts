@@ -45,7 +45,8 @@ export function exampleText(doc: string, example: string) {
   return `// ${sentence}\n${example}`
 }
 
-export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new Set()) {
+export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new Set(), droneNames?: readonly string[]) {
+  const nameType = droneNames?.length ? droneNames.map(name => JSON.stringify(name)).join(' | ') : 'string'
   const declaration = (b: Brick, prefix = '') => {
     const note = exampleText(b.doc, b.example).split('\n').map(line => ` * ${line}`).join('\n')
     const deprecated = b.deprecated ? ` @deprecated Use ${b.deprecated.use}` : ''
@@ -64,7 +65,7 @@ ${members('furnace.')}
 ${members('depot.')}
   }
   export interface Drone extends Target {
-    readonly name: string
+    readonly name: ${nameType}
     readonly cargo: number
     readonly capacity: number
 ${members('drone.')}
