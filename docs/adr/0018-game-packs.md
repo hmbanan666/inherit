@@ -18,4 +18,4 @@ Nick played chapter one and missed the change from calling a function to handing
 
 The [implementation spec](../specs/v5-game-packs.md) gives the pack contract, full lesson sequence, Workshop port and validation rules.
 
-> Superseded by ADR 0021 as the product. [ADR 0022](0022-quest-loop-no-loss.md) keeps the shipped packs as a legacy mode at `/?packs` and does not restore this ADR.
+> Superseded by ADR 0021 as the product. [ADR 0030](0030-packs-removed.md) removes the packs. This ADR is not restored.

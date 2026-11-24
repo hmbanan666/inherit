@@ -68,7 +68,9 @@ export async function createSession(site: Site, files = site.files, saved?: Worl
       }
       noteRun(script.name, script.file, script.line, `${script.name} ok`, 'log')
       world.script = null
-      world.pace = { mode: 'run', name: script.name }
+      world.pace = !world.holding && world.loop && triggerUnlocked(world, 'tick')
+        ? { mode: 'tick', name: 'onTick' }
+        : { mode: 'idle', name: '' }
       return
     }
     if (!world.holding && world.loop && triggerUnlocked(world, 'tick')) {

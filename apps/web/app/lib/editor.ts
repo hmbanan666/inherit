@@ -1,5 +1,18 @@
 import type { Ref, InjectionKey } from 'vue'
-import type { Files, Starter } from '@inherit/sim/pack'
+export type Files = Record<string, string>
+export interface Starter {
+  placeholder?: string
+  files: Files
+  edit: { file: string; line: number; column?: number }
+}
+export interface PlainError {
+  file: string
+  line: number
+  title: string
+  body: string
+  raw: string
+  mark: { from: number; to: number }
+}
 type Read<T> = Readonly<Ref<T>>
 export interface EditorSession {
   id: string

@@ -73,8 +73,12 @@ async function act(command: FactoryCommand) {
         session!.stop()
         publish()
       } else if (command.kind === 'loop') {
+        if (command.on && command.files) {
+          await session!.deploy(command.files)
+          noteCheckReset(session!.world)
+        }
         session!.setLoop(command.on, command.name, command.file, command.line)
-        publish()
+        publish(command.files)
       } else if (command.kind === 'clear-console') {
         clearConsole(session!.world)
         publish()

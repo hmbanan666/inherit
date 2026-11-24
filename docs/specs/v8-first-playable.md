@@ -8,7 +8,7 @@ Where an older milestone mentioned rent, pause, speeds, bankruptcy, deadlines, a
 
 Nick opens `/`. Nobody is asking until he takes a quest. Bram is first, at level 1: buttons on the furnace and the drone, and two ingots taken from the depot. **Hand over** pays that quest's credits and XP when every goal line passes. Shipping does not pay. The next villager waits until this one is handed over and the level is high enough. The clock keeps ticking while the tab is hidden. There is no pause and no speed button.
 
-`/?packs` opens the legacy pack showcase. Pack code stays.
+`/` is the game. Packs were removed ([ADR 0030](../adr/0030-packs-removed.md)). The logo opens this page and the current save.
 
 The site is Kettlewick Works. Its numbers live on `kettlewick` in `packages/sim/src/v8/sites/kettlewick.ts`.
 

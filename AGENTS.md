@@ -1,6 +1,6 @@
 # Inherit development
 
-Use Node 24 and the pnpm release pinned in the root manifest. `pnpm dev` opens Kettlewick Works. Legacy packs stay at `/?packs`.
+Use Node 24 and the pnpm release pinned in the root manifest. `pnpm dev` opens Kettlewick Works.
 
 Keep game rules and goal evaluation in `packages/sim`. The page renders the world the worker sends. Player code stays in QuickJS. v8 code lives in `packages/sim/src/v8/`. Build on the existing frame and components. Do not restart a screen from scratch.
 
@@ -22,10 +22,6 @@ pnpm build
 ## Commits and merging
 
 Cursor cloud agents run on grok-4.7 high. Squash-merge with an explicit subject and body. Omit `Co-authored-by` trailers and AI tool or model names from commit messages, PR titles, and PR bodies. GitHub's default squash message appends `Co-authored-by` trailers for commit authors.
-
-## Legacy packs
-
-Packs are not v8. To add or change one, use [.agents/skills/author-pack/SKILL.md](.agents/skills/author-pack/SKILL.md) and [the authoring guide](docs/packs/AUTHORING.md). Do not delete pack code.
 
 ## Issue tracker
 

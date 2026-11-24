@@ -116,35 +116,35 @@ export function queueRun(world: World, name: string, file: string, line: number)
   if (!triggerUnlocked(world, 'run')) throw new Error('Run is locked. A quest unlocks it.')
   world.holding = false
   world.script = { name, file, line, loop: world.loop, phase: 'start' }
-  world.pace = { mode: 'run', name }
   world.manualRuns = (world.manualRuns ?? 0) + 1
 }
 
 export function stopScript(world: World) {
+  if (world.loop) pushConsole(world, { tick: world.tick, text: 'Loop stopped: onTick', level: 'log' })
   world.holding = true
   world.loop = false
   world.script = null
   world.pace = { mode: 'idle', name: '' }
 }
 
-/** Loop calls onTick every tick. Passing a name also queues that function once. */
-export function setLoop(world: World, on: boolean, name?: string, file = 'main.ts', line = 1) {
+/** Loop calls onTick every tick. It does not queue a one-shot Run. */
+export function setLoop(world: World, on: boolean, _name?: string, _file = 'main.ts', _line = 1) {
   if (!triggerUnlocked(world, 'tick')) throw new Error('Loop is locked. A quest unlocks it.')
   if (!on) {
+    if (world.loop) pushConsole(world, { tick: world.tick, text: 'Loop stopped: onTick', level: 'log' })
     world.loop = false
     if (world.script) world.script.loop = false
+    if (world.pace.mode === 'tick') world.pace = { mode: 'idle', name: '' }
     return
   }
+  const starting = !world.loop
   world.holding = false
   world.loop = true
-  if (world.script) {
-    world.script.loop = true
-    return
+  if (world.script) world.script.loop = true
+  if (starting) {
+    pushConsole(world, { tick: world.tick, text: 'Loop started: onTick', level: 'log' })
+    world.pace = { mode: 'tick', name: 'onTick' }
   }
-  if (!name) return
-  world.script = { name, file, line, loop: true, phase: 'start' }
-  world.pace = { mode: 'run', name }
-  world.manualRuns = (world.manualRuns ?? 0) + 1
 }
 
 function distance(a: Cell, b: Cell) {

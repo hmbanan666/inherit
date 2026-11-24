@@ -23,7 +23,7 @@ test('Bram offers a quest, the checks sit beside the editor, and credits stay pu
   await expect(page.getByTestId('take-quest')).toBeVisible()
   await expect(page.getByTestId('complete-quest')).toHaveCount(0)
   await expect(page.getByLabel('The script is running.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Inherit showcase' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Inherit' })).toBeVisible()
   await expect(page.getByLabel('Factory map').locator('canvas')).toBeVisible()
   await expect(page.getByLabel('Village').locator('canvas')).toBeVisible()
   const files = page.getByLabel('Project files')

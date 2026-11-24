@@ -75,5 +75,6 @@ function resize(event: PointerEvent) {
       </section>
     </main>
     <footer class="statusbar"><slot name="status" /></footer>
+    <slot />
   </div>
 </template>

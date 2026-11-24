@@ -1,13 +1,12 @@
 import ts from 'typescript'
-import type { Files } from '../../packages/sim/src/framework/pack'
 
 /** Share standard library syntax trees while giving each project a separate scope. */
 const options: ts.CompilerOptions = {strict:true, target:ts.ScriptTarget.ES2022, module:ts.ModuleKind.ESNext,
   moduleResolution:ts.ModuleResolutionKind.Bundler, types:[], lib:['lib.es2022.d.ts'], noEmit:true}
 const host = ts.createCompilerHost(options)
 const standard = new Map<string, ts.SourceFile>()
-export function diagnostics(files: Files, declarations: string) {
-  const root = '/pack-validation/'
+export function diagnostics(files: Record<string, string>, declarations: string) {
+  const root = '/player/'
   const source = new Map(Object.entries({...files,'player.d.ts':declarations}).map(([name,text]) => [root+name,text]))
   const local: ts.CompilerHost = {...host,
     fileExists: path => source.has(path) || host.fileExists(path),

@@ -30,6 +30,8 @@ Bram's text described a full cart at the vein. A fresh drone is empty at the dep
 
 **Save and renderer errors stay visible.** A failed save, a failed restore, and a floor renderer error are console rows and count in the problems badge. The line above Tests and Console stays.
 
+**The editor row is API, Loop, and Deploy.** API opens the book. Escape or the X closes it. Run is the gutter mark beside an export in `main.ts`. The toolbar has no second Run, and a finished call does not flash its name: the result is the console line `{name} ok`. Loop is the toggle `Loop: onTick`. The tooltip is `calls onTick every tick`. Turning it on writes `Loop started: onTick` and calls `onTick` every tick. Turning it off writes `Loop stopped: onTick`. With no `onTick` in `main.ts` the toggle is disabled. The quest card shows one next step from the quest state, and the quest that grants Run, Loop, or `on()` adds one line for that grant.
+
 ## Consequences
 
 Old quest programs that walk with `moveAlong` and mine one step when they arrive still complete. A mine command given while the drone is already beside the vein digs once on that tick. The same command on the next tick does not dig twice. A pickup given beside the furnace takes the goods on that tick, and the next `moveAlong` cancels the delivery so an old haul can carry them itself.

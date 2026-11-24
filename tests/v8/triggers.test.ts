@@ -237,7 +237,10 @@ export function onTick() { memory.n = (memory.n ?? 0) + 1 }`,
     session.step(2)
     expect(session.world.memory.n).toBe(2)
     expect(session.world.holding).toBe(true)
-    session.setLoop(true)
+    session.setLoop(true, 'onTick')
+    expect(session.world.manualRuns).toBe(0)
+    expect(session.world.console.some(line => line.text === 'Loop stopped: onTick')).toBe(true)
+    expect(session.world.console.some(line => line.text === 'Loop started: onTick')).toBe(true)
     session.step(1)
     expect(session.world.memory.n).toBe(3)
   } finally { session.dispose() }

@@ -1,6 +1,6 @@
 # Workshop · parcel challenges
 
-> Legacy mode, not v8. These challenges stay playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md).
+> Removed. [ADR 0030](../adr/0030-packs-removed.md) is the record. This file is the old workshop, not a mode in the game.
 
 Game level. Choose any of twelve 5–15 minute challenges from Learn. Each starts with its own set of parcels. Learn shows the condition, two worked cases and the theory needed for that challenge. Inspect the labels on the floor, then write your solution in `main.ts`. Each Starter below is the whole file. Players can open hints and the API reference. The reference solutions are for pack authors.
 

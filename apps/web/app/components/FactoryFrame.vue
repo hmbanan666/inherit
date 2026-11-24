@@ -12,6 +12,8 @@ import {
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
+import { grantHint, questNextStep } from '../lib/questStep'
+import { reduceApiBook } from '../lib/apiBookState'
 import { insertTriggerExample } from '../lib/triggerNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
@@ -239,21 +241,15 @@ function rememberNotes(ids: string[]) {
   notes.value = ids
   try { localStorage.setItem(notesKey, JSON.stringify(ids)) } catch { /* The save still carries the ids. */ }
 }
-function focusedExport() {
-  const source = files.value[activeFile.value] ?? ''
-  const found = runnableExports(source)
-  return found.find(item => item.line === cursor.value.line) ?? found[0]
-}
 function runCommand(name: string, file: string, line: number) {
   send({ kind: 'run-fn', name, file, line, files: dirty.value ? files.value : undefined })
 }
-function runFocused() {
-  const hit = focusedExport()
-  if (!hit) return
-  runCommand(hit.name, activeFile.value, hit.line)
-}
 function toggleLoop() {
-  send({ kind: 'loop', on: !loopOn.value })
+  const hit = runnableExports(files.value['main.ts'] ?? '').find(item => item.name === 'onTick')
+  send({
+    kind: 'loop', on: !loopOn.value, name: 'onTick', file: 'main.ts', line: hit?.line ?? 1,
+    files: !loopOn.value && dirty.value ? files.value : undefined,
+  })
 }
 function take(id: string) {
   const quest = kettlewick.questList?.find(item => item.id === id)
@@ -292,8 +288,31 @@ const problems = computed(() => {
 const canRun = computed(() => !!world.value && triggerUnlocked(world.value, 'run'))
 const canLoop = computed(() => !!world.value && triggerUnlocked(world.value, 'tick'))
 const loopOn = computed(() => !!world.value?.loop)
-const running = computed(() => world.value?.pace.mode === 'run' || world.value?.pace.mode === 'tick')
-const paceName = computed(() => world.value?.pace.name ?? '')
+const loopable = computed(() => runnableExports(files.value['main.ts'] ?? '').some(item => item.name === 'onTick'))
+const runName = computed(() => runnableExports(files.value['main.ts'] ?? '')[0]?.name)
+const nextStep = computed(() => questNextStep({
+  quest: activeQuest.value ? {
+    from: activeQuest.value.from, goal: activeQuest.value.goal, item: activeQuest.value.item,
+    qty: activeQuest.value.qty, trigger: activeQuest.value.trigger,
+  } : undefined,
+  reading: !activeQuest.value && reading.value ? { from: reading.value.from } : undefined,
+  available: !activeQuest.value ? (available.value[0] ? { from: available.value[0].from } : undefined) : undefined,
+  ready: ready.value,
+  shipped: shippedCount.value,
+  loop: !!world.value?.loop,
+  furnace: {
+    input: world.value?.furnace.input ?? 0,
+    coal: world.value?.furnace.coal ?? 0,
+    output: world.value?.furnace.output ?? 0,
+    steel: world.value?.furnace.steel ?? 0,
+  },
+  made: { ingots: world.value?.ingotsMade ?? 0, steel: world.value?.steelMade ?? 0 },
+  runName: runName.value,
+}))
+const granted = computed(() => {
+  const line = grantHint(activeQuest.value?.trigger)
+  return line && line !== nextStep.value ? line : undefined
+})
 const scriptState = computed<'running' | 'error' | 'stopped'>(() => {
   if (!world.value) return 'stopped'
   if (error.value || saveError.value || floorError.value || world.value.status.startsWith('CPU')) return 'error'
@@ -490,6 +509,7 @@ onBeforeUnmount(() => {
         </nav>
         <div class="quest-scroll">
           <template v-if="zone === 'quests'">
+            <p v-if="!shownQuest" class="goal">{{ nextStep }}</p>
             <ul v-if="!shownQuest && available.length" class="requests">
               <li v-for="quest in available" :key="quest.id">
                 <button type="button" @click="readingId = quest.id">
@@ -503,6 +523,8 @@ onBeforeUnmount(() => {
             </ul>
             <article v-else-if="shownQuest" class="quest">
               <h2>{{ shownQuest.title }}</h2>
+              <p class="goal">{{ nextStep }}</p>
+              <p v-if="granted" class="goal">{{ granted }}</p>
               <VillageAsk :who="shownQuest.who" :name="shownQuest.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="shownQuest.ask" />
               <div v-if="quantity" class="need">
                 <p>{{ shownQuest.need }}</p>
@@ -590,11 +612,11 @@ onBeforeUnmount(() => {
             <div class="editor-pane"><div class="editor-host">
               <LazyCodeEditor @reference="bookOpen = true">
                 <template #actions>
-                  <button class="ide" type="button" @click="bookOpen = true">API</button>
-                  <button v-if="canRun" class="ide" type="button" :disabled="pending || !world" @click="runFocused">Run</button>
-                  <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" title="Call onTick every tick until Stop." @click="toggleLoop">Loop</button>
-                  <button v-if="running" class="ide" type="button" @click="send({ kind: 'stop' })">Stop</button>
-                  <span v-if="running" class="running">{{ paceName }}</span>
+                  <button class="ide" type="button" @click="bookOpen = reduceApiBook(bookOpen, 'api')">API</button>
+                  <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" :data-state="loopOn ? 'running' : 'idle'"
+                    :disabled="pending || !world || (!loopOn && !loopable)"
+                    :title="loopable || loopOn ? 'calls onTick every tick' : 'Export onTick in main.ts to loop it.'"
+                    @click="toggleLoop">Loop: onTick {{ loopOn ? '■' : '▶' }}</button>
                   <button class="deploy" type="button" aria-label="Deploy" :data-dirty="dirty ? 'true' : 'false'" :disabled="pending || !world" @click="deploy">
                     <Play /> Deploy <kbd>Ctrl+Enter</kbd>
                   </button>
@@ -667,7 +689,9 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </template>
-    <ApiBook v-if="bookOpen" :sections="bookSections" @close="bookOpen = false" />
+    <Teleport to="body">
+      <ApiBook v-if="bookOpen" :sections="bookSections" @close="bookOpen = reduceApiBook(true, 'close')" />
+    </Teleport>
   </StudioShell>
 </template>
 

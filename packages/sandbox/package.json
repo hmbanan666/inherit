@@ -4,8 +4,7 @@
   "type": "module",
   "exports": {
     "./v8": "./src/v8.ts",
-    ".": "./src/index.ts",
-    "./pack": "./src/pack-run.ts"
+    ".": "./src/index.ts"
   },
   "dependencies": {
     "@inherit/sim": "workspace:*",

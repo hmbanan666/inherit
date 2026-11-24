@@ -1,6 +1,6 @@
 # A TypeScript course and a challenge pack
 
-> Legacy mode, not v8. Packs stay playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md).
+> Removed. [ADR 0030](../adr/0030-packs-removed.md) is the record. This file is the old course contract, not a mode in the game.
 
 [ADR 0019](../adr/0019-one-screen-two-tracks.md) governed v6. It is not restored. The [Beginner curriculum](v6-beginner-curriculum.md) and [Workshop briefs and reference](v6-workshop-challenges.md) are the pack content.
 

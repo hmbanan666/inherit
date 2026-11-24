@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { diagnostics } from '../packs/compiler'
+import { diagnostics } from './diagnostics'
 import { declarations, factoryBricks, kettlewick, repeatedLabel } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 

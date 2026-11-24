@@ -16,7 +16,7 @@ The sim in `packages/sim/src/v8/` ticks a seeded world: one drone, veins A and B
 
 Uncle's `main.ts` in `packages/sim/src/v8/sites/kettlewick.ts` is fourteen lines and it works. It pathfinds, mines, unloads, smelts even when the furnace is empty, and ships. `tests/v8/session.test.ts` expects that program to earn credits by itself. The "first fix" the test teaches is guarding `smelt`, which pays more per minute. The player can sit and watch Hale's order fill.
 
-The page is the standing frame. `StudioShell.vue` is the nav, the floor, the editor dock and the footer. `PackNav.vue` has the logo and, since `a786d03`, a settings menu. `FactoryFrame.vue` puts the current order, the pay line and "Due in N ticks" inside that header. The due count changes every tick, and so does the status sentence under it (`world.status`, including the fuel warning, the late warning and the idle line). Console, API and Charts open from the menu onto `MetricsPanel.vue` and `ApiReference.vue`. Deploy replaces a "Running" pill when the editor differs. Start over asks for confirmation. The tick is only in the console. Packs stay at `/?packs`.
+The page is the standing frame. `StudioShell.vue` is the nav, the floor, the editor dock and the footer. `PackNav.vue` has the logo and, since `a786d03`, a settings menu. `FactoryFrame.vue` puts the current order, the pay line and "Due in N ticks" inside that header. The due count changes every tick, and so does the status sentence under it (`world.status`, including the fuel warning, the late warning and the idle line). Console, API and Charts open from the menu onto `MetricsPanel.vue` and `ApiReference.vue`. Deploy replaces a "Running" pill when the editor differs. Start over asks for confirmation. The tick is only in the console. Packs were later removed ([ADR 0030](../adr/0030-packs-removed.md)).
 
 `FileTree.vue` (new in #72) sits in the editor column as a strip at most 180px tall, above Monaco. New files must match `lib/<name>`, so there is no folder nesting. The tree from `ae60756` (`apps/web/app/components/FileTree.vue` at that commit, placed above the editor in `app.vue`) had the same stacked position, with real folders.
 
@@ -66,7 +66,7 @@ These are binding, and the concept has not caught up:
 
 ## PR plan
 
-Five PRs. Each one after this is playable on its own. Packs stay mounted at `/?packs`. No new illustration work beyond restoring files from git.
+Five PRs. Each one after this is playable on its own. Packs were later removed ([ADR 0030](../adr/0030-packs-removed.md)). No new illustration work beyond restoring files from git.
 
 1. **This audit.**
 
