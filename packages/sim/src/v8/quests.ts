@@ -4,6 +4,8 @@ import { noteCheckReset, readChecks } from './checkFacts'
 export interface QuestTest {
   id: string
   text: string
+  /** Plain sentence for the test list in the editor. What the check is looking at. */
+  explain: string
   pass(world: World): boolean
 }
 
@@ -20,6 +22,8 @@ export interface QuestDef {
   quote: string
   /** One line under the name. The quote and the need, and nothing else. */
   ask: string
+  /** What the works must produce, and roughly how it is made. Shown on the rail. */
+  need: string
   /** Inserted once at the top of the open file. A nudge, never a solution or a shop. */
   nudge: string
   change: string
@@ -65,33 +69,36 @@ export const questList: QuestDef[] = [
     id: 'bram', from: 'Bram', who: 'bram', role: 'Blacksmith', building: 'forge',
     title: 'Horseshoes for the mail horse',
     goal: 'Bring Bram 4 ingots.',
-    why: 'The cart fills at the vein and stays there, so the furnace never receives ore. The furnace and the drone have buttons. Bram takes ingots from the depot.',
+    why: 'The cart fills at the vein and stays there, so the furnace never receives ore. Buttons move the drone and the furnace. Run plays a function until it returns.',
     quote: 'The mail horse throws a shoe on every hill.',
     ask: 'The mail horse throws a shoe on every hill. I need four ingots.',
+    need: 'Need 4 ingots. An ingot is smelted from ore.',
     nudge: 'the cart sits full at the vein, and the furnace is still cold.',
     change: 'The forge is lit. The mail horse has shoes.',
     item: 'ingot', qty: 4, pay: 80, xp: 20, needLevel: 1,
+    trigger: 'run',
     tests: [
-      { id: 'ore', text: 'Ore reaches the furnace', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
-      { id: 'ingot', text: 'The furnace makes an ingot', pass: world => world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
-      { id: 'done', text: 'Bram receives 4 ingots', pass: world => shipped(world, 'bram') >= 4 },
+      { id: 'ore', text: 'Ore reaches the furnace', explain: 'The furnace has taken in ore, or an ingot was already made from it.', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
+      { id: 'ingot', text: 'The furnace makes an ingot', explain: 'The furnace has finished at least one ingot.', pass: world => world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
+      { id: 'done', text: 'Bram receives 4 ingots', explain: 'Four ingots have been handed over from the depot.', pass: world => shipped(world, 'bram') >= 4 },
     ],
   },
   {
     id: 'ines', from: 'Ines', who: 'ines', role: 'Warden', building: 'town-hall',
     title: 'Ingots for the storehouse',
     goal: 'Bring Ines 16 ingots.',
-    why: 'Sixteen ingots is a long time on the Smelt button. A function can call furnace.smelt. Run, beside the function, plays it once.',
+    why: 'Sixteen ingots is a long time on one click. Loop runs a function again each time it finishes. onTick is that loop in code.',
     quote: 'The storehouse shelves have been bare all winter.',
     ask: 'The storehouse shelves have been bare all winter. I need sixteen ingots.',
-    nudge: 'a function can call furnace.smelt. Run, beside it, plays that function once.',
+    need: 'Need 16 ingots. An ingot is smelted from ore.',
+    nudge: 'loop runs the function again when it finishes. onTick is that loop in code.',
     change: 'The storehouse has iron again.',
     item: 'ingot', qty: 16, pay: 90, xp: 20, needLevel: 2,
-    trigger: 'run',
+    trigger: 'tick',
     tests: [
-      { id: 'ore', text: 'Ore reaches the furnace', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
-      { id: 'ingot', text: 'The furnace makes an ingot', pass: world => world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
-      { id: 'done', text: 'Ines receives 16 ingots', pass: world => shipped(world, 'ines') >= 16 },
+      { id: 'ore', text: 'Ore reaches the furnace', explain: 'The furnace has taken in ore, or an ingot was already made from it.', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
+      { id: 'ingot', text: 'The furnace makes an ingot', explain: 'The furnace has finished at least one ingot.', pass: world => world.ingotsMade > 0 || shipped(world, 'ines') > 0 },
+      { id: 'done', text: 'Ines receives 16 ingots', explain: 'Sixteen ingots have been handed over from the depot.', pass: world => shipped(world, 'ines') >= 16 },
     ],
   },
   {
@@ -100,38 +107,39 @@ export const questList: QuestDef[] = [
     goal: 'Bring Odile 4 steel.',
     why: 'Steel is 2 ore and 1 coal alloyed together. Vein B is coal. furnace.alloy() makes steel.',
     unlock: { brick: 'furnace.alloy', signature: 'furnace.alloy(): 2 ore + 1 coal -> 1 steel', legacy: 'alloy' },
-    trigger: 'events',
     quote: 'Two banks, and no way across.',
     ask: 'Two banks, and no way across. I need steel for the bridge.',
+    need: 'Need 4 steel. Steel is smelted from ore and coal.',
     nudge: 'steel is ore and coal together. Where would they meet?',
     change: 'The bridge stands. Kettlewick can cross the river again.',
     gift: 'drone-2',
     item: 'steel', qty: 4, pay: 100, xp: 20, needLevel: 2,
     tests: [
-      { id: 'coal', text: 'Coal reaches the furnace', pass: world => world.furnace.coal > 0 || world.steelMade > 0 || shipped(world, 'odile') > 0 },
-      { id: 'steel', text: 'The furnace makes steel', pass: world => world.steelMade > 0 || shipped(world, 'odile') > 0 },
-      { id: 'done', text: 'Odile receives 4 steel', pass: world => shipped(world, 'odile') >= 4 },
+      { id: 'coal', text: 'Coal reaches the furnace', explain: 'The furnace hopper holds coal, or steel was already made.', pass: world => world.furnace.coal > 0 || world.steelMade > 0 || shipped(world, 'odile') > 0 },
+      { id: 'steel', text: 'The furnace makes steel', explain: 'The furnace has finished at least one steel.', pass: world => world.steelMade > 0 || shipped(world, 'odile') > 0 },
+      { id: 'done', text: 'Odile receives 4 steel', explain: 'Four steel have been handed over from the depot.', pass: world => shipped(world, 'odile') >= 4 },
     ],
   },
   {
     id: 'elsie', from: 'Elsie', who: 'elsie', role: 'Baker', building: 'bakery',
     title: 'A grate for the oven',
     goal: 'Bring Elsie 6 steel.',
-    why: 'One cart cannot be in two places.',
+    why: 'One cart cannot be in two places. on() runs a function once when the cart is idle or the furnace is ready.',
     quote: 'The oven has been cold since dawn.',
     ask: 'The oven has been cold since dawn. I need a grate.',
-    nudge: 'one cart cannot be in two places.',
+    need: 'Need 6 steel. Steel is smelted from ore and coal.',
+    nudge: 'one cart cannot be in two places. on() can run a function when the cart is idle.',
     change: 'The bakery is warm again.',
     item: 'steel', qty: 6, pay: 140, xp: 25, needLevel: 3,
-    trigger: 'tick',
+    trigger: 'events',
     prepare: world => { world.steelMark = world.steelMade },
     tests: [
-      { id: 'drone', text: 'drone-2 leaves the depot', pass: world => {
+      { id: 'drone', text: 'drone-2 leaves the depot', explain: 'The second cart has moved off the depot.', pass: world => {
         const drone = world.drones.find(item => item.name === 'drone-2')
         return !!drone && (drone.pos.x !== world.depot.pos.x || drone.pos.y !== world.depot.pos.y)
       } },
-      { id: 'both', text: 'Ore and coal are in the furnace together', pass: world => world.steelMade > world.steelMark || (world.furnace.input >= 2 && world.furnace.coal >= 1) },
-      { id: 'done', text: 'Elsie receives 6 steel', pass: world => shipped(world, 'elsie') >= 6 },
+      { id: 'both', text: 'Ore and coal are in the furnace together', explain: 'The hopper holds 2 ore and 1 coal at the same time, or steel was made after this quest was taken.', pass: world => world.steelMade > world.steelMark || (world.furnace.input >= 2 && world.furnace.coal >= 1) },
+      { id: 'done', text: 'Elsie receives 6 steel', explain: 'Six steel have been handed over from the depot.', pass: world => shipped(world, 'elsie') >= 6 },
     ],
   },
   {
@@ -141,13 +149,14 @@ export const questList: QuestDef[] = [
     why: 'Vein A is poor: 5 ticks for 1 ore. A richer vein is hidden. prospect() reveals it.',
     quote: 'The stores want iron, and the old cut is a slow teacher.',
     ask: 'The stores want iron, and the old cut is a slow teacher. I need sixty ingots.',
+    need: 'Need 60 ingots. A richer vein yields ore faster.',
     nudge: 'the old cut is slow. A richer vein is still hidden.',
     change: 'The hill is open.',
     item: 'ingot', qty: 60, pay: 80, xp: 0, needLevel: 4,
     unlock: { brick: 'prospect', signature: 'prospect(): reveals the next hidden vein', legacy: 'prospect' },
     tests: [
-      { id: 'hands', text: 'Done with no manual runs', pass: world => world.manualRuns === 0 && shipped(world, 'harrow') >= 60 },
-      { id: 'done', text: 'Harrow receives 60 ingots', pass: world => shipped(world, 'harrow') >= 60 },
+      { id: 'hands', text: 'Done with no manual runs', explain: 'The ingots arrived without a button press or a Run. onTick does not count as a manual run.', pass: world => world.manualRuns === 0 && shipped(world, 'harrow') >= 60 },
+      { id: 'done', text: 'Harrow receives 60 ingots', explain: 'Sixty ingots have been handed over from the depot.', pass: world => shipped(world, 'harrow') >= 60 },
     ],
   },
   {
@@ -157,13 +166,14 @@ export const questList: QuestDef[] = [
     why: 'The mill wheel needs iron. Smelt ore into ingots.',
     quote: 'The wheel sits in the race and will not turn.',
     ask: 'The wheel sits in the race and will not turn. I need iron for it.',
+    need: 'Need 8 ingots. An ingot is smelted from ore.',
     nudge: 'the wheel needs iron. Ore will not turn it.',
     change: 'The mill wheel turns.',
     item: 'ingot', qty: 8, pay: 100, xp: 25, needLevel: 4,
     prepare: world => { world.ingotsMade = 0 },
     tests: [
-      { id: 'smelt', text: 'An ingot is smelted this quest', pass: world => world.ingotsMade > 0 },
-      { id: 'done', text: 'Tomas receives 8 ingots', pass: world => shipped(world, 'tomas') >= 8 },
+      { id: 'smelt', text: 'An ingot is smelted this quest', explain: 'An ingot was smelted after this quest was taken.', pass: world => world.ingotsMade > 0 },
+      { id: 'done', text: 'Tomas receives 8 ingots', explain: 'Eight ingots have been handed over from the depot.', pass: world => shipped(world, 'tomas') >= 8 },
     ],
   },
   {
@@ -173,13 +183,14 @@ export const questList: QuestDef[] = [
     why: 'Pell wants plain ingots. Steel will not do. Smelt ore on its own when the order asks for ingots.',
     quote: 'Rope will not hold a barrel of ale.',
     ask: 'Rope will not hold a barrel of ale. I need plain ingots.',
+    need: 'Need 4 ingots. Plain ingots, not steel.',
     nudge: 'the barrels want plain ingots. Steel will not do.',
     change: 'The barrels have hinges.',
     item: 'ingot', qty: 4, pay: 80, xp: 25, needLevel: 5,
     prepare: world => { world.ingotsMade = 0 },
     tests: [
-      { id: 'smelt', text: 'An ingot is smelted this quest', pass: world => world.ingotsMade > 0 },
-      { id: 'done', text: 'Pell receives 4 ingots', pass: world => shipped(world, 'pell') >= 4 && world.ingotsMade >= 4 },
+      { id: 'smelt', text: 'An ingot is smelted this quest', explain: 'An ingot was smelted after this quest was taken.', pass: world => world.ingotsMade > 0 },
+      { id: 'done', text: 'Pell receives 4 ingots', explain: 'Four ingots have been handed over, and at least four were smelted this quest.', pass: world => shipped(world, 'pell') >= 4 && world.ingotsMade >= 4 },
     ],
   },
   {
@@ -189,6 +200,7 @@ export const questList: QuestDef[] = [
     why: 'Calling findPath for every drone on every tick spends the CPU. Remember a route and reuse it.',
     quote: 'The street lamps have been dark a week.',
     ask: 'The street lamps have been dark a week. I need steel, and a path worth keeping.',
+    need: 'Need 4 steel. Steel is smelted from ore and coal.',
     nudge: 'a fresh path every tick spends the oil. A road can be remembered.',
     change: 'The lamps are lit.',
     item: 'steel', qty: 4, pay: 120, xp: 30, needLevel: 6,
@@ -197,8 +209,8 @@ export const questList: QuestDef[] = [
       world.pathWindow = []
     },
     tests: [
-      { id: 'memory', text: 'The route is remembered', pass: world => world.pathWindow.length >= 8 && world.pathWindow.reduce((sum, calls) => sum + calls, 0) <= 4 },
-      { id: 'done', text: 'Wen receives 4 steel', pass: world => shipped(world, 'wen') >= 4 },
+      { id: 'memory', text: 'The route is remembered', explain: 'findPath was not called on every tick. A remembered route stays at 4 calls or fewer across 8 ticks.', pass: world => world.pathWindow.length >= 8 && world.pathWindow.reduce((sum, calls) => sum + calls, 0) <= 4 },
+      { id: 'done', text: 'Wen receives 4 steel', explain: 'Four steel have been handed over from the depot.', pass: world => shipped(world, 'wen') >= 4 },
     ],
   },
 ]
@@ -239,13 +251,34 @@ export function syncQuest(world: World, site: Site) {
   return world.checks.find(check => check.status !== 'green')?.text ?? 'Every test passes. Complete the quest.'
 }
 
+/** A save from before the loop grant keeps the triggers that quest position used to give. */
+export function pinLegacyTriggers(world: Pick<World, 'automation' | 'questId' | 'cleared'>) {
+  const auto = world.automation
+  if (!auto || auto.pinned) return
+  const reached = (id: string) => {
+    const index = questList.findIndex(item => item.id === id)
+    if (index < 0) return false
+    if (world.questId === id || world.cleared.includes(id)) return true
+    return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
+  }
+  if (reached('ines')) auto.run = true
+  if (reached('odile')) auto.events = true
+  if (reached('elsie')) auto.tick = true
+  auto.pinned = true
+}
+
 export function acceptQuest(world: World, site: Site, id?: string) {
   if (world.questId) return false
   const quest = id
     ? site.questList?.find(item => item.id === id && !world.cleared.includes(item.id) && world.level >= item.needLevel)
     : nextQuest(world, site)
   if (!quest) return false
+  const grantsLoop = quest.trigger === 'tick' && !triggerUnlocked(world, 'tick')
   world.questId = quest.id
+  if (grantsLoop) {
+    world.loop = true
+    world.holding = false
+  }
   world.manualRuns = 0
   quest.prepare?.(world)
   noteCheckReset(world)

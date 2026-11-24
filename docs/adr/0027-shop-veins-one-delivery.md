@@ -1,6 +1,6 @@
 # Shop, veins, and one delivery
 
-Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0025](0025-functions-with-triggers.md), and [ADR 0026](0026-quantity-quests-one-world.md).
+Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0023](0023-quest-unlocks-functions.md), [ADR 0025](0025-functions-with-triggers.md), and [ADR 0026](0026-quantity-quests-one-world.md). [ADR 0028](0028-run-to-completion.md) supersedes the sentence that Elsie grants `onTick`.
 
 ## Context
 
@@ -10,7 +10,7 @@ Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0
 
 **Credits.** A quest pays credits on Hand over. The shop spends them. The balance never goes negative: a tick cannot lower it, and the shop refuses a purchase the player cannot pay. There is no rent. Wording that says credits only rise is withdrawn, including the "credits only accumulate" sentence in ADR 0023.
 
-**Elsie.** Elsie asks for a count of steel. Ore and coal do not cool and do not expire. Taking the quest still grants `onTick`. The cooling timer is gone.
+**Elsie.** Elsie asks for a count of steel. Ore and coal do not cool and do not expire. Taking the quest grants `on()`. [ADR 0028](0028-run-to-completion.md) moved `onTick` to Ines. The cooling timer is gone.
 
 **Wen.** Wen's check stays a check on `findPath`. It is not only a count of steel.
 

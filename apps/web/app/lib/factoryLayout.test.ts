@@ -49,11 +49,12 @@ test('the map row defaults to 45% of the works column and a saved height stays i
   expect(clampMapHeight(45)).toBe(45)
 })
 
-test('the checks pane remembers whether Checks or Console is selected', () => {
-  expect(readSideTab(null)).toBe('checks')
-  expect(readSideTab('checks')).toBe('checks')
+test('the side pane remembers Tests or Console, and an old Checks choice opens Tests', () => {
+  expect(readSideTab(null)).toBe('tests')
+  expect(readSideTab('checks')).toBe('tests')
+  expect(readSideTab('tests')).toBe('tests')
   expect(readSideTab('console')).toBe('console')
-  expect(readSideTab('api')).toBe('checks')
+  expect(readSideTab('api')).toBe('tests')
 })
 
 test('the checks pane and the file tree remember a width inside a sane range', () => {

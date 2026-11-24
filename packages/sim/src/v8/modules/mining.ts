@@ -104,17 +104,17 @@ export function mining(site: Site): Brick[] {
     brick('cpu.limit', 'readonly limit: number', 'CPU available per tick.', 'cpu.limit', read, ({ world }) => world.cpu.limit),
     brick('drones', 'function drones(): Drone[]', 'Read your drones.', 'drones()[0]', read, ctx => ctx.world.drones),
     brick('veins', 'function veins(): Vein[]', 'Read the known veins. purity is poor, normal, or rich. A vein does not run out.', 'veins()[0]', read, ctx => ctx.world.veins.filter(vein => !vein.hidden)),
-    brick('prospect', 'function prospect(): void', 'Reveal the next hidden vein.', 'prospect()', action, ({ world }) => {
+    brick('prospect', 'function prospect(): void', 'Reveal the next hidden vein.', `// Opens the next hidden vein. Nothing happens if none is left.\nprospect()`, action, ({ world }) => {
       if (!functionUnlocked(world, 'prospect')) throw new Error(unlockError('prospect'))
       const vein = world.veins.find(item => item.hidden)
       if (vein) vein.hidden = false
     }),
     brick('findPath', 'function findPath(from: Cell, to: Cell): Cell[]', 'Cells to walk from here to the target.',
-      'findPath(drone.pos, depot.pos)', site.costs.findPath, findPath),
+      `// The cells from the drone to the depot. Remember the array if you walk it again.\nfindPath(drone.pos, depot.pos)`, site.costs.findPath, findPath),
     brick('drone.isNear', 'isNear(target: Target): boolean', 'Within one cell of a target.', 'drone.isNear(depot)', read,
       ({ world }, name, pos) => distance(drone(world, name).pos, cell(world, pos)) <= 1),
     brick('drone.moveAlong', 'moveAlong(path: Cell[]): void', 'Walk one step along a saved route.',
-      'drone.moveAlong(memory.route)', action, (ctx, name, path) => {
+      `// One cell along the path. The next call walks the next cell.\ndrone.moveAlong(memory.route)`, action, (ctx, name, path) => {
         const d = drone(ctx.world, name)
         if (!Array.isArray(path)) throw new Error(`${who(d)}; moveAlong path is not an array of cells.`)
         const index = path.findIndex(p => distance(cell(ctx.world, p), d.pos) === 0)
@@ -135,7 +135,7 @@ export function mining(site: Site): Brick[] {
     brick('depot.coal', 'readonly coal: number', 'Coal sitting at the depot.', 'depot.coal', read, ({ world }) => world.depot.coal ?? 0),
     brick('depot.ingots', 'readonly ingots: number', 'Ingots waiting for a villager.', 'depot.ingots', read, ({ world }) => world.depot.ingots ?? 0),
     brick('depot.steel', 'readonly steel: number', 'Steel waiting for a villager.', 'depot.steel', read, ({ world }) => world.depot.steel ?? 0),
-    brick('drone.mine', 'mine(vein: Vein): void', 'Work this vein. A poor vein takes several ticks per rock. The cart holds one kind.', 'drone.mine(veins()[0])', action,
+    brick('drone.mine', 'mine(vein: Vein): void', 'Work this vein. A poor vein takes several ticks per rock. The cart holds one kind.', `// Stand next to the vein. A poor vein needs several calls for one rock.\ndrone.mine(veins()[0])`, action,
       (ctx, name, veinName) => {
         const d = drone(ctx.world, name)
         const vein = ctx.world.veins.find(v => v.name === veinName)
@@ -167,7 +167,7 @@ export function mining(site: Site): Brick[] {
         d.source = vein.name
         d.dig = null
       }),
-    brick('drone.unload', 'unload(station: Target): void', 'Leave cargo at a nearby depot or furnace. The furnace hopper is limited. The depot is not.', 'drone.unload(depot)', action,
+    brick('drone.unload', 'unload(station: Target): void', 'Leave cargo at a nearby depot or furnace. The furnace hopper is limited. The depot is not.', `// Stand next to the depot or the furnace, then leave the cargo there.\ndrone.unload(depot)`, action,
       (ctx, name, target) => {
         const d = drone(ctx.world, name), { depot, furnace } = ctx.world
         const pos = cell(ctx.world, target)

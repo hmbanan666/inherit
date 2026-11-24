@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
-import { goalLabel, insertQuestNote, questComment } from './questNote'
+import { goalLabel, insertQuestNote, quantityLabel, questComment } from './questNote'
+import { insertTriggerExample, triggerExample } from './triggerNote'
 
 const odile = questComment('Mayor Odile', 'steel is ore and coal together. Where would they meet?')
 
@@ -15,6 +16,20 @@ test('taking a quest inserts one comment and does not put it back', () => {
   const again = insertQuestNote(first.source, odile, 'odile', [])
   expect(again.source).toBe(first.source)
   expect(again.source.split('\n').filter(line => line.trim() === odile)).toHaveLength(1)
+})
+
+test('the rail names the quantity, and a trigger example is inserted once', () => {
+  expect(quantityLabel('ingot', 16, 3)).toEqual({ text: 'Ingots 3/16', value: 3, max: 16 })
+  expect(quantityLabel('steel', 4, 9)).toEqual({ text: 'Steel 4/4', value: 4, max: 4 })
+  const file = 'export function smeltOnce() {}\n'
+  const run = insertTriggerExample(file, 'run', [])
+  expect(run.source.startsWith(triggerExample('run').source)).toBe(true)
+  expect(run.source).toContain('yield')
+  const again = insertTriggerExample(file, 'run', run.remembered)
+  expect(again.source).toBe(file)
+  const loop = insertTriggerExample('export function onTick() {}\n', 'tick', [])
+  expect(loop.source).toBe('export function onTick() {}\n')
+  expect(loop.remembered).toEqual(['trigger:tick'])
 })
 
 test('a delivery goal names the depot count', () => {

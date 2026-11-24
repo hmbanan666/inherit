@@ -1,6 +1,6 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
-import { grantSecondDrone, syncQuest, type QuestDef } from '../quests'
+import { grantSecondDrone, pinLegacyTriggers, syncQuest, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
 export interface Drone {
@@ -72,7 +72,16 @@ export function migrateWorld(world: World) {
   world.inbox ??= { smelt: false, alloy: false, collect: false, clear: false, drones: {} }
   world.collectAt ??= null
   world.collectSpan ??= 0
-  if (!world.automation) world.automation = { run: true, events: true, tick: true }
+  world.holding ??= false
+  world.script ??= null
+  world.pace ??= { mode: 'idle', name: '' }
+  const hadAutomation = world.automation != null
+  const rememberedLoop = world.loop
+  if (!world.automation) world.automation = { run: true, events: true, tick: true, pinned: true }
+  else pinLegacyTriggers(world)
+  if (!hadAutomation) world.loop = true
+  else if (rememberedLoop === undefined) world.loop = !!world.automation.tick
+  else world.loop = rememberedLoop
   if (world.ledger) delete (world.ledger as { waste?: number }).waste
   for (const order of world.orders ?? []) delete (order as { due?: number }).due
   delete (world as { holdTicks?: number }).holdTicks
@@ -117,6 +126,19 @@ export interface ConsoleLine {
   line?: number
   count?: number
 }
+export interface ScriptRun {
+  name: string
+  file: string
+  line: number
+  loop: boolean
+  phase: 'start' | 'live' | 'again'
+}
+
+export interface Pace {
+  mode: 'idle' | 'run' | 'tick'
+  name: string
+}
+
 export interface World {
   tick: number
   seed: number
@@ -152,7 +174,15 @@ export interface World {
   /** Last progress key for each check, and the tick it last changed. */
   checkMoved: Record<string, { key: string; at: number }>
   /** Legacy saves set every flag. A fresh world starts with all of them off. */
-  automation: { run: boolean; events: boolean; tick: boolean }
+  automation: { run: boolean; events: boolean; tick: boolean; pinned?: boolean }
+  /** Restart a finished Run. The same switch as exporting onTick. */
+  loop: boolean
+  /** Stop holds the works until Run or Loop. */
+  holding: boolean
+  /** The function Run is playing. Null when only onTick, or nothing, is driving. */
+  script: ScriptRun | null
+  /** What the last tick ran. The toolbar reads this. */
+  pace: Pace
   manualRuns: number
   pendingRuns: { name: string; file: string; line: number }[]
   jobs: Record<string, { kind: 'mine' | 'unload'; vein?: string; left: number; total: number }>
@@ -176,7 +206,8 @@ export function createWorld(site: Site): World {
     orders: [], growth: [], status: '',
     ledger: { income: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [],
-    automation: { run: false, events: false, tick: false },
+    automation: { run: false, events: false, tick: false, pinned: true },
+    loop: false, holding: false, script: null, pace: { mode: 'idle', name: '' },
     manualRuns: 0, pendingRuns: [], jobs: {}, inbox: { smelt: false, alloy: false, collect: false, clear: false, drones: {} },
     collectAt: null, collectSpan: 0,
     signals: { output: 0, ingotsMade: 0, steelMade: 0, drones: {} },

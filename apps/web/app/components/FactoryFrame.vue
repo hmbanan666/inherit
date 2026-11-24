@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { declarations, inspectMachine, kettlewick, factoryBricks, machineList, onApi, shop, levelSpan, readChecks, repeatedLabel, functionUnlocked, freshBrick, triggerUnlocked, type World } from '@inherit/sim/v8'
-import ChecksPanel from './ChecksPanel.vue'
+import { apiBook, declarations, inspectMachine, kettlewick, factoryBricks, machineList, shop, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type World } from '@inherit/sim/v8'
+import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { CircleAlert, Coins, Cpu, Play, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
@@ -10,22 +10,18 @@ import {
   questRailPx, readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
   treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
-import { goalLabel, insertQuestNote, questComment } from '../lib/questNote'
+import { runnableExports } from '../lib/runGlyph'
+import { quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
+import { insertTriggerExample } from '../lib/triggerNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
 const bricks = factoryBricks(kettlewick)
-const lockedWorld = { questId: undefined, cleared: [] as string[], bought: [] as string[] }
+const lockedWorld = { questId: undefined, cleared: [] as string[], bought: [] as string[], automation: { run: false, events: false, tick: false } }
 const visibleBricks = computed(() => bricks.filter(brick => functionUnlocked(world.value ?? lockedWorld, brick.name)))
 const freshNames = computed(() => new Set(bricks.filter(brick => freshBrick(world.value, brick.name)).map(brick => brick.name)))
 const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name))))
-const entries = computed(() => [
-  ...visibleBricks.value.map(brick => ({
-    name: brick.name, signature: brick.name.includes('.') ? brick.name.split('.')[0] + '.' + brick.signature.replace(/^readonly /, '') : brick.signature,
-    description: brick.doc + ' CPU: ' + brick.cost + '.', params: [], returns: '', example: brick.example,
-    fresh: freshNames.value.has(brick.name),
-  })),
-  { name: onApi.name, signature: onApi.signature, description: onApi.doc + ' CPU: ' + onApi.cost + '.', params: [], returns: '', example: onApi.example, fresh: world.value?.questId === 'odile' },
-])
+const bookSections = computed(() => apiBook(bricks, world.value ?? lockedWorld))
+const bookOpen = ref(false)
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
 const dirty = computed(() => Object.keys(files.value).length !== Object.keys(deployed.value).length ||
@@ -41,9 +37,10 @@ const error = ref('')
 const saveError = ref('')
 const floorError = ref('')
 const pending = ref(true)
-const panels = ['API', 'Charts'] as const
+const panels = ['Charts'] as const
 const tool = ref<typeof panels[number]>()
-const side = ref<'checks' | 'console'>('checks')
+const side = ref<'tests' | 'console'>('tests')
+const pickedTest = ref('')
 const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
 const blankConsole = ref(false)
@@ -61,7 +58,7 @@ function openMachine(id: string) {
 const triggerLabel: Record<string, string> = {
   run: 'Run',
   events: 'on(event, fn)',
-  tick: 'onTick()',
+  tick: 'Loop',
 }
 const questRailCss = questRailPx + 'px'
 const worldGapCss = worldGapPx + 'px'
@@ -138,15 +135,31 @@ const readingId = ref<string>()
 const reading = computed(() => available.value.find(quest => quest.id === readingId.value))
 const shownQuest = computed(() => activeQuest.value ?? reading.value)
 const ready = computed(() => !!activeQuest.value && !!world.value?.checks.length && world.value.checks.every(check => check.status === 'green'))
-const goals = computed(() => {
+const shippedCount = computed(() => {
   const quest = shownQuest.value
   const current = world.value
-  if (!quest || !current) return []
-  const shipped = current.orders.find(order => order.id === quest.id)?.shipped ?? 0
-  const live = current.questId === quest.id ? readChecks(current, quest) : quest.tests.map(test => ({ id: test.id, state: 'pending' as const, reason: undefined }))
-  return live.map(check => {
-    const meter = goalLabel(check.id, quest.item, quest.qty, shipped, check.state === 'passing', current.pathWindow.length)
-    return { id: check.id, ...meter, state: check.state, reason: check.reason }
+  if (!quest || !current) return 0
+  return current.orders.find(order => order.id === quest.id)?.shipped ?? 0
+})
+const quantity = computed(() => {
+  const quest = shownQuest.value
+  if (!quest) return undefined
+  return quantityLabel(quest.item, quest.qty, shippedCount.value)
+})
+const testRows = computed(() => {
+  const quest = shownQuest.value
+  const current = world.value
+  if (!quest) return []
+  const live = current && current.questId === quest.id ? readChecks(current, quest) : undefined
+  return quest.tests.map(test => {
+    const reading = live?.find(item => item.id === test.id)
+    return {
+      id: test.id,
+      text: reading?.text ?? test.text,
+      explain: test.explain,
+      state: reading?.state ?? 'pending' as const,
+      reason: reading?.reason,
+    }
   })
 })
 function grantCall(signature: string) {
@@ -178,18 +191,7 @@ watch(world, (next, previous) => {
   window.clearTimeout(gainTimer)
   gainTimer = window.setTimeout(() => { gains.value = [] }, 1200)
 })
-const log = computed(() => {
-  const lines: { text: string; file?: string; line?: number; bad?: boolean }[] = []
-  if (error.value) lines.push({ text: error.value, bad: true })
-  if (saveError.value) lines.push({ text: saveError.value, bad: true })
-  if (floorError.value) lines.push({ text: floorError.value, bad: true })
-  const current = world.value
-  if (current?.status.startsWith('CPU')) lines.push({ text: current.status, bad: true })
-  for (const message of [...(current?.messages ?? [])].reverse()) {
-    lines.push({ text: repeatedLabel(message.text, message.count), file: message.file, line: message.line, bad: true })
-  }
-  return lines
-})
+const hostError = computed(() => error.value || saveError.value || floorError.value)
 const consoleLines = computed(() => blankConsole.value ? [] : (world.value?.console ?? []))
 const unseen = computed(() => {
   if (side.value === 'console') return { count: 0, error: false }
@@ -230,12 +232,32 @@ function rememberNotes(ids: string[]) {
   notes.value = ids
   try { localStorage.setItem(notesKey, JSON.stringify(ids)) } catch { /* The save still carries the ids. */ }
 }
+function focusedExport() {
+  const source = files.value[activeFile.value] ?? ''
+  const found = runnableExports(source)
+  return found.find(item => item.line === cursor.value.line) ?? found[0]
+}
+function runFocused() {
+  const hit = focusedExport()
+  if (!hit) return
+  send({ kind: 'run-fn', name: hit.name, file: activeFile.value, line: hit.line })
+}
+function toggleLoop() {
+  send({ kind: 'loop', on: !loopOn.value })
+}
 function take(id: string) {
   const quest = kettlewick.questList?.find(item => item.id === id)
   const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
   if (quest) {
+    let source = files.value[file] ?? ''
+    let remembered = notes.value
+    if (quest.trigger) {
+      const added = insertTriggerExample(source, quest.trigger, remembered)
+      source = added.source
+      remembered = added.remembered
+    }
     const note = questComment(quest.from, quest.nudge)
-    const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value)
+    const next = insertQuestNote(source, note, quest.id, remembered)
     rememberNotes(next.remembered)
     if (next.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: next.source }
   }
@@ -255,9 +277,15 @@ const problems = computed(() => {
   }
   return { errors, warnings }
 })
+const canRun = computed(() => !!world.value && triggerUnlocked(world.value, 'run'))
+const canLoop = computed(() => !!world.value && triggerUnlocked(world.value, 'tick'))
+const loopOn = computed(() => !!world.value?.loop)
+const running = computed(() => world.value?.pace.mode === 'run' || world.value?.pace.mode === 'tick')
+const paceName = computed(() => world.value?.pace.name ?? '')
 const scriptState = computed<'running' | 'error' | 'stopped'>(() => {
   if (!world.value) return 'stopped'
   if (error.value || saveError.value || floorError.value || world.value.status.startsWith('CPU')) return 'error'
+  if (world.value.pace.mode === 'idle') return 'stopped'
   return 'running'
 })
 const scriptTip = computed(() => {
@@ -282,7 +310,7 @@ provide(editorKey, {
   id: kettlewick.id, label: 'Player TypeScript', files, deployed, activeFile, api,
   apiNames: shallowRef(new Set(bricks.map(b => b.name.split('.').at(-1)!))),
   dirty, multiFile: ref(true), navigation, watching: ref(false), call: ref(), tickCalls: ref([]),
-  canRun: computed(() => !!world.value && triggerUnlocked(world.value, 'run')),
+  canRun,
   runAt(name, file, line) { send({ kind: 'run-fn', name, file, line }) },
   setFile(file, code) { files.value = { ...files.value, [file]: code } },
   openFile(file) { activeFile.value = file },
@@ -462,14 +490,13 @@ onBeforeUnmount(() => {
               </li>
             </ul>
             <article v-else-if="shownQuest" class="quest">
+              <h2>{{ shownQuest.title }}</h2>
               <VillageAsk :who="shownQuest.who" :name="shownQuest.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="shownQuest.ask" />
-              <ul class="goals" data-testid="checks">
-                <li v-for="goal in goals" :key="goal.id" :data-mark="goal.state">
-                  <span class="goal-line">{{ goal.text }}</span>
-                  <progress :value="goal.value" :max="goal.max" :aria-label="goal.text" />
-                  <small v-if="goal.reason">{{ goal.reason }}</small>
-                </li>
-              </ul>
+              <div v-if="quantity" class="need">
+                <p>{{ shownQuest.need }}</p>
+                <span class="goal-line">{{ quantity.text }}</span>
+                <progress :value="quantity.value" :max="quantity.max" :aria-label="quantity.text" />
+              </div>
               <ul class="rewards">
                 <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
                 <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
@@ -549,23 +576,27 @@ onBeforeUnmount(() => {
           <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
           <div class="editor-column">
             <div class="editor-pane"><div class="editor-host">
-              <LazyCodeEditor @reference="tool = 'API'">
+              <LazyCodeEditor @reference="bookOpen = true">
                 <template #actions>
+                  <button class="ide" type="button" @click="bookOpen = true">API</button>
+                  <button v-if="canRun" class="ide" type="button" :disabled="pending || !world" @click="runFocused">Run</button>
+                  <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" title="Run the function again each time it finishes. onTick is the same loop." @click="toggleLoop">Loop</button>
+                  <button v-if="running" class="ide" type="button" @click="send({ kind: 'stop' })">Stop</button>
+                  <span v-if="running" class="running">{{ paceName }}</span>
                   <button class="deploy" type="button" aria-label="Deploy" :data-dirty="dirty ? 'true' : 'false'" :disabled="pending || !world" @click="deploy">
                     <Play /> Deploy <kbd>Ctrl+Enter</kbd>
                   </button>
                 </template>
               </LazyCodeEditor>
             </div></div>
-            <div v-if="tool" class="tool-slot">
-              <ApiReference v-if="tool === 'API'" :entries="entries" />
-              <MetricsPanel v-else-if="world" :world="world" />
+            <div v-if="tool === 'Charts' && world" class="tool-slot">
+              <MetricsPanel :world="world" />
             </div>
           </div>
           <PaneSplit class="side-split" axis="x" label="Resize checks" @move="onSide" @reset="setSideWidth(checksPanePx)" @nudge="nudgeSide" />
-          <aside class="checks-pane" :aria-label="side === 'checks' ? 'Quest checks' : 'Console'">
-            <div class="checks-head" role="tablist" aria-label="Checks and console">
-              <button type="button" role="tab" :aria-selected="side === 'checks'" @click="side = 'checks'">Checks</button>
+          <aside class="checks-pane" :aria-label="side === 'tests' ? 'Quest tests' : 'Console'">
+            <div class="checks-head" role="tablist" aria-label="Tests and console">
+              <button type="button" role="tab" :aria-selected="side === 'tests'" @click="side = 'tests'">Tests</button>
               <button type="button" role="tab" :aria-selected="side === 'console'" @click="side = 'console'; consoleFilter = 'all'">
                 Console
                 <span v-if="unseen.count" class="badge" :class="{ bad: unseen.error }">{{ unseen.count }}</span>
@@ -575,7 +606,15 @@ onBeforeUnmount(() => {
                 <span class="tick-now"><span>Tick</span><b data-testid="tick">{{ world?.tick ?? 0 }}</b></span>
               </template>
             </div>
-            <ChecksPanel v-if="side === 'checks'" :tried="!!world?.questId" :checks="[]" :log="log" @open="openLine" />
+            <p v-if="hostError" class="host-error">{{ hostError }}</p>
+            <section v-if="side === 'tests'" class="tests" aria-label="Quest tests">
+              <p v-if="!testRows.length" class="empty">Take a quest to see its tests.</p>
+              <button v-for="row in testRows" :key="row.id" type="button" class="test" :data-mark="row.state" :aria-pressed="pickedTest === row.id" @click="pickedTest = row.id">
+                <b>{{ row.text }}</b>
+                <span>{{ row.explain }}</span>
+                <small v-if="row.reason">{{ row.reason }}</small>
+              </button>
+            </section>
             <section v-else class="console" aria-label="Console">
               <p v-if="consoleFilter === 'problems'" class="filter">Errors and warnings. <button type="button" @click="consoleFilter = 'all'">Show all</button></p>
               <p v-if="!shownConsole.length" class="empty">Nothing logged yet.</p>
@@ -616,6 +655,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </template>
+    <ApiBook v-if="bookOpen" :sections="bookSections" @close="bookOpen = false" />
   </StudioShell>
 </template>
 
@@ -684,10 +724,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(102deg, var(--accent-surface), var(--accent-surface) 70%);
-  border: 1px solid var(--accent-line);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 7px;
-  box-shadow: 0 3px 7px var(--shadow-light);
 }
 .zone-tabs {
   display: flex;
@@ -700,13 +739,13 @@ onBeforeUnmount(() => {
   min-height: 28px;
   background: transparent;
   color: var(--soft);
-  border-color: var(--accent-line);
+  border-color: var(--line);
   font: 12px var(--mono);
 }
 .zone-tabs button[aria-pressed='true'] {
-  background: var(--accent-shadow);
-  color: var(--accent-soft);
-  border-color: var(--gold);
+  background: var(--surface-low);
+  color: var(--text);
+  border-color: var(--line-strong, var(--line));
 }
 .quest-scroll {
   flex: 1;
@@ -746,8 +785,12 @@ onBeforeUnmount(() => {
   flex: none;
   margin-top: auto;
   padding: 10px 12px 12px;
-  border-top: 1px solid var(--accent-line);
+  border-top: 1px solid var(--line);
 }
+.need { display: grid; gap: 6px }
+.need p { margin: 0; font-size: 13px; line-height: 1.4 }
+.need progress { width: 100%; height: 4px; border: 0; background: var(--line); accent-color: var(--mint) }
+.need progress::-webkit-progress-bar { background: var(--line) }
 .quest-action .gold { width: 100%; height: 34px }
 .quest-action .gold.pulse { animation: quest-ready 0.7s ease-out 1 }
 .quest-action .calm { margin: 0; text-align: center; color: var(--sub); font-size: 13px }
@@ -924,6 +967,27 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   max-width: 180px;
 }
+.editor-column :deep(.ide) {
+  height: 26px;
+  flex: none;
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  font: 12px var(--mono);
+}
+.editor-column :deep(.ide[aria-pressed='true']) {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.editor-column :deep(.running) {
+  flex: none;
+  margin-left: 6px;
+  color: var(--mint);
+  font: 11px var(--mono);
+}
 .editor-column :deep(.deploy) {
   height: 26px;
   flex: none;
@@ -1015,6 +1079,33 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
 }
 .tool-slot :deep(.bench) { padding: 0; max-height: none }
+.host-error { margin: 0; padding: 8px 10px 0; color: var(--alert); font: 12px var(--mono) }
+.tests {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+.tests .empty { margin: 0; color: var(--sub); font: 12px var(--mono) }
+.tests .test {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+}
+.tests .test[aria-pressed='true'] { border-color: var(--gold) }
+.tests .test b { font: 12px var(--mono); font-weight: 600 }
+.tests .test span, .tests .test small { color: var(--soft); font: 12px/1.4 var(--mono) }
+.tests .test[data-mark='passing'] b { color: var(--mint) }
+.tests .test[data-mark='failed'] b { color: var(--alert) }
 .console {
   flex: 1;
   min-height: 0;

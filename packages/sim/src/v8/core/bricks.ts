@@ -24,9 +24,28 @@ export function brick(name: string, signature: string, doc: string, example: str
   return { name, signature, doc, example, cost, since: '1.0', handler }
 }
 
+/** on() is declared with the bricks so the book, the hover, and the type string stay one text. */
+export const onSignature = "function on(event: 'furnace.full' | 'furnace.ready' | 'drone.idle' | 'drone.full', fn: () => void): void"
+export const onDoc = 'Call fn once when that event happens. A quest unlocks on().'
+export const onExample = `// furnace.full: the output cap was just reached.
+// furnace.ready: an ingot or steel just finished.
+// drone.idle: the cart is empty and not walking.
+// drone.full: the cart just filled.
+on("drone.idle", haul)`
+
+/** One example block. A bare call gains a comment from its doc line, so the book and the hover stay together. */
+export function exampleText(doc: string, example: string) {
+  if (/(^|\n)\s*\/\//.test(example)) return example
+  const sentence = doc.endsWith('.') ? doc : `${doc}.`
+  return `// ${sentence}\n${example}`
+}
+
 export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new Set()) {
-  const declaration = (b: Brick, prefix = '') =>
-    `  /** ${fresh.has(b.name) ? 'new. ' : ''}${b.doc} CPU: ${b.cost}.${b.deprecated ? ' @deprecated Use ' + b.deprecated.use : ''} */\n  ${prefix}${b.signature}`
+  const declaration = (b: Brick, prefix = '') => {
+    const note = exampleText(b.doc, b.example).split('\n').map(line => ` * ${line}`).join('\n')
+    const deprecated = b.deprecated ? ` @deprecated Use ${b.deprecated.use}` : ''
+    return `  /** ${fresh.has(b.name) ? 'new. ' : ''}${b.doc} CPU: ${b.cost}.${deprecated}\n${note}\n   */\n  ${prefix}${b.signature}`
+  }
   const members = (owner: string) => bricks.filter(b => b.name.startsWith(owner)).map(b => declaration(b)).join('\n')
   return `declare module "inherit" {
   export interface Cell { x: number; y: number }
@@ -50,7 +69,9 @@ ${members('cpu.')}
   }
 ${bricks.filter(b => !b.name.includes('.')).map(b => declaration(b, 'export ')).join('\n')}
   export type WorksEvent = 'furnace.full' | 'furnace.ready' | 'drone.idle' | 'drone.full'
-  /** Call fn once when the event happens. A quest unlocks on(). CPU: 0. */
+  /** ${onDoc} CPU: 0.
+${exampleText(onDoc, onExample).split('\n').map(line => `   * ${line}`).join('\n')}
+   */
   export function on(event: WorksEvent, fn: () => void): void
 }
 declare interface InheritConsole {
