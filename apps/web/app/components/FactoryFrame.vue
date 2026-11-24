@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiBook, canTake, chainReady, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, chainReady, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { CircleAlert, Coins, Cpu, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
@@ -11,7 +11,7 @@ import {
   stackCodeColumn, tightCodeColumn, treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
-import { deliveryNote, firstOpenTest, quantityLabel, insertQuestNote, questComment } from '../lib/questNote'
+import { insertQuestNote, questCard, questComment } from '../lib/questNote'
 import { cpuTitle, readCpu, steadyCpu, type CpuHold, type CpuMeter } from '../lib/cpuMeter'
 import { droneStatusLine, grantNote, questNextStep, steadyLine, type CartCue, type SteadyLine } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
@@ -154,37 +154,9 @@ const reading = computed(() => available.value.find(quest => quest.id === readin
 const readingHold = computed(() => reading.value && world.value ? questHold(world.value, reading.value) : undefined)
 const readingTake = computed(() => !!reading.value && !!world.value && canTake(world.value, reading.value))
 const shownQuest = computed(() => activeQuest.value ?? reading.value)
-const ready = computed(() => !!activeQuest.value && !!world.value?.checks.length && world.value.checks.every(check => check.status === 'green'))
-const shippedCount = computed(() => {
-  const quest = shownQuest.value
-  const current = world.value
-  if (!quest || !current) return 0
-  return current.orders.find(order => order.id === quest.id)?.shipped ?? 0
-})
-const quantity = computed(() => {
-  const quest = shownQuest.value
-  if (!quest) return undefined
-  const order = world.value?.orders.find(item => item.id === quest.id)
-  const lines = order?.lines ?? quest.lines?.map(line => ({ ...line, shipped: 0 }))
-  return quantityLabel(quest.from, quest.item, quest.qty, shippedCount.value, lines)
-})
-const needText = computed(() => shownQuest.value ? deliveryNote(shownQuest.value.need) : '')
-const testRows = computed(() => {
-  const quest = shownQuest.value
-  const current = world.value
-  if (!quest) return []
-  const live = current && current.questId === quest.id ? readChecks(current, quest) : undefined
-  return quest.tests.map(test => {
-    const reading = live?.find(item => item.id === test.id)
-    return {
-      id: test.id,
-      text: reading?.text ?? test.text,
-      explain: test.explain,
-      state: reading?.state ?? 'pending' as const,
-      reason: reading?.reason,
-    }
-  })
-})
+const card = computed(() => shownQuest.value && world.value ? questCard(world.value, shownQuest.value) : undefined)
+const ready = computed(() => card.value?.ready ?? false)
+const testRows = computed(() => card.value?.tests ?? [])
 function grantCall(signature: string) {
   return signature.split(':')[0] ?? signature
 }
@@ -375,28 +347,25 @@ watch(world, (current) => {
 const nextStep = computed(() => {
   if (!activeQuest.value && readingHold.value) return readingHold.value
   return questNextStep({
-  quest: activeQuest.value ? {
-    from: activeQuest.value.from, goal: activeQuest.value.goal, item: activeQuest.value.item,
-    qty: activeQuest.value.qty, trigger: activeQuest.value.trigger,
-  } : undefined,
-  reading: !activeQuest.value && reading.value ? { from: reading.value.from } : undefined,
-  available: !activeQuest.value ? (available.value[0] ? { from: available.value[0].from } : undefined) : undefined,
-  ready: ready.value,
-  shipped: shippedCount.value,
-  loop: !!world.value?.loop,
-  furnace: {
-    input: world.value?.furnace.input ?? 0,
-    coal: world.value?.furnace.coal ?? 0,
-    output: world.value?.furnace.output ?? 0,
-    steel: world.value?.furnace.steel ?? 0,
-  },
-  made: { ingots: world.value?.ingotsMade ?? 0, steel: world.value?.steelMade ?? 0 },
-  runName: runName.value,
-  cart: cartCue(world.value),
-  oreNeed: kettlewick.recipe.ore,
-  smelting: world.value?.furnace.readyAt != null,
-  triggerReady: !!activeQuest.value?.trigger && !!world.value && triggerUnlocked(world.value, activeQuest.value.trigger),
-})
+    quest: activeQuest.value ? card.value : undefined,
+    reading: !activeQuest.value && reading.value ? { from: reading.value.from } : undefined,
+    available: !activeQuest.value ? (available.value[0] ? { from: available.value[0].from } : undefined) : undefined,
+    ready: ready.value,
+    shipped: card.value?.shipped ?? 0,
+    loop: !!world.value?.loop,
+    furnace: {
+      input: world.value?.furnace.input ?? 0,
+      coal: world.value?.furnace.coal ?? 0,
+      output: world.value?.furnace.output ?? 0,
+      steel: world.value?.furnace.steel ?? 0,
+    },
+    made: { ingots: world.value?.ingotsMade ?? 0, steel: world.value?.steelMade ?? 0 },
+    runName: runName.value,
+    cart: cartCue(world.value),
+    oreNeed: kettlewick.recipe.ore,
+    smelting: world.value?.furnace.readyAt != null,
+    triggerReady: !!activeQuest.value?.trigger && !!world.value && triggerUnlocked(world.value, activeQuest.value.trigger),
+  })
 })
 const loopReady = computed(() => ({
   on: loopOn.value,
@@ -411,13 +380,9 @@ const granted = computed(() => {
   if (!note || note.text === nextStep.value) return
   return note
 })
-const shipmentFull = computed(() => {
-  const quest = activeQuest.value
-  return !!quest && shippedCount.value >= quest.qty && !ready.value
-})
 function showOpenTest() {
   side.value = 'tests'
-  const id = firstOpenTest(testRows.value)
+  const id = card.value?.remainingTest
   if (id) pickedTest.value = id
 }
 function testMark(state: string) {
@@ -644,19 +609,19 @@ onBeforeUnmount(() => {
                 </button>
               </li>
             </ul>
-            <article v-else-if="shownQuest" class="quest">
+            <article v-else-if="shownQuest && card" class="quest">
               <button v-if="reading" type="button" class="hint" @click="readingId = undefined">All requests</button>
-              <h2>{{ shownQuest.title }}</h2>
+              <h2>{{ card.title }}</h2>
               <p class="goal step">{{ nextStep }}</p>
               <p v-if="granted" class="goal">
                 {{ granted.text }}
                 <button v-if="granted.file" type="button" class="hint" @click="activeFile = granted.file">{{ granted.file }}</button>
               </p>
-              <VillageAsk :who="shownQuest.who" :name="shownQuest.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="shownQuest.ask" />
-              <div v-if="quantity" class="need">
-                <p>{{ needText }}</p>
-                <span class="goal-line">{{ quantity.text }}</span>
-                <progress :value="quantity.value" :max="quantity.max" :aria-label="quantity.text" />
+              <VillageAsk :who="shownQuest.who" :name="card.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="card.ask" />
+              <div class="need">
+                <p>{{ card.needText }}</p>
+                <span class="goal-line">{{ card.quantity.text }}</span>
+                <progress :value="card.quantity.value" :max="card.quantity.max" :aria-label="card.quantity.text" />
               </div>
               <ul class="rewards">
                 <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
@@ -724,7 +689,7 @@ onBeforeUnmount(() => {
             <button class="gold" type="button" data-testid="take-quest" :disabled="!readingTake" @click="take(reading.id)">Take quest</button>
             <p v-if="readingHold" class="calm">{{ readingHold }}</p>
           </template>
-          <button v-else-if="shipmentFull" type="button" class="calm link" @click="showOpenTest">View remaining test</button>
+          <button v-else-if="card?.remainingTest" type="button" class="calm link" @click="showOpenTest">View remaining test</button>
           <p v-else-if="!ready" class="calm">In progress</p>
           <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" @click="send({ kind: 'complete' })">Hand over</button>
         </div>
