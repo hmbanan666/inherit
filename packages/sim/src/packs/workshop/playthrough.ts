@@ -84,7 +84,7 @@ for (const rate of [1, 2, 4]) test('direct clock entry, pause and parcel deliver
   await expect(page.getByTestId('result-cart')).toHaveText('A B C')
 })
 
-test('Stop loop retains the floor and Run once inspects a disposable tick', async ({ page }) => {
+test('Stop loop retains the floor and Try once inspects a disposable tick', async ({ page }) => {
   await page.goto('/?pack=workshop')
   await page.getByTestId('progress-chip').click()
   await page.getByRole('navigation', { name: 'Challenge picker' }).getByRole('button', { name: /Dispatch on the clock/ }).click()
@@ -103,7 +103,7 @@ test('Stop loop retains the floor and Run once inspects a disposable tick', asyn
   })
   await expect(primary).toContainText('Deploy')
   const before = (await page.getByTestId('result-cart').textContent())!
-  await page.getByRole('button', { name: 'Run once', exact: true }).click()
+  await page.getByRole('button', { name: 'Try once', exact: true }).click()
   await expect(page.getByTestId('result-cart')).toHaveText('A')
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('inherit.pack.workshop')!).world.queues.cart)).toEqual([])
   await page.getByRole('button', { name: 'Return to paused floor' }).click()

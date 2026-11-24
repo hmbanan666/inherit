@@ -15,6 +15,7 @@ const props = defineProps<{
   types?: string[]
   logs?: string[]
   busy?: boolean
+  tryOnce?: string
 }>()
 const emit = defineEmits<{
   close: []
@@ -54,13 +55,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', escape))
     <section :key="tab" id="drawer-panel" class="sheet-content" role="tabpanel" :aria-labelledby="'tab-' + tab">
       <template v-if="tab === 'learn'">
         <ol v-if="clock" class="clock-strip" aria-label="The floor clock">
-          <li><b>Run</b>Read your file once.</li>
+          <li><b>{{ tryOnce ?? 'Run' }}</b>Read your file once.</li>
           <li><b>Deploy</b>Call your exported onTick each tick.</li>
           <li><b>Stop loop</b>Keep the last completed tick.</li>
         </ol>
         <template v-if="theory"><h2>{{ theory.title }}</h2><p v-for="line in theory.body" :key="line">{{ line }}</p><pre>{{ theory.example }}</pre></template>
         <template v-if="task"><h3>Condition</h3><p>{{ task.condition }}</p><ul><li v-for="example in task.examples" :key="example">{{ example }}</li></ul></template>
-        <p v-if="clock">Pause holds the current reach. Choose 1×, 2× or 4× to change speed. Run once tries one tick on a copy.</p>
+        <p v-if="clock">Pause holds the current reach. Choose 1×, 2× or 4× to change speed. {{ tryOnce ?? 'Run' }} once tries one tick on a copy.</p>
         <button v-if="theory || task" class="got-it" @click="emit('edit')">Got it</button>
         <slot name="learn" />
 

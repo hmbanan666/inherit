@@ -198,13 +198,8 @@ export function mining(site: Site): Brick[] {
           if (room <= 0)
             throw new Error(`${d.name} keeps ${d.cargo} ${kind}; Furnace is full (${held}/${cap} ${kind}). Wait for smelt() or unload at the depot.`)
           moved = Math.min(d.cargo, room)
-          if (kind === 'coal') {
-            furnace.coal += moved
-            furnace.coalAt = ctx.world.tick
-          } else {
-            furnace.input += moved
-            furnace.oreAt = ctx.world.tick
-          }
+          if (kind === 'coal') furnace.coal += moved
+          else furnace.input += moved
         } else if (kind === 'coal') depot.coal = (depot.coal ?? 0) + moved
         else depot.ore += moved
         d.cargo -= moved

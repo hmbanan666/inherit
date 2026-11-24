@@ -32,7 +32,7 @@ export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new S
   export interface Cell { x: number; y: number }
   export interface Target { readonly pos: Cell }
   export interface Vein extends Target { readonly name: string; readonly kind: 'ore' | 'coal'; readonly purity: 'poor' | 'normal' | 'rich'; readonly ticksPerUnit: number; readonly yield: number }
-  export interface Order { readonly id: string; readonly item: 'ingot' | 'steel'; readonly qty: number; readonly shipped: number; readonly due: number; readonly pay: number; readonly from: string }
+  export interface Order { readonly id: string; readonly item: 'ingot' | 'steel'; readonly qty: number; readonly shipped: number; readonly pay: number; readonly from: string }
   export interface Furnace extends Target {
 ${members('furnace.')}
   }

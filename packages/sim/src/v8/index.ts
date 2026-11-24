@@ -37,6 +37,7 @@ globalThis.__inheritEmit = function (event) {
   if (!list) return
   for (let i = 0; i < list.length; i++) list[i]()
 }
-export const { orders, ship, credits, prospect } = api
+export function ship() {}
+export const { orders, credits, prospect } = api
 `
 }

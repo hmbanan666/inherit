@@ -1,6 +1,6 @@
 # Quest unlocks, hopper, infinite veins
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md).
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Amended by [ADR 0027](0027-shop-veins-one-delivery.md): credits are spent in the shop, and the second drone is Odile's reward, not a shop item. The sentences below that say otherwise are the record of that day. They are not in force.
 
 ## Context
 

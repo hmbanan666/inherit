@@ -58,6 +58,22 @@ test('normal takes 2 ticks and rich yields 2 in one tick', async () => {
   } finally { session.dispose() }
 })
 
+test('kettlewick places a normal vein between the poor cuts and the rich one', () => {
+  const world = createWorld(kettlewick)
+  const ore = world.veins.filter(vein => vein.kind === 'ore')
+  expect(ore.map(vein => [vein.name, vein.purity, vein.hidden ?? false])).toEqual([
+    ['A', 'poor', false],
+    ['D', 'normal', false],
+    ['C', 'rich', true],
+  ])
+  expect(ore[1]).toMatchObject({ ticksPerUnit: 2, yield: 1 })
+  expect(world.veins.find(vein => vein.name === 'B')).toMatchObject({ purity: 'poor', kind: 'coal' })
+  const depot = world.depot.pos
+  const dist = (pos: { x: number; y: number }) => Math.abs(pos.x - depot.x) + Math.abs(pos.y - depot.y)
+  expect(dist(ore[0]!.pos)).toBeLessThan(dist(ore[1]!.pos))
+  expect(dist(ore[1]!.pos)).toBeLessThan(dist(ore[2]!.pos))
+})
+
 test('a saved finite vein becomes a purity and loses its stock', () => {
   const world = createWorld(kettlewick)
   world.veins[0] = { name: 'A', pos: { x: 6, y: 2 }, kind: 'ore', hidden: false, left: 12 } as unknown as typeof world.veins[number]
