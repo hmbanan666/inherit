@@ -4,7 +4,7 @@ import { pushConsole, type Cell, type Site, type World } from './core/world'
 import { dumpCargo, mining, orderMine, orderPickup, orderUnload } from './modules/mining'
 import { takeFromDepot } from './modules/orders'
 import { outputCap, smelting } from './modules/smelting'
-import { ensureBin, finishedCap, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel, type Press } from './modules/stock'
+import { ensureBin, finishedCap, hingeRecipe, kitLines, kitRecipe, latheRecipes, machineSlot, missingInputs, port, pressRecipes, pressStockLabel, recipeById, recipeParts, reservedLabel, type Item, type Press, type Recipe } from './modules/stock'
 import { functionUnlocked, triggerUnlocked, unlockError } from './quests'
 
 export const worksEvents = ['furnace.full', 'furnace.ready', 'drone.idle', 'drone.full'] as const
@@ -339,6 +339,8 @@ export function machineList(world: World) {
     { id: 'furnace', name: 'Furnace', detail: furnaceDetail(world.furnace) },
     ...world.press ? [{ id: 'press', name: 'Press', detail: pressStockLabel(world.press) }] : [],
     ...world.spare ? [{ id: 'spare', name: 'Spare press', detail: pressStockLabel(world.spare) }] : [],
+    ...world.lathe ? [{ id: 'lathe', name: 'Lathe', detail: pressStockLabel(world.lathe) }] : [],
+    ...world.bench ? [{ id: 'bench', name: 'Assembly table', detail: pressStockLabel(world.bench) }] : [],
     { id: 'depot', name: 'Depot', detail: `${world.depot.ingots} ingots · ${world.depot.steel} steel` },
     ...world.drones.map(drone => ({
       id: drone.name,
@@ -362,6 +364,8 @@ export function inspectMachine(world: World, site: Site, id: string): InspectVie
   if (id === 'furnace') return inspectFurnace(world, site)
   if (id === 'press' && world.press) return inspectPress(world, world.press, 'press', 'Press')
   if (id === 'spare' && world.spare) return inspectPress(world, world.spare, 'spare', 'Spare press')
+  if (id === 'lathe' && world.lathe) return inspectStation(world, world.lathe, 'lathe', 'Lathe', latheRecipes, 'Cuts a blank into a gear, steel into a pin, or a plate into a cut plate.')
+  if (id === 'bench' && world.bench) return inspectBench(world)
   if (id === 'depot') return inspectDepot(world)
   const drone = world.drones.find(item => item.name === id)
   if (drone) return inspectDrone(world, drone)
@@ -433,14 +437,14 @@ function inspectPress(world: World, press: Press, id: 'press' | 'spare', name: s
   return {
     id,
     name,
-    description: 'Forms a grate from steel, a plate from an ingot, or a blank from steel.',
+    description: 'Forms a grate from steel, a plate from an ingot, a blank from steel, or a shutter from a cut plate.',
     lines: [
       { label: 'Recipe', value: activeText ? `${activeText.input} → ${activeText.output}` : 'Idle' },
       { label: 'Missing', value: active ? (missingInputs(view, active) ?? 'none') : (idleGaps.join(' · ') || 'none') },
       { label: 'Reserved', value: reservedLabel(ensureBin(press.bin)) },
       { label: 'Steel', value: `${view.get('steel')}/${machineSlot}` },
       { label: 'Ingots', value: `${view.get('ingot')}/${machineSlot}` },
-      { label: 'Finished', value: `${view.get('grate') + view.get('plate') + view.get('blank')}/${cap}` },
+      { label: 'Finished', value: `${view.get('grate') + view.get('plate') + view.get('blank') + view.get('shutter')}/${cap}` },
     ],
     recipes: pressRecipes.map(recipe => {
       const text = recipeParts(recipe)
@@ -449,6 +453,49 @@ function inspectPress(world: World, press: Press, id: 'press' | 'spare', name: s
     actions: [],
     progress,
   }
+}
+
+function outputSum(view: NonNullable<ReturnType<typeof port>>, items: readonly Item[]) {
+  return items.reduce((sum, item) => sum + view.get(item), 0)
+}
+
+function inspectStation(world: World, machine: Press, id: 'lathe' | 'bench', name: string, recipes: readonly Recipe[], description: string): InspectView {
+  const view = port(world, id)!
+  const active = machine.recipe ? (machine.recipe.startsWith('pack:') ? kitRecipe(machine.recipe.endsWith('lamp') ? 'lamp' : 'winch') : recipeById(machine.recipe)) : undefined
+  const activeText = active ? recipeParts(active) : undefined
+  const span = active?.ticks ?? 1
+  const progress = machine.readyAt !== null && active
+    ? bar(active.output, span - (machine.readyAt - world.tick), span)
+    : undefined
+  const outputs: Item[] = id === 'lathe' ? ['gear', 'pin', 'cut'] : ['hinge', 'winch', 'lamp']
+  const cap = finishedCap(world)
+  return {
+    id,
+    name,
+    description,
+    lines: [
+      { label: 'Recipe', value: activeText ? `${activeText.input} → ${activeText.output}` : 'Idle' },
+      { label: 'Missing', value: active ? (missingInputs(view, active) ?? 'none') : 'none' },
+      { label: 'Reserved', value: reservedLabel(ensureBin(machine.bin)) },
+      { label: 'Finished', value: `${outputSum(view, outputs)}/${cap}` },
+    ],
+    recipes: recipes.map(recipe => {
+      const text = recipeParts(recipe)
+      return { id: recipe.id, input: text.input, output: text.output, missing: missingInputs(view, recipe) }
+    }),
+    actions: [],
+    progress,
+  }
+}
+
+function inspectBench(world: World): InspectView {
+  const kit = world.manifest?.active === 'lamp' ? 'lamp' : 'winch'
+  const pack = kitRecipe(kit)
+  const view = inspectStation(world, world.bench!, 'bench', 'Assembly table', [hingeRecipe, pack], 'Joins a plate and a pin into a hinge, or packs the active kit into a labeled crate.')
+  view.lines.splice(1, 0, { label: 'Crate', value: kit })
+  const staged = kitLines[kit].map(line => `${world.manifest?.staged[line.item] ?? 0}/${line.qty} ${line.item}`).join(' · ')
+  view.lines.push({ label: 'Set aside', value: staged })
+  return view
 }
 
 function inspectDepot(world: World): InspectView {

@@ -2,7 +2,7 @@ export * from './core/world'
 export * from './core/bricks'
 export { mining, miningModule, dumpCargo, stepDroneTasks, cancelDroneTask, orderTransfer } from './modules/mining'
 export { kettlewick, uncleMain } from './sites/kettlewick'
-export { questList, shop, shopFor, acceptQuest, completeQuest, buyUpgrade, nextQuest, canTake, questHold, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, rewardGranted, rewardFresh, secondDroneUnlocked, syncSecondDrone, syncPress, syncSpare, worksGrants, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
+export { questList, shop, shopFor, acceptQuest, completeQuest, buyUpgrade, nextQuest, canTake, chainReady, questHold, levelFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, rewardGranted, rewardFresh, secondDroneUnlocked, syncSecondDrone, syncPress, syncSpare, syncLathe, syncBench, worksGrants, unlockError, pinLegacyTriggers, repairHarrow } from './quests'
 export { outputCap } from './modules/smelting'
 export {
   worksEvents, onApi, triggerDocs, pressManual, queueRun, stopScript, setLoop, grantLegacy, ensureTriggers, actManual, dueEvents, settleTriggers,
@@ -43,6 +43,6 @@ globalThis.__inheritEmit = function (event) {
   for (let i = 0; i < list.length; i++) list[i]()
 }
 export function ship() {}
-export const { orders, credits, prospect } = api
+export const { orders, credits, prospect, manifest } = api
 `
 }

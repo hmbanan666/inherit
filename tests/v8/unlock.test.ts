@@ -76,14 +76,14 @@ test('alloy and prospect name the quest that grants them, and smelt notes steel 
   } finally { session.dispose() }
 })
 
-test('taking the 60 ingot quest unlocks prospect and reveals the rich vein', async () => {
+test('taking Harrow unlocks prospect and reveals the rich vein', async () => {
   const session = await createSession(kettlewick, kettlewick.files)
   try {
     session.world.level = 4
     session.world.cleared = ['bram', 'ines', 'odile', 'elsie']
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('harrow')
-    expect(session.world.orders.find(order => order.id === 'harrow')?.qty).toBe(60)
+    expect(session.world.orders.find(order => order.id === 'harrow')?.lines?.map(line => line.item)).toEqual(['plate', 'blank'])
     expect(functionUnlocked(session.world, 'prospect')).toBe(true)
     expect(session.world.credits).toBe(kettlewick.credits)
     await session.deploy({ 'main.ts': `import { prospect, memory } from "inherit"

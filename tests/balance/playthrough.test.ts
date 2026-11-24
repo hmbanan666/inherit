@@ -15,7 +15,7 @@ beforeAll(async () => {
   const trials = run.probes.reduce((total, trial) => total + trial.ticks, 0)
   const rate = Math.round((ticks + trials) * 1000 / (performance.now() - start))
   console.info(`${ticks} playthrough ticks + ${trials} previous-program ticks, ${rate} ticks/s including deploys.`)
-}, 30_000)
+}, 120_000)
 
 test('a fresh works hands over every quest before the run limit', () => {
   expect([...run.cleared].sort()).toEqual(questList.map(quest => quest.id).sort())

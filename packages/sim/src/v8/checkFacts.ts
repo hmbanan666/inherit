@@ -87,9 +87,22 @@ function blockingFact(world: World, quest: QuestDef, id: string) {
     return 'furnace steel 0'
   }
   if (id === 'hands') return `shipped ${shipped(world, quest.id)}/${quest.qty}`
+  if (id === 'plate' || id === 'blank') return `${id} shipped ${world.orders.find(order => order.id === quest.id)?.lines?.find(line => line.item === id)?.shipped ?? 0}`
+  if (id === 'winch' || id === 'lamp') return world.manifest?.[id] ? `${id} crate received` : `${id} crate waiting at the depot`
   if (id === 'done') {
+    if (quest.lines?.length) {
+      const parts = quest.lines.map(line => {
+        const got = world.orders.find(order => order.id === quest.id)?.lines?.find(item => item.item === line.item)?.shipped ?? 0
+        return `${got}/${line.qty} ${line.item}`
+      })
+      return parts.join(', ')
+    }
     if (quest.item === 'ore') return `vein D ore unloaded ${shipped(world, quest.id)}/${quest.qty}`
     if (quest.item === 'grate') return `${world.depot.bin?.qty.grate ?? 0} grate at the depot; carry grates to the depot`
+    if (quest.item !== 'ingot' && quest.item !== 'steel') {
+      const at = world.depot.bin?.qty[quest.item] ?? 0
+      return `${at} ${quest.item} at the depot; carry them to the depot`
+    }
     const held = quest.item === 'steel' ? world.furnace.steel : world.furnace.output
     const at = quest.item === 'steel' ? world.depot.steel : world.depot.ingots
     const noun = quest.item === 'ingot' ? (held === 1 ? 'ingot' : 'ingots') : 'steel'

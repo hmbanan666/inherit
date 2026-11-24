@@ -84,17 +84,25 @@ test('counts advance and a passing check has no reason', () => {
 })
 
 test('a route check stays pending until the window is full and the count has sat still', () => {
+  const wen = questList.find(quest => quest.id === 'wen')!
+  const routeQuest = {
+    ...wen,
+    tests: [
+      { id: 'memory', text: 'The route is remembered', explain: 'A remembered route stays under the path budget.', pass: () => false },
+      ...wen.tests,
+    ],
+  }
   const earlyWorld = createWorld(kettlewick)
   earlyWorld.pathWindow = [1, 1, 1]
-  const early = readChecks(earlyWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'memory')
+  const early = readChecks(earlyWorld, routeQuest).find(check => check.id === 'memory')
   expect(early?.text).toBe('The route is remembered 3/8')
   expect(early?.state).toBe('pending')
   const lateWorld = createWorld(kettlewick)
   lateWorld.pathWindow = [1, 1, 1, 1, 1, 1, 1, 1]
-  const late = afterStill(lateWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'memory')
+  const late = afterStill(lateWorld, routeQuest).find(check => check.id === 'memory')
   expect(late?.state).toBe('failed')
   expect(late?.reason).toBe('path calls 8')
-  expect(readChecks(lateWorld, questList.find(quest => quest.id === 'wen')!!).find(check => check.id === 'done')?.reason).toBe('waits on: The route is remembered')
+  expect(readChecks(lateWorld, routeQuest).find(check => check.id === 'done')?.reason).toBe('waits on: The route is remembered')
 })
 
 test('a full hopper is named when it blocks the ingot', () => {

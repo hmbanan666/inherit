@@ -3,7 +3,7 @@ import type { Item } from '@inherit/sim/v8'
 export interface StepQuest {
   from: string
   goal: string
-  item: 'ingot' | 'steel' | 'ore' | 'grate'
+  item: Item
   qty: number
   trigger?: 'run' | 'events' | 'tick'
 }
@@ -75,6 +75,11 @@ function goods(item: StepQuest['item'], qty: number) {
   if (item === 'steel') return `${qty} steel`
   if (item === 'ore') return `${qty} ore`
   if (item === 'grate') return qty === 1 ? '1 grate' : `${qty} grates`
+  if (item === 'plate') return '1 plate and 1 blank'
+  if (item === 'gear') return qty === 1 ? '1 gear' : `${qty} gears`
+  if (item === 'hinge') return qty === 1 ? '1 hinge' : `${qty} hinges`
+  if (item === 'shutter') return qty === 1 ? '1 shutter' : `${qty} shutters`
+  if (item === 'winch') return 'the winch crate and the lamp crate'
   return qty === 1 ? '1 ingot' : `${qty} ingots`
 }
 

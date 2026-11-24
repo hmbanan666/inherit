@@ -1,3 +1,4 @@
+import { questList, shop } from '../packages/sim/src/v8'
 import { balance } from './config'
 import { minutes, type Event, type Run } from './playthrough'
 
@@ -64,31 +65,28 @@ export function assess(run: Run) {
       failures.set(`code/${quest.id}`, 'The edit has no failed previous-program trial.')
   }
 
-  // Shop entries from a single observation are consecutive. Measure the
-  // purse before spending, both per item and for the simultaneous opening.
+  // Each convenience is priced against the purse at the hand-over that can
+  // first afford it. A ratio under 1 is a shortfall. A ratio over the cap is
+  // late hoarding. Cheap items are not scored against the final purse.
+  const planned: [string, string][] = [
+    ['cart', 'ines'],
+    ['hopper', 'odile'],
+    ['furnace', 'elsie'],
+    ['racks', 'harrow'],
+    ['cpu', 'tomas'],
+    ['spare', 'pell'],
+  ]
   const openings = []
-  for (let i = 0; i < run.events.length; i++) {
-    const first = run.events[i]
-    if (first.kind !== 'unlock' || !first.listing) continue
-    const listings = [first.listing]
-    while (i + 1 < run.events.length) {
-      const next = run.events[i + 1]
-      if (next.kind !== 'unlock' || !next.listing || next.tick !== first.tick) break
-      listings.push(next.listing)
-      i++
-    }
-    const prices = [...listings]
-    if (listings.length > 1) prices.push({
-      id: listings.map(item => item.id).sort().join('+'),
-      price: listings.reduce((total, item) => total + item.price, 0),
-    })
-    for (const { id, price } of prices) {
-      const ratio = first.credits / price
-      openings.push({ id, price, tick: first.tick, credits: first.credits, ratio })
-      if (ratio < 1 || ratio > balance.maxHoardRatio) {
-        const issue = ratio < 1 ? 'shortfall' : 'hoard'
-        failures.set(`shop/${issue}/${id}`, `${first.credits} credits / ${price} price = ${ratio.toFixed(2)}× at tick ${first.tick} (target 1–${balance.maxHoardRatio}×).`)
-      }
+  for (const [id, questId] of planned) {
+    const item = shop.find(entry => entry.id === id)
+    const quest = run.quests.find(entry => entry.id === questId)
+    const plan = questList.find(entry => entry.id === questId)
+    if (!item || !quest || !plan) continue
+    const ratio = quest.finish.credits / item.price
+    openings.push({ id, price: item.price, tick: quest.finish.tick, credits: quest.finish.credits, ratio, quest: plan.title })
+    if (ratio < 1 || ratio > balance.maxHoardRatio) {
+      const issue = ratio < 1 ? 'shortfall' : 'hoard'
+      failures.set(`shop/${issue}/${id}`, `${quest.finish.credits} credits / ${item.price} price = ${ratio.toFixed(2)}× at ${plan.title} (target 1–${balance.maxHoardRatio}×).`)
     }
   }
   return { failures, dead, idle, plateaus, openings }

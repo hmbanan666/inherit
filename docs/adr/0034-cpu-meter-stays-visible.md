@@ -6,7 +6,7 @@ Accepted 24 November 2026. Amends the status-bar clause of [ADR 0024](0024-quest
 
 CPU is the limit the player hits. The status bar showed used and limit only after a tick had spent half the budget, or had already hit the limit. The rest of the time the number was absent, and the console line was the only signal.
 
-The world's `cpu.used` and `cpu.limit` are the budget. The shop's CPU +10 adds 10 to that limit. Wen's quest sets it. The guest had also kept the limit from deploy, so a purchase could raise the world and leave the guest on the old ceiling.
+The world's `cpu.used` and `cpu.limit` are the budget. The shop's CPU +10 adds 10 to that limit. Wen's quest used to set it. [ADR 0036](0036-region-1-fabrication-chain.md) removes that cut, so the shop is the only change to the limit. The guest had also kept the limit from deploy, so a purchase could raise the world and leave the guest on the old ceiling.
 
 ## Decision
 

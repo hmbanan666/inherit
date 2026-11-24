@@ -72,6 +72,8 @@ function pick(clientX: number, clientY: number) {
     { id: 'furnace', title: 'Furnace', pos: props.world.furnace.pos },
     ...props.world.press ? [{ id: 'press', title: 'Press', pos: props.world.press.pos }] : [],
     ...props.world.spare ? [{ id: 'spare', title: 'Spare press', pos: props.world.spare.pos }] : [],
+    ...props.world.lathe ? [{ id: 'lathe', title: 'Lathe', pos: props.world.lathe.pos }] : [],
+    ...props.world.bench ? [{ id: 'bench', title: 'Assembly table', pos: props.world.bench.pos }] : [],
   ])
   if (label) return label
   const drone = scene?.pickDrone(px, py)
