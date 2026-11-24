@@ -1,6 +1,6 @@
 # v8 quest screen
 
-Governs the arrangement of Kettlewick Works. The rules are [ADR 0033](../adr/0033-quest-card-stays-still.md), [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
+Governs the arrangement of Kettlewick Works. The rules are [ADR 0034](../adr/0034-cpu-meter-stays-visible.md), [ADR 0033](../adr/0033-quest-card-stays-still.md), [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
 
 The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The quest rail is a fixed 280px column on the left, the same panel surface as the rest of the desk. To its right, the map is the top row and the editor is the bottom row. One splitter component divides the map from the editor, the file tree from the code, and the code from the tests. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px ask, a 34px gold button, and a 48px portrait.
 
@@ -20,7 +20,7 @@ The editor and the tests fill the rest of the bottom row. The file tree is the l
 2. Quest rail. Who is asking, what they need, the reward, the one button.
 3. Works. The map.
 4. Editor. The open file tab, the code, API, Loop, Deploy, and the tests beside the code.
-5. Status bar. The script, problems, caret, tick, and CPU when it is worth showing.
+5. Status bar. The script, problems, the drone line, caret, tick, and the CPU meter.
 
 On a narrow window the rail stacks above the map, and the map stacks above the editor. The same five stops stay in that order.
 
@@ -66,7 +66,7 @@ The API book is a modal. Its sections are Furnace, Drone, Depot, Veins, Events, 
 
 ## Status bar
 
-A quiet strip, every item the same height, an icon and a short label, each with a tooltip. From the left: one lamp for the script, running, error, or stopped; then the error count and the warning count, which open the Console filtered to those lines. In the spare middle, one line names what each drone is doing, such as `drone-1: mining Vein A`. That line is a single row with an ellipsis and a fixed height. A new task is shown after the same words have held for two ticks, so a one-tick flicker stays off the bar. On the right: the caret as `Ln 12, Col 4`, the tick, and CPU only when the tick has spent at least half its budget or has already hit the limit. Depot, furnace, and drone quantities stay on the map and the machine inspector. The inspector still names the task on the drone.
+A quiet strip, every item the same height, an icon and a short label, each with a tooltip. From the left: one lamp for the script, running, error, or stopped; then the error count and the warning count, which open the Console filtered to those lines. In the spare middle, one line names what each drone is doing, such as `drone-1: mining Vein A`. That line is a single row with an ellipsis and a fixed height. A new task is shown after the same words have held for two ticks, so a one-tick flicker stays off the bar. On the right, beside the drone line: a CPU meter that is always there, then the caret as `Ln 12, Col 4`, and the tick. The meter reads `world.cpu` for that snapshot. The label is `CPU 34/50`. The spent figure is the highest of the last few ticks, and a short bar fills with it. The width is fixed and the figures are tabular, so a change does not move the caret. At or under 80% the meter is quiet. Above 80% it turns gold. At the limit it uses the alert color and the bar is full. The tooltip says that CPU is the budget for one tick, that a call past the limit does not run, and that CPU +10 in the shop raises the limit. Buying that item, or a quest that sets the limit, changes the meter on that snapshot. The console still records `CPU limit (n) hit.` Depot, furnace, and drone quantities stay on the map and the machine inspector. The inspector still names the task on the drone.
 
 ## One home each
 

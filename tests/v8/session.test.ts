@@ -103,6 +103,36 @@ test('the generated inherit declarations typecheck both controllers and require 
     .toHaveLength(1)
 })
 
+test('CPU +10 raises the limit the guest can spend', async () => {
+  const spend = `import { depot, findPath, memory } from "inherit"
+export function onTick() {
+  let n = 0
+  while (n < 12) {
+    findPath(depot.pos, { x: 6, y: 2 })
+    n++
+  }
+  memory.spent = n
+}`
+  const capped = await createSession(kettlewick, { 'main.ts': spend })
+  try {
+    capped.step(1)
+    expect(capped.world.cpu.limit).toBe(kettlewick.cpuLimit)
+    expect(capped.world.cpu.used).toBe(kettlewick.cpuLimit)
+    expect(capped.world.console.some(line => line.text.includes('CPU limit'))).toBe(true)
+  } finally { capped.dispose() }
+
+  const raised = await createSession(kettlewick, { 'main.ts': spend })
+  try {
+    raised.world.credits = 700
+    expect(raised.buy('cpu')).toBe(true)
+    expect(raised.world.cpu.limit).toBe(kettlewick.cpuLimit + 10)
+    raised.step(1)
+    expect(raised.world.cpu.used).toBe(36)
+    expect(raised.world.memory.spent).toBe(12)
+    expect(raised.world.console.some(line => line.text.includes('CPU limit'))).toBe(false)
+  } finally { raised.dispose() }
+})
+
 test('deploy replaces the controller on the same world and a failed deploy keeps it running', async () => {
   const session = await createSession(kettlewick, cached)
   try {
