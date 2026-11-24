@@ -3,8 +3,7 @@ import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
-import { buildingLabelHit } from '../lib/floorPick'
-import { inspectAt } from '@inherit/sim/v8'
+import { floorCursor, floorPoint, pickFloor, stationsOf } from '../lib/floorPick'
 
 const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean; selected?: string }>()
 const emit = defineEmits<{ error: [message: string]; select: [id: string] }>()
@@ -12,7 +11,8 @@ const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 0, h: 0 }),
   pan = ref({ x: 0, y: 0 }),
-  zoom = ref(1)
+  zoom = ref(1),
+  pointing = ref(false)
 const renderError = ref('')
 let app: Application | undefined,
   scene: FloorScene | undefined,
@@ -64,23 +64,21 @@ function sync() {
 watch([() => props.world, camera, scale, () => props.selected], sync)
 function pick(clientX: number, clientY: number) {
   const rect = host.value?.getBoundingClientRect()
-  if (!rect || scale.value === 0) return
-  const px = (clientX - rect.left - camera.value.x) / scale.value
-  const py = (clientY - rect.top - camera.value.y) / scale.value
-  const label = buildingLabelHit(px, py, tile, [
-    { id: 'depot', title: 'Depot', pos: props.world.depot.pos },
-    { id: 'furnace', title: 'Furnace', pos: props.world.furnace.pos },
-    ...props.world.press ? [{ id: 'press', title: 'Press', pos: props.world.press.pos }] : [],
-    ...props.world.spare ? [{ id: 'spare', title: 'Spare press', pos: props.world.spare.pos }] : [],
-    ...props.world.lathe ? [{ id: 'lathe', title: 'Lathe', pos: props.world.lathe.pos }] : [],
-    ...props.world.bench ? [{ id: 'bench', title: 'Assembly table', pos: props.world.bench.pos }] : [],
-  ])
-  if (label) return label
-  const drone = scene?.pickDrone(px, py)
-  if (drone) return drone
-  const x = Math.floor(px / tile)
-  const y = Math.floor(py / tile)
-  return inspectAt(props.world, x, y)?.id
+  if (!rect) return
+  const point = floorPoint(clientX, clientY, {
+    left: rect.left,
+    top: rect.top,
+    cameraX: camera.value.x,
+    cameraY: camera.value.y,
+    scale: scale.value,
+  })
+  if (!point) return
+  return pickFloor(point.x, point.y, tile, stationsOf(props.world), scene?.cartAnchors() ?? [])
+}
+function aim(clientX: number, clientY: number) {
+  const hit = pick(clientX, clientY)
+  scene?.highlight(hit ?? '')
+  pointing.value = floorCursor(hit) === 'pointer'
 }
 function down(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('button,aside') || e.button !== 0) return
@@ -92,7 +90,12 @@ function down(e: PointerEvent) {
 }
 function hover(e: PointerEvent) {
   if (pointers.size) return
-  scene?.highlight(pick(e.clientX, e.clientY) ?? '')
+  aim(e.clientX, e.clientY)
+}
+function leave() {
+  if (pointers.size) return
+  scene?.highlight('')
+  pointing.value = false
 }
 function move(e: PointerEvent) {
   const old = pointers.get(e.pointerId)
@@ -185,11 +188,13 @@ onBeforeUnmount(() => {
   <div
     ref="host"
     class="floor"
+    :class="{ pointing }"
     tabindex="0"
     aria-label="Factory map"
     @wheel.prevent="wheel"
     @pointerdown="down"
     @pointermove="hover"
+    @pointerleave="leave"
   >
     <div ref="mount" class="pixi-mount"></div>
     <div class="map-controls">
@@ -246,5 +251,7 @@ onBeforeUnmount(() => {
   display: block;
   width: 100% !important;
   height: 100% !important;
+  cursor: inherit;
 }
+.pointing { cursor: pointer }
 </style>

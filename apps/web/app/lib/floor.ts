@@ -4,6 +4,10 @@ import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
+import {
+  cartDrawScale, cartMark, hoverScale, hoverStroke, selectionColor, selectionStroke, stationShapes, stationsOf,
+  type Shape,
+} from './floorPick'
 
 export type FloorWorld = Omit<World, 'memory'>
 export const tile = 96
@@ -100,6 +104,7 @@ export class FloorScene {
   }[] = []
   private readonly seen = new Set<string>()
   private readonly veinBars = new Map<string, Graphics>()
+  private readonly stations = new Map<string, Container>()
   private readonly paths: Graphics
   private readonly ring: Graphics
   private readonly fire: Graphics
@@ -128,9 +133,12 @@ export class FloorScene {
     land(this.root, world.grid)
     this.paths = this.root.addChild(new Graphics())
     for (const vein of world.veins) this.placeVein(vein)
-    caption(equipment(this.root, world.depot.pos, depot), 'Depot', 0, -63)
+    const yard = equipment(this.root, world.depot.pos, depot)
+    caption(yard, 'Depot', 0, -63)
+    this.stations.set('depot', yard)
     const smelter = equipment(this.root, world.furnace.pos, furnace)
     caption(smelter, 'Furnace', 0, -63)
+    this.stations.set('furnace', smelter)
     this.fire = smelter.addChild(new Graphics())
     this.fire.ellipse(3, -22, 15, 4.5).fill(0xf3a94d)
     this.fire.ellipse(3, -22, 9, 2.6).fill(0xffdb80)
@@ -151,17 +159,20 @@ export class FloorScene {
     if (vein.hidden || this.seen.has(vein.name)) return
     this.seen.add(vein.name)
     const { x, y } = center(vein.pos)
-    this.root.addChild(new Graphics()).ellipse(x, y + 5, 31, 14).fill({ color: 0x202126, alpha: 0.42 })
+    const group = this.root.addChild(new Container())
+    group.position.set(x, y)
+    this.stations.set(`Vein ${vein.name}`, group)
+    group.addChild(new Graphics()).ellipse(0, 5, 31, 14).fill({ color: 0x202126, alpha: 0.42 })
     const rock = vein.kind === 'coal' ? 'coal' : 'iron-ore'
     for (let i = 0; i < 7; i++) {
-      const ore = this.root.addChild(materialArt(rock))
-      ore.position.set(x - 19 + ((i * 11) % 39), y - 7 + ((i * 8) % 16))
+      const ore = group.addChild(materialArt(rock))
+      ore.position.set(-19 + ((i * 11) % 39), -7 + ((i * 8) % 16))
       ore.scale.set(1 + (i % 3) * 0.24)
     }
     const tint = vein.purity === 'rich' ? 0xe0b15a : vein.purity === 'normal' ? 0x8d9a6a : 0x7a6558
-    this.root.addChild(new Graphics()).ellipse(x, y + 4, 36, 16).stroke({ color: tint, width: 3, alpha: 0.9 })
-    caption(this.root, `Vein ${vein.name}  ${vein.purity ?? 'poor'}`, x, y + 22)
-    const bar = this.root.addChild(new Graphics())
+    group.addChild(new Graphics()).ellipse(0, 4, 36, 16).stroke({ color: tint, width: 3, alpha: 0.9 })
+    caption(group, `Vein ${vein.name}  ${vein.purity ?? 'poor'}`, 0, 22)
+    const bar = group.addChild(new Graphics())
     this.veinBars.set(vein.name, bar)
   }
 
@@ -169,7 +180,7 @@ export class FloorScene {
     const d = drawing()
     truck(d)
     const art = this.root.addChild(new Container())
-    art.addChild(d.g).scale.set(0.54)
+    art.addChild(d.g).scale.set(cartDrawScale)
     const load = loadArt(drone.carrying)
     const cargo = art.addChild(materialArt(load))
     cargo.position.set(-7, -12)
@@ -199,6 +210,7 @@ export class FloorScene {
   highlight(id = '') {
     if (id === this.hover) return
     this.hover = id
+    this.paintHover()
     this.paintRing(this.latest)
   }
 
@@ -208,42 +220,58 @@ export class FloorScene {
     this.paintRing(this.latest)
   }
 
-  /** World pixels. A moving drone keeps a wide target on its sprite. */
-  pickDrone(x: number, y: number) {
-    const radius = 56
-    for (let i = this.haulers.length - 1; i >= 0; i--) {
-      const art = this.haulers[i]!.art
-      if (!art.visible) continue
-      const dx = x - art.x
-      const dy = y - art.y
-      if (dx * dx + dy * dy <= radius * radius) return this.latest.drones[i]?.name
+  /** Live cart anchors, including the walk between cells. */
+  cartAnchors() {
+    const anchors: { id: string; x: number; y: number }[] = []
+    for (const [i, item] of this.haulers.entries()) {
+      const id = this.latest.drones[i]?.name
+      if (!id || !item.art.visible) continue
+      anchors.push({ id, x: item.art.x, y: item.art.y })
     }
+    return anchors
+  }
+
+  private paintHover() {
+    const scale = (id: string | undefined) => id === this.hover ? hoverScale : 1
+    for (const [id, art] of this.stations) art.scale.set(scale(id))
+    for (const [i, item] of this.haulers.entries()) item.art.scale.set(scale(this.latest.drones[i]?.name))
   }
 
   private paintRing(world: FloorWorld) {
     this.ring.clear()
-    const id = this.hover || this.selected
-    if (!id) return
+    if (this.hover && this.hover !== this.selected) this.strokeId(world, this.hover, hoverStroke)
+    if (this.selected) this.strokeId(world, this.selected, selectionStroke)
+    this.root.addChild(this.ring)
+  }
+
+  private strokeId(world: FloorWorld, id: string, style: { width: number; alpha: number; grow: number }) {
     const drone = world.drones.findIndex(item => item.name === id)
     if (drone >= 0) {
       const art = this.haulers[drone]?.art
-      if (!art) return
-      this.ring.circle(art.x, art.y, 40).stroke({ color: 0xeabe50, width: 2, alpha: 0.85 })
+      if (!art?.visible) return
+      this.strokeBox(art.x, art.y, cartMark, style)
       return
     }
-    const spots = [
-      ...world.veins.filter(vein => !vein.hidden).map(vein => ({ id: `Vein ${vein.name}`, pos: vein.pos })),
-      { id: 'furnace', pos: world.furnace.pos },
-      { id: 'depot', pos: world.depot.pos },
-      ...world.press ? [{ id: 'press', pos: world.press.pos }] : [],
-      ...world.spare ? [{ id: 'spare', pos: world.spare.pos }] : [],
-      ...world.lathe ? [{ id: 'lathe', pos: world.lathe.pos }] : [],
-      ...world.bench ? [{ id: 'bench', pos: world.bench.pos }] : [],
-    ]
-    const spot = spots.find(item => item.id === id)
-    if (!spot) return
-    const point = center(spot.pos)
-    this.ring.circle(point.x, point.y, 38).stroke({ color: 0xeabe50, width: 2, alpha: 0.85 })
+    const spot = stationsOf(world).find(item => item.id === id)
+    if (!this.stations.has(id) || !spot) return
+    const origin = center(spot.pos)
+    for (const shape of stationShapes(spot.kind, spot.title)) this.strokeShape(origin.x, origin.y, shape, style)
+  }
+
+  private strokeShape(x: number, y: number, shape: Shape, style: { width: number; alpha: number; grow: number }) {
+    if (shape.type === 'ellipse') {
+      const ellipse = shape.ellipse
+      this.ring.ellipse(x + ellipse.cx, y + ellipse.cy, ellipse.rx + style.grow, ellipse.ry + style.grow)
+        .stroke({ color: selectionColor, width: style.width, alpha: style.alpha })
+      return
+    }
+    this.strokeBox(x, y, shape.box, style)
+  }
+
+  private strokeBox(x: number, y: number, box: { x: number; y: number; w: number; h: number }, style: { width: number; alpha: number; grow: number }) {
+    const grow = style.grow
+    this.ring.roundRect(x + box.x - grow, y + box.y - grow, box.w + grow * 2, box.h + grow * 2, 8)
+      .stroke({ color: selectionColor, width: style.width, alpha: style.alpha })
   }
 
   private paintRoutes(world: FloorWorld) {
@@ -273,6 +301,7 @@ export class FloorScene {
     if (!this.pressArt) {
       this.pressArt = equipment(this.root, press.pos, pressDrawing)
       caption(this.pressArt, 'Press', 0, -63)
+      this.stations.set('press', this.pressArt)
       this.pressWork = this.pressArt.addChild(new Graphics())
       this.pressWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.pressMark = this.pressArt.addChild(materialArt('steel'))
@@ -294,6 +323,7 @@ export class FloorScene {
     if (!this.latheArt) {
       this.latheArt = equipment(this.root, machine.pos, cutter)
       caption(this.latheArt, 'Lathe', 0, -63)
+      this.stations.set('lathe', this.latheArt)
       this.latheWork = this.latheArt.addChild(new Graphics())
       this.latheWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.latheMark = this.latheArt.addChild(materialArt('steel'))
@@ -315,6 +345,7 @@ export class FloorScene {
     if (!this.benchArt) {
       this.benchArt = equipment(this.root, machine.pos, assembler)
       caption(this.benchArt, 'Assembly', 0, -63)
+      this.stations.set('bench', this.benchArt)
       this.benchWork = this.benchArt.addChild(new Graphics())
       this.benchWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.benchMark = this.benchArt.addChild(materialArt('iron-ingot'))
@@ -336,6 +367,7 @@ export class FloorScene {
     if (!this.spareArt) {
       this.spareArt = equipment(this.root, press.pos, pressDrawing)
       caption(this.spareArt, 'Spare', 0, -63)
+      this.stations.set('spare', this.spareArt)
       this.spareWork = this.spareArt.addChild(new Graphics())
       this.spareWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.spareMark = this.spareArt.addChild(materialArt('steel'))
@@ -382,12 +414,12 @@ export class FloorScene {
       const vein = world.veins.find(entry => entry.name === name)
       const digger = world.drones.find(drone => drone.dig?.vein === name && (drone.dig?.ticks ?? 0) > 0)
       if (!vein || !digger?.dig) continue
-      const { x, y } = center(vein.pos)
       const width = 40 * Math.min(1, digger.dig.ticks / vein.ticksPerUnit)
-      bar.roundRect(x - 20, y + 42, 40, 4, 1).fill(0x2a2b2e)
-      bar.roundRect(x - 20, y + 42, width, 4, 1).fill(0xe7c56a)
+      bar.roundRect(-20, 42, 40, 4, 1).fill(0x2a2b2e)
+      bar.roundRect(-20, 42, width, 4, 1).fill(0xe7c56a)
     }
     this.paintRoutes(world)
+    this.paintHover()
     this.paintRing(world)
     for (const i of snap) {
       const item = this.haulers[i]!
