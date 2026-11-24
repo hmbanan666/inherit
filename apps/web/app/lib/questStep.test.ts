@@ -1,6 +1,7 @@
-import { kettlewick, questList } from '@inherit/sim/v8'
+import { createWorld, kettlewick, questList } from '@inherit/sim/v8'
 import { expect, test } from 'vitest'
-import { droneStatusLine, grantHint, grantNote, questNextStep, steadyLine, type CartCue, type QuestStepState } from './questStep'
+import { nextTick, shallowRef } from 'vue'
+import { droneStatusLine, grantHint, grantNote, questNextStep, steadyLine, useDroneStatus, type CartCue, type QuestStepState } from './questStep'
 
 const bram = questList.find(quest => quest.id === 'bram')!
 const empty = { input: 0, coal: 0, output: 0, steel: 0 }
@@ -109,6 +110,29 @@ test('the status line names each drone and its task', () => {
     { name: 'drone-1', task: 'mine', vein: 'A' },
     { name: 'drone-2', task: null },
   ])).toBe('drone-1: mining Vein A · drone-2: idle')
+})
+
+test('both carts reach the status bar after two distinct ticks with the same tasks', async () => {
+  const world = shallowRef(createWorld(kettlewick))
+  const first = world.value.drones[0]!
+  const second = { ...first, name: 'drone-2' }
+  world.value = { ...world.value, tick: 10, drones: [first, second] }
+  const line = useDroneStatus(world)
+  const idle = 'drone-1: idle · drone-2: idle'
+  expect(line.value).toBe(idle)
+
+  world.value = { ...world.value, tick: 11, drones: [
+    { ...first, task: { kind: 'mine', vein: 'A', since: 11 } },
+    { ...second, task: { kind: 'pickup', phase: 'fetch', since: 11 } },
+  ] }
+  await nextTick()
+  expect(line.value).toBe(idle)
+  world.value = { ...world.value }
+  await nextTick()
+  expect(line.value).toBe(idle)
+  world.value = { ...world.value, tick: 12 }
+  await nextTick()
+  expect(line.value).toBe('drone-1: mining Vein A · drone-2: hauling')
 })
 
 test('a status line waits out a one-tick flicker', () => {
