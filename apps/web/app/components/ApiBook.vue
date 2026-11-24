@@ -2,32 +2,34 @@
 import type { ApiSection } from '@inherit/sim/v8'
 import { X } from '@lucide/vue'
 
-const props = defineProps<{ sections: ApiSection[] }>()
-const emit = defineEmits<{ close: [] }>()
-const openId = ref(props.sections[0]?.id ?? 'furnace')
-const section = computed(() => props.sections.find(item => item.id === openId.value) ?? props.sections[0])
+const props = defineProps<{ sections: ApiSection[]; sectionId?: string }>()
+const emit = defineEmits<{ close: []; select: [id: string] }>()
+const section = computed(() => props.sections.find(item => item.id === props.sectionId) ?? props.sections[0])
+const dialog = ref<HTMLDialogElement>()
+const closeButton = ref<HTMLButtonElement>()
+const pages = ref<HTMLElement>()
 
-function onKey(event: KeyboardEvent) {
-  if (event.key === 'Escape') emit('close')
-}
-onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+onMounted(() => dialog.value?.showModal())
+onBeforeUnmount(() => dialog.value?.close())
 </script>
 
 <template>
-  <div class="shade" @click.self="emit('close')">
-    <section class="book" role="dialog" aria-modal="true" aria-label="API book">
+  <dialog ref="dialog" class="shade" aria-label="API book" @cancel.prevent="emit('close')" @click.self="emit('close')">
+    <section class="book">
       <header>
         <h2>API</h2>
-        <button type="button" aria-label="Close API" @click="emit('close')"><X :size="16" /></button>
+        <button
+          ref="closeButton" type="button" aria-label="Close API" autofocus
+          @keydown.shift.tab.exact.prevent="pages?.focus()" @click="emit('close')"
+        ><X :size="16" /></button>
       </header>
       <div class="body">
         <nav aria-label="API sections">
-          <button v-for="item in sections" :key="item.id" type="button" :aria-current="item.id === section?.id ? 'true' : undefined" @click="openId = item.id">
+          <button v-for="item in sections" :key="item.id" type="button" :aria-current="item.id === section?.id ? 'true' : undefined" @click="emit('select', item.id)">
             {{ item.title }}
           </button>
         </nav>
-        <div class="pages">
+        <div ref="pages" class="pages" tabindex="0" @keydown.tab.exact.prevent="closeButton?.focus()">
           <article v-for="entry in section?.entries ?? []" :key="entry.id" :class="{ locked: !!entry.locked }">
             <h3>
               <code>{{ entry.signature }}</code>
@@ -40,19 +42,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </div>
       </div>
     </section>
-  </div>
+  </dialog>
 </template>
 
 <style scoped>
 .shade {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  display: grid;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
   place-items: center;
   padding: 24px;
-  background: rgba(8, 8, 9, 0.62);
+  background: transparent;
 }
+.shade[open] { display: grid }
+.shade::backdrop { background: rgba(8, 8, 9, 0.62) }
 .book {
   width: min(880px, 100%);
   height: min(720px, 100%);

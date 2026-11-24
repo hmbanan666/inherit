@@ -15,7 +15,7 @@ import { insertQuestNote, questCard, questComment } from '../lib/questNote'
 import { cpuTitle, readCpu, steadyCpu, type CpuHold, type CpuMeter } from '../lib/cpuMeter'
 import { droneStatusLine, grantNote, questNextStep, steadyLine, type CartCue, type SteadyLine } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
-import { reduceApiBook } from '../lib/apiBookState'
+import { useApiBook } from '../lib/apiBookState'
 import { insertTriggerExample } from '../lib/triggerNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
@@ -27,7 +27,7 @@ const droneNames = computed(() => world.value?.drones.map(drone => drone.name) ?
 const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name)), new Set(), ['drone-1']))
 const bookSections = computed(() => apiBook(bricks, world.value ?? lockedWorld))
 const catalog = computed(() => shopFor(world.value ?? { cleared: [], bought: [] }))
-const bookOpen = ref(false)
+const { isOpen: bookOpen, sectionId, selectSection, open: openBook, close: closeBook } = useApiBook()
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
 const dirty = computed(() => Object.keys(files.value).length !== Object.keys(deployed.value).length ||
@@ -454,6 +454,7 @@ function startOver() {
   send({ kind: 'restart', files: kettlewick.files, fresh: true })
 }
 function shortcut(event: KeyboardEvent) {
+  if (bookOpen.value) return
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
     event.stopPropagation()
@@ -699,9 +700,9 @@ onBeforeUnmount(() => {
           <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
           <div class="editor-column">
             <div class="editor-pane"><div class="editor-host">
-              <LazyCodeEditor @reference="bookOpen = true">
+              <LazyCodeEditor :book-open="bookOpen" @reference="openBook">
                 <template #actions>
-                  <button class="ide" type="button" @click="bookOpen = reduceApiBook(bookOpen, 'api')">API</button>
+                  <button class="ide" type="button" aria-haspopup="dialog" @click="openBook($event.currentTarget as HTMLButtonElement)">API</button>
                   <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" :data-state="loopOn ? 'running' : 'idle'"
                     :disabled="pending || !world || (!loopOn && !loopable)"
                     :title="loopable || loopOn ? 'calls onTick every tick' : 'Export onTick in main.ts to loop it.'"
@@ -795,7 +796,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <Teleport to="body">
-      <ApiBook v-if="bookOpen" :sections="bookSections" @close="bookOpen = reduceApiBook(true, 'close')" />
+      <ApiBook v-if="bookOpen" :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeBook" />
     </Teleport>
   </StudioShell>
 </template>

@@ -6,6 +6,7 @@ import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.
 import 'monaco-editor/esm/vs/language/typescript/monaco.contribution.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import type { ApiBookOpener } from '../lib/apiBookState'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
 import { SuggestAdapter } from 'monaco-editor/esm/vs/language/typescript/tsMode.js'
@@ -16,13 +17,14 @@ import { FileSearch, FolderSearch, X } from '@lucide/vue'
 const game = inject(editorKey)!
 const { files, activeFile, deployed, multiFile, api, dirty } = game
 const props = defineProps<{
+  bookOpen?: boolean
   diagnostic?: PlainError
   starter?: Starter
   ids?: string[]
   selected?: string
   code?: string
 }>()
-const emit = defineEmits<{ hint: []; reference: []; ready: []; focusIds: [string[]]; edit: [string] }>()
+const emit = defineEmits<{ hint: []; reference: [opener: ApiBookOpener]; ready: []; focusIds: [string[]]; edit: [string] }>()
 const host = ref<HTMLElement>()
 const shellTabs = shallowRef<HTMLElement>()
 const input = ref<HTMLInputElement>()
@@ -229,7 +231,7 @@ function find(next: 'open' | 'search') {
   } else showFinder()
 }
 function keys(e: KeyboardEvent) {
-  if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+  if (props.bookOpen || !(e.ctrlKey || e.metaKey) || e.altKey) return
   const key = e.key.toLowerCase()
   if (!(key === 'p' && !e.shiftKey) && !(key === 'f' && e.shiftKey)) return
   e.preventDefault()
@@ -425,7 +427,7 @@ onMounted(() => {
     openCodeEditor(source, resource, pos) {
       if (source !== editor) return false
       if (resource.toString() === libraryUri.toString()) {
-        emit('reference')
+        emit('reference', source)
         return true
       }
       const file = resource.path.slice(prefix.length)
