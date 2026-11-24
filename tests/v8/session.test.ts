@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { diagnostics } from '../packs/compiler'
+import { diagnostics } from './diagnostics'
 import { declarations, kettlewick, factoryBricks, uncleMain } from '../../packages/sim/src/v8'
 import { createSession, runSession } from '../../packages/sandbox/src/v8'
 
@@ -8,7 +8,7 @@ test('uncle fills the cart and nothing is paid until a quest is taken', async ()
   try {
     expect(session.world.drones).toHaveLength(1)
     expect(session.world.orders).toEqual([])
-    expect(session.world.status).toContain('cart fills')
+    expect(session.world.status).toContain('empty at the depot')
     session.step(30)
     expect(session.world.drones[0]!.cargo).toBe(session.world.drones[0]!.capacity)
     expect(session.world.credits).toBe(kettlewick.credits)

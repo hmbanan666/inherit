@@ -68,30 +68,30 @@ export const questList: QuestDef[] = [
   {
     id: 'bram', from: 'Bram', who: 'bram', role: 'Blacksmith', building: 'forge',
     title: 'Horseshoes for the mail horse',
-    goal: 'Bring Bram 4 ingots.',
-    why: 'The cart fills at the vein and stays there, so the furnace never receives ore. Buttons move the drone and the furnace. Run plays a function until it returns.',
+    goal: 'Bring Bram 2 ingots.',
+    why: 'The drone is empty at the depot. Buttons send it to a vein. Run calls a function once, and the drone keeps the task.',
     quote: 'The mail horse throws a shoe on every hill.',
-    ask: 'The mail horse throws a shoe on every hill. I need four ingots.',
-    need: 'Need 4 ingots. An ingot is smelted from ore.',
-    nudge: 'the cart sits full at the vein, and the furnace is still cold.',
+    ask: 'The mail horse throws a shoe on every hill. I need two ingots.',
+    need: 'Need 2 ingots. An ingot is smelted from ore.',
+    nudge: 'the drone is empty at the depot, and the furnace is cold.',
     change: 'The forge is lit. The mail horse has shoes.',
-    item: 'ingot', qty: 4, pay: 80, xp: 20, needLevel: 1,
+    item: 'ingot', qty: 2, pay: 80, xp: 20, needLevel: 1,
     trigger: 'run',
     tests: [
       { id: 'ore', text: 'Ore reaches the furnace', explain: 'The furnace has taken in ore, or an ingot was already made from it.', pass: world => world.furnace.input > 0 || world.furnace.output > 0 || world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
       { id: 'ingot', text: 'The furnace makes an ingot', explain: 'The furnace has finished at least one ingot.', pass: world => world.ingotsMade > 0 || shipped(world, 'bram') > 0 },
-      { id: 'done', text: 'Bram receives 4 ingots', explain: 'Four ingots have been handed over from the depot.', pass: world => shipped(world, 'bram') >= 4 },
+      { id: 'done', text: 'Bram receives 2 ingots', explain: 'Two ingots have been handed over from the depot.', pass: world => shipped(world, 'bram') >= 2 },
     ],
   },
   {
     id: 'ines', from: 'Ines', who: 'ines', role: 'Warden', building: 'town-hall',
     title: 'Ingots for the storehouse',
     goal: 'Bring Ines 16 ingots.',
-    why: 'Sixteen ingots is a long time on one click. Loop runs a function again each time it finishes. onTick is that loop in code.',
+    why: 'Sixteen ingots is a long shift of buttons. Loop calls a function every tick. onTick is that loop.',
     quote: 'The storehouse shelves have been bare all winter.',
     ask: 'The storehouse shelves have been bare all winter. I need sixteen ingots.',
     need: 'Need 16 ingots. An ingot is smelted from ore.',
-    nudge: 'loop runs the function again when it finishes. onTick is that loop in code.',
+    nudge: 'loop calls the function every tick. onTick is that loop.',
     change: 'The storehouse has iron again.',
     item: 'ingot', qty: 16, pay: 90, xp: 20, needLevel: 2,
     trigger: 'tick',
@@ -155,8 +155,8 @@ export const questList: QuestDef[] = [
     item: 'ingot', qty: 60, pay: 80, xp: 0, needLevel: 4,
     unlock: { brick: 'prospect', signature: 'prospect(): reveals the next hidden vein', legacy: 'prospect' },
     tests: [
-      { id: 'hands', text: 'Done with no manual runs', explain: 'The ingots arrived without a button press or a Run. onTick does not count as a manual run.', pass: world => world.manualRuns === 0 && shipped(world, 'harrow') >= 60 },
       { id: 'done', text: 'Harrow receives 60 ingots', explain: 'Sixty ingots have been handed over from the depot.', pass: world => shipped(world, 'harrow') >= 60 },
+      { id: 'hands', text: 'Hand over stays open', explain: 'Sixty ingots open Hand over. A gutter Run does not lock the quest.', pass: world => shipped(world, 'harrow') >= 60 },
     ],
   },
   {
@@ -216,10 +216,10 @@ export const questList: QuestDef[] = [
 ]
 
 export const shop: ShopItem[] = [
-  { id: 'furnace', name: 'Hotter furnace', price: 60, detail: 'A batch finishes in 2 ticks instead of 4.', apply: world => { world.batchTicks = 2 } },
-  { id: 'cart', name: 'Bigger cart', price: 40, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
-  { id: 'hopper', name: 'Bigger hopper', price: 50, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
-  { id: 'cpu', name: 'CPU +10', price: 80, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
+  { id: 'cart', name: 'Bigger cart', price: 240, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
+  { id: 'hopper', name: 'Bigger hopper', price: 280, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
+  { id: 'furnace', name: 'Hotter furnace', price: 580, detail: 'A batch finishes in 2 ticks instead of 4.', apply: world => { world.batchTicks = 2 } },
+  { id: 'cpu', name: 'CPU +10', price: 700, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
 ]
 
 /** Odile's reward. A save that already bought drone-2, or has passed Odile, keeps a single drone-2. */
@@ -229,9 +229,16 @@ export function grantSecondDrone(world: World) {
   const capacity = world.drones[0]?.capacity ?? 3
   world.drones.push({
     name: 'drone-2', pos: { x: home.x, y: home.y }, cargo: 0,
-    capacity, carrying: null, source: '', dig: null,
+    capacity, carrying: null, source: '', dig: null, task: null,
   })
   if (world.signals?.drones) world.signals.drones['drone-2'] = { cargo: 0, capacity, idle: true }
+}
+
+/** A Harrow save that already delivered 60 ingots is not locked by an earlier Run. Credits stay. */
+export function repairHarrow(world: World) {
+  if (world.questId !== 'harrow') return
+  const shipped = world.orders?.find(order => order.id === 'harrow')?.shipped ?? 0
+  if (shipped >= 60) world.manualRuns = 0
 }
 
 export function nextQuest(world: World, site: Site) {

@@ -8,10 +8,8 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { defineWorkshopTheme } from '../lib/workshopTheme'
 import { createLineHighlight } from '../lib/line-highlight'
-import type { PlainError } from '@inherit/sandbox/pack'
-import type { Starter } from '@inherit/sim/pack'
 import { SuggestAdapter } from 'monaco-editor/esm/vs/language/typescript/tsMode.js'
-import { editorKey, rankApiSuggestions } from '../lib/editor'
+import { editorKey, rankApiSuggestions, type PlainError, type Starter } from '../lib/editor'
 import { runnableExports } from '../lib/runGlyph'
 import { FileSearch, FolderSearch, X } from '@lucide/vue'
 
@@ -86,10 +84,18 @@ function markRuns() {
     runMarks.clear()
     return
   }
-  const source = files.value[activeFile.value] ?? ''
+  if (activeFile.value !== 'main.ts') {
+    runMarks.clear()
+    return
+  }
+  const source = files.value['main.ts'] ?? ''
+  const pending = source !== (deployed.value['main.ts'] ?? '')
   runMarks.set(runnableExports(source).map(item => ({
     range: new monaco.Range(item.line, 1, item.line, 1),
-    options: { glyphMarginClassName: 'run-glyph', glyphMarginHoverMessage: { value: `Run ${item.name}` } },
+    options: {
+      glyphMarginClassName: 'run-glyph',
+      glyphMarginHoverMessage: { value: pending ? `Deploy and run ${item.name}` : `Run ${item.name}` },
+    },
   })))
 }
 
@@ -416,7 +422,7 @@ onMounted(() => {
   emit('ready')
 })
 watch([game.tickCalls, game.watching, activeFile, files, deployed], markTickLines, { flush: 'post' })
-watch([() => game.canRun?.value, activeFile, files], markRuns, { flush: 'post' })
+watch([() => game.canRun?.value, activeFile, files, deployed], markRuns, { flush: 'post' })
 watch([game.call, activeFile, files, deployed], lightCall, { flush: 'post' })
 watch(files, syncFiles)
 watch(activeFile, display)

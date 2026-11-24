@@ -1,4 +1,4 @@
-import { clearConsole, kettlewick, noteCheckReset, pressManual } from '@inherit/sim/v8'
+import { clearConsole, kettlewick, noteCheckReset, pressManual, pushConsole } from '@inherit/sim/v8'
 import { createSession } from '@inherit/sandbox/v8'
 import type { FactoryCommand, FactoryFrame } from './factoryProtocol'
 
@@ -52,17 +52,33 @@ async function act(command: FactoryCommand) {
         session!.dump(command.name)
         publish()
       } else if (command.kind === 'manual') {
-        pressManual(session!.world, command.action, command.drone)
+        pressManual(session!.world, command.action, command.drone, command.vein)
         publish()
       } else if (command.kind === 'run-fn') {
-        session!.queue(command.name, command.file, command.line)
-        publish()
+        if (command.files) {
+          await session!.deploy(command.files)
+          noteCheckReset(session!.world)
+        }
+        if (command.file !== 'main.ts') {
+          pushConsole(session!.world, {
+            tick: session!.world.tick,
+            text: 'Run starts an export in main.ts.',
+            level: 'error',
+            file: command.file,
+            line: command.line,
+          })
+        } else session!.queue(command.name, command.file, command.line)
+        publish(command.files)
       } else if (command.kind === 'stop') {
         session!.stop()
         publish()
       } else if (command.kind === 'loop') {
+        if (command.on && command.files) {
+          await session!.deploy(command.files)
+          noteCheckReset(session!.world)
+        }
         session!.setLoop(command.on, command.name, command.file, command.line)
-        publish()
+        publish(command.files)
       } else if (command.kind === 'clear-console') {
         clearConsole(session!.world)
         publish()

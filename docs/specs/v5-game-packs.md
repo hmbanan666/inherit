@@ -1,6 +1,6 @@
 # Game packs on one framework
 
-> Legacy mode, not v8. Packs stay playable at `/?packs`. The game is the quest loop in [ADR 0022](../adr/0022-quest-loop-no-loss.md). CI does not run a browser suite.
+> Removed. [ADR 0030](../adr/0030-packs-removed.md) is the record. This file is the old pack contract, not a mode in the game.
 
 ## Problem
 

@@ -1,7 +1,7 @@
 import { chargeCpu } from './core/cpu'
 import { onDoc, onExample, onSignature } from './core/bricks'
 import { pushConsole, type Cell, type Site, type World } from './core/world'
-import { dumpCargo, mining } from './modules/mining'
+import { dumpCargo, mining, orderMine, orderPickup, orderUnload } from './modules/mining'
 import { takeFromDepot } from './modules/orders'
 import { outputCap, smelting } from './modules/smelting'
 import { functionUnlocked, triggerUnlocked, unlockError } from './quests'
@@ -23,15 +23,33 @@ export const triggerDocs = [
     id: 'run' as const,
     name: 'Run',
     signature: 'Run functionName',
-    doc: 'Play an exported function until it returns. yield, or return false, waits one tick.',
-    example: `// Run plays this until it returns. yield waits one tick.\nexport function* once() {\n  // One step of the drone, then the next tick.\n  yield\n}`,
+    doc: 'Call an exported function once, on one tick. The function reads the works and gives commands.',
+    example: `import { drones, veins } from "inherit"
+
+// Run calls haul once. The drone keeps the task after haul returns.
+export function haul() {
+  const vein = veins().find(item => item.name === "A")
+  const drone = drones()[0]
+  if (vein && !drone.busy) drone.mine(vein)
+}`,
   },
   {
     id: 'tick' as const,
     name: 'Loop',
     signature: 'export function onTick(): void',
-    doc: 'Run the function again each time it finishes, until Stop. The Loop switch does this too.',
-    example: `// Loop calls onTick again after it returns, until Stop.\nexport function onTick() {\n  // One step. The works call this again when it finishes.\n}`,
+    doc: 'Call onTick every tick until Stop. The Loop switch does this too.',
+    example: `import { drones, veins, furnace } from "inherit"
+
+// Loop calls onTick every tick. Give a command only when the drone is free.
+export function onTick() {
+  const drone = drones()[0]
+  const vein = veins().find(item => item.name === "A")
+  if (!drone.busy && vein) {
+    if (drone.cargo === 0) drone.mine(vein)
+    else drone.unload(furnace)
+  }
+  if (furnace.input >= 2) furnace.smelt()
+}`,
   },
   {
     id: 'events' as const,
@@ -56,7 +74,7 @@ export function snapshotSignals(world: World): World['signals'] {
     drones: Object.fromEntries(world.drones.map(drone => [drone.name, {
       cargo: drone.cargo,
       capacity: drone.capacity,
-      idle: drone.cargo === 0 && !drone.route?.length && !world.jobs[drone.name],
+      idle: drone.cargo === 0 && !drone.route?.length && !drone.task,
     }])),
   }
 }
@@ -86,44 +104,47 @@ export function ensureTriggers(world: World) {
   return world
 }
 
-export function pressManual(world: World, action: ManualAction, drone = 'drone-1') {
-  if (action === 'mine' || action === 'unload' || action === 'dump') world.inbox.drones[drone] = action
-  else world.inbox[action] = true
+export function pressManual(world: World, action: ManualAction, drone = 'drone-1', vein?: string) {
+  if (action === 'mine' || action === 'unload' || action === 'dump') {
+    world.inbox.drones[drone] = action
+    if (vein) world.inbox.vein = vein
+  } else world.inbox[action] = true
+  if (action === 'collect') world.inbox.collectDrone = drone
 }
 
 export function queueRun(world: World, name: string, file: string, line: number) {
   if (!triggerUnlocked(world, 'run')) throw new Error('Run is locked. A quest unlocks it.')
   world.holding = false
   world.script = { name, file, line, loop: world.loop, phase: 'start' }
-  world.pace = { mode: 'run', name }
   world.manualRuns = (world.manualRuns ?? 0) + 1
 }
 
 export function stopScript(world: World) {
+  if (world.loop) pushConsole(world, { tick: world.tick, text: 'Loop stopped: onTick', level: 'log' })
   world.holding = true
   world.loop = false
   world.script = null
   world.pace = { mode: 'idle', name: '' }
 }
 
-/** Loop restarts the function when it finishes. Passing a name starts that function. */
-export function setLoop(world: World, on: boolean, name?: string, file = 'main.ts', line = 1) {
+/** Loop calls onTick every tick. It does not queue a one-shot Run. */
+export function setLoop(world: World, on: boolean, _name?: string, _file = 'main.ts', _line = 1) {
   if (!triggerUnlocked(world, 'tick')) throw new Error('Loop is locked. A quest unlocks it.')
   if (!on) {
+    if (world.loop) pushConsole(world, { tick: world.tick, text: 'Loop stopped: onTick', level: 'log' })
     world.loop = false
     if (world.script) world.script.loop = false
+    if (world.pace.mode === 'tick') world.pace = { mode: 'idle', name: '' }
     return
   }
+  const starting = !world.loop
   world.holding = false
   world.loop = true
-  if (world.script) {
-    world.script.loop = true
-    return
+  if (world.script) world.script.loop = true
+  if (starting) {
+    pushConsole(world, { tick: world.tick, text: 'Loop started: onTick', level: 'log' })
+    world.pace = { mode: 'tick', name: 'onTick' }
   }
-  if (!name) return
-  world.script = { name, file, line, loop: true, phase: 'start' }
-  world.pace = { mode: 'run', name }
-  world.manualRuns = (world.manualRuns ?? 0) + 1
 }
 
 function distance(a: Cell, b: Cell) {
@@ -141,14 +162,7 @@ function handler(site: Site, name: string): Act | undefined {
   return typeof found?.handler === 'function' ? found.handler : undefined
 }
 
-function stepToward(drone: World['drones'][number], target: Cell) {
-  const dx = Math.sign(target.x - drone.pos.x)
-  const dy = dx === 0 ? Math.sign(target.y - drone.pos.y) : 0
-  drone.pos = { x: drone.pos.x + dx, y: drone.pos.y + dy }
-  drone.route = undefined
-}
-
-/** Buttons and queued work for this tick. Returns the CPU those actions spent. */
+/** Buttons for this tick. Drone tasks step after the player's function. Returns the CPU these buttons spent. */
 export function actManual(world: World, site: Site) {
   let used = 0
   const limit = world.cpu.limit
@@ -159,30 +173,20 @@ export function actManual(world: World, site: Site) {
     return charge.allowed
   }
   const ctx = { world, cpuUsed: () => used }
-  finishCollect(world)
   const inbox = world.inbox
+  const vein = inbox.vein
+  const collectDrone = inbox.collectDrone ?? 'drone-1'
   world.inbox = emptyInbox()
   if (inbox.smelt) trySmelt(world, site, ctx, spend)
   if (inbox.alloy) tryAlloy(world, site, ctx, spend)
-  if (inbox.collect) tryCollect(world, site)
+  if (inbox.collect) tryCollect(world, collectDrone)
   if (inbox.clear) tryClear(world, site, ctx, spend)
   for (const [name, action] of Object.entries(inbox.drones)) {
     if (action === 'dump') tryDump(world, name, spend)
-    else if (action === 'mine') beginMine(world, name)
+    else if (action === 'mine') beginMine(world, name, vein)
     else beginUnload(world, name)
   }
-  for (const name of Object.keys(world.jobs)) stepJob(world, site, name, ctx, spend)
   return used
-}
-
-function finishCollect(world: World) {
-  if (world.collectAt === null || world.tick < world.collectAt) return
-  world.depot.ingots += world.furnace.output
-  world.depot.steel += world.furnace.steel
-  world.furnace.output = 0
-  world.furnace.steel = 0
-  world.collectAt = null
-  world.collectSpan = 0
 }
 
 function trySmelt(world: World, site: Site, ctx: { world: World; cpuUsed: () => number }, spend: (cost: number) => boolean) {
@@ -206,13 +210,15 @@ function tryAlloy(world: World, site: Site, ctx: { world: World; cpuUsed: () => 
   catch (error) { note(world, error instanceof Error ? error.message : String(error)) }
 }
 
-function tryCollect(world: World, site: Site) {
-  if (world.collectAt !== null) return note(world, 'The furnace is already collecting.')
-  if (world.furnace.output <= 0 && world.furnace.steel <= 0) return note(world, 'The furnace has no ingots or steel.')
-  const span = world.batchTicks ?? site.recipe.ticks
-  world.collectAt = world.tick + span
-  world.collectSpan = span
-  world.manualRuns++
+function tryCollect(world: World, name: string) {
+  if (!world.drones.some(item => item.name === name)) return note(world, `No drone named ${name}.`)
+  try {
+    const result = orderPickup(world, name, world.tick - 1)
+    if (result === 'same') return note(world, `${name} is already picking up.`)
+    world.manualRuns++
+  } catch (error) {
+    note(world, error instanceof Error ? error.message : String(error))
+  }
 }
 
 function tryClear(world: World, site: Site, ctx: { world: World; cpuUsed: () => number }, spend: (cost: number) => boolean) {
@@ -225,83 +231,49 @@ function tryClear(world: World, site: Site, ctx: { world: World; cpuUsed: () => 
 function tryDump(world: World, name: string, spend: (cost: number) => boolean) {
   const drone = world.drones.find(item => item.name === name)
   if (!drone) return note(world, `No drone named ${name}.`)
-  if (!drone.cargo) return note(world, `${name} carries nothing.`)
+  if (!drone.cargo) {
+    dumpCargo(world, name)
+    return note(world, `${name} carries nothing.`)
+  }
   if (!spend(1)) return
   world.manualRuns++
   try { dumpCargo(world, name) }
   catch (error) { note(world, error instanceof Error ? error.message : String(error)) }
 }
 
-function beginMine(world: World, name: string) {
-  const drone = world.drones.find(item => item.name === name)
-  if (!drone) return note(world, `No drone named ${name}.`)
-  if (world.jobs[name]) return note(world, `${name} is already working.`)
-  const veins = world.veins.filter(vein => !vein.hidden && vein.kind === 'ore')
-  veins.sort((a, b) => distance(drone.pos, a.pos) - distance(drone.pos, b.pos))
-  const vein = veins[0]
+function beginMine(world: World, name: string, veinName?: string) {
+  const found = world.drones.find(item => item.name === name)
+  if (!found) return note(world, `No drone named ${name}.`)
+  let vein = veinName ? world.veins.find(item => item.name === veinName && !item.hidden) : undefined
+  if (veinName && !vein) return note(world, `${name} has no vein named ${veinName}.`)
+  if (!vein) {
+    const veins = world.veins.filter(item => !item.hidden && item.kind === 'ore')
+    veins.sort((a, b) => distance(found.pos, a.pos) - distance(found.pos, b.pos) || a.name.localeCompare(b.name))
+    vein = veins[0]
+  }
   if (!vein) return note(world, `${name} has no vein to mine.`)
-  const steps = Math.max(0, distance(drone.pos, vein.pos) - 1)
-  world.jobs[name] = { kind: 'mine', vein: vein.name, left: steps, total: Math.max(steps, 1) }
-  world.manualRuns++
+  try {
+    const result = orderMine(world, name, vein.name, world.tick - 1)
+    if (result === 'same') return note(world, `${name} is already mining Vein ${vein.name}.`)
+    if (result === 'full') return note(world, `${name} cart is full (${found.cargo}/${found.capacity}).`)
+    world.manualRuns++
+  } catch (error) {
+    note(world, error instanceof Error ? error.message : String(error))
+  }
 }
 
 function beginUnload(world: World, name: string) {
-  const drone = world.drones.find(item => item.name === name)
-  if (!drone) return note(world, `No drone named ${name}.`)
-  if (!drone.cargo) return note(world, `${name} carries nothing.`)
-  if (world.jobs[name]) return note(world, `${name} is already working.`)
-  const station = drone.carrying === 'ingot' || drone.carrying === 'steel' ? world.depot.pos : world.furnace.pos
-  const steps = Math.max(0, distance(drone.pos, station) - 1)
-  world.jobs[name] = { kind: 'unload', left: steps, total: Math.max(steps, 1) }
-  world.manualRuns++
-}
-
-function stepJob(world: World, site: Site, name: string, ctx: { world: World; cpuUsed: () => number }, spend: (cost: number) => boolean) {
-  const job = world.jobs[name]
-  const drone = world.drones.find(item => item.name === name)
-  if (!job || !drone) {
-    delete world.jobs[name]
-    return
+  const found = world.drones.find(item => item.name === name)
+  if (!found) return note(world, `No drone named ${name}.`)
+  if (!found.cargo) return note(world, `${name} carries nothing.`)
+  const station = found.carrying === 'ingot' || found.carrying === 'steel' ? world.depot.pos : world.furnace.pos
+  try {
+    const result = orderUnload(world, name, station, world.tick - 1)
+    if (result === 'same') return note(world, `${name} is already unloading.`)
+    world.manualRuns++
+  } catch (error) {
+    note(world, error instanceof Error ? error.message : String(error))
   }
-  if (job.kind === 'mine') stepMine(world, site, drone, job, ctx, spend)
-  else stepUnload(world, site, drone, job, ctx, spend)
-}
-
-function stepMine(world: World, site: Site, drone: World['drones'][number], job: World['jobs'][string], ctx: { world: World; cpuUsed: () => number }, spend: (cost: number) => boolean) {
-  const vein = world.veins.find(item => item.name === job.vein)
-  if (!vein) {
-    delete world.jobs[drone.name]
-    return note(world, `${drone.name} has no vein to mine.`)
-  }
-  if (distance(drone.pos, vein.pos) > 1) {
-    if (!spend(site.costs.action)) return
-    stepToward(drone, vein.pos)
-    job.left = Math.max(0, distance(drone.pos, vein.pos) - 1)
-    return
-  }
-  if (!spend(site.costs.action)) return
-  const before = drone.cargo
-  try { handler(site, 'drone.mine')?.(ctx, drone.name, vein.name) }
-  catch (error) {
-    delete world.jobs[drone.name]
-    return note(world, error instanceof Error ? error.message : String(error))
-  }
-  if (drone.cargo > before) delete world.jobs[drone.name]
-  else job.left = Math.max(0, vein.ticksPerUnit - (drone.dig?.ticks ?? 0))
-}
-
-function stepUnload(world: World, site: Site, drone: World['drones'][number], job: World['jobs'][string], ctx: { world: World; cpuUsed: () => number }, spend: (cost: number) => boolean) {
-  const station = drone.carrying === 'ingot' || drone.carrying === 'steel' ? world.depot.pos : world.furnace.pos
-  if (distance(drone.pos, station) > 1) {
-    if (!spend(site.costs.action)) return
-    stepToward(drone, station)
-    job.left = Math.max(0, distance(drone.pos, station) - 1)
-    return
-  }
-  if (!spend(site.costs.action)) return
-  try { handler(site, 'drone.unload')?.(ctx, drone.name, station) }
-  catch (error) { note(world, error instanceof Error ? error.message : String(error)) }
-  delete world.jobs[drone.name]
 }
 
 export function readEdges(world: World): WorksEvent[] {
@@ -313,7 +285,7 @@ export function readEdges(world: World): WorksEvent[] {
     const was = prev.drones[drone.name]
     const full = drone.capacity > 0 && drone.cargo >= drone.capacity
     if (full && !(was && was.cargo >= was.capacity && was.capacity > 0)) found.add('drone.full')
-    const idle = drone.cargo === 0 && !drone.route?.length && !world.jobs[drone.name]
+    const idle = drone.cargo === 0 && !drone.route?.length && !drone.task
     if (idle && !(was && was.idle)) found.add('drone.idle')
   }
   return [...found]
@@ -337,6 +309,7 @@ export interface InspectAction {
   enabled: boolean
   reason?: string
   drone?: string
+  vein?: string
 }
 export interface InspectProgress { label: string; pct: number }
 export interface InspectView {
@@ -377,7 +350,7 @@ export function inspectMachine(world: World, site: Site, id: string): InspectVie
   const drone = world.drones.find(item => item.name === id)
   if (drone) return inspectDrone(world, drone)
   const vein = world.veins.find(item => `Vein ${item.name}` === id && !item.hidden)
-  if (vein) return inspectVein(vein)
+  if (vein) return inspectVein(world, vein)
 }
 
 function inspectFurnace(world: World, site: Site): InspectView {
@@ -385,7 +358,6 @@ function inspectFurnace(world: World, site: Site): InspectView {
   const span = world.batchTicks ?? site.recipe.ticks
   let progress: InspectProgress | undefined
   if (furnace.readyAt !== null) progress = bar(furnace.batch === 'steel' ? 'Alloying' : 'Smelting', span - (furnace.readyAt - world.tick), span)
-  else if (world.collectAt !== null) progress = bar('Collecting', world.collectSpan - (world.collectAt - world.tick), world.collectSpan || span)
   const alloy = functionUnlocked(world, 'furnace.alloy')
   return {
     id: 'furnace',
@@ -407,9 +379,9 @@ function inspectFurnace(world: World, site: Site): InspectView {
       },
     ],
     actions: [
-      { id: 'smelt', label: 'Smelt', api: 'furnace.smelt()', enabled: furnace.readyAt === null && world.collectAt === null },
+      { id: 'smelt', label: 'Smelt', api: 'furnace.smelt()', enabled: furnace.readyAt === null },
       { id: 'alloy', label: 'Alloy', api: 'furnace.alloy()', enabled: alloy && furnace.readyAt === null, reason: alloy ? undefined : 'Unlocks with Steel for the bridge' },
-      { id: 'collect', label: 'Collect', api: '', enabled: world.collectAt === null && (furnace.output > 0 || furnace.steel > 0), reason: 'Moves ingots and steel to the depot' },
+      { id: 'collect', label: 'Collect', api: 'drone.pickup(furnace)', enabled: furnace.output > 0 || furnace.steel > 0, drone: 'drone-1', reason: 'The drone picks up at the furnace and unloads at the depot' },
       { id: 'clear', label: 'Clear hopper', api: 'furnace.clear()', enabled: furnace.input > 0 || furnace.coal > 0, reason: 'Drops ore and coal. Ingots and steel stay' },
     ],
     progress,
@@ -433,27 +405,35 @@ function inspectDepot(world: World): InspectView {
 }
 
 function inspectDrone(world: World, drone: World['drones'][number]): InspectView {
-  const job = world.jobs[drone.name]
+  const task = drone.task
+  let progress: InspectProgress | undefined
+  if (task?.kind === 'mine' && drone.dig) {
+    const vein = world.veins.find(item => item.name === drone.dig?.vein)
+    if (vein) progress = bar('Mining', drone.dig.ticks, vein.ticksPerUnit)
+  } else if (task?.kind === 'unload') progress = bar('Unloading', 0, 1)
+  else if (task?.kind === 'pickup') progress = bar('Hauling', 0, 1)
   return {
     id: drone.name,
     name: drone.name,
-    description: 'A cart. It mines, carries one kind, and unloads.',
+    description: 'A cart. It keeps one task: mine, unload, or pick up.',
     lines: [
       { label: 'Cargo', value: drone.carrying ?? 'empty' },
       { label: 'Load', value: `${drone.cargo}/${drone.capacity}` },
+      { label: 'Task', value: task?.kind ?? 'free' },
       { label: 'At', value: `${drone.pos.x},${drone.pos.y}` },
     ],
     recipes: [],
     actions: [
-      { id: 'mine', label: 'Mine', api: 'drone.mine(vein)', enabled: !job, drone: drone.name, reason: job?.kind === 'mine' ? 'Already mining' : undefined },
-      { id: 'unload', label: 'Unload', api: 'drone.unload(station)', enabled: !job && drone.cargo > 0, drone: drone.name },
-      { id: 'dump', label: 'Dump', api: 'drone.dump()', enabled: drone.cargo > 0, drone: drone.name, reason: 'Drops ore and coal. Ingots and steel stay' },
+      { id: 'mine', label: 'Mine', api: 'drone.mine(vein)', enabled: true, drone: drone.name, reason: task?.kind === 'mine' ? 'Same vein keeps going. Another vein replaces it' : undefined },
+      { id: 'unload', label: 'Unload', api: 'drone.unload(station)', enabled: drone.cargo > 0, drone: drone.name },
+      { id: 'dump', label: 'Dump', api: 'drone.dump()', enabled: drone.cargo > 0 || !!task, drone: drone.name, reason: 'Drops ore and coal and cancels the task. Ingots and steel stay' },
     ],
-    progress: job ? bar(job.kind === 'mine' ? 'Mining' : 'Unloading', job.total - job.left, job.total) : undefined,
+    progress,
   }
 }
 
-function inspectVein(vein: World['veins'][number]): InspectView {
+function inspectVein(world: World, vein: World['veins'][number]): InspectView {
+  const drone = world.drones[0]
   return {
     id: `Vein ${vein.name}`,
     name: `Vein ${vein.name}`,
@@ -464,6 +444,8 @@ function inspectVein(vein: World['veins'][number]): InspectView {
       { label: 'Each mine', value: `${vein.ticksPerUnit} ticks for ${vein.yield}` },
     ],
     recipes: [],
-    actions: [],
+    actions: drone
+      ? [{ id: 'mine', label: 'Mine', api: 'drone.mine(vein)', enabled: true, drone: drone.name, vein: vein.name, reason: 'The drone walks here and mines until the cart is full' }]
+      : [],
   }
 }

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { diagnostics } from '../packs/compiler'
+import { diagnostics } from './diagnostics'
 import { declarations, factoryBricks, kettlewick, repeatedLabel } from '../../packages/sim/src/v8'
 import { createSession } from '../../packages/sandbox/src/v8'
 
@@ -111,23 +111,31 @@ export function onTick() { memory.kind = drones()[0].cargoKind }`,
     expect(session.world.depot.ore).toBe(2)
     expect(drone().cargo).toBe(0)
 
-    // The playtest: cargo 2/3 of ore, standing next to the furnace, mining Vein B.
-    drone().pos = { x: 6, y: 1 }
-    await session.deploy(mine(0))
-    session.step(10)
+    // mine() from the furnace walks to the vein. It does not refuse for distance.
     drone().pos = { x: 3, y: 1 }
+    drone().cargo = 0
+    drone().carrying = null
     await session.deploy(mine(1))
     session.step(3)
-    const away = 'drone-1 at (3,1) carries ore 2/3; not next to Vein B (coal); nearest: Furnace'
+    expect(drone().pos).not.toEqual({ x: 3, y: 1 })
+    expect(session.world.messages.some(message => message.text.includes('not next to'))).toBe(false)
+
+    // An empty unload throws the same sentence every tick, and the log keeps one row.
+    drone().pos = { x: 1, y: 2 }
+    drone().cargo = 0
+    drone().carrying = null
+    drone().task = null
+    await session.deploy(unload('depot'))
+    session.step(3)
+    const away = 'Depot accepts ore and coal; drone-1 at (1,2) carries nothing'
     const hit = session.world.messages.find(message => message.text.includes(away))
     expect(hit?.count).toBe(3)
     expect(hit?.tick).toBe(session.world.tick)
-    expect(session.world.messages.filter(message => message.text.includes('not next to Vein B'))).toHaveLength(1)
+    expect(session.world.messages.filter(message => message.text.includes(away))).toHaveLength(1)
     const logged = session.world.console.filter(line => line.level === 'error' && line.text.includes(away))
     expect(logged).toHaveLength(1)
     expect(logged[0]).toMatchObject({ count: 3, tick: session.world.tick })
     expect(repeatedLabel(away, logged[0]?.count)).toBe(`${away} x 3`)
-    expect(drone()).toMatchObject({ cargo: 2, carrying: 'ore' })
     expect(session.world.console.filter(line => line.text === dumped)).toHaveLength(1)
   } finally { session.dispose() }
 })

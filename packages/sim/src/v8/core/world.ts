@@ -1,8 +1,14 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
-import { grantSecondDrone, pinLegacyTriggers, syncQuest, type QuestDef } from '../quests'
+import { grantSecondDrone, pinLegacyTriggers, repairHarrow, syncQuest, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
+/** One machine command. The drone keeps it across ticks. `since` is the tick it was given. */
+export type DroneTask =
+  | { kind: 'mine'; vein: string; since: number }
+  | { kind: 'unload'; at: 'furnace' | 'depot'; since: number }
+  | { kind: 'pickup'; phase: 'fetch' | 'deliver'; since: number }
+
 export interface Drone {
   name: string
   pos: Cell
@@ -13,6 +19,8 @@ export interface Drone {
   route?: Cell[]
   /** Ticks spent on the current rock. Null when the drone is not mining. */
   dig?: { vein: string; ticks: number } | null
+  /** The command the drone is carrying out. Null when it is free. */
+  task?: DroneTask | null
 }
 export type Purity = 'poor' | 'normal' | 'rich'
 export interface Vein {
@@ -63,7 +71,29 @@ export function migrateWorld(world: World) {
   }
   world.furnace.oreMax ??= 6
   world.furnace.coalMax ??= 3
-  for (const drone of world.drones) if (drone.dig === undefined) drone.dig = null
+  for (const drone of world.drones) {
+    if (drone.dig === undefined) drone.dig = null
+    if (drone.task === undefined) drone.task = null
+  }
+  if (world.jobs) {
+    for (const [name, job] of Object.entries(world.jobs)) {
+      const found = world.drones.find(item => item.name === name)
+      if (!found || found.task) continue
+      if (job.kind === 'mine' && job.vein) found.task = { kind: 'mine', vein: job.vein, since: 0 }
+      else if (job.kind === 'unload') {
+        const at = found.carrying === 'ingot' || found.carrying === 'steel' ? 'depot' : 'furnace'
+        found.task = { kind: 'unload', at, since: 0 }
+      }
+    }
+    world.jobs = {}
+  }
+  if (world.collectAt != null) {
+    world.collectAt = null
+    world.collectSpan = 0
+    const found = world.drones[0]
+    const goods = (world.furnace?.output ?? 0) > 0 || (world.furnace?.steel ?? 0) > 0
+    if (found && !found.task && goods) found.task = { kind: 'pickup', phase: 'fetch', since: 0 }
+  }
   world.depot.ingots ??= 0
   world.depot.steel ??= 0
   world.manualRuns ??= 0
@@ -89,6 +119,7 @@ export function migrateWorld(world: World) {
   const later = new Set(['elsie', 'harrow', 'tomas', 'pell', 'wen'])
   if (world.bought?.includes('drone') || world.cleared?.includes('odile') || later.has(world.questId ?? ''))
     grantSecondDrone(world)
+  repairHarrow(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
     ingotsMade: world.ingotsMade,
@@ -186,7 +217,15 @@ export interface World {
   manualRuns: number
   pendingRuns: { name: string; file: string; line: number }[]
   jobs: Record<string, { kind: 'mine' | 'unload'; vein?: string; left: number; total: number }>
-  inbox: { smelt: boolean; alloy: boolean; collect: boolean; clear: boolean; drones: Record<string, 'mine' | 'unload' | 'dump'> }
+  inbox: {
+    smelt: boolean
+    alloy: boolean
+    collect: boolean
+    clear: boolean
+    drones: Record<string, 'mine' | 'unload' | 'dump'>
+    vein?: string
+    collectDrone?: string
+  }
   collectAt: number | null
   collectSpan: number
   signals: {
@@ -199,7 +238,7 @@ export interface World {
 export function createWorld(site: Site): World {
   const world: World = {
     tick: 0, seed: site.seed, credits: site.credits, grid: structuredClone(site.grid),
-    drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null })),
+    drones: structuredClone(site.drones).map(drone => ({ ...drone, carrying: drone.carrying ?? null, source: drone.source ?? '', dig: null, task: null })),
     veins: site.veins.map(vein => settleVein(vein)),
     depot: structuredClone(site.depot),
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null },

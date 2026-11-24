@@ -1,7 +1,0 @@
-export interface PlayerAPI {
-  /** Light the garden lantern.
-   * @returns No value.
-   * @example light()
-   */
-  light(): void
-}

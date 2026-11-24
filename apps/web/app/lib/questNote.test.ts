@@ -24,7 +24,7 @@ test('the rail names the quantity, and a trigger example is inserted once', () =
   const file = 'export function smeltOnce() {}\n'
   const run = insertTriggerExample(file, 'run', [])
   expect(run.source.startsWith(triggerExample('run').source)).toBe(true)
-  expect(run.source).toContain('yield')
+  expect(run.source).toContain('drone.mine')
   const again = insertTriggerExample(file, 'run', run.remembered)
   expect(again.source).toBe(file)
   const loop = insertTriggerExample('export function onTick() {}\n', 'tick', [])

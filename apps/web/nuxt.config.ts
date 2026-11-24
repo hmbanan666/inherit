@@ -26,32 +26,10 @@ export default defineNuxtConfig({
       link: [{ rel: 'icon', href: '/mark.svg' }],
     },
   },
-  hooks: {
-    'build:manifest'(manifest) {
-      for (const resource of Object.values(manifest)) {
-        if (/^pack\.worker-/.test(resource.file)) {
-          resource.preload = false
-          resource.prefetch = false
-        }
-      }
-    },
-  },
   vite: {
     worker: {
       format: 'es',
       rolldownOptions: { output: { codeSplitting: false } },
-      plugins: () => [
-        {
-          name: 'check-controller-worker',
-          generateBundle(_, bundle) {
-            const chunks = Object.values(bundle).filter((file) => file.type === 'chunk')
-            const runner = chunks.find((chunk) => /\/pack\.worker\.ts$/.test(chunk.facadeModuleId ?? ''))
-            if (runner && (chunks.length !== 1 || runner.imports.length || runner.exports.length)) {
-              this.error('The controller worker must be a single JavaScript chunk with no imports or exports.')
-            }
-          },
-        },
-      ],
     },
   },
 })

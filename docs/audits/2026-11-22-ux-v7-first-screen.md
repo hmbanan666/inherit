@@ -1,6 +1,6 @@
 # UX audit for v7: the first screen (2026-11-22)
 
-> Historical snapshot of `b4d3de7`. Not the current game. The beginner pack stays at `/?packs`. [ADR 0026](../adr/0026-quantity-quests-one-world.md) is the v8 vision.
+> Historical snapshot of `b4d3de7`. Not the current game. The beginner pack was removed ([ADR 0030](../adr/0030-packs-removed.md)). [ADR 0026](../adr/0026-quantity-quests-one-world.md) is the v8 vision.
 
 Scope: an audit only. No product code was changed. Inputs: ADR 0019, the [v6 audit](2026-11-22-ux-v6.md), `docs/specs/v6-beginner-curriculum.md`, `apps/web/app` and `packages/sim/src/packs/beginner` on `main` at `b4d3de7`, the owner's lesson 1 screenshot, and a local walk through lessons `hello`, `sign-spaces` and `call-order` at 1280×800 and 390×844 (`pnpm dev`, `?pack=beginner&lesson=<id>`). Screenshots are attached to the PR that adds this file.
 

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { createWorld } from '../../packages/sim/src/v8/core/world'
 import { kettlewick } from '../../packages/sim/src/v8/sites/kettlewick'
-import { inspectMachine, machineList } from '../../packages/sim/src/v8/triggers'
+import { inspectMachine, machineList, triggerDocs } from '../../packages/sim/src/v8/triggers'
 import { migrateWorld } from '../../packages/sim/src/v8/core/world'
 import { triggerUnlocked } from '../../packages/sim/src/v8/quests'
 import { apiBook, declarations, factoryBricks } from '../../packages/sim/src/v8'
@@ -10,7 +10,7 @@ import { runnableExports } from '../../apps/web/app/lib/runGlyph'
 
 test('the play mark finds a no-argument export and skips the rest', () => {
   const found = runnableExports('export function smeltOnce() {\n}\nexport function* bringOne() {\n}\nexport function haul(drone) {\n}\nfunction local() {}\n')
-  expect(found).toEqual([{ name: 'smeltOnce', line: 1 }, { name: 'bringOne', line: 3 }])
+  expect(found).toEqual([{ name: 'smeltOnce', line: 1 }])
 })
 
 test('the inspector names caps, a locked recipe, and dump', () => {
@@ -20,6 +20,7 @@ test('the inspector names caps, a locked recipe, and dump', () => {
   expect(furnace?.recipes.find(recipe => recipe.id === 'steel')?.locked).toContain('Steel for the bridge')
   expect(furnace?.actions.find(action => action.id === 'dump')).toBeUndefined()
   expect(furnace?.actions.find(action => action.id === 'clear')?.api).toBe('furnace.clear()')
+  expect(furnace?.actions.find(action => action.id === 'collect')?.api).toBe('drone.pickup(furnace)')
   const depot = inspectMachine(world, kettlewick, 'depot')
   expect(depot?.actions).toEqual([])
   const vein = inspectMachine(world, kettlewick, 'Vein A')
@@ -119,7 +120,8 @@ export function onTick() { furnace.smelt() }`,
     session.world.furnace.output = 4
     session.world.depot.ingots = 4
     session.step(1)
-    expect(session.world.orders.find(order => order.id === 'bram')?.shipped).toBe(4)
+    expect(session.world.orders.find(order => order.id === 'bram')?.shipped).toBe(2)
+    expect(session.world.depot.ingots).toBe(2)
     expect(session.world.furnace.output).toBe(4)
     session.world.level = 2
     session.world.questId = undefined
@@ -136,72 +138,85 @@ export function onTick() { furnace.smelt() }`,
   } finally { session.dispose() }
 })
 
-test('a generator run walks and mines across ticks, then stops', async () => {
+test('a generator runs to its first yield and does not continue', async () => {
   const session = await createSession(kettlewick, {
-    'main.ts': `import { drones, veins, findPath } from "inherit"
+    'main.ts': `import { memory } from "inherit"
 export function* bringOne() {
-  const vein = veins()[0]
-  while (!drones()[0].isNear(vein)) {
-    const drone = drones()[0]
-    drone.moveAlong(findPath(drone.pos, vein.pos))
-    yield
-  }
-  while (drones()[0].cargo < 1) {
-    drones()[0].mine(vein)
-    yield
-  }
+  memory.n = 1
+  yield
+  memory.n = 2
 }`,
   }, undefined, { fresh: true })
   try {
     session.accept()
     session.queue('bringOne', 'main.ts', 2)
-    session.step(1)
-    expect(session.world.drones[0]!.pos).not.toEqual(kettlewick.drones[0]!.pos)
-    expect(session.world.pace).toEqual({ mode: 'run', name: 'bringOne' })
-    for (let i = 0; i < 40 && session.world.pace.mode === 'run'; i++) session.step(1)
-    expect(session.world.drones[0]!.cargo).toBe(1)
+    session.step(3)
+    expect(session.world.memory.n).toBe(1)
+    expect(session.world.script).toBeNull()
     expect(session.world.pace.mode).toBe('idle')
-    expect(session.world.manualRuns).toBe(1)
     expect(session.world.console.some(line => line.text === 'bringOne ok')).toBe(true)
   } finally { session.dispose() }
 })
 
-test('return false continues the run, and Loop restarts it until Stop', async () => {
+test('return false finishes the call, and the next ticks do not call it again', async () => {
   const session = await createSession(kettlewick, {
     'main.ts': `import { memory } from "inherit"
 export function keep() {
   memory.n = (memory.n ?? 0) + 1
   return false
-}
-export function ping() {
-  memory.ping = (memory.ping ?? 0) + 1
 }`,
   }, undefined, { fresh: true })
   try {
     session.accept()
     session.queue('keep', 'main.ts', 2)
-    session.step(2)
-    expect(session.world.memory.n).toBe(2)
-    expect(session.world.pace).toEqual({ mode: 'run', name: 'keep' })
-    session.stop()
-    session.step(1)
-    expect(session.world.memory.n).toBe(2)
-    expect(session.world.pace.mode).toBe('idle')
-    session.world.questId = undefined
-    session.world.cleared = ['bram']
-    session.world.level = 2
-    session.world.orders = []
-    expect(session.accept('ines')).toBe(true)
-    session.queue('ping', 'main.ts', 6)
     session.step(3)
-    expect(session.world.memory.ping).toBe(3)
-    expect(session.world.pace).toEqual({ mode: 'run', name: 'ping' })
-    expect(session.world.console.some(line => line.text === 'ping ok')).toBe(false)
+    expect(session.world.memory.n).toBe(1)
+    expect(session.world.script).toBeNull()
+    expect(session.world.console.some(line => line.text === 'keep ok')).toBe(true)
+  } finally { session.dispose() }
+})
+
+test('one Mine press fills the cart, and the same vein does not reset the dig', async () => {
+  const session = await createSession(kettlewick, kettlewick.files, undefined, { fresh: true })
+  try {
+    const drone = session.world.drones[0]!
+    session.press('mine', 'drone-1')
+    session.step(25)
+    expect(drone.cargo).toBe(drone.capacity)
+    expect(drone.task).toBeNull()
     expect(session.world.manualRuns).toBe(1)
-    session.setLoop(false)
+    drone.pos = { x: 6, y: 1 }
+    drone.cargo = 0
+    drone.carrying = null
+    session.press('mine', 'drone-1', 'A')
+    session.step(2)
+    expect(drone.dig).toEqual({ vein: 'A', ticks: 2 })
+    session.press('mine', 'drone-1', 'A')
     session.step(1)
-    expect(session.world.memory.ping).toBe(4)
-    expect(session.world.pace.mode).toBe('idle')
+    expect(drone.dig).toEqual({ vein: 'A', ticks: 3 })
+    expect(session.world.manualRuns).toBe(2)
+    session.press('mine', 'drone-1', 'D')
+    session.step(1)
+    expect(drone.task).toMatchObject({ kind: 'mine', vein: 'D' })
+    expect(drone.dig).toBeNull()
+  } finally { session.dispose() }
+})
+
+test('Collect sends the drone, and the goods are not at the depot until it unloads', async () => {
+  const session = await createSession(kettlewick, kettlewick.files, undefined, { fresh: true })
+  try {
+    session.world.furnace.output = 2
+    session.press('collect')
+    expect(session.world.furnace.output).toBe(2)
+    expect(session.world.depot.ingots).toBe(0)
+    session.step(1)
+    expect(session.world.furnace.output).toBe(0)
+    expect(session.world.drones[0]).toMatchObject({ cargo: 2, carrying: 'ingot' })
+    expect(session.world.depot.ingots).toBe(0)
+    expect(session.world.manualRuns).toBe(1)
+    session.step(1)
+    expect(session.world.depot.ingots).toBe(2)
+    expect(session.world.drones[0]!.cargo).toBe(0)
   } finally { session.dispose() }
 })
 
@@ -222,7 +237,10 @@ export function onTick() { memory.n = (memory.n ?? 0) + 1 }`,
     session.step(2)
     expect(session.world.memory.n).toBe(2)
     expect(session.world.holding).toBe(true)
-    session.setLoop(true)
+    session.setLoop(true, 'onTick')
+    expect(session.world.manualRuns).toBe(0)
+    expect(session.world.console.some(line => line.text === 'Loop stopped: onTick')).toBe(true)
+    expect(session.world.console.some(line => line.text === 'Loop started: onTick')).toBe(true)
     session.step(1)
     expect(session.world.memory.n).toBe(3)
   } finally { session.dispose() }
@@ -265,4 +283,90 @@ test('the book and the hover share one example, and a locked call names its ques
   world.questId = 'odile'
   const open = apiBook(bricks, world).find(section => section.id === 'furnace')
   expect(open?.entries.find(entry => entry.id === 'furnace.alloy')).toMatchObject({ locked: undefined, fresh: true })
+})
+
+const idleExample = triggerDocs.find(item => item.id === 'events')!.example
+
+test('the documented on() example registers at module scope, and a second copy does not double-fire', async () => {
+  const locked = await createSession(kettlewick, kettlewick.files, undefined, { fresh: true })
+  try {
+    await expect(locked.deploy({ 'main.ts': idleExample })).rejects.toThrow(/on\(\) is locked/)
+  } finally { locked.dispose() }
+  const session = await createSession(kettlewick, { 'main.ts': idleExample })
+  try {
+    session.world.signals.drones['drone-1'] = { cargo: 0, capacity: 3, idle: false }
+    session.step(1)
+    expect(session.world.memory.hauls).toBe(1)
+    session.step(1)
+    expect(session.world.memory.hauls).toBe(1)
+    session.world.signals.drones['drone-1'] = { cargo: 0, capacity: 3, idle: false }
+    session.step(1)
+    expect(session.world.memory.hauls).toBe(2)
+    await session.deploy({ 'main.ts': idleExample })
+    session.world.signals.drones['drone-1'] = { cargo: 0, capacity: 3, idle: false }
+    session.step(1)
+    expect(session.world.memory.hauls).toBe(3)
+  } finally { session.dispose() }
+})
+
+test('onTick can register the same listener every tick', async () => {
+  const session = await createSession(kettlewick, {
+    'main.ts': `import { on, memory } from "inherit"
+function haul() { memory.hauls = (memory.hauls ?? 0) + 1 }
+export function onTick() { on("drone.idle", haul) }`,
+  })
+  try {
+    session.world.signals.drones['drone-1'] = { cargo: 0, capacity: 3, idle: false }
+    session.step(1)
+    expect(session.world.memory.hauls).toBe(1)
+    session.world.signals.drones['drone-1'] = { cargo: 0, capacity: 3, idle: false }
+    session.step(1)
+    expect(session.world.memory.hauls).toBe(2)
+  } finally { session.dispose() }
+})
+
+test('sixty ingots open Harrow hand over after a Run, and a finished save is repaired', async () => {
+  const session = await createSession(kettlewick, {
+    'main.ts': `export function smeltOnce() {}`,
+  })
+  try {
+    session.world.credits = 140
+    session.world.questId = 'harrow'
+    session.world.orders = [{
+      id: 'harrow', at: 1, item: 'ingot', qty: 60, pay: 80, from: 'Harrow', who: 'harrow',
+      role: 'Prospector', title: 'A richer vein', text: 'Sixty.', building: 'mill',
+      change: 'The mill turns.', shipped: 60, status: 'open',
+    }]
+    session.queue('smeltOnce', 'main.ts', 1)
+    expect(session.world.manualRuns).toBe(1)
+    session.step(1)
+    expect(session.world.manualRuns).toBe(1)
+    expect(session.complete()).toBe(true)
+    expect(session.world.credits).toBe(220)
+  } finally { session.dispose() }
+  const saved = createWorld(kettlewick)
+  saved.credits = 140
+  saved.questId = 'harrow'
+  saved.manualRuns = 3
+  saved.orders = [{
+    id: 'harrow', at: 1, item: 'ingot', qty: 60, pay: 80, from: 'Harrow', who: 'harrow',
+    role: 'Prospector', title: 'A richer vein', text: 'Sixty.', building: 'mill',
+    change: 'The mill turns.', shipped: 60, status: 'open',
+  }]
+  migrateWorld(saved)
+  expect(saved.manualRuns).toBe(0)
+  expect(saved.credits).toBe(140)
+  saved.manualRuns = 3
+  saved.orders[0]!.shipped = 59
+  migrateWorld(saved)
+  expect(saved.manualRuns).toBe(3)
+  expect(saved.credits).toBe(140)
+  const collecting = createWorld(kettlewick)
+  collecting.collectAt = 8
+  collecting.collectSpan = 4
+  collecting.furnace.output = 2
+  migrateWorld(collecting)
+  expect(collecting.collectAt).toBeNull()
+  expect(collecting.furnace.output).toBe(2)
+  expect(collecting.drones[0]?.task).toMatchObject({ kind: 'pickup', phase: 'fetch' })
 })

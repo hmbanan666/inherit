@@ -28,4 +28,4 @@ Centre the celebration over the game, with a little confetti, the idea learned a
 
 The runner can validate a course frontier or an independent fixture with the same lesson evidence. The studio must distinguish a selected lesson from earned progress, and tick simulation from presentation of that tick. Old Workshop code needs a recovery path outside the play screen. Use the [curriculum](../specs/v6-beginner-curriculum.md) and [challenge briefs](../specs/v6-workshop-challenges.md) as the content contracts.
 
-> Superseded by ADR 0021. [ADR 0022](0022-quest-loop-no-loss.md) does not restore it. Packs stay playable as a legacy mode.
+> Superseded by ADR 0021. [ADR 0030](0030-packs-removed.md) removes the packs. This ADR is not restored.

@@ -19,10 +19,10 @@ These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `sh
 | `apps/web/app/lib/art/materials.ts` | One lump of iron ore, one iron ingot, one steel bar, and one lump of coal. |
 | `apps/web/app/lib/art/townPaint.ts` | Canvas helpers (box, line, stipple) for the portraits. The comment also names printed scenery. That scenery is in the archive. |
 | `apps/web/app/lib/art/townPortrait.ts` | Cameos of Bram, Elsie, Tomas, Wen, Odile, Harrow, Ines, and Pell, each worried or happy. |
-| `apps/web/app/lib/art/contact-sheet.png` | The palette and line-weight sheet. [The pack authoring guide](packs/AUTHORING.md) points at it. Nothing in the game renders it. |
+| `apps/web/app/lib/art/contact-sheet.png` | The palette and line-weight sheet. Nothing in the game renders it. |
 | `apps/web/app/components/town/TownPortrait.vue` | The canvas that shows one cameo. |
-| `packages/sim/src/visuals/Villager.vue` | The standing figure the beginner pack uses. |
-| `packages/sim/src/visuals/AppleTree.vue` | The trees on the beginner village panorama. |
+| `packages/sim/src/visuals/Villager.vue` | The standing figure. The beginner scenes still use it. [ADR 0030](adr/0030-packs-removed.md) removed the pack that played those scenes. |
+| `packages/sim/src/visuals/AppleTree.vue` | The trees on the village panorama. The panorama stays. |
 
 A drone's load is drawn as the material it carries: ore, coal, ingot, or steel. The furnace draws one ingot whenever it holds ingots or steel. That furnace mark is a gap in the floor, not a missing file.
 

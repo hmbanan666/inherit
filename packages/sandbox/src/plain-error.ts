@@ -1,4 +1,3 @@
-import type { Files } from '../../sim/src/framework/pack'
 import { playerError } from './player-error'
 
 export interface PlainError {
@@ -13,7 +12,7 @@ export interface PlainError {
 export class PlayerRunError extends Error {
   diagnostic: PlainError
 
-  constructor(cause: unknown, files: Files, names: readonly string[], example?: string) {
+  constructor(cause: unknown, files: Record<string, string>, names: readonly string[], example?: string) {
     const message = playerError(cause, names)
     super(message, { cause })
     const raw = cause instanceof Error ? cause.message : message
