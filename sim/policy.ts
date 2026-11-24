@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import type { createSession } from '../packages/sandbox/src/v8'
-import { kettlewick, shopFor } from '../packages/sim/src/v8'
+import { kettlewick } from '../packages/sim/src/v8'
 
 export type Session = Awaited<ReturnType<typeof createSession>>
-export type Stage = 'manual' | 'run' | 'survey' | 'steel-loop' | 'grates' | 'two-drones' | 'press-line'
+export type Stage = 'manual' | 'run' | 'survey' | 'steel-loop' | 'grates' | 'two-drones' | 'press-line' | 'dies' | 'gears' | 'hinges' | 'shutters' | 'kits'
 const source = (name: string) => readFileSync(new URL(`./players/${name}.ts`, import.meta.url), 'utf8')
 const helpers = { 'lib/haul.ts': source('haul') }
+const mill = { ...helpers, 'lib/mill.ts': source('mill') }
 export const players: Record<Stage, Record<string, string>> = {
   manual: kettlewick.files,
   run: { 'main.ts': source('run') },
@@ -13,8 +14,13 @@ export const players: Record<Stage, Record<string, string>> = {
   'steel-loop': { 'main.ts': source('steel-loop'), ...helpers },
   grates: { 'main.ts': source('grates'), ...helpers },
   'two-drones': { 'main.ts': source('two-drones'), ...helpers },
-  // One cart on the press. The quest chain uses grates, which also hauls for the later jobs.
+  // One cart on the press. Typechecked, and not a proposed edit.
   'press-line': { 'main.ts': source('press-line') },
+  dies: { 'main.ts': source('dies'), ...mill },
+  gears: { 'main.ts': source('gears'), ...mill },
+  hinges: { 'main.ts': source('hinges'), ...mill },
+  shutters: { 'main.ts': source('shutters'), ...mill },
+  kits: { 'main.ts': source('kits'), ...mill },
 }
 
 // Unlisted quests keep the deployed files. A proposed edit is tried only
@@ -24,6 +30,11 @@ export const edits: Record<string, { to: Stage; reason: string; practice?: boole
   ines: { to: 'survey', reason: 'Mine vein D and unload that ore at the depot.' },
   odile: { to: 'steel-loop', reason: 'Loop fetches coal and alloys steel.' },
   elsie: { to: 'grates', reason: 'Each cart hauls steel to the press or a grate to the depot.' },
+  harrow: { to: 'dies', reason: 'The order names a plate and a blank, so the press die has to change.' },
+  tomas: { to: 'gears', reason: 'A blank is cut into a gear on the lathe.' },
+  pell: { to: 'hinges', reason: 'A hinge joins a plate from the press with a pin from the lathe.' },
+  wen: { to: 'shutters', reason: 'A plate goes to the lathe, and the cut plate comes back to the press.' },
+  crew: { to: 'kits', reason: 'Pack the winch crate, then the lamp crate.' },
 }
 
 export function act(session: Session, stage: Stage) {
@@ -47,19 +58,8 @@ export function act(session: Session, stage: Stage) {
   else if (furnace.readyAt === null && furnace.input < kettlewick.recipe.ore) session.press('mine', cart.name)
 }
 
-// Reconsider at Take and after each tick. The catalog itself is the live
-// list of unlocked conveniences (ADR 0026). buy() owns the transaction.
-export function buyForGoal(session: Session) {
-  const { world } = session
-  const order = world.orders.find(order => order.id === world.questId)
-  if (!order) return
-  const useful = (id: string) => {
-    if (id === 'cart') return world.drones.some(cart => cart.capacity < order.qty * kettlewick.recipe.ore)
-    if (id === 'hopper') return order.item === 'steel' && world.drones.some(cart => cart.capacity > (world.furnace.coalMax ?? 0))
-    if (id === 'furnace') return world.furnace.readyAt !== null && world.furnace.input >= kettlewick.recipe.ore
-    return id === 'cpu' && world.cpu.used >= world.cpu.limit
-  }
-  const item = shopFor(world).find(item => !world.bought.includes(item.id) && item.price <= world.credits && useful(item.id))
-  if (item && !session.buy(item.id)) throw new Error(`Shop refused ${item.name} at tick ${world.tick}.`)
-  return item
+// The reference run saves. Affordability is the unspent purse at the planned
+// hand-over, so this playthrough does not buy.
+export function buyForGoal(_session: Session): { id: string; name: string; price: number } | undefined {
+  return undefined
 }

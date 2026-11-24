@@ -1,6 +1,6 @@
 import type { Site, World } from './core/world'
 import { noteCheckReset, readChecks } from './checkFacts'
-import { createPress, createSpare, hotFurnaceTicks, machineSlot, normalizePress, normalizeSpare, smeltRecipe } from './modules/stock'
+import { createBench, createLathe, createPress, createSpare, hotFurnaceTicks, machineSlot, normalizeBench, normalizeLathe, normalizePress, normalizeSpare, smeltRecipe, type Item } from './modules/stock'
 
 export interface QuestTest {
   id: string
@@ -28,8 +28,10 @@ export interface QuestDef {
   /** Inserted once at the top of the open file. A nudge, never a solution or a shop. */
   nudge: string
   change: string
-  item: 'ingot' | 'steel' | 'ore' | 'grate'
+  item: Item
   qty: number
+  /** Extra goods on the same order. The depot fills each line. `item` and `qty` stay the rail. */
+  lines?: { item: Item; qty: number }[]
   pay: number
   xp: number
   needLevel: number
@@ -68,6 +70,8 @@ export function levelSpan(xp: number) {
 }
 
 const shipped = (world: World, id: string) => world.orders.find(order => order.id === id)?.shipped ?? 0
+const lineShipped = (world: World, id: string, item: Item) =>
+  world.orders.find(order => order.id === id)?.lines?.find(line => line.item === item)?.shipped ?? 0
 
 export const questList: QuestDef[] = [
   {
@@ -148,72 +152,87 @@ export const questList: QuestDef[] = [
   {
     id: 'harrow', from: 'Harrow', who: 'harrow', role: 'Surveyor', building: 'town-hall',
     title: 'Iron from the hill',
-    goal: 'Bring Harrow 60 ingots.',
-    why: 'Vein A is poor: 5 ticks for 1 ore. A richer vein is hidden. prospect() reveals it.',
-    quote: 'The stores want iron, and the old cut is a slow teacher.',
-    ask: 'The stores want iron, and the old cut is a slow teacher. I need sixty ingots.',
-    need: 'Need 60 ingots. A richer vein yields ore faster.',
-    nudge: 'the old cut is slow. A richer vein is still hidden.',
-    change: 'The hill is open.',
-    item: 'ingot', qty: 60, pay: 110, xp: 25, needLevel: 4,
+    goal: 'Bring Harrow 1 plate and 1 blank.',
+    why: 'The press can form a plate from an ingot or a blank from steel. The die has to match the order. prospect() still reveals the rich vein.',
+    quote: 'The stores want a plate and a blank, and the press still wears the grate die.',
+    ask: 'The stores want a plate and a blank, and the press still wears the grate die.',
+    need: 'Need 1 plate and 1 blank. A plate is an ingot. A blank is steel.',
+    nudge: 'the press is still on the grate die. The order names a plate and a blank.',
+    change: 'The hill stores have a plate and a blank.',
+    item: 'plate', qty: 2, lines: [{ item: 'plate', qty: 1 }, { item: 'blank', qty: 1 }],
+    pay: 110, xp: 25, needLevel: 4,
     unlock: { brick: 'prospect', signature: 'prospect(): reveals the next hidden vein', legacy: 'prospect' },
+    install: 'lathe',
     tests: [
-      { id: 'done', text: 'Harrow receives 60 ingots', explain: 'Sixty ingots have been handed over from the depot.', pass: world => shipped(world, 'harrow') >= 60 },
-      { id: 'hands', text: 'Hand over stays open', explain: 'Sixty ingots open Hand over. A gutter Run does not lock the quest.', pass: world => shipped(world, 'harrow') >= 60 },
+      { id: 'plate', text: 'Harrow receives 1 plate', explain: 'One plate has been handed over from the depot.', pass: world => lineShipped(world, 'harrow', 'plate') >= 1 },
+      { id: 'blank', text: 'Harrow receives 1 blank', explain: 'One blank has been handed over from the depot.', pass: world => lineShipped(world, 'harrow', 'blank') >= 1 },
     ],
   },
   {
     id: 'tomas', from: 'Tomas', who: 'tomas', role: 'Miller', building: 'mill',
-    title: 'Iron for the mill wheel',
-    goal: 'Bring Tomas 8 ingots.',
-    why: 'The mill wheel needs iron. Smelt ore into ingots.',
+    title: 'Gears for the mill wheel',
+    goal: 'Bring Tomas 2 gears.',
+    why: 'A blank is not a gear until the lathe cuts it.',
     quote: 'The wheel sits in the race and will not turn.',
-    ask: 'The wheel sits in the race and will not turn. I need iron for it.',
-    need: 'Need 8 ingots. An ingot is smelted from ore.',
-    nudge: 'the wheel needs iron. Ore will not turn it.',
+    ask: 'The wheel sits in the race and will not turn. I need gears, not blanks.',
+    need: 'Need 2 gears. The lathe cuts a blank into a gear.',
+    nudge: 'a blank will not turn the wheel. The lathe cuts it.',
     change: 'The mill wheel turns.',
-    item: 'ingot', qty: 8, pay: 130, xp: 25, needLevel: 5,
-    prepare: world => { world.ingotsMade = 0 },
+    item: 'gear', qty: 2, pay: 130, xp: 25, needLevel: 5,
+    unlock: { brick: 'lathe.gear', signature: 'lathe.start("gear"): 1 blank -> 1 gear' },
+    install: 'assembly table',
     tests: [
-      { id: 'smelt', text: 'An ingot is smelted this quest', explain: 'An ingot was smelted after this quest was taken.', pass: world => world.ingotsMade > 0 },
-      { id: 'done', text: 'Tomas receives 8 ingots', explain: 'Eight ingots have been handed over from the depot.', pass: world => shipped(world, 'tomas') >= 8 },
+      { id: 'done', text: 'Tomas receives 2 gears', explain: 'Two gears have been handed over from the depot.', pass: world => shipped(world, 'tomas') >= 2 },
     ],
   },
   {
     id: 'pell', from: 'Pell', who: 'pell', role: 'Cooper', building: 'riverside',
     title: 'Hinges for the barrels',
-    goal: 'Bring Pell 4 ingots.',
-    why: 'Pell wants plain ingots. Steel will not do. Smelt ore on its own when the order asks for ingots.',
+    goal: 'Bring Pell 2 hinges.',
+    why: 'A hinge is a plate from the press and a pin from the lathe.',
     quote: 'Rope will not hold a barrel of ale.',
-    ask: 'Rope will not hold a barrel of ale. I need plain ingots.',
-    need: 'Need 4 ingots. Plain ingots, not steel.',
-    nudge: 'the barrels want plain ingots. Steel will not do.',
+    ask: 'Rope will not hold a barrel of ale. I need hinges, and a hinge is two parts.',
+    need: 'Need 2 hinges. Each hinge is 1 plate and 1 pin.',
+    nudge: 'a hinge is a plate and a pin. One of them will not do.',
     change: 'The barrels have hinges.',
-    item: 'ingot', qty: 4, pay: 150, xp: 30, needLevel: 5,
-    prepare: world => { world.ingotsMade = 0 },
+    item: 'hinge', qty: 2, pay: 150, xp: 30, needLevel: 5,
+    unlock: { brick: 'bench.hinge', signature: 'bench.start("hinge"): 1 plate + 1 pin -> 1 hinge' },
     tests: [
-      { id: 'smelt', text: 'An ingot is smelted this quest', explain: 'An ingot was smelted after this quest was taken.', pass: world => world.ingotsMade > 0 },
-      { id: 'done', text: 'Pell receives 4 ingots', explain: 'Four ingots have been handed over, and at least four were smelted this quest.', pass: world => shipped(world, 'pell') >= 4 && world.ingotsMade >= 4 },
+      { id: 'done', text: 'Pell receives 2 hinges', explain: 'Two hinges have been handed over from the depot.', pass: world => shipped(world, 'pell') >= 2 },
     ],
   },
   {
     id: 'wen', from: 'Wen', who: 'wen', role: 'Lamplighter', building: 'lamp-street',
-    title: 'Steel for the lamps',
-    goal: 'Bring Wen 4 steel without spending the CPU on a fresh path every tick.',
-    why: 'Calling findPath for every drone on every tick spends the CPU. Remember a route and reuse it.',
+    title: 'Shutters for the lamps',
+    goal: 'Bring Wen 2 folding shutters.',
+    why: 'A plate goes to the lathe to be cut, then back to the press to be folded. The next stop depends on the part in the cart.',
     quote: 'The street lamps have been dark a week.',
-    ask: 'The street lamps have been dark a week. I need steel, and a path worth keeping.',
-    need: 'Need 4 steel. Steel is smelted from ore and coal.',
-    nudge: 'a fresh path every tick spends the oil. A road can be remembered.',
-    change: 'The lamps are lit.',
-    item: 'steel', qty: 4, pay: 170, xp: 30, needLevel: 6,
-    prepare: world => {
-      world.cpu.limit = world.bought.includes('cpu') ? 18 : 8
-      world.pathWindow = []
-    },
+    ask: 'The street lamps have been dark a week. I need folding shutters, and a shutter comes back through the press.',
+    need: 'Need 2 shutters. Cut a plate, then fold it.',
+    nudge: 'a cut plate is not a shutter until it goes back through the press.',
+    change: 'The lamps have shutters.',
+    item: 'shutter', qty: 2, pay: 170, xp: 30, needLevel: 6,
+    unlock: { brick: 'press.shutter', signature: 'press.start("shutter"): 1 cut plate -> 1 shutter' },
     tests: [
-      { id: 'memory', text: 'The route is remembered', explain: 'findPath was not called on every tick. A remembered route stays at 4 calls or fewer across 8 ticks.', pass: world => world.pathWindow.length >= 8 && world.pathWindow.reduce((sum, calls) => sum + calls, 0) <= 4 },
-      { id: 'done', text: 'Wen receives 4 steel', explain: 'Four steel have been handed over from the depot.', pass: world => shipped(world, 'wen') >= 4 },
+      { id: 'done', text: 'Wen receives 2 shutters', explain: 'Two shutters have been handed over from the depot.', pass: world => shipped(world, 'wen') >= 2 },
+    ],
+  },
+  {
+    id: 'crew', from: 'Mayor Odile', who: 'odile', role: 'Mayor', building: 'bridge',
+    title: 'Kits for the bridge crew',
+    goal: 'Pack a winch crate, then a lamp crate, and hand both over.',
+    why: 'The winch crate is 1 gear and 2 hinges. The lamp crate is 2 shutters and 1 hinge. The second crate waits until the first is received.',
+    quote: 'The crew cannot raise the span with loose parts.',
+    ask: 'The crew cannot raise the span with loose parts. Pack the winch crate first, then the lamp crate.',
+    need: 'Need 2 labeled crates, in order. The winch crate is first.',
+    nudge: 'the winch crate is first. The lamp crate waits.',
+    change: 'The bridge crew is equipped.',
+    item: 'winch', qty: 2, pay: 200, xp: 40, needLevel: 7,
+    unlock: { brick: 'bench.pack', signature: 'bench.start("pack"): the active kit -> 1 labeled crate' },
+    prepare: world => { world.manifest = { active: 'winch', staged: {}, winch: false, lamp: false } },
+    tests: [
+      { id: 'winch', text: 'The winch crate is received', explain: 'The depot received the winch crate. The lamp crate waits.', pass: world => world.manifest.winch },
+      { id: 'lamp', text: 'The lamp crate is received', explain: 'The depot received the lamp crate after the winch crate.', pass: world => world.manifest.winch && world.manifest.lamp },
     ],
   },
 ]
@@ -222,17 +241,23 @@ export const shop: ShopItem[] = [
   { id: 'cart', name: 'Bigger cart', price: 150, detail: 'Every drone carries 2 more.', apply: world => { for (const drone of world.drones) drone.capacity += 2 } },
   { id: 'hopper', name: 'Bigger hopper', price: 240, detail: 'The furnace holds 12 ore and 6 coal.', apply: world => { world.furnace.oreMax = 12; world.furnace.coalMax = 6 } },
   { id: 'furnace', name: 'Hotter furnace', price: 350, detail: `A batch finishes in ${hotFurnaceTicks} ticks instead of ${smeltRecipe.ticks}.`, apply: world => { world.batchTicks = hotFurnaceTicks } },
-  { id: 'racks', name: 'Output racks', price: 450, detail: `The press holds ${machineSlot * 2} finished parts.`, apply: world => { world.outputRacks = true } },
+  { id: 'racks', name: 'Output racks', price: 450, detail: `Each later machine holds ${machineSlot * 2} finished parts.`, apply: world => { world.outputRacks = true } },
   { id: 'cpu', name: 'CPU +10', price: 580, detail: 'Raises the CPU limit by 10.', apply: world => { world.cpu.limit += 10 } },
   { id: 'spare', name: 'Spare press', price: 720, detail: 'A second press at (5, 4).', apply: world => { world.spare = world.spare ? normalizeSpare(world.spare) : createSpare() } },
 ]
 
 const secondDrone = 'drone-2'
 
-/** Odile's Hand over installs drone-2 and the press. A bought drone is only the cart. A later quest adds neither. */
+/** Hand-over grants. A bought drone is only the cart. Being on a later quest adds none of these. */
 export function worksGrants(world: Pick<World, 'cleared' | 'bought'>) {
-  const odile = !!world.cleared?.includes('odile')
-  return { 'drone-2': odile || !!world.bought?.includes('drone'), press: odile }
+  const cleared = world.cleared ?? []
+  const odile = cleared.includes('odile')
+  return {
+    'drone-2': odile || !!world.bought?.includes('drone'),
+    press: odile,
+    lathe: cleared.includes('harrow'),
+    bench: cleared.includes('tomas'),
+  }
 }
 
 /** Odile's hand-over, or a save that already bought the drone. Being on a later quest does not count. */
@@ -268,6 +293,24 @@ export function syncPress(world: World) {
     return
   }
   world.press = world.press ? normalizePress(world.press) : createPress()
+}
+
+/** The lathe is on the floor only when Harrow's Hand over granted it. */
+export function syncLathe(world: World) {
+  if (!worksGrants(world).lathe) {
+    world.lathe = null
+    return
+  }
+  world.lathe = world.lathe ? normalizeLathe(world.lathe) : createLathe()
+}
+
+/** The assembly table is on the floor only when Tomas's Hand over granted it. */
+export function syncBench(world: World) {
+  if (!worksGrants(world).bench) {
+    world.bench = null
+    return
+  }
+  world.bench = world.bench ? normalizeBench(world.bench) : createBench()
 }
 
 /** The spare press is on the floor only after it is bought, and only while the base press stands. */
@@ -340,9 +383,16 @@ export function questHold(world: Pick<World, 'drones'>, quest: QuestDef) {
   return `Finish ${who}'s ${place} for ${gift}`
 }
 
-/** The list and Accept share this. Level, an open chain, and a gift already in the world. */
+/** The previous quest in the list has been handed over. The first quest has no predecessor. */
+export function chainReady(world: Pick<World, 'cleared'>, quest: QuestDef) {
+  const index = questList.findIndex(item => item.id === quest.id)
+  const prev = index > 0 ? questList[index - 1] : undefined
+  return !prev || world.cleared.includes(prev.id)
+}
+
+/** The list and Accept share this. Level, the previous hand-over, and a gift already in the world. */
 export function canTake(world: Pick<World, 'cleared' | 'level' | 'drones'>, quest: QuestDef) {
-  return !world.cleared.includes(quest.id) && world.level >= quest.needLevel && !questHold(world, quest)
+  return chainReady(world, quest) && !world.cleared.includes(quest.id) && world.level >= quest.needLevel && !questHold(world, quest)
 }
 
 export function nextQuest(world: World, site: Site) {
@@ -398,6 +448,7 @@ export function acceptQuest(world: World, site: Site, id?: string) {
     id: quest.id, at: world.tick, item: quest.item, qty: quest.qty, pay: quest.pay,
     from: quest.from, who: quest.who, role: quest.role, title: quest.title, text: quest.goal,
     building: quest.building, change: quest.change, shipped: 0, status: 'open',
+    lines: quest.lines?.map(line => ({ item: line.item, qty: line.qty, shipped: 0 })),
   })
   world.status = syncQuest(world, site)
   return true
@@ -417,6 +468,9 @@ export function completeQuest(world: World, site: Site) {
   if (!world.growth.includes(quest.change)) world.growth.push(quest.change)
   syncSecondDrone(world)
   syncPress(world)
+  syncSpare(world)
+  syncLathe(world)
+  syncBench(world)
   if (armLoop) {
     world.loop = true
     world.holding = false
@@ -440,7 +494,7 @@ export function buyUpgrade(world: World, id: string) {
 /** True when no quest owns the brick, the player already bought it, or they have reached the quest that grants it. */
 export function functionUnlocked(world: Pick<World, 'questId' | 'cleared' | 'bought'>, brick: string) {
   if (brick === 'spare' || brick.startsWith('spare.')) return !!world.bought?.includes('spare')
-  if (brick === 'press.grate') {
+  if (brick === 'press.grate' || brick === 'press.shutter' || brick === 'lathe.gear' || brick === 'lathe.pin' || brick === 'lathe.cut' || brick === 'bench.hinge' || brick === 'bench.pack') {
     const quest = questList.find(item => item.unlock?.brick === brick)
     if (!quest) return false
     if (world.questId === quest.id || world.cleared.includes(quest.id)) return true
@@ -448,6 +502,8 @@ export function functionUnlocked(world: Pick<World, 'questId' | 'cleared' | 'bou
     return questList.some((item, i) => i > index && (world.questId === item.id || world.cleared.includes(item.id)))
   }
   if (brick === 'press' || brick.startsWith('press.')) return worksGrants(world).press
+  if (brick === 'lathe' || brick.startsWith('lathe.')) return worksGrants(world).lathe
+  if (brick === 'bench' || brick.startsWith('bench.')) return worksGrants(world).bench
   const quest = questList.find(item => item.unlock?.brick === brick)
   if (!quest?.unlock) return true
   if (quest.unlock.legacy && world.bought.includes(quest.unlock.legacy)) return true

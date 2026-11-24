@@ -21,6 +21,8 @@ export interface ApiSection {
 const groups: { id: string; title: string; match(name: string): boolean }[] = [
   { id: 'furnace', title: 'Furnace', match: name => name === 'furnace' || name.startsWith('furnace.') },
   { id: 'press', title: 'Press', match: name => name === 'press' || name.startsWith('press.') || name === 'spare' || name.startsWith('spare.') },
+  { id: 'lathe', title: 'Lathe', match: name => name === 'lathe' || name.startsWith('lathe.') },
+  { id: 'bench', title: 'Assembly table', match: name => name === 'bench' || name.startsWith('bench.') },
   { id: 'drone', title: 'Drone', match: name => name === 'drones' || name.startsWith('drone.') },
   { id: 'depot', title: 'Depot', match: name => name === 'depot' || name.startsWith('depot.') },
   { id: 'veins', title: 'Veins', match: name => name === 'veins' || name === 'prospect' || name === 'findPath' },
@@ -37,6 +39,8 @@ function lockTitle(brick: string) {
   if (brick === 'press.grate') return questList.find(quest => quest.unlock?.brick === 'press.grate')?.title
   if (brick === 'spare' || brick.startsWith('spare.')) return shop.find(item => item.id === 'spare')?.name
   if (brick === 'press' || brick.startsWith('press.')) return questList.find(quest => quest.install === 'press')?.title
+  if (brick === 'lathe' || brick.startsWith('lathe.')) return questList.find(quest => quest.install === 'lathe')?.title
+  if (brick === 'bench' || brick.startsWith('bench.')) return questList.find(quest => quest.install === 'assembly table')?.title
   return questList.find(quest => quest.unlock?.brick === brick)?.title
 }
 
@@ -55,7 +59,11 @@ export function apiBook(bricks: readonly Brick[], world: Pick<World, 'questId' |
         locked: functionUnlocked(world, brick.name) ? undefined : title,
         fresh: brick.name === 'press' || brick.name.startsWith('press.')
           ? rewardFresh(world, 'odile')
-          : freshBrick(world, brick.name),
+          : brick.name === 'lathe' || brick.name.startsWith('lathe.')
+            ? rewardFresh(world, 'harrow')
+            : brick.name === 'bench' || brick.name.startsWith('bench.')
+              ? rewardFresh(world, 'tomas')
+              : freshBrick(world, brick.name),
       }
     })
     return { id: group.id, title: group.title, entries }

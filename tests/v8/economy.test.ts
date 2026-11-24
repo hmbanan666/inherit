@@ -119,5 +119,5 @@ test('the opening purse buys nothing, and racks wait for the press', () => {
   world.cleared = ['bram', 'ines', 'odile']
   expect(shopFor(world).map(item => item.id)).toEqual(['cart', 'hopper', 'furnace', 'racks', 'cpu', 'spare'])
   const pays = questList.map(quest => quest.pay)
-  expect(pays).toEqual([40, 60, 80, 100, 110, 130, 150, 170])
+  expect(pays).toEqual([40, 60, 80, 100, 110, 130, 150, 170, 200])
 })

@@ -2,7 +2,7 @@ import { depot, drones, furnace, orders, press } from 'inherit'
 import { mine, unload } from './lib/haul'
 
 // Elsie: one cart feeds the press, the other carries the grate home.
-// Later jobs keep the two-cart ingot and steel loop.
+// A plate or a blank order is left alone.
 export function onTick() {
   if (orders()[0]?.item === 'grate' && press.installed) {
     if (press.count('grate') < 2) press.start('grate')

@@ -3,6 +3,7 @@ import { declarations, factoryBricks, inspectMachine, kettlewick, machineList, s
 import { createWorld, migrateWorld } from '../../packages/sim/src/v8/core/world'
 import { acceptQuest, canTake, levelSpan, questHold, questList } from '../../packages/sim/src/v8/quests'
 import { createSession } from '../../packages/sandbox/src/v8'
+import { players } from '../../sim/policy'
 
 test('Elsie stays listed until Odile hands over drone-2, and an open Elsie save keeps the quest', () => {
   const world = createWorld(kettlewick)
@@ -212,87 +213,6 @@ ${bring}export function onTick() {
   if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
 }`
 
-const everyPath = `import { drones, furnace, findPath } from "inherit"
-export function onTick() {
-  for (const drone of drones()) drone.moveAlong(findPath(drone.pos, furnace.pos))
-}`
-
-const remembered = `import { drones, veins, furnace, depot, findPath, memory } from "inherit"
-function walk(drone, target) {
-  const key = drone.name + ">" + target.pos.x + "," + target.pos.y
-  let path = memory[key]
-  const onPath = path && path.some(cell => cell.x === drone.pos.x && cell.y === drone.pos.y)
-  const startsHere = path && Math.abs(path[0].x - drone.pos.x) + Math.abs(path[0].y - drone.pos.y) === 1
-  if (!onPath && !startsHere) path = memory[key] = findPath(drone.pos, target.pos)
-  drone.moveAlong(path)
-}
-function carry(drone) {
-  const kind = drone.cargoKind
-  if (kind === "ingot" || kind === "steel") {
-    if (drone.isNear(depot)) drone.unload(depot)
-    else walk(drone, depot)
-    return true
-  }
-  if (!kind && (furnace.output > 0 || furnace.steel > 0)) {
-    if (drone.isNear(furnace)) drone.pickup(furnace)
-    else walk(drone, furnace)
-    return true
-  }
-  return false
-}
-export function onTick() {
-  const ore = veins().find(vein => vein.kind === "ore")
-  const coal = veins().find(vein => vein.kind === "coal")
-  for (const drone of drones()) {
-    if (carry(drone)) continue
-    const vein = drone.name === "drone-2" ? coal : ore
-    if (!vein) continue
-    if (drone.cargo > 0 && drone.carrying && drone.carrying !== vein.kind) {
-      if (!drone.isNear(furnace)) walk(drone, furnace)
-      else drone.unload(furnace)
-      continue
-    }
-    const home = drone.cargo >= drone.capacity
-    const target = home ? furnace : vein
-    if (!drone.isNear(target)) walk(drone, target)
-    else if (home) {
-      const room = vein.kind === "coal" ? furnace.coalMax - furnace.coal : furnace.inputMax - furnace.input
-      if (room > 0) drone.unload(furnace)
-    } else drone.mine(vein)
-  }
-  if (furnace.steel < 6 && furnace.input >= 2 && furnace.coal >= 1) furnace.alloy()
-}`
-
-const richHaul = `import { drones, veins, furnace, depot, findPath, prospect, memory } from "inherit"
-${bring}export function onTick() {
-  if (!memory.opened) { prospect(); memory.opened = true }
-  const vein = veins().find(item => item.name === "C") || veins().find(item => item.kind === "ore")
-  const drone = drones()[0]
-  if (bringHome(drone)) return
-  if (!vein) return
-  const home = drone.cargo >= drone.capacity
-  const target = home ? furnace : vein
-  if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
-  else if (home) drone.unload(furnace)
-  else drone.mine(vein)
-  if (furnace.output < 6 && furnace.input >= 2) furnace.smelt()
-}`
-
-const prospected = `import { drones, veins, furnace, depot, findPath, prospect, memory } from "inherit"
-${bring}export function onTick() {
-  if (!memory.opened) { prospect(); memory.opened = true }
-  const vein = veins().find(item => item.kind === "ore")
-  const drone = drones()[0]
-  if (bringHome(drone)) return
-  if (!vein) return
-  const home = drone.cargo >= drone.capacity
-  const target = home ? furnace : vein
-  if (!drone.isNear(target)) drone.moveAlong(findPath(drone.pos, target.pos))
-  else if (home) drone.unload(furnace)
-  else drone.mine(vein)
-  if (furnace.output < 6 && furnace.input >= 2) furnace.smelt()
-}`
-
 function open(world: { checks: { status: string }[] }) {
   return world.checks.some(check => check.status !== 'green')
 }
@@ -360,41 +280,56 @@ test('each quest pays on completion and the previous program does not pass the n
 
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('harrow')
+    await session.deploy(players.grates)
     session.step(40)
-    expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
-    await session.deploy({ 'main.ts': richHaul })
-    await reach(session, session.world.tick + 5000)
+    expect(open(session.world)).toBe(true)
+    await session.deploy(players.dies)
+    await reach(session, session.world.tick + 4000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
+    expect(session.world.lathe?.pos).toEqual({ x: 9, y: 1 })
 
     expect(session.accept()).toBe(true)
     expect(session.world.questId).toBe('tomas')
-    await session.deploy({ 'main.ts': steel })
-    session.step(40)
-    expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
-    await session.deploy({ 'main.ts': richHaul })
-    await reach(session, session.world.tick + 1200)
+    await session.deploy(players.dies)
+    session.step(20)
+    expect(open(session.world)).toBe(true)
+    await session.deploy(players.gears)
+    await reach(session, session.world.tick + 4000)
+    expect(open(session.world)).toBe(false)
+    expect(session.complete()).toBe(true)
+    expect(session.world.bench?.pos).toEqual({ x: 12, y: 4 })
+
+    expect(session.accept()).toBe(true)
+    expect(session.world.questId).toBe('pell')
+    await session.deploy(players.gears)
+    session.step(20)
+    expect(open(session.world)).toBe(true)
+    await session.deploy(players.hinges)
+    await reach(session, session.world.tick + 4000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
 
     expect(session.accept()).toBe(true)
-    await session.deploy({ 'main.ts': steel })
-    session.step(60)
-    expect(session.world.checks.find(check => check.id === 'done')?.status).not.toBe('green')
-    await session.deploy({ 'main.ts': prospected })
-    await reach(session, session.world.tick + 800)
+    expect(session.world.questId).toBe('wen')
+    await session.deploy(players.hinges)
+    session.step(20)
+    expect(open(session.world)).toBe(true)
+    await session.deploy(players.shutters)
+    await reach(session, session.world.tick + 4000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
 
     expect(session.accept()).toBe(true)
-    await session.deploy({ 'main.ts': everyPath })
-    session.step(30)
-    expect(session.world.checks.find(check => check.id === 'memory')?.status).not.toBe('green')
-    await session.deploy({ 'main.ts': remembered })
-    await reach(session, session.world.tick + 1500)
+    expect(session.world.questId).toBe('crew')
+    await session.deploy(players.shutters)
+    session.step(20)
+    expect(open(session.world)).toBe(true)
+    await session.deploy(players.kits)
+    await reach(session, session.world.tick + 8000)
     expect(open(session.world)).toBe(false)
     expect(session.complete()).toBe(true)
     expect(session.world.status).toBe('More is coming.')
-    expect(session.world.credits).toBeGreaterThanOrEqual(0)
+    expect(session.world.credits).toBe(kettlewick.credits + 40 + 60 + 80 + 100 + 110 + 130 + 150 + 170 + 200)
   } finally { session.dispose() }
 })

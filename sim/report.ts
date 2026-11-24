@@ -58,10 +58,11 @@ export function report(run: Run) {
     const credits = '█'.repeat(Math.round(q.finish.credits / maxCredits * 16))
     rows.push(`${q.id.padEnd(10)}${time.padEnd(34)}${credits.padEnd(17)}${String(q.finish.credits).padEnd(6)}${'█'.repeat(q.finish.level)} ${q.finish.level}`)
   }
-  rows.push('```', '', '## Shop on first listing', '',
-    '| Item | Tick | Credits before spending | Price | Purse / price |', '|---|---:|---:|---:|---:|')
+  rows.push('```', '', '## Shop at the planned hand-over', '',
+    'Each convenience is priced against the unspent purse at the hand-over that can first afford it. The reference run does not buy.',
+    '', '| Item | Quest | Tick | Credits | Price | Purse / price |', '|---|---|---:|---:|---:|---:|')
   for (const entry of openings)
-    rows.push(`| ${entry.id} | ${entry.tick} | ${entry.credits} | ${entry.price} | ${entry.ratio.toFixed(2)}× |`)
+    rows.push(`| ${entry.id} | ${entry.quest} | ${entry.tick} | ${entry.credits} | ${entry.price} | ${entry.ratio.toFixed(2)}× |`)
 
   rows.push('', '## Previous program trials', '',
     'Each proposed edit gets a separate replay from Take with the same purchase policy. Trial ticks are excluded from player time. A failed trial deploys the next program. A successful previous program stays deployed.', '',

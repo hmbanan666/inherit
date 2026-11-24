@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, chainReady, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, readChecks, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { CircleAlert, Coins, Cpu, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
@@ -143,7 +143,7 @@ const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id 
 const available = computed(() => {
   const current = world.value
   if (!current || current.questId) return []
-  return kettlewick.questList?.filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel) ?? []
+  return kettlewick.questList?.filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel && chainReady(current, quest)) ?? []
 })
 const offers = computed(() => available.value.map(quest => ({
   quest,
@@ -164,7 +164,9 @@ const shippedCount = computed(() => {
 const quantity = computed(() => {
   const quest = shownQuest.value
   if (!quest) return undefined
-  return quantityLabel(quest.from, quest.item, quest.qty, shippedCount.value)
+  const order = world.value?.orders.find(item => item.id === quest.id)
+  const lines = order?.lines ?? quest.lines?.map(line => ({ ...line, shipped: 0 }))
+  return quantityLabel(quest.from, quest.item, quest.qty, shippedCount.value, lines)
 })
 const needText = computed(() => shownQuest.value ? deliveryNote(shownQuest.value.need) : '')
 const testRows = computed(() => {

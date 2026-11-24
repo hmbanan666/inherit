@@ -5,9 +5,9 @@ import { dumpCargo, orderTransfer, stepDroneTasks } from '../../packages/sim/src
 import { takeFromDepot } from '../../packages/sim/src/v8/modules/orders'
 import { inspectMachine } from '../../packages/sim/src/v8/triggers'
 import {
-  createPress, hotFurnaceTicks, machineSlot, port, pressAt, pressRecipes, smeltRecipe, startRecipe,
+  benchAt, createBench, createLathe, createPress, hotFurnaceTicks, latheAt, machineSlot, port, pressAt, pressRecipes, smeltRecipe, startRecipe,
 } from '../../packages/sim/src/v8/modules/stock'
-import { syncPress } from '../../packages/sim/src/v8/quests'
+import { syncBench, syncLathe, syncPress } from '../../packages/sim/src/v8/quests'
 import { players } from '../../sim/policy'
 
 function tick(world: ReturnType<typeof createWorld>, count = 1) {
@@ -191,6 +191,79 @@ test('old saves map the press to Odile and leave a bought drone without one', ()
   fresh.cleared = ['odile']
   syncPress(fresh)
   expect(fresh.press?.pos).toEqual({ x: 5, y: 1 })
+})
+
+test('plate and blank open with Harrow, and the lathe cuts a gear in 6 ticks', () => {
+  const closed = createWorld(kettlewick)
+  closed.press = createPress()
+  port(closed, 'press')!.add('ingot', 1)
+  expect(() => startRecipe(closed, 'press', 'plate')).toThrow(/Harrow is taken/)
+  closed.questId = 'harrow'
+  expect(startRecipe(closed, 'press', 'plate')).toBe('started')
+
+  const world = createWorld(kettlewick)
+  world.questId = 'tomas'
+  world.cleared = ['bram', 'ines', 'odile', 'elsie', 'harrow']
+  world.lathe = createLathe()
+  port(world, 'lathe')!.add('blank', 1)
+  expect(startRecipe(world, 'lathe', 'gear')).toBe('started')
+  expect(world.lathe?.readyAt).toBe(6)
+  runTicks(world, kettlewick, 6, () => ({ used: 0 }))
+  expect(port(world, 'lathe')!.get('gear')).toBe(1)
+})
+
+test('the assembly table packs the active crate, and a partial delivery stays', () => {
+  const world = createWorld(kettlewick)
+  world.questId = 'crew'
+  world.cleared = ['bram', 'ines', 'odile', 'elsie', 'harrow', 'tomas', 'pell', 'wen']
+  world.manifest = { active: 'winch', staged: {}, winch: false, lamp: false }
+  world.bench = createBench()
+  world.orders = [{
+    id: 'crew', at: 0, item: 'winch', qty: 2, pay: 200, from: 'Mayor Odile', who: 'odile',
+    role: 'Mayor', title: 'Kits for the bridge crew', text: 'Two crates.', building: 'bridge',
+    change: 'The bridge crew is equipped.', shipped: 0, status: 'open',
+  }]
+  port(world, 'depot')!.add('gear', 1)
+  tick(world, 1)
+  expect(world.manifest.staged.gear).toBe(1)
+  port(world, 'depot')!.take('gear', 1)
+  tick(world, 1)
+  expect(world.manifest.staged.gear).toBe(1)
+  port(world, 'bench')!.add('gear', 1)
+  port(world, 'bench')!.add('hinge', 2)
+  expect(startRecipe(world, 'bench', 'pack')).toBe('started')
+  expect(world.bench?.recipe).toBe('pack:winch')
+  runTicks(world, kettlewick, 6, () => ({ used: 0 }))
+  expect(port(world, 'bench')!.get('winch')).toBe(1)
+  port(world, 'depot')!.add('winch', 1)
+  tick(world, 1)
+  expect(world.manifest.winch).toBe(true)
+  expect(world.manifest.active).toBe('lamp')
+  expect(world.manifest.staged.gear).toBeUndefined()
+  const saved = migrateWorld(structuredClone(world))
+  expect(saved.manifest.winch).toBe(true)
+  expect(saved.manifest.active).toBe('lamp')
+})
+
+test('the lathe and the assembly table follow the hand-over, not the open quest', () => {
+  const onWen = createWorld(kettlewick)
+  onWen.questId = 'wen'
+  onWen.cleared = ['bram', 'ines', 'odile', 'elsie']
+  migrateWorld(onWen)
+  expect(onWen.lathe).toBeNull()
+  expect(onWen.bench).toBeNull()
+
+  const harrow = createWorld(kettlewick)
+  harrow.cleared = ['bram', 'ines', 'odile', 'elsie', 'harrow']
+  syncLathe(harrow)
+  syncBench(harrow)
+  expect(harrow.lathe?.pos).toEqual(latheAt)
+  expect(harrow.bench).toBeNull()
+
+  const tomas = createWorld(kettlewick)
+  tomas.cleared = [...harrow.cleared, 'tomas']
+  syncBench(tomas)
+  expect(tomas.bench?.pos).toEqual(benchAt)
 })
 
 test('the press line carries steel onto the press and a grate into the depot', async () => {

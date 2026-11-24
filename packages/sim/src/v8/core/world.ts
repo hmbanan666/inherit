@@ -1,7 +1,7 @@
 import type { Order } from '../modules/orders'
 import { finishBatch } from '../modules/smelting'
-import { emptyBin, ensureBin, finishPress, type Bin, type Item, type Press, type StationId } from '../modules/stock'
-import { pinLegacyTriggers, repairHarrow, syncPress, syncQuest, syncSecondDrone, syncSpare, triggerUnlocked, type QuestDef } from '../quests'
+import { emptyBin, emptyManifest, ensureBin, finishPress, normalizeManifest, type Bin, type Item, type Manifest, type Press, type StationId } from '../modules/stock'
+import { pinLegacyTriggers, repairHarrow, syncBench, syncLathe, syncPress, syncQuest, syncSecondDrone, syncSpare, triggerUnlocked, type QuestDef } from '../quests'
 
 export interface Cell { x: number; y: number }
 /** One machine command. The drone keeps it across ticks. `since` is the tick it was given. */
@@ -126,9 +126,14 @@ export function migrateWorld(world: World) {
   world.hauled ??= {}
   world.outputRacks = !!world.bought?.includes('racks')
   world.spare ??= null
+  world.lathe ??= null
+  world.bench ??= null
+  world.manifest = normalizeManifest(world.manifest)
   syncSecondDrone(world)
   syncPress(world)
   syncSpare(world)
+  syncLathe(world)
+  syncBench(world)
   repairHarrow(world)
   if (!world.signals) world.signals = {
     output: world.furnace.output,
@@ -197,6 +202,12 @@ export interface World {
   /** The press Odile installs. Null until that Hand over. */
   press: Press | null
   spare: Press | null
+  /** The lathe Harrow installs. Null until that Hand over. */
+  lathe: Press | null
+  /** The assembly table Tomas installs. Null until that Hand over. */
+  bench: Press | null
+  /** The bridge contract. The active crate and parts already set aside survive a save. */
+  manifest: Manifest
   outputRacks: boolean
   codedBatch: boolean
   manualCommand: boolean
@@ -260,7 +271,8 @@ export function createWorld(site: Site): World {
     depot: { ...structuredClone(site.depot), bin: emptyBin() },
     furnace: { ...structuredClone(site.furnace), readyAt: null, coal: 0, steel: 0, batch: null, bin: emptyBin() },
     press: null,
-    spare: null, outputRacks: false, codedBatch: false, manualCommand: false, hauled: {},
+    spare: null, lathe: null, bench: null, manifest: emptyManifest(),
+    outputRacks: false, codedBatch: false, manualCommand: false, hauled: {},
     orders: [], growth: [], status: '',
     ledger: { income: 0 }, cpu: { used: 0, limit: site.cpuLimit }, memory: {}, messages: [], console: [],
     xp: 0, level: 1, cleared: [], bought: [], checks: [],
@@ -286,6 +298,8 @@ export function createWorld(site: Site): World {
   }
   syncSecondDrone(world)
   syncPress(world)
+  syncLathe(world)
+  syncBench(world)
   world.status = site.questList ? syncQuest(world, site) : (world.growth.at(-1) ?? 'The village is quiet.')
   return world
 }

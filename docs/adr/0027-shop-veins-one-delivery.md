@@ -12,7 +12,7 @@ Accepted 24 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md), [ADR 0
 
 **Elsie.** Elsie asks for a count of steel. Ore and coal do not cool and do not expire. Taking the quest grants `on()`. [ADR 0028](0028-run-to-completion.md) moved `onTick` to Ines. The cooling timer is gone.
 
-**Wen.** Wen's check stays a check on `findPath`. It is not only a count of steel.
+**Wen.** Wen's check stays a check on `findPath`. It is not only a count of steel. [ADR 0036](0036-region-1-fabrication-chain.md) supersedes this sentence: Wen asks for 2 folding shutters and has no findPath quota.
 
 **The shop.** The shop sells conveniences only: a hotter furnace, a bigger cart, a bigger hopper, and CPU. There is no key to a quest branch. ADR 0026's key is withdrawn from the vision. The second drone is not for sale.
 

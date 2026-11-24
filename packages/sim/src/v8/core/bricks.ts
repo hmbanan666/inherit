@@ -53,16 +53,27 @@ export function declarations(bricks: Brick[], fresh: ReadonlySet<string> = new S
     return `  /** ${fresh.has(b.name) ? 'new. ' : ''}${b.doc} CPU: ${b.cost}.${deprecated}\n${note}\n   */\n  ${prefix}${b.signature}`
   }
   const members = (owner: string) => bricks.filter(b => b.name.startsWith(owner)).map(b => declaration(b)).join('\n')
+  const counted = bricks.find(b => b.name === 'depot.count')?.signature ?? ''
+  const itemUnion = counted.match(/item: ([^)]+)/)?.[1] ?? 'string'
   return `declare module "inherit" {
   export interface Cell { x: number; y: number }
   export interface Target { readonly pos: Cell }
   export interface Vein extends Target { readonly name: string; readonly kind: 'ore' | 'coal'; readonly purity: 'poor' | 'normal' | 'rich'; readonly ticksPerUnit: number; readonly yield: number }
-  export interface Order { readonly id: string; readonly item: 'ingot' | 'steel' | 'ore' | 'grate'; readonly qty: number; readonly shipped: number; readonly pay: number; readonly from: string }
+  export interface OrderLine { readonly item: ${itemUnion}; readonly qty: number; readonly shipped: number }
+  export interface Order { readonly id: string; readonly item: ${itemUnion}; readonly qty: number; readonly shipped: number; readonly pay: number; readonly from: string; readonly lines?: readonly OrderLine[] }
+  export interface ManifestLine { readonly item: ${itemUnion}; readonly qty: number; readonly staged: number }
+  export interface Manifest { readonly id: 'winch' | 'lamp'; readonly winch: boolean; readonly lamp: boolean; readonly lines: readonly ManifestLine[] }
   export interface Furnace extends Target {
 ${members('furnace.')}
   }
   export interface Press extends Target {
 ${members('press.')}
+  }
+  export interface Lathe extends Target {
+${members('lathe.')}
+  }
+  export interface Bench extends Target {
+${members('bench.')}
   }
   export interface Depot extends Target {
 ${members('depot.')}

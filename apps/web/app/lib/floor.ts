@@ -2,7 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js'
 import type { Cell, World } from '@inherit/sim/v8'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
-import { press as pressDrawing } from './art/fabrication'
+import { assembler, cutter, press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
 
 export type FloorWorld = Omit<World, 'memory'>
@@ -22,8 +22,8 @@ const label = (text: string, size: number, color: number) =>
 
 function loadArt(carrying: FloorWorld['drones'][number]['carrying']): Material {
   if (carrying === 'coal') return 'coal'
-  if (carrying === 'ingot' || carrying === 'plate') return 'iron-ingot'
-  if (carrying === 'steel' || carrying === 'grate' || carrying === 'blank') return 'steel'
+  if (carrying === 'ingot' || carrying === 'plate' || carrying === 'hinge' || carrying === 'lamp') return 'iron-ingot'
+  if (carrying === 'steel' || carrying === 'grate' || carrying === 'blank' || carrying === 'gear' || carrying === 'pin' || carrying === 'cut' || carrying === 'shutter' || carrying === 'winch') return 'steel'
   return 'iron-ore'
 }
 
@@ -111,6 +111,12 @@ export class FloorScene {
   private spareArt?: Container
   private spareWork?: Graphics
   private spareMark?: Container
+  private latheArt?: Container
+  private latheWork?: Graphics
+  private latheMark?: Container
+  private benchArt?: Container
+  private benchWork?: Graphics
+  private benchMark?: Container
   private arrivals = 0
   private lastTick = -1
   private hover = ''
@@ -134,6 +140,9 @@ export class FloorScene {
     this.steelMark.position.set(31, 18)
     this.steelMark.visible = false
     this.syncPress(world)
+    this.syncSpare(world)
+    this.syncLathe(world)
+    this.syncBench(world)
     this.ring = this.root.addChild(new Graphics())
     for (const drone of world.drones) this.placeHauler(drone)
   }
@@ -228,6 +237,8 @@ export class FloorScene {
       { id: 'depot', pos: world.depot.pos },
       ...world.press ? [{ id: 'press', pos: world.press.pos }] : [],
       ...world.spare ? [{ id: 'spare', pos: world.spare.pos }] : [],
+      ...world.lathe ? [{ id: 'lathe', pos: world.lathe.pos }] : [],
+      ...world.bench ? [{ id: 'bench', pos: world.bench.pos }] : [],
     ]
     const spot = spots.find(item => item.id === id)
     if (!spot) return
@@ -270,8 +281,50 @@ export class FloorScene {
     }
     this.pressArt.visible = true
     if (this.pressWork) this.pressWork.visible = press.readyAt !== null
-    const finished = (press.bin.qty.grate ?? 0) + (press.bin.qty.plate ?? 0) + (press.bin.qty.blank ?? 0)
+    const finished = (press.bin.qty.grate ?? 0) + (press.bin.qty.plate ?? 0) + (press.bin.qty.blank ?? 0) + (press.bin.qty.shutter ?? 0)
     if (this.pressMark) this.pressMark.visible = finished > 0
+  }
+
+  private syncLathe(world: FloorWorld) {
+    const machine = world.lathe
+    if (!machine) {
+      if (this.latheArt) this.latheArt.visible = false
+      return
+    }
+    if (!this.latheArt) {
+      this.latheArt = equipment(this.root, machine.pos, cutter)
+      caption(this.latheArt, 'Lathe', 0, -63)
+      this.latheWork = this.latheArt.addChild(new Graphics())
+      this.latheWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
+      this.latheMark = this.latheArt.addChild(materialArt('steel'))
+      this.latheMark.position.set(18, 8)
+      if (this.ring) this.root.addChild(this.ring)
+    }
+    this.latheArt.visible = true
+    if (this.latheWork) this.latheWork.visible = machine.readyAt !== null
+    const finished = (machine.bin.qty.gear ?? 0) + (machine.bin.qty.pin ?? 0) + (machine.bin.qty.cut ?? 0)
+    if (this.latheMark) this.latheMark.visible = finished > 0
+  }
+
+  private syncBench(world: FloorWorld) {
+    const machine = world.bench
+    if (!machine) {
+      if (this.benchArt) this.benchArt.visible = false
+      return
+    }
+    if (!this.benchArt) {
+      this.benchArt = equipment(this.root, machine.pos, assembler)
+      caption(this.benchArt, 'Assembly', 0, -63)
+      this.benchWork = this.benchArt.addChild(new Graphics())
+      this.benchWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
+      this.benchMark = this.benchArt.addChild(materialArt('iron-ingot'))
+      this.benchMark.position.set(18, 8)
+      if (this.ring) this.root.addChild(this.ring)
+    }
+    this.benchArt.visible = true
+    if (this.benchWork) this.benchWork.visible = machine.readyAt !== null
+    const finished = (machine.bin.qty.hinge ?? 0) + (machine.bin.qty.winch ?? 0) + (machine.bin.qty.lamp ?? 0)
+    if (this.benchMark) this.benchMark.visible = finished > 0
   }
 
   private syncSpare(world: FloorWorld) {
@@ -291,7 +344,7 @@ export class FloorScene {
     }
     this.spareArt.visible = true
     if (this.spareWork) this.spareWork.visible = press.readyAt !== null
-    const finished = (press.bin.qty.grate ?? 0) + (press.bin.qty.plate ?? 0) + (press.bin.qty.blank ?? 0)
+    const finished = (press.bin.qty.grate ?? 0) + (press.bin.qty.plate ?? 0) + (press.bin.qty.blank ?? 0) + (press.bin.qty.shutter ?? 0)
     if (this.spareMark) this.spareMark.visible = finished > 0
   }
 
@@ -299,6 +352,8 @@ export class FloorScene {
     this.latest = world
     this.syncPress(world)
     this.syncSpare(world)
+    this.syncLathe(world)
+    this.syncBench(world)
     for (const vein of world.veins) this.placeVein(vein)
     while (this.haulers.length < world.drones.length) this.placeHauler(world.drones[this.haulers.length]!)
     const count = world.drones.length
