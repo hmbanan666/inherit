@@ -1,6 +1,8 @@
+import { kettlewick, questList } from '@inherit/sim/v8'
 import { expect, test } from 'vitest'
 import { droneStatusLine, grantHint, grantNote, questNextStep, steadyLine, type CartCue, type QuestStepState } from './questStep'
 
+const bram = questList.find(quest => quest.id === 'bram')!
 const empty = { input: 0, coal: 0, output: 0, steel: 0 }
 const none = { ingots: 0, steel: 0 }
 
@@ -22,13 +24,6 @@ test('the card names who to talk to, the quest to take, and the hand-over', () =
 })
 
 test('an open quest says what to press, what to carry, or the bring line', () => {
-  const bram = { from: 'Bram', goal: 'Bring Bram 2 ingots.', item: 'ingot' as const, qty: 2, trigger: 'run' as const }
-  expect(questNextStep(state({ quest: bram, runName: 'smeltOnce' }))).toBe('Bring Bram 2 ingots.')
-  expect(questNextStep(state({ quest: bram, runName: 'smeltOnce', triggerReady: true }))).toBe('Press ▶ next to smeltOnce')
-  expect(questNextStep(state({ quest: bram, furnace: { ...empty, output: 2 } }))).toBe('Carry the ingots to the depot.')
-  expect(questNextStep(state({ quest: bram, furnace: { ...empty, output: 2, steel: 1 } }))).toBe('Carry the ingots to the depot.')
-  expect(questNextStep(state({ quest: bram, furnace: { ...empty, steel: 1 } }))).toBe('Bring Bram 2 ingots.')
-  expect(questNextStep(state({ quest: bram, furnace: { ...empty, input: 2 } }))).toBe('Open the furnace and choose Smelt.')
   const ines = { from: 'Ines', goal: 'Bring Ines 16 ingots.', item: 'ingot' as const, qty: 16, trigger: 'tick' as const }
   expect(questNextStep(state({ quest: ines }))).toBe('Bring Ines 16 ingots.')
   expect(questNextStep(state({ quest: ines, triggerReady: true }))).toBe('Turn on Loop: onTick')
@@ -39,6 +34,26 @@ test('an open quest says what to press, what to carry, or the bring line', () =>
   expect(questNextStep(state({ quest: elsie, furnace: { ...empty, steel: 1 } }))).toBe('Carry the steel to the depot.')
 })
 
+test('Bram needs a loaded hopper and a batch started from the editor', () => {
+  const batch = state({ quest: { ...bram, batchCheck: 'open' }, oreNeed: kettlewick.recipe.ore })
+  expect(questNextStep(batch)).toBe('Load ore into the furnace.')
+  const loaded = { ...batch, furnace: { ...empty, input: kettlewick.recipe.ore, output: 1 } }
+  expect(questNextStep(loaded)).toBe('Edit smeltOnce, then press ▶.')
+  expect(questNextStep({
+    ...batch, furnace: { ...empty, input: kettlewick.furnace.oreMax! },
+    cart: { name: 'drone-1', capacity: 3, cargo: 3, carrying: 'ore' },
+  })).toBe('Edit smeltOnce, then press ▶.')
+  expect(questNextStep({ ...loaded, smelting: true, furnace: { ...empty, input: 2 } })).toBe('The furnace is smelting.')
+  const started = { ...bram, batchCheck: 'green' as const }
+  expect(questNextStep({ ...batch, quest: started, smelting: true })).toBe('The furnace is smelting.')
+  expect(questNextStep({ ...loaded, quest: started })).toBe('Carry the ingots to the depot.')
+})
+
+test.each(['ines', 'elsie', 'harrow', 'pell', 'crew'])('%s keeps its delivery goal while the furnace works', id => {
+  const quest = questList.find(quest => quest.id === id)!
+  expect(questNextStep(state({ quest, smelting: true, furnace: { ...empty, output: 1 } }))).toBe(quest.goal)
+})
+
 test('a granted trigger adds one line', () => {
   expect(grantHint('run')).toBe('Press ▶ next to a function. It runs once, this tick.')
   expect(grantHint('tick')).toBe('Loop calls that function every tick.')
@@ -47,33 +62,33 @@ test('a granted trigger adds one line', () => {
 })
 
 test('a live drone task stays off the card', () => {
-  const bram = { from: 'Bram', goal: 'Bring Bram 2 ingots.', item: 'ingot' as const, qty: 2, trigger: 'run' as const }
+  const quest = { ...bram, batchCheck: 'open' as const }
   const cart: CartCue = { name: 'drone-1', cargo: 0, capacity: 3, carrying: null }
   const mining = state({
-    quest: bram, triggerReady: true, runName: 'smeltOnce',
+    quest,
     cart: { ...cart, task: 'mine', vein: 'A' },
   })
   const hauling = state({
-    quest: bram, triggerReady: true, runName: 'smeltOnce',
+    quest,
     cart: { ...cart, cargo: 1, carrying: 'ore', task: 'unload', at: 'furnace' },
   })
-  expect(questNextStep(mining)).toBe('Bring Bram 2 ingots.')
+  expect(questNextStep(mining)).toBe('Load ore into the furnace.')
   expect(questNextStep(hauling)).toBe(questNextStep(mining))
   expect(questNextStep(state({
-    quest: bram,
+    quest,
     cart: { ...cart, cargo: 3, capacity: 3, carrying: 'ore', task: null },
   }))).toBe('Open drone-1 and choose Unload.')
   expect(questNextStep(state({
-    quest: bram,
+    quest,
     cart: { ...cart, cargo: 3, carrying: 'ore', task: 'unload', at: 'furnace' },
   }))).toBe('Open drone-1 and choose Unload.')
   expect(questNextStep(state({
-    quest: bram,
+    quest,
     cart: { ...cart, cargo: 2, carrying: 'ingot', task: 'pickup', phase: 'deliver' },
     furnace: { ...empty, output: 2 },
   }))).toBe('Carry the ingots to the depot.')
   expect(questNextStep(state({
-    quest: bram, smelting: true, furnace: { ...empty, input: 2 },
+    quest, smelting: true, furnace: { ...empty, input: 2 },
     cart: { ...cart, task: 'mine', vein: 'A' },
   }))).toBe('The furnace is smelting.')
   const odile = { from: 'Mayor Odile', goal: 'Bring Odile 4 steel.', item: 'steel' as const, qty: 4 }

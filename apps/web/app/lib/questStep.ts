@@ -1,10 +1,13 @@
-import type { Item } from '@inherit/sim/v8'
+import { outputCap, type Item, type World } from '@inherit/sim/v8'
+import { furnaceOutput, orderGoods } from './questNote'
 
 export interface StepQuest {
   from: string
   goal: string
+  batchCheck?: World['checks'][number]['status']
   item: Item
   qty: number
+  lines?: { item: Item; qty: number }[]
   trigger?: 'run' | 'events' | 'tick'
 }
 
@@ -71,18 +74,6 @@ function person(from: string) {
   return from.replace(/^Mayor /, '')
 }
 
-function goods(item: StepQuest['item'], qty: number) {
-  if (item === 'steel') return `${qty} steel`
-  if (item === 'ore') return `${qty} ore`
-  if (item === 'grate') return qty === 1 ? '1 grate' : `${qty} grates`
-  if (item === 'plate') return '1 plate and 1 blank'
-  if (item === 'gear') return qty === 1 ? '1 gear' : `${qty} gears`
-  if (item === 'hinge') return qty === 1 ? '1 hinge' : `${qty} hinges`
-  if (item === 'shutter') return qty === 1 ? '1 shutter' : `${qty} shutters`
-  if (item === 'winch') return 'the winch crate and the lamp crate'
-  return qty === 1 ? '1 ingot' : `${qty} ingots`
-}
-
 function sitting(state: QuestStepState) {
   return state.shipped === 0 && state.furnace.output === 0 && state.furnace.steel === 0
 }
@@ -103,14 +94,18 @@ export function questNextStep(state: QuestStepState) {
     if (state.available) return `Talk to ${person(state.available.from)}`
     return 'More is coming.'
   }
-  if (state.ready) return `Hand over ${goods(quest.item, quest.qty)}`
+  if (state.ready) return `Hand over ${orderGoods(quest)}`
   const cart = state.cart
   const busy = droneBusy(cart)
+  const oreNeed = state.oreNeed ?? 2
+  if (quest.batchCheck === 'open' && !state.smelting && state.furnace.input >= oreNeed && state.furnace.output < outputCap)
+    return 'Edit smeltOnce, then press ▶.'
   if (cart && cart.cargo >= cart.capacity && cart.cargo > 0) return `Open ${cart.name} and choose Unload.`
+  if (!furnaceOutput(quest.item)) return quest.goal
   if (quest.item === 'ingot' && state.furnace.output > 0) return 'Carry the ingots to the depot.'
   if (quest.item === 'steel' && state.furnace.steel > 0) return 'Carry the steel to the depot.'
-  const oreNeed = state.oreNeed ?? 2
-  if (!state.smelting && quest.item === 'ingot' && state.furnace.input >= oreNeed) return 'Open the furnace and choose Smelt.'
+  if (quest.batchCheck === 'open') return state.smelting ? 'The furnace is smelting.' : 'Load ore into the furnace.'
+  if (!quest.batchCheck && !state.smelting && quest.item === 'ingot' && state.furnace.input >= oreNeed) return 'Open the furnace and choose Smelt.'
   if (!state.smelting && quest.item === 'steel' && state.furnace.input >= oreNeed && state.furnace.coal >= 1)
     return 'Open the furnace and choose Alloy.'
   if (state.smelting) return 'The furnace is smelting.'
