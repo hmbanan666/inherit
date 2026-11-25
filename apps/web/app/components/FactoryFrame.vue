@@ -17,6 +17,7 @@ import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/q
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
+import { dialogClose } from '../lib/dialogMotion'
 import type { Point } from '../lib/floorPick'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
@@ -76,6 +77,16 @@ const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
 const blankConsole = ref(false)
 const selectedId = ref('')
+const floor = useTemplateRef('floor')
+const cardSprite = ref<string>()
+watch([selectedId, floor], async ([id, component], _, onCleanup) => {
+  cardSprite.value = undefined
+  if (!id || !component) return
+  let current = true
+  onCleanup(() => { current = false })
+  const sprite = await component.snapshot(id)
+  if (current) cardSprite.value = sprite
+})
 const machines = computed(() => world.value ? machineList(world.value) : [])
 const inspected = computed(() => {
   const current = world.value
@@ -90,6 +101,10 @@ function showDialog(next: Exclude<GameOverlay, { kind: 'none' }>, from?: ApiBook
   selectedId.value = ''
   overlay.value = openOverlay(overlay.value, next)
 }
+function openMachineApi(id: string) {
+  selectSection(id)
+  showDialog({ kind: 'api' })
+}
 function closeSurface() {
   overlay.value = closeOverlay(overlay.value)
   selectedId.value = ''
@@ -101,6 +116,7 @@ function closeSurface() {
     else from?.focus()
   })
 }
+const { closing: bookClosing, requestClose: closeBook, vDialogMotion } = dialogClose(closeSurface)
 function inspectFromFloor(id: string) {
   const from = mapFrame.value?.querySelector<HTMLElement>('[aria-label="Factory map"]') ?? undefined
   if (id.startsWith('npc:')) {
@@ -675,7 +691,7 @@ onBeforeUnmount(() => {
     <template #floor>
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
+          <LazyFactoryFloor v-if="world" ref="floor" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
         <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': columns.stackChecks }">
@@ -796,8 +812,9 @@ onBeforeUnmount(() => {
         @take="take($event); closeSurface()" @hand-over="send({ kind: 'complete' }); closeSurface()" @close="closeSurface" />
       <ShopDialog v-else-if="shopOpen && world" :catalog="catalog" :credits="world.credits" :bought="world.bought"
         @buy="send({ kind: 'buy', id: $event })" @close="closeSurface" />
-      <ApiBook v-else-if="bookOpen" :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeSurface" />
-      <MachineCard v-else-if="inspected" :inspected="inspected" @close="closeSurface"
+      <ApiBook v-else-if="bookOpen" v-dialog-motion class="dialog-motion" :class="{ closing: bookClosing }"
+        :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeBook" />
+      <MachineCard v-else-if="inspected" :inspected="inspected" :sprite="cardSprite" @api="openMachineApi" @close="closeSurface"
         @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
     </Teleport>
   </StudioShell>
