@@ -1,4 +1,7 @@
-import { levelSpan, type World } from '@inherit/sim/v8'
+import { kettlewick, levelSpan, type World } from '@inherit/sim/v8'
+import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
+import type { SideTab } from './factoryLayout'
+import { named, type questCard } from './questNote'
 import type { GameEvent } from './worldEvents'
 
 function clampFraction(value: number) {
@@ -24,6 +27,38 @@ export function welcomeToast(world: Pick<World, 'questId' | 'cleared'>, step: st
   return { kind: 'event', key: 'welcome', icon: 'talk', text: `${step}. Click the gold ! next to the house.` }
 }
 
+export const questTabHint = 'Go and talk to a villager with a gold ! over their head.'
+
 export const shellLabels = {
+  pane: { quest: 'Quest', tests: 'Quest tests', console: 'Console' },
+  sideTabs: 'Quest, tests and console',
+  seeTests: 'See Tests',
   level: (level: number) => `Level ${level}`,
+}
+
+export function questTabNotice(side: SideTab, ready: boolean) {
+  if (ready && side !== 'quest') return 'Quest, ready to hand over'
+}
+
+export const giverPortraits = new Map(kettlewick.questList?.map(({ who, from, role, building }) => [
+  who, { id: who, name: from, role, buildingId: building, mood: 'waiting' as const },
+]))
+
+type Card = NonNullable<ReturnType<typeof questCard>>
+
+export function questObjectives(card: Card) {
+  const lines = card.lines?.length ? card.lines : [card]
+  return lines.map(({ item, qty, shipped }) => {
+    const received = Math.max(0, Math.min(shipped, qty))
+    return { id: item, text: `Deliver ${named(item, qty)}`, count: `${received}/${qty}`, done: received === qty }
+  })
+}
+
+export function questLog(quest?: QuestDef, card?: Card) {
+  if (!quest || !card) return []
+  return [{
+    id: quest.id, who: quest.who, name: card.from.replace(/^Mayor /, ''), role: quest.role,
+    title: card.title, quote: quest.quote, goal: card.goal, objectives: questObjectives(card),
+    ready: card.ready, expanded: true,
+  }]
 }

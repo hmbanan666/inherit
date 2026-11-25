@@ -8,7 +8,7 @@ import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type Facto
 import {
   checksPanePx, clampMapHeight, editorColumns, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
   readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
-  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldInsetPx,
+  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldInsetPx, type SideTab,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { insertQuestNote, questCard, questComment, questSummary } from '../lib/questNote'
@@ -23,7 +23,7 @@ import { journalRequests, villagerDialog, villagers, villageView } from '../lib/
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
 import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
-import { shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
+import { questTabNotice, shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
 import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
@@ -95,7 +95,7 @@ const floorNotice = ref<HostNotice>()
 const pending = ref(true)
 const panels = ['Charts'] as const
 const tool = ref<typeof panels[number]>()
-const side = ref<'tests' | 'console'>('tests')
+const side = ref<SideTab>(readSideTab(null))
 const pickedTest = ref('')
 const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
@@ -229,6 +229,7 @@ const card = computed(() => shownQuest.value && world.value ? questCard(world.va
 const journalSummary = computed(() => journalOpen.value && world.value && shownQuest.value && card.value
   ? questSummary(world.value, shownQuest.value, card.value) : undefined)
 const ready = computed(() => card.value?.ready ?? false)
+const readyNotice = computed(() => questTabNotice(side.value, ready.value))
 const testRows = computed(() => card.value?.tests ?? [])
 const pulse = ref(false)
 let pulseTimer = 0
@@ -471,8 +472,11 @@ const granted = computed(() => {
   if (!note || note.text === nextStep.value) return
   return note
 })
-function showOpenTest() {
+function openTests() {
   side.value = 'tests'
+}
+function showOpenTest() {
+  openTests()
   const id = card.value?.remainingTest
   if (id) pickedTest.value = id
 }
@@ -702,9 +706,6 @@ onBeforeUnmount(() => {
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
           <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
-          <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
-            @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
-            @show-test="showOpenTest" @open-file="activeFile = $event" />
           <div v-if="inspected" ref="machineCard" class="machine-card" :style="cardPosition">
             <MachineCard :inspected="inspected" @close="closeSurface"
               @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
@@ -735,8 +736,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <PaneSplit class="side-split" axis="x" label="Resize checks" @move="onSide" @reset="setSideWidth(checksPanePx)" @nudge="nudgeSide" />
-          <aside class="checks-pane" :aria-label="side === 'tests' ? 'Quest tests' : 'Console'">
-            <div class="checks-head" role="tablist" aria-label="Tests and console">
+          <aside class="checks-pane" :aria-label="shellLabels.pane[side]">
+            <div class="checks-head" role="tablist" :aria-label="shellLabels.sideTabs">
+              <button type="button" role="tab" :aria-selected="side === 'quest'"
+                :aria-label="readyNotice" @click="side = 'quest'">
+                {{ shellLabels.pane.quest }}<i v-if="readyNotice" class="dot" aria-hidden="true" />
+              </button>
               <button type="button" role="tab" :aria-selected="side === 'tests'" @click="side = 'tests'">Tests</button>
               <button type="button" role="tab" :aria-selected="side === 'console'" @click="side = 'console'; consoleFilter = 'all'">
                 Console
@@ -745,7 +750,12 @@ onBeforeUnmount(() => {
               <button v-if="side === 'console'" type="button" class="clear" @click="clearLog">Clear</button>
             </div>
             <p v-if="hostError" class="host-error">{{ hostError }}</p>
-            <section v-if="side === 'tests'" class="tests" aria-label="Quest tests">
+            <section v-if="side === 'quest'" class="quest-tab" :aria-label="shellLabels.pane.quest">
+              <QuestTracker v-if="world" :quest="activeQuest" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
+                @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
+                @show-test="showOpenTest" @open-tests="openTests" @open-file="activeFile = $event" />
+            </section>
+            <section v-else-if="side === 'tests'" class="tests" aria-label="Quest tests">
               <p v-if="!testRows.length" class="empty">Take a quest to see its tests.</p>
               <button v-for="row in testRows" :key="row.id" type="button" class="test" :data-mark="row.state" :aria-pressed="pickedTest === row.id" :aria-label="testLabel(row.state, row.text)" @click="pickedTest = row.id">
                 <b><span class="state-mark" aria-hidden="true">{{ testMark(row.state) }}</span> {{ row.text }}</b>
@@ -1099,6 +1109,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: var(--panel);
 }
+.quest-tab { flex: 1; min-height: 0; display: flex; flex-direction: column }
 .checks-head {
   flex: none;
   height: v-bind(headerCss);
@@ -1114,7 +1125,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--sub);
   font: inherit;
-  padding: 0 10px;
+  padding: 0 6px;
 }
 .checks-head button[aria-selected="true"] {
   color: var(--text);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { kettlewick } from '@inherit/sim/v8'
+import { giverPortraits } from '../lib/shellBar'
 import { BellRing, Check, Cog, Coins, MessageCircle, Sparkles, Truck, Unlock } from '@lucide/vue'
 import TownPortrait from './town/TownPortrait.vue'
 import type { Toast } from '../lib/toasts'
@@ -8,9 +8,6 @@ import { dismissToastLabel } from '../lib/worldEvents'
 defineProps<{ toasts: readonly Toast[] }>()
 const emit = defineEmits<{ dismiss: [id: number]; hover: [over: boolean] }>()
 const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, machine: Cog, drone: Truck, ready: BellRing, talk: MessageCircle }
-const portraits = new Map(kettlewick.questList?.map(({ who, from, role, building }) => [
-  who, { id: who, name: from, role, buildingId: building, mood: 'waiting' as const },
-]))
 </script>
 
 <template>
@@ -20,7 +17,7 @@ const portraits = new Map(kettlewick.questList?.map(({ who, from, role, building
     <button v-for="toast in toasts" :key="toast.id" type="button" class="toast" :title="dismissToastLabel"
       @click="emit('dismiss', toast.id)">
       <template v-if="toast.kind === 'npc'">
-        <TownPortrait class="cameo" :person="portraits.get(toast.who)!" />
+        <TownPortrait class="cameo" :person="giverPortraits.get(toast.who)!" />
         <span><b>{{ toast.name }}</b> {{ toast.text }}</span>
       </template>
       <template v-else>

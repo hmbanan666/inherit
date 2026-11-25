@@ -31,10 +31,10 @@ export const treeWidthMax = 420
 export const sideWidthMin = 220
 export const sideWidthMax = 560
 
-export type SideTab = 'tests' | 'console'
+export type SideTab = 'quest' | 'tests' | 'console'
 
 export function readSideTab(stored: string | null): SideTab {
-  return stored === 'console' ? 'console' : 'tests'
+  return stored === 'tests' || stored === 'console' ? stored : 'quest'
 }
 
 /** A space, then the word. The nav reads "300 credits". */
