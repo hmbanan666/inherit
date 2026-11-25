@@ -2,20 +2,23 @@
 import { apiBook, canTake, chainReady, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
-import { CircleAlert, Coins, Cpu, Sparkles, TextCursor, Timer, TriangleAlert, Unlock } from '@lucide/vue'
+import { BookOpen, CircleAlert, Coins, Cpu, Store, TextCursor, Timer, TriangleAlert } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
   checksPanePx, clampMapHeight, editorColumns, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
-  questRailPx, readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
-  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldGapPx, worldInsetPx,
+  readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
+  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldInsetPx,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { insertQuestNote, questCard, questComment } from '../lib/questNote'
 import { cpuTitle, readCpu, steadyCpu, type CpuHold, type CpuMeter } from '../lib/cpuMeter'
 import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
-import { useApiBook } from '../lib/apiBookState'
+import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
+import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
+import { questHistory } from '../lib/questJournal'
+import { testLabel, testMark } from '../lib/questTracker'
 import { insertTriggerExample } from '../lib/triggerNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
@@ -27,7 +30,15 @@ const droneNames = computed(() => world.value?.drones.map(drone => drone.name) ?
 const api = ref(declarations(bricks.filter(brick => functionUnlocked(lockedWorld, brick.name)), new Set(), ['drone-1']))
 const bookSections = computed(() => apiBook(bricks, world.value ?? lockedWorld))
 const catalog = computed(() => shopFor(world.value ?? { cleared: [], bought: [] }))
-const { isOpen: bookOpen, sectionId, selectSection, open: openBook, close: closeBook } = useApiBook()
+const { sectionId, selectSection } = useApiBook()
+const overlay = shallowRef<GameOverlay>({ kind: 'none' })
+const journalOpen = computed(() => overlay.value.kind === 'journal')
+const shopOpen = computed(() => overlay.value.kind === 'shop')
+const bookOpen = computed(() => overlay.value.kind === 'api')
+const modalOpen = computed(() => overlay.value.kind !== 'none')
+const mapFrame = ref<HTMLElement>()
+const journalButton = ref<HTMLButtonElement>()
+let opener: ApiBookOpener | undefined
 const files = shallowRef({ ...kettlewick.files })
 const deployed = shallowRef(kettlewick.files)
 const dirty = computed(() => Object.keys(files.value).length !== Object.keys(deployed.value).length ||
@@ -50,7 +61,6 @@ const pickedTest = ref('')
 const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
 const blankConsole = ref(false)
-const zone = ref<'quests' | 'shop' | 'machines'>('quests')
 const selectedId = ref('')
 const machines = computed(() => world.value ? machineList(world.value) : [])
 const inspected = computed(() => {
@@ -59,15 +69,31 @@ const inspected = computed(() => {
 })
 function openMachine(id: string) {
   selectedId.value = id
-  zone.value = 'machines'
 }
-const triggerLabel: Record<string, string> = {
-  run: 'Run',
-  events: 'on(event, fn)',
-  tick: 'Loop',
+function showDialog(kind: 'journal' | 'shop' | 'api', from: ApiBookOpener) {
+  if (!modalOpen.value) opener = from
+  selectedId.value = ''
+  overlay.value = openOverlay(overlay.value, { kind })
 }
-const questRailCss = questRailPx + 'px'
-const worldGapCss = worldGapPx + 'px'
+function closeSurface() {
+  overlay.value = closeOverlay(overlay.value)
+  selectedId.value = ''
+  const from = opener
+  opener = undefined
+  nextTick(() => {
+    if (modalOpen.value || selectedId.value) return
+    if (from instanceof HTMLElement && !from.isConnected) journalButton.value?.focus()
+    else from?.focus()
+  })
+}
+function inspectFromFloor(id: string) {
+  opener = mapFrame.value?.querySelector<HTMLElement>('[aria-label="Factory map"]') ?? undefined
+  openMachine(id)
+}
+function inspectFromJournal(id: string) {
+  overlay.value = closeOverlay(overlay.value)
+  openMachine(id)
+}
 const worldInsetCss = worldInsetPx + 'px'
 const headerCss = editorHeaderPx + 'px'
 const checksPaneCss = computed(() => sideWidth.value + 'px')
@@ -144,20 +170,16 @@ const offers = computed(() => available.value.map(quest => ({
   quest,
   hold: world.value ? questHold(world.value, quest) : undefined,
 })))
+const newRequest = computed(() => !world.value?.questId && offers.value.length > 0)
+const history = computed(() => questHistory(world.value?.cleared ?? [], kettlewick.questList ?? []))
 const readingId = ref<string>()
-const reading = computed(() => available.value.find(quest => quest.id === readingId.value))
+const reading = computed(() => journalOpen.value ? available.value.find(quest => quest.id === readingId.value) : undefined)
 const readingHold = computed(() => reading.value && world.value ? questHold(world.value, reading.value) : undefined)
 const readingTake = computed(() => !!reading.value && !!world.value && canTake(world.value, reading.value))
 const shownQuest = computed(() => activeQuest.value ?? reading.value)
 const card = computed(() => shownQuest.value && world.value ? questCard(world.value, shownQuest.value) : undefined)
 const ready = computed(() => card.value?.ready ?? false)
 const testRows = computed(() => card.value?.tests ?? [])
-function grantCall(signature: string) {
-  return signature.split(':')[0] ?? signature
-}
-function initial(name: string) {
-  return name.replace(/^Mayor /, '').slice(0, 1)
-}
 const pulse = ref(false)
 let pulseTimer = 0
 watch(ready, (value, previous) => {
@@ -374,15 +396,6 @@ function showOpenTest() {
   const id = card.value?.remainingTest
   if (id) pickedTest.value = id
 }
-function testMark(state: string) {
-  if (state === 'passing') return '✓'
-  if (state === 'failed') return '!'
-  return '·'
-}
-function testLabel(state: string, text: string) {
-  const name = state === 'passing' ? 'Passing' : state === 'failed' ? 'Failed' : 'Open'
-  return `${name}: ${text}`
-}
 const scriptState = computed<'running' | 'error' | 'stopped'>(() => {
   if (!world.value) return 'stopped'
   if (scriptNotice.value || world.value.status.startsWith('CPU')) return 'error'
@@ -448,7 +461,13 @@ function startOver() {
   send({ kind: 'restart', files: kettlewick.files, fresh: true })
 }
 function shortcut(event: KeyboardEvent) {
-  if (bookOpen.value) return
+  if (modalOpen.value) return
+  if (event.key === 'Escape' && inspected.value && mapFrame.value?.contains(event.target as Node)) {
+    event.preventDefault()
+    event.stopPropagation()
+    closeSurface()
+    return
+  }
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault()
     event.stopPropagation()
@@ -495,7 +514,8 @@ onMounted(async () => {
         files.value = { ...data.deployed }
         activeFile.value = 'main.ts'
         tool.value = undefined
-        zone.value = 'quests'
+        closeSurface()
+        readingId.value = undefined
         resetting = false
       }
       pending.value = false
@@ -557,6 +577,13 @@ onBeforeUnmount(() => {
     <template #nav>
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
+        <button ref="journalButton" type="button" class="nav-btn" aria-haspopup="dialog"
+          :aria-label="newRequest ? overlayLabels.newRequest : overlayLabels.journal" @click="showDialog('journal', $event.currentTarget as HTMLButtonElement)">
+          <BookOpen :size="16" />{{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
+        </button>
+        <button type="button" class="nav-btn" aria-haspopup="dialog" :disabled="!world" @click="showDialog('shop', $event.currentTarget as HTMLButtonElement)">
+          <Store :size="16" />{{ overlayLabels.shop }}
+        </button>
         <template #clock>
           <div v-if="world" class="pills">
             <p class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
@@ -578,116 +605,14 @@ onBeforeUnmount(() => {
       </PackNav>
     </template>
     <template #floor>
-      <section class="quest-zone" aria-label="Current request">
-        <nav class="zone-tabs" aria-label="Quest, shop, and machines">
-          <button type="button" :aria-pressed="zone === 'quests'" @click="zone = 'quests'">Quests</button>
-          <button type="button" :aria-pressed="zone === 'shop'" @click="zone = 'shop'">Shop</button>
-          <button type="button" :aria-pressed="zone === 'machines'" @click="zone = 'machines'">Machines</button>
-        </nav>
-        <div class="quest-scroll">
-          <template v-if="zone === 'quests'">
-            <p v-if="!shownQuest" class="goal">{{ nextStep }}</p>
-            <ul v-if="!shownQuest && offers.length" class="requests">
-              <li v-for="offer in offers" :key="offer.quest.id">
-                <button type="button" @click="readingId = offer.quest.id">
-                  <span class="initial" aria-hidden="true">{{ initial(offer.quest.from) }}</span>
-                  <span>
-                    <b>{{ offer.quest.from.replace(/^Mayor /, '') }}</b>
-                    <small>{{ offer.quest.ask }}</small>
-                    <small v-if="offer.hold">{{ offer.hold }}</small>
-                  </span>
-                </button>
-              </li>
-            </ul>
-            <article v-else-if="shownQuest && card" class="quest">
-              <button v-if="reading" type="button" class="hint" @click="readingId = undefined">All requests</button>
-              <h2>{{ card.title }}</h2>
-              <p class="goal step">{{ nextStep }}</p>
-              <p v-if="granted" class="goal">
-                {{ granted.text }}
-                <button v-if="granted.file" type="button" class="hint" @click="activeFile = granted.file">{{ granted.file }}</button>
-              </p>
-              <VillageAsk :who="shownQuest.who" :name="card.from.replace(/^Mayor /, '')" :role="shownQuest.role" :building-id="shownQuest.building" :line="card.ask" />
-              <div class="need">
-                <p>{{ card.needText }}</p>
-                <span class="goal-line">{{ card.quantity.text }}</span>
-                <progress :value="card.quantity.value" :max="card.quantity.max" :aria-label="card.quantity.text" />
-              </div>
-              <ul class="rewards">
-                <li title="Credits paid when you hand this over."><Coins />{{ shownQuest.pay }}</li>
-                <li v-if="shownQuest.xp" title="XP paid when you hand this over."><Sparkles />{{ shownQuest.xp }}</li>
-                <li v-if="shownQuest.unlock" :title="shownQuest.unlock.signature"><Unlock />{{ grantCall(shownQuest.unlock.signature) }}<span class="when">On Take</span></li>
-                <li v-if="shownQuest.trigger" :title="triggerLabel[shownQuest.trigger]"><Unlock />{{ triggerLabel[shownQuest.trigger] }}<span class="when">On hand-over</span></li>
-                <li v-if="shownQuest.gift" title="Granted when you hand this over."><Unlock />{{ shownQuest.gift }}<span class="when">On hand-over</span></li>
-                <li v-if="shownQuest.install" title="Installed when you hand this over."><Unlock />{{ shownQuest.install }}<span class="when">On hand-over</span></li>
-              </ul>
-            </article>
-            <div v-else class="quest">
-              <h2>{{ world?.cleared.length ? 'More is coming' : 'Kettlewick Works' }}</h2>
-              <p v-if="!world" class="goal">Uncle Ambrose left you the works.</p>
-            </div>
-          </template>
-          <ul v-else-if="zone === 'shop'" class="shop-list purchases">
-            <li v-for="item in catalog" :key="item.id">
-              <button type="button" :disabled="!world || world.bought.includes(item.id) || world.credits < item.price"
-                @click="send({ kind: 'buy', id: item.id })">
-                <b>{{ item.name }}</b>
-                <span v-if="world?.bought.includes(item.id)" class="owned">Owned</span>
-                <span v-else>{{ item.price }} credits</span>
-                <small>{{ item.detail }}</small>
-              </button>
-            </li>
-          </ul>
-          <div v-else>
-            <article v-if="inspected" class="quest">
-              <button type="button" class="hint" @click="selectedId = ''">My machines</button>
-              <h2>{{ inspected.name }}</h2>
-              <p>{{ inspected.description }}</p>
-              <ul class="facts">
-                <li v-for="line in inspected.lines" :key="line.label" :class="{ 'task-line': line.label === 'Task' }"><b>{{ line.label }}</b> {{ line.value }}</li>
-                <li v-for="recipe in inspected.recipes" :key="recipe.id">
-                  <b>{{ recipe.input }} → {{ recipe.output }}</b>
-                  <template v-if="recipe.missing"> Missing {{ recipe.missing }}.</template>
-                  <template v-if="recipe.locked"> {{ recipe.locked }}</template>
-                </li>
-              </ul>
-              <div v-if="inspected.progress" class="xp">
-                <span>{{ inspected.progress.label }}</span>
-                <span class="bar"><i :style="{ width: inspected.progress.pct + '%' }" /></span>
-              </div>
-              <ul v-if="inspected.actions.length" class="shop-list">
-                <li v-for="action in inspected.actions" :key="action.id">
-                  <button type="button" :disabled="!action.enabled" @click="send({ kind: 'manual', action: action.id, drone: action.drone, vein: action.vein })">
-                    <b>{{ action.label }}</b>
-                    <span v-if="action.api">{{ action.api }}</span>
-                    <small v-if="action.reason">{{ action.reason }}</small>
-                  </button>
-                </li>
-              </ul>
-            </article>
-            <ul v-else class="shop-list">
-              <li v-for="row in machines" :key="row.id">
-                <button type="button" @click="openMachine(row.id)">
-                  <b>{{ row.name }}</b>
-                  <small>{{ row.detail }}</small>
-                </button>
-              </li>
-            </ul>
-          </div>
-        </div>
-        <div v-if="zone === 'quests' && (activeQuest || reading)" class="quest-action">
-          <template v-if="reading">
-            <button class="gold" type="button" data-testid="take-quest" :disabled="!readingTake" @click="take(reading.id)">Take quest</button>
-            <p v-if="readingHold" class="calm">{{ readingHold }}</p>
-          </template>
-          <button v-else-if="card?.remainingTest" type="button" class="calm link" @click="showOpenTest">View remaining test</button>
-          <p v-else-if="!ready" class="calm">In progress</p>
-          <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" @click="send({ kind: 'complete' })">Hand over</button>
-        </div>
-      </section>
       <div class="stage">
-        <div class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="openMachine" />
+        <div ref="mapFrame" class="map-frame">
+          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
+          <QuestTracker v-if="world" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
+            @journal="showDialog('journal', $event)" @hand-over="send({ kind: 'complete' })"
+            @show-test="showOpenTest" @open-file="activeFile = $event" />
+          <MachineCard v-if="inspected" class="machine-card" :inspected="inspected" @close="closeSurface"
+            @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
         <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': columns.stackChecks }">
@@ -695,9 +620,9 @@ onBeforeUnmount(() => {
           <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
           <div class="editor-column">
             <div class="editor-pane"><div class="editor-host">
-              <LazyCodeEditor :book-open="bookOpen" @reference="openBook">
+              <LazyCodeEditor :book-open="modalOpen" @reference="showDialog('api', $event)">
                 <template #actions>
-                  <button class="ide" type="button" aria-haspopup="dialog" @click="openBook($event.currentTarget as HTMLButtonElement)">API</button>
+                  <button class="ide" type="button" aria-haspopup="dialog" @click="showDialog('api', $event.currentTarget as HTMLButtonElement)">API</button>
                   <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" :data-state="loopOn ? 'running' : 'idle'"
                     :disabled="pending || !world || (!loopOn && !loopable)"
                     :title="loopable || loopOn ? 'calls onTick every tick' : 'Export onTick in main.ts to loop it.'"
@@ -788,7 +713,14 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <Teleport to="body">
-      <ApiBook v-if="bookOpen" :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeBook" />
+      <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :granted="granted"
+        :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
+        :active="!!world?.questId" :offers="offers" :history="history" :machines="machines" @close="closeSurface"
+        @read="readingId = $event" @take="take" @hand-over="send({ kind: 'complete' })"
+        @show-test="showOpenTest(); closeSurface()" @open-machine="inspectFromJournal" @open-file="activeFile = $event; closeSurface()" />
+      <ShopDialog v-else-if="shopOpen && world" :catalog="catalog" :credits="world.credits" :bought="world.bought"
+        @buy="send({ kind: 'buy', id: $event })" @close="closeSurface" />
+      <ApiBook v-else-if="bookOpen" :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeSurface" />
     </Teleport>
   </StudioShell>
 </template>
@@ -808,7 +740,7 @@ onBeforeUnmount(() => {
   flex-direction: row;
   align-items: stretch;
   flex: 1 1 auto;
-  gap: v-bind(worldGapCss);
+  gap: 0;
   padding: v-bind(worldInsetCss);
   width: 100%;
   height: 100%;
@@ -849,171 +781,27 @@ onBeforeUnmount(() => {
 .editor-bay :deep(.tree-split) { grid-column: 2; grid-row: 1 }
 .editor-bay :deep(.side-split) { grid-column: 4; grid-row: 1 }
 .editor-bay :deep(.tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
-.quest-zone {
-  width: v-bind(questRailCss);
-  flex: 0 0 v-bind(questRailCss);
-  align-self: stretch;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 7px;
-}
-.zone-tabs {
-  display: flex;
-  gap: 4px;
-  flex: none;
-  padding: 12px 12px 0;
-}
-.zone-tabs button {
-  flex: 1;
-  min-height: 28px;
-  background: transparent;
-  color: var(--soft);
-  border-color: var(--line);
-  font: 12px var(--mono);
-}
-.zone-tabs button[aria-pressed='true'] {
-  background: var(--surface-low);
-  color: var(--text);
-  border-color: var(--line-strong, var(--line));
-}
-.quest-scroll {
-  flex: 1;
-  min-height: 0;
+.machine-card {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  width: 260px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
   overflow: auto;
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  padding: 10px 12px;
 }
-.quest { display: grid; gap: 12px; min-width: 0 }
-.quest-zone h2 {
-  font-size: 15px;
-  line-height: 1.2;
-  letter-spacing: -0.4px;
-  margin: 0;
-}
-.goal { font-size: 13px; line-height: 1.4 }
-.quest > .goal.step { min-height: calc(2 * 1.4em) }
-.lesson {
-  border-top: 1px solid var(--accent-line);
-  padding-top: 9px;
-  display: grid;
-  gap: 8px;
-  justify-items: start;
-}
-.lesson ol {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 1.45;
-}
-.reward, .progress { margin: 0; font: 13px var(--mono); color: var(--accent-soft) }
-.reward b, .progress b { color: var(--text); letter-spacing: 0.5px }
-.quest-action {
-  flex: none;
-  margin-top: auto;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--line);
-}
-.need { display: grid; gap: 6px; min-width: 0 }
-.need p { margin: 0; font-size: 13px; line-height: 1.4 }
-.need progress { width: 100%; height: 4px; margin: 0; border: 0; background: var(--line); accent-color: var(--mint) }
-.need progress::-webkit-progress-bar { background: var(--line) }
-.quest-action .gold { width: 100%; height: 34px }
-.quest-action .gold.pulse { animation: quest-ready 0.7s ease-out 1 }
-.quest-action .calm {
-  margin: 0;
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--sub);
-  font-size: 13px;
-}
-.quest-action .link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  background: transparent;
-  border: 0;
-  color: var(--text);
-  text-decoration: underline;
-  cursor: pointer;
-}
-@keyframes quest-ready {
-  0% { transform: scale(1) }
-  40% { transform: scale(1.04) }
-  100% { transform: scale(1) }
-}
-.requests { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
-.requests button {
-  width: 100%;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  text-align: left;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  padding: 8px;
-  color: var(--text);
-}
-.requests b { display: block; font-size: 14px }
-.requests small { display: block; color: var(--soft); font-size: 12px; line-height: 1.35 }
-.initial {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--surface-low);
-  color: var(--gold);
-  font: 700 13px var(--mono);
-}
-.goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px }
-.goals li { display: grid; gap: 3px; min-width: 0 }
-.goal-line {
-  min-width: 0;
-  min-height: 1.3em;
-  font-size: 13px;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.goals progress { width: 100%; height: 4px; border: 0; background: var(--line); accent-color: var(--mint) }
-.goals progress::-webkit-progress-bar { background: var(--line) }
-.goals [data-mark=passing] { color: var(--mint) }
-.goals [data-mark=pending] { color: var(--text) }
-.goals [data-mark=failed] { color: var(--alert) }
-.goals [data-mark=failed] progress { accent-color: var(--alert) }
-.goals small { color: var(--soft); font-size: 12px; line-height: 1.35 }
-.rewards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px }
-.rewards li {
+.nav-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 8px;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--text);
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--surface-low);
-  font: 12px var(--mono);
-  color: var(--text);
 }
-.rewards svg { width: 13px; height: 13px; color: var(--gold) }
-.rewards .when { color: var(--soft); font-size: 10px }
+.nav-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold) }
 .pills { display: flex; align-items: center; gap: 8px; margin-inline: auto }
 .pill {
   position: relative;
@@ -1108,54 +896,6 @@ onBeforeUnmount(() => {
 .context [data-state=stopped] .lamp { background: var(--sub) }
 .filter { margin: 0; padding: 6px 8px 0; color: var(--sub); font: 11px var(--mono) }
 .filter button { border: 0; background: transparent; color: var(--text); font: inherit; text-decoration: underline }
-.shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
-.shop-list button {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  justify-content: stretch;
-  justify-items: start;
-  gap: 2px 8px;
-  text-align: left;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 8px;
-}
-.shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
-.shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
-.shop-list button:disabled, .shop-list button.locked { opacity: 0.45 }
-.purchases button:enabled { border-color: var(--gold); background: var(--accent-surface) }
-.purchases button:enabled:hover { background: var(--hover) }
-.purchases button:disabled { opacity: 1 }
-.purchases button .owned { color: var(--sub) }
-.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font: 12px var(--mono); color: var(--soft) }
-.facts li {
-  min-width: 0;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-  font-variant-numeric: tabular-nums;
-}
-.facts .task-line {
-  height: 1.45em;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.facts b { color: var(--text); font-weight: 600 }
-.quest .bar { display: block; height: 5px; border-radius: 3px; background: var(--accent-shadow); overflow: hidden }
-.quest .bar i { display: block; height: 100%; background: var(--gold) }
-.balance b { font-variant-numeric: tabular-nums }
-.xp { display: grid; gap: 4px; min-width: 92px }
-.xp-bar {
-  display: block;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--accent-shadow);
-  overflow: hidden;
-}
-.xp-bar i { display: block; height: 100%; background: var(--gold) }
 .editor-column {
   container: editor / inline-size;
   --editor-header: v-bind(headerCss);
@@ -1387,7 +1127,6 @@ onBeforeUnmount(() => {
     height: auto;
     min-height: clamp(480px, 66dvh, 720px);
   }
-  .quest-zone { flex: none; width: auto; max-height: 42% }
   .stage { width: 100%; min-height: 320px; flex: 1 1 auto; }
   .map-frame { min-height: 140px; }
   .editor-bay {

@@ -1,14 +1,14 @@
 # v8 quest screen
 
-Governs the arrangement of Kettlewick Works. The rules are [ADR 0034](../adr/0034-cpu-meter-stays-visible.md), [ADR 0033](../adr/0033-quest-card-stays-still.md), [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
+Governs the arrangement of Kettlewick Works. The rules are [ADR 0039](../adr/0039-quest-ux-village.md), [ADR 0034](../adr/0034-cpu-meter-stays-visible.md), [ADR 0033](../adr/0033-quest-card-stays-still.md), [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
 
-The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The quest rail is a fixed 280px column on the left, the same panel surface as the rest of the desk. To its right, the map is the top row and the editor is the bottom row. One splitter component divides the map from the editor, the file tree from the code, and the code from the tests. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape and is compact enough for that column: padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px ask, a 34px gold button, and a 48px portrait.
+The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The field spans the top row. The editor fills the row below it. One splitter component divides the map from the editor, the file tree from the code, and the code from the tests. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape in the Journal with padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px ask, a 34px gold button, and a 48px portrait.
 
 ## Proportions
 
-The grid is 16 cells wide and 6 tall, so the map is a wide row, not a tall column. It spans the full width beside the quest rail. A horizontal splitter under the map sets the row's height. The default is 45% of that column. The splitter can move it between 22% and 75%, and the height is saved in this browser under `inherit.v8.map-height`.
+The grid is 16 cells wide and 6 tall, so the map is a wide row, not a tall column. It spans the full width inside the frame padding. A horizontal splitter under the map sets the row's height. The default is 45% of the works height. The splitter can move it between 22% and 75%, and the height is saved in this browser under `inherit.v8.map-height`.
 
-The quest rail does not grow. It stays 280px, inside the 260–300px band, and it runs the full height of the desk. Shop stays a tab on that rail. The portrait and the quest text are compact so the column can stay narrow.
+The tracker sits 12px from the field’s top-right corner. It is 280px wide and scrolls within the top half of the field. A selected machine opens a 260px card 12px from the top-left corner. Its contents scroll within the field’s height.
 
 The file tree is a column inside the editor row, 140px until the player drags it. The drag stays between 96px and 420px, and the width is saved as `inherit.v8.tree-width`. Double-click restores 140px. One Files toggle sits on its bar. Under 1280px it starts closed, as a narrow rail with that same toggle. Open or closed is saved separately. Dragging the rail opens it.
 
@@ -16,37 +16,45 @@ The editor and the tests fill the rest of the bottom row. The file tree is the l
 
 ## Reading order
 
-1. Nav. Where you are, and the credits and level you hold.
-2. Quest rail. Who is asking, what they need, the reward, the one button.
-3. Works. The map.
-4. Editor. The open file tab, the code, API, Loop, Deploy, and the tests beside the code.
-5. Status bar. The script, problems, the drone line, caret, tick, and the CPU meter.
+1. Nav. Kettlewick Works, Journal, Shop, credits, level, and Settings.
+2. Field. The tracker names the next step. Clicking a machine opens its card.
+3. Editor. The open file tab, the code, API, Loop, Deploy, and the tests beside the code.
+4. Status bar. The script, problems, the drone line, caret, tick, and the CPU meter.
 
-On a narrow window the rail stacks above the map, and the map stacks above the editor. The same five stops stay in that order.
+The field stays above the editor on a narrow window. The Journal also provides a keyboard route to the requests and machines.
 
 ## Nav
 
-Logo and the place name Kettlewick Works stay on the left. Settings stays on the right and opens Charts and Start over. The API book opens from the editor, not from this bar. The center is two pills of equal height. Credits are a coin and the number. When credits arrive, that gain floats up from the pill, and the motion is skipped when the player prefers reduced motion. Level is a badge with the number and a thin XP bar. The XP count, such as `12 / 20 XP`, is the tooltip on that pill. CPU, Running, and any other status text are not in the header.
+Journal and Shop follow the logo and the place name Kettlewick Works. Each opens a dialog. Journal shows a small gold dot and announces “new request” when a request is listed and no quest is open. Settings stays on the right and opens Charts and Start over. The API book opens from the editor. The center is two pills of equal height. Credits are a coin and the number. When credits arrive, that gain floats up from the pill, and the motion is skipped when the player prefers reduced motion. Level is a badge with the number and a thin XP bar. The XP count, such as `12 / 20 XP`, is the tooltip on that pill.
 
 The bar uses the six steps already in `levelFor`. Past the last step it stays full.
 
-## Quest rail
+## Quest tracker
 
-One card, two tabs: Quests and Shop. The shop lists the conveniences: hotter furnace, bigger cart, bigger hopper, and CPU. Each row shows the price in credits, or Owned. A purchase stays on this tab. Functions are not on this list. The second drone is not on this list.
+With no open quest, the tracker shows the next step and a Journal button. With an open quest, it shows the giver, title, next step, and any grant line and file link. Up to three tests show their marks. The first pending or failed test takes the first place, with its reason when one is available. The delivery bar shows what the villager has received. Folding the tracker leaves the giver and step on one line. The browser remembers the fold under `inherit.v8.tracker`.
 
-With no quest open, the rail lists the villagers who have a request. A row is an initial, the name, and one line. Clicking it opens that request.
+The footer reads `In progress` while the order is underway. When delivery is full and a check is still open, `View remaining test` selects it in Tests. When all checks pass, Hand over becomes available and pulses once.
 
-The open card is the title, one next step, the portrait, and one in-character line. The next step is one sentence from the quest state, such as `Talk to Ines`, `Press ▶ next to smeltOnce`, `Open the furnace and choose Smelt.`, or `Hand over 3 ore`. It names what the player does next. It does not follow the drone. The goal keeps two lines of height, and the quantity line is one line with tabular figures, so a change does not move the portrait. A quest that grants Run, Loop, or `on()` adds one more line for that grant. Under the ask, one sentence says what is needed and how it is made, including that Collect sends a drone from the furnace to the depot, then one quantity bar, such as `Delivered to Bram · 0/1 ingot`. Test rows are not on this card. The tests panel and the card background stay as they are. The reward is tiles: credits, XP, an unlock such as `furnace.alloy()` when the quest grants one, Run, Loop, or Events when the quest grants that, and `drone-2` and the press on Odile's card. An unlock is marked On Take. A trigger, a gift, or an installed machine is marked On hand-over. There is no Next list and no shop-tier line. Level and XP stay in the header.
+## Journal and Shop
 
-Take quest sits in the footer once a request is open. A preview has All requests back to the list. A held request stays on the list and Take stays closed, with the sentence from [ADR 0031](../adr/0031-quest-gift-before-take.md). After Take, the footer says `In progress` until every goal is met, then a Hand over button. When the order is full and a check is still open, the footer says `View remaining test` and that click opens the first open row. It is not a disabled count.
+The Journal has four sections in order.
+
+1. **Now** shows the open quest or the request being read. The card has the title, step, grant line, portrait and ask, need, delivery bar, and reward tiles. Old contracts show their saved requirements. A request has Take quest and All requests. A held request shows its hold sentence and disables Take. The open quest has the same footer actions as the tracker. With no card, Now shows the next step.
+2. **Requests** lists the available villagers while no quest is open. Each row has an initial, name, ask and any hold. Selecting a row shows its card in Now.
+3. **Done** lists hand-overs in the order they happened, with each title, giver and change.
+4. **Machines** lists the works and drones. Selecting a row closes the Journal and opens the same pinned card as a click on the field.
+
+Shop lists the existing conveniences. Each row shows the detail and price or Owned. Buying keeps Shop open. Owned items and purchases beyond the current credit balance are disabled.
+
+Journal, Shop and the API book each open as a native modal and close any machine card. Escape, the close button or a backdrop click closes the dialog and returns focus to its opener. Editor shortcuts wait until the dialog closes.
 
 Taking a quest inserts one comment at the top of the open file, in the villager's voice, for example `// Odile: steel is ore and coal together. Where would they meet?`. It is a nudge, not a solution, and it does not name the shop. When that quest is handed over and it grants a trigger, one example with a comment is inserted under that line, once. A file that already exports `onTick` does not gain a second one. If that quest was already offered the line, deleting it does not bring it back. The API book marks a function `new` while the quest that granted it is open.
 
 ## Works
 
-The map fills the top row beside the quest rail. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit and centers that grid in the row, horizontally and vertically. The whole grid stays visible and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
+The map fills the top row. On load, and whenever that row changes size, a resize observer scales the tiles with a contain fit and centers that grid in the row, horizontally and vertically. The whole grid stays visible and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
-Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it, or a row under Machines, opens that object on the rail: what it is, what it holds, its recipes, and its buttons. Recipes are facts. A button names the call and the reason it can run, such as `Needs 2 ore`, `Unload at furnace`, or `Collect with drone-1`. Dump calls `drone.dump()`. The drone's hit target follows the sprite. The Depot and Furnace captions are their own hits, so a drone standing on the tile does not hide the building. A vein is labeled poor, normal, or rich, and a bar shows measured mining on the drone and on the vein. A haul with no measured progress is a task label. A play mark in the gutter of `main.ts` calls one exported function once, once Run is unlocked. The same command is `Run function at cursor`. The mark uses the project dirty flag: a dirty project says deploy and run. A clean Deploy button says Deployed. Deploying clears current drone tasks. The result is a console line, such as `smeltOnce ok`. Loop, once Ines is handed over, is the toggle `Loop: onTick`. It calls `onTick` every tick. The console records when that loop starts and stops. With no `onTick` in `main.ts` the toggle is disabled. A lit Loop whose deployed `main.ts` has no `onTick` says so on the grant line.
+Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it, or a row under Machines in the Journal, opens its card in the top-left corner of the field with what it is, what it holds, its recipes, and its buttons. Recipes are facts. A button names the call and the reason it can run, such as `Needs 2 ore`, `Unload at furnace`, or `Collect with drone-1`. Dump calls `drone.dump()`. The drone's hit target follows the sprite. The Depot and Furnace captions are their own hits, so a drone standing on the tile does not hide the building. A vein is labeled poor, normal, or rich, and a bar shows measured mining on the drone and on the vein. A haul with no measured progress is a task label. A play mark in the gutter of `main.ts` calls one exported function once, once Run is unlocked. The same command is `Run function at cursor`. The mark uses the project dirty flag: a dirty project says deploy and run. A clean Deploy button says Deployed. Deploying clears current drone tasks. The result is a console line, such as `smeltOnce ok`. Loop, once Ines is handed over, is the toggle `Loop: onTick`. It calls `onTick` every tick. The console records when that loop starts and stops. With no `onTick` in `main.ts` the toggle is disabled. A lit Loop whose deployed `main.ts` has no `onTick` says so on the grant line.
 
 ## Editor
 
@@ -56,7 +64,7 @@ The editor side of the row is the open file tabs, then API, Loop, and Deploy, th
 
 Tests and Console share the pane to the right of the code. The pane's header is the same 36px row, with two tabs: Tests and Console. The selected tab is remembered in the browser. A saved Checks choice opens Tests. While Console is selected the header reads `Tick 12762`, with a space. Borders on this row are 1px. The seams between tree, code, and this pane are the splitters, which draw a line only while hovered or dragged.
 
-The quantity lives on the quest rail. A test turns failed only after its facts have not changed for 20 ticks, about 10 seconds, since Take quest or the last Deploy. The first stuck test adds one fact from the works. A full cart that has not moved for that stretch, on or beside a vein, is named before the furnace, such as `drone-1 is full (3/3) at Vein A and not moving`. Later tests say `waits on: Ore reaches the furnace` instead of repeating that fact. The fact names a field. It does not say what to write.
+The tracker and the Journal card show the delivery quantity. A test turns failed only after its facts have not changed for 20 ticks, about 10 seconds, since Take quest or the last Deploy. The first stuck test adds one fact from the works. A full cart that has not moved for that stretch, on or beside a vein, is named before the furnace, such as `drone-1 is full (3/3) at Vein A and not moving`. Later tests say `waits on: Ore reaches the furnace` instead of repeating that fact. The fact names a field. It does not say what to write.
 
 The Tests tab lists each test of the open quest. A row is the test's name, a plain line for what it checks, and the stuck reason when there is one. Clicking the row marks it. There is no Checks tab. A host error, such as a failed deploy, a failed save, or a floor renderer error, is a line above this list and a console row. Those rows count in the problems badge.
 
@@ -73,8 +81,13 @@ A quiet strip, every item the same height, an icon and a short label, each with 
 | Element | Home |
 | --- | --- |
 | Credits and level | Nav, two pills |
-| Portrait, need, quantity, reward, Take, Hand over, shop | Quest rail |
-| Map and its labels | Top row, beside the quest rail |
+| Journal and Shop buttons | Nav, after Kettlewick Works |
+| Requests, portrait, need, rewards, Take, hand-over history, machine list | Journal dialog |
+| Step, grant, quantity, remaining test, Hand over | Tracker and current card in the Journal |
+| Test marks at a glance | Tracker in the top-right corner of the field |
+| Purchases | Shop dialog |
+| Map and its labels | Full-width top row |
+| Machine facts and manual actions | Pinned card in the top-left corner of the field |
 | Files, code, API, Loop, Deploy, gutter Run | Editor header and the code under it |
 | Pass and fail | Test rows beside the code |
 | Errors and sim events | Console tab |

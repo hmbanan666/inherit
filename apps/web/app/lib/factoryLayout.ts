@@ -1,11 +1,9 @@
-/** Kettlewick Works frame. The map is a wide row, because the grid is 16 by 6. */
+/** Kettlewick Works frame. The map and editor span the width inside the frame padding. */
 
-export const questRailPx = 280
 export const fileTreePx = 140
 export const treeRailPx = 36
 export const splitterPx = 7
 export const worldInsetPx = 8
-export const worldGapPx = 8
 
 /** One header row for the file tree, the open tabs, and the checks pane. */
 export const editorHeaderPx = 36
@@ -13,7 +11,7 @@ export const editorHeaderPx = 36
 /** Checks sit to the right of the code, inside the 280–320px band. */
 export const checksPanePx = 300
 
-/** Map row as a share of the column beside the quest rail. */
+/** Map row as a share of the works height. */
 export const mapHeightShare = 0.45
 export const mapHeightMin = 22
 export const mapHeightMax = 75
@@ -86,9 +84,9 @@ export function consoleBody(text: string, located = false) {
   return text.replace(/^[\w./-]+\.ts:\d+ · /, '')
 }
 
-/** Width of the map and editor column after the fixed rail and the frame padding. */
+/** Width of the map and editor column inside the frame padding. */
 export function worksWidth(viewport: number) {
-  return Math.max(0, viewport - questRailPx - worldInsetPx * 2 - worldGapPx)
+  return Math.max(0, viewport - worldInsetPx * 2)
 }
 
 export function readFilesOpen(stored: string | null, viewport: number) {

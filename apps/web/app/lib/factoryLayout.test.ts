@@ -12,7 +12,6 @@ import {
   formatCredits,
   mapHeightMax,
   mapHeightMin,
-  questRailPx,
   readFilesOpen,
   editorColumns,
   codeStackPx,
@@ -32,13 +31,9 @@ test('credits are written with a space', () => {
   expect(formatCredits(300)).toBe('300 credits')
 })
 
-test('the quest rail stays 280px and the map uses the width beside it', () => {
-  expect(questRailPx).toBe(280)
-  expect(questRailPx).toBeGreaterThanOrEqual(260)
-  expect(questRailPx).toBeLessThanOrEqual(300)
-  const width = worksWidth(1024)
-  expect(width).toBeGreaterThan(1024 * 0.6)
-  expect(width).toBe(1024 - questRailPx - 8 * 2 - 8)
+test('the map and editor use the full width inside the frame padding', () => {
+  expect(worksWidth(1024)).toBe(1024 - 16)
+  expect(worksWidth(8)).toBe(0)
 })
 
 test('the map row defaults to 45% of the works column and a saved height stays in range', () => {
@@ -85,8 +80,8 @@ test('a measured bay stacks Tests even when the saved panes leave zero code room
 test('at 801px the displayed tree leaves room for the active file and actions', () => {
   const bay = worksWidth(801) - 2 // The observer measures inside the two 1px borders.
   const narrow = editorColumns(bay, treeWidthMax, sideWidthMax)
-  expect(narrow.stackChecks).toBe(true)
-  expect(bay - narrow.tree).toBe(codeStackPx)
+  expect(narrow).toEqual({ tree: treeWidthMax, stackChecks: true })
+  expect(bay - narrow.tree).toBeGreaterThanOrEqual(codeStackPx)
   expect(editorColumns(bay, 36, sideWidthMax)).toEqual({ tree: 36, stackChecks: true })
 
   const wide = treeWidthMax + sideWidthMax + codeStackPx
