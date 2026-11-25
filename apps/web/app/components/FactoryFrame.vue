@@ -690,7 +690,7 @@ onBeforeUnmount(() => {
     <template #floor>
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-point="focusPoint" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
+          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
           <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
             @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
             @show-test="showOpenTest" @open-file="activeFile = $event" />

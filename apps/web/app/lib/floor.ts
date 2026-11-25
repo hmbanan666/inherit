@@ -7,6 +7,7 @@ import { portrait } from './art/townPortrait'
 import {
   fieldBounds, houseBox, housePrint, houseScale, propArt, villageGround, villageHomes, villageProps, type VillageView,
 } from './village'
+import { advanceWander, markerBob, wanderEnvelope, wanderFrozen, wanderOffset, type WanderClock } from './wander'
 import { screenBox } from './popupPlace'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
@@ -138,7 +139,7 @@ function equipment(parent: Container, pos: Cell, paint: (d: ReturnType<typeof dr
 type VillageNpc = VillageView['npcs'][number]
 type House = VillageView['houses'][number]
 
-function villagerToken(layer: Container, npc: VillageNpc) {
+function villagerToken(layer: Container, npc: VillageNpc, neighbours: VillageNpc[]) {
   const art = layer.addChild(new Container())
   art.position.set(npc.spot.x, npc.spot.y)
   const face = art.addChild(print(60, 64, p => portrait(p, npc.who, 'waiting')))
@@ -152,7 +153,17 @@ function villagerToken(layer: Container, npc: VillageNpc) {
   badge.y = npcMarker.y
   const glyph = badge.addChild(label('', 16, 0x242529))
   glyph.anchor.set(0.5)
-  return { art, badge, glyph, name: npc.name }
+  const clock: WanderClock = { ms: 0 }
+  return { art, badge, glyph, name: npc.name, who: npc.who, spot: npc.spot, mark: npc.mark, clock,
+    envelope: wanderEnvelope(npc, neighbours) }
+}
+
+type Token = ReturnType<typeof villagerToken>
+
+function pose(token: Token, reducedMotion: boolean) {
+  const offset = reducedMotion ? { x: 0, y: 0 } : wanderOffset(token.who, token.clock.ms, undefined, token.envelope)
+  token.art.position.set(token.spot.x + offset.x, token.spot.y + offset.y)
+  token.badge.y = npcMarker.y + markerBob(token.mark, token.clock.ms)
 }
 
 export class FloorScene {
@@ -176,7 +187,11 @@ export class FloorScene {
   private readonly villageLayer = new Container({ label: 'village' })
   private readonly houses = new Map<House['building'], { state: House['state']; art: Sprite }>()
   private readonly npcLayer = new Container({ label: 'villagers' })
-  private readonly npcs = new Map<string, ReturnType<typeof villagerToken>>()
+  private readonly npcs = new Map<string, Token>()
+  private frozen?: string
+  private readonly pressed = new Map<number, string>()
+  private visible = true
+  private reducedMotion = false
   private readonly equipmentLayer = new Container({ label: 'equipment' })
   private readonly paths: Graphics
   private readonly ring: Graphics
@@ -246,10 +261,13 @@ export class FloorScene {
     for (const npc of view.npcs) {
       let token = this.npcs.get(npc.id)
       if (!token) {
-        token = villagerToken(this.npcLayer, npc)
+        token = villagerToken(this.npcLayer, npc, view.npcs)
+        pose(token, this.reducedMotion)
         this.npcs.set(npc.id, token)
       }
       token.art.alpha = npc.dim ? 0.55 : 1
+      token.mark = npc.mark
+      token.badge.y = npcMarker.y + markerBob(npc.mark, token.clock.ms)
       token.badge.visible = !!npc.mark
       if (npc.mark) {
         token.badge.tint = npc.mark === 'active' ? 0x8a8a8a : selectionColor
@@ -259,7 +277,7 @@ export class FloorScene {
   }
 
   npcAnchors() {
-    return Array.from(this.npcs, ([id, { art, badge, name }]) => ({ id, x: art.x, y: art.y, name, marked: badge.visible }))
+    return Array.from(this.npcs, ([id, { art, badge, name }]) => ({ id, x: art.x, y: art.y, name, marked: badge.visible, bob: badge.y - npcMarker.y }))
   }
 
   private placeVein(vein: FloorWorld['veins'][number]) {
@@ -319,9 +337,42 @@ export class FloorScene {
     item.cargo.visible = drone.cargo > 0
   }
 
+  private suspend(id?: string) {
+    const token = id && this.npcs.get(id)
+    if (token) token.clock.previous = undefined
+  }
+
+  setFrozen(id?: string) {
+    if (this.frozen === id) return
+    this.frozen = id
+    this.suspend(id)
+  }
+
+  setPressed(id?: string, pointerId = 0) {
+    if (id) {
+      this.pressed.set(pointerId, id)
+      this.suspend(id)
+    } else this.pressed.delete(pointerId)
+  }
+
+  setVisible(visible: boolean) {
+    this.visible = visible
+    if (!visible) for (const token of this.npcs.values()) token.clock.previous = undefined
+  }
+
+  setReducedMotion(reduce: boolean) {
+    if (reduce === this.reducedMotion) return
+    this.reducedMotion = reduce
+    if (reduce) for (const token of this.npcs.values()) {
+      token.clock = { ms: 0 }
+      pose(token, true)
+    }
+  }
+
   highlight(id = '') {
     if (id === this.hover) return
     this.hover = id
+    this.suspend(id)
     this.paintHover()
     this.paintRing(this.latest)
   }
@@ -368,7 +419,7 @@ export class FloorScene {
       return { origin: art.position, shapes: [{ type: 'box', box }] }
     }
     const npc = this.npcs.get(id)
-    if (npc) return { origin: npc.art.position, shapes: npcShapes(npc.name, npc.badge.visible) }
+    if (npc) return { origin: npc.art.position, shapes: npcShapes(npc.name, npc.badge.visible, npc.badge.y - npcMarker.y) }
     const spot = stationsOf(world).find(item => item.id === id)
     if (!this.stations.has(id) || !spot) return
     return { origin: center(spot.pos), shapes: stationShapes(spot.kind, spot.title) }
@@ -572,6 +623,15 @@ export class FloorScene {
   }
 
   animate(now: number, interval: number, paused: boolean) {
+    const pressed = [...this.pressed.values()]
+    for (const [id, token] of this.npcs) {
+      const frozen = wanderFrozen({
+        hovered: this.hover === id, pressed: pressed.includes(id), dialog: this.frozen === id,
+        reducedMotion: this.reducedMotion, hidden: !this.visible, paused,
+      })
+      token.clock = advanceWander(token.clock, now, frozen)
+      if (!frozen) pose(token, false)
+    }
     const t = paused ? 1 : Math.min(1, (now - this.arrivals) / interval)
     for (const item of this.haulers)
       item.art.position.set(item.fromX + (item.x - item.fromX) * t, item.fromY + (item.y - item.fromY) * t)

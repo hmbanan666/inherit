@@ -33,6 +33,7 @@ export interface NpcHit {
   y: number
   name?: string
   marked?: boolean
+  bob?: number
 }
 
 export const cameo = { y: -22, radius: 20 }
@@ -110,12 +111,12 @@ export function stationShapes(kind: MachineKind, title: string): Shape[] {
   return [bodies[kind], { type: 'box', box: captionBox(title, top) }]
 }
 
-export function npcShapes(name: string, marked = true): Shape[] {
+export function npcShapes(name: string, marked = true, bob = 0): Shape[] {
   const shapes: Shape[] = [
     { type: 'ellipse', ellipse: { cx: 0, cy: cameo.y, rx: cameo.radius, ry: cameo.radius } },
     { type: 'box', box: captionBox(name, npcCaptionY) },
   ]
-  if (marked) shapes.push({ type: 'ellipse', ellipse: { cx: 0, cy: npcMarker.y, rx: npcMarker.radius, ry: npcMarker.radius } })
+  if (marked) shapes.push({ type: 'ellipse', ellipse: { cx: 0, cy: npcMarker.y + bob, rx: npcMarker.radius, ry: npcMarker.radius } })
   return shapes
 }
 
@@ -190,7 +191,7 @@ export function pickFloor(
   }
   for (let i = npcs.length - 1; i >= 0; i--) {
     const npc = npcs[i]!
-    const shapes = npcShapes(npc.name ?? npc.id.slice(4), npc.marked)
+    const shapes = npcShapes(npc.name ?? npc.id.slice(4), npc.marked, npc.bob)
     if (hitsShapes(px - npc.x, py - npc.y, shapes, hitPadding)) return npc.id
   }
   for (let i = stations.length - 1; i >= 0; i--) {
