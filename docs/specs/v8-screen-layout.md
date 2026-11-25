@@ -8,7 +8,7 @@ The shell is the workshop frame already on screen: charcoal palette, 65px nav, 2
 
 The grid is 16 cells wide and 6 tall, so the map is a wide row, not a tall column. It spans the full width inside the frame padding. A horizontal splitter under the map sets the row's height. The default is 45% of the works height. The splitter can move it between 22% and 75%, and the height is saved in this browser under `inherit.v8.map-height`.
 
-A selected machine or drone opens a 260px card beside its footprint. The card fits inside the field with an 8px margin and scrolls when space is short.
+The machine card opens in a centred GameDialog over the app, up to 880px wide. At 1280×720 its two columns fit without inner scrolling. Below 860px of panel width the sections form one column.
 
 The file tree is a column inside the editor row, 140px until the player drags it. The drag stays between 96px and 420px, and the width is saved as `inherit.v8.tree-width`. Double-click restores 140px. One Files toggle sits on its bar. Under 1280px it starts closed, as a narrow rail with that same toggle. Open or closed is saved separately. Dragging the rail opens it.
 
@@ -45,11 +45,11 @@ The Journal has three sections in order.
 2. **Requests** lists the available villagers while no quest is open. Each row has an initial, name, ask and any hold. Selecting a row opens that villager’s dialog.
 3. **Done** lists hand-overs in the order they happened, with each title, giver and change.
 
-Machines opens its own dialog from the nav. Each row gives a machine or drone name and detail. Selecting a row closes the dialog and opens the card beside that machine or drone.
+Machines opens its own dialog from the nav. Each row names a machine, drone or visible vein and gives its detail. Selecting a row replaces the list with the machine card. Closing the card returns focus to the Machines link.
 
 Shop lists the existing conveniences. Each row shows the detail and price or Owned. Buying keeps Shop open. Owned items and purchases beyond the current credit balance are disabled.
 
-Journal, Machines, Shop, villager dialogs and the API book use native modals. Opening one closes the previous surface. Escape, the close button or a backdrop click returns focus to the opener, or to the Factory map after a canvas click. Editor shortcuts wait until the dialog closes.
+Journal, Machines, Shop, machine cards, villager dialogs and the API book use native modals. Opening one closes the previous surface. Escape, the close button or a backdrop click returns focus to the opener, or to the Factory map after a canvas click. Editor shortcuts wait until the dialog closes.
 
 Taking a quest inserts one comment at the top of the open file, in the villager's voice, for example `// Odile: steel is ore and coal together. Where would they meet?`. It is a nudge, not a solution, and it does not name the shop. When that quest is handed over and it grants a trigger, one example with a comment is inserted under that line, once. A file that already exports `onTick` does not gain a second one. If that quest was already offered the line, deleting it does not bring it back. The API book marks a function `new` while the quest that granted it is open.
 
@@ -73,7 +73,11 @@ On a fresh game, one welcome toast names the first available villager and points
 
 The map fills the top row. The village extends 20 columns west of the works, and on load or resize the default camera fits the nearest twelve village columns, three lots wide, and the works up to vein B, so the village takes about 44% of the width. The depot, furnace and every vein stay in view; only the empty last grid column waits past the right edge. No caption is drawn on the field. The center control returns to that fit. Pan west or zoom out to see the rest of the village. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
-Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking a machine or drone, or its row in the Machines dialog, opens its card with what it is, what it holds, its recipes, and its buttons. The card follows its footprint during pan, zoom and drone movement. It opens to the right when space allows, then tries the left and finally below. Close it with the X, Escape from the floor or card, or a click on empty floor. Recipes are facts. A button names the call and the reason it can run, such as `Needs 2 ore`, `Unload at furnace`, or `Collect with drone-1`. Dump calls `drone.dump()`. The drone's hit target follows the sprite. The Depot and Furnace captions are their own hits, so a drone standing on the tile does not hide the building. A vein is labeled poor, normal, or rich, and a bar shows measured mining on the drone and on the vein. A haul with no measured progress is a task label. A play mark in the gutter of `main.ts` calls one exported function once, once Run is unlocked. The same command is `Run function at cursor`. The mark uses the project dirty flag: a dirty project says deploy and run. A clean Deploy button says Deployed. Deploying clears current drone tasks. The result is a console line, such as `smeltOnce ok`. Loop, once Ines is handed over, is the toggle `Loop: onTick`. It calls `onTick` every tick. The console records when that loop starts and stops. With no `onTick` in `main.ts` the toggle is disabled. A lit Loop whose deployed `main.ts` has no `onTick` says so on the grant line.
+Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hover and selection draw one rounded highlight around the sprite and its name together. Clicking a machine, drone or vein opens its card over the app and keeps that object selected behind the dim backdrop. Escape, the X or a backdrop click closes the card and returns focus to the Factory map.
+
+The dialog title names the object, with its kind icon and one-line role below. In the left column, State pairs capacity meters and lists facts and progress, followed by Recipes with any missing inputs. In the right column, Code API gives each manual action, signature and reason. Locked shows each gated recipe or action with its unlock reason on the line below. Empty sections are omitted.
+
+Recipes are facts. A button names the call and the reason it can run, such as `Needs 2 ore`, `Unload at furnace`, or `Collect with drone-1`. Dump calls `drone.dump()`. The drone's hit target follows the sprite. The Depot and Furnace captions are their own hits, so a drone standing on the tile does not hide the building. A vein is labeled poor, normal, or rich, and a bar shows measured mining on the drone and on the vein. A haul with no measured progress is a task label. A play mark in the gutter of `main.ts` calls one exported function once, once Run is unlocked. The same command is `Run function at cursor`. The mark uses the project dirty flag: a dirty project says deploy and run. A clean Deploy button says Deployed. Deploying clears current drone tasks. The result is a console line, such as `smeltOnce ok`. Loop, once Ines is handed over, is the toggle `Loop: onTick`. It calls `onTick` every tick. The console records when that loop starts and stops. With no `onTick` in `main.ts` the toggle is disabled. A lit Loop whose deployed `main.ts` has no `onTick` says so on the grant line.
 
 ## Editor
 
@@ -109,7 +113,7 @@ A quiet strip, every item the same height, an icon and a short label, each with 
 | Purchases | Shop dialog |
 | Works, village, cameos and quest marks | Full-width field above the editor |
 | Villager lines and event feedback | Toasts in the window’s bottom-right corner, above the status bar |
-| Machine facts and manual actions | Card beside the selected machine or moving drone |
+| Machine facts and manual actions | Machine card in the wide GameDialog over the app |
 | Files, code, API, Loop, Deploy, gutter Run | Editor header and the code under it |
 | Pass and fail | Test rows beside the code |
 | Errors and sim events | Console tab |

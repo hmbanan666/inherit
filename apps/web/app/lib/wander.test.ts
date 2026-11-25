@@ -1,7 +1,8 @@
 import { expect, test, vi } from 'vitest'
 import { createWorld, kettlewick, questList } from '@inherit/sim/v8'
+import { Graphics } from 'pixi.js'
 import { FloorScene } from './floor'
-import { cameo, captionBox, hitPadding, hoverScale, npcCaptionY, npcMarker, pickFloor, tile, type Box } from './floorPick'
+import { cameo, captionBox, hitPadding, hoverScale, hoverStroke, selectionStroke, npcCaptionY, npcMarker, pickFloor, tile, type Box } from './floorPick'
 import { houseBox, propBox, villageGround, villageHomes, villageLots, villageProps, villagers, villagerBox, villageView } from './village'
 import { wanderEnvelope, wanderFrozen, wanderOffset } from './wander'
 
@@ -100,6 +101,30 @@ vi.mock(import('./art/townPaint'), async original => ({
 
 const bram = 'npc:bram'
 const anchor = (scene: FloorScene) => scene.npcAnchors().find(npc => npc.id === bram)!
+
+test.each(['furnace', 'drone-1', bram, 'Vein A'])('%s has one rounded outline around its sprite and caption', id => {
+  const scene = new FloorScene(world)
+  scene.setVillage(view)
+  const box = scene.anchorBox(id)!
+  if (id === 'drone-1') {
+    const cart = scene.cartAnchors()[0]!
+    const name = captionBox(id, 9)
+    box.x = cart.x + name.x
+    box.w = name.w
+    box.h = cart.y + name.y + name.h - box.y
+  }
+  using rect = vi.spyOn(Graphics.prototype, 'roundRect')
+  using stroke = vi.spyOn(Graphics.prototype, 'stroke')
+  for (const [method, style] of [['highlight', hoverStroke], ['select', selectionStroke]] as const) {
+    scene[method](id)
+    const { grow } = style
+    expect(stroke).toHaveBeenCalledTimes(1)
+    expect(rect).toHaveBeenCalledExactlyOnceWith(box.x - grow, box.y - grow, box.w + grow * 2, box.h + grow * 2, 8)
+    scene[method]('')
+    rect.mockClear()
+    stroke.mockClear()
+  }
+})
 
 function midWalk() {
   const scene = new FloorScene(world)

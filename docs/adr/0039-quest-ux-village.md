@@ -73,3 +73,13 @@ Nick played Phases 1–5 (pt242u). The field, the village and the dialogs stay. 
 - **The CPU meter** keeps its label, bar and tones from [ADR 0034](0034-cpu-meter-stays-visible.md) and takes the same icon-and-text look as the other status items.
 
 The exact values are in [Phase 6 of the plan](../plans/quest-ux-village.md).
+
+## Amendment, 25 November 2026: the machine card is a modal
+
+Nick played the anchored card from Phase 4 (pt248u). It ran out of room inside the field, its actions sat below the fold, and its contents read as one pile. The card next to the machine is replaced:
+
+- **A click on a machine, drone or vein opens its card as a modal over the whole app**, in the same dialog as Journal, Machines and Shop. Escape, the X or the backdrop closes it. The field keeps the selection while it is open. This replaces the paragraph "A click on a machine opens its card next to it."
+- **The card is split into labelled sections:** a header with the role, State with meters, Recipes, Code API with each call and its state, and Locked. It fits a 1280×720 window without scrolling. The data and the actions are the same as before.
+- **The selection is one highlight** round the sprite and its label together, for every object that can be selected.
+
+The exact values are in [Phase 7 of the plan](../plans/quest-ux-village.md).
