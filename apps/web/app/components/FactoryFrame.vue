@@ -23,7 +23,7 @@ import { journalRequests, villagerDialog, villagers, villageView } from '../lib/
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
 import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
-import { questTabNotice, shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
+import { isCodeJob, questTabNotice, shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
 import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
@@ -395,7 +395,8 @@ function take(id: string) {
   if (!current || current.questId || !quest || !canTake(current, quest)) return
   const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
   const note = questComment(quest.from, quest.nudge)
-  const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value)
+  const example = isCodeJob(quest.id) ? shellLabels.codeExample : undefined
+  const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value, example)
   rememberNotes(next.remembered)
   if (next.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: next.source }
   send({ kind: 'accept', id })

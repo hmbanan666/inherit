@@ -3,6 +3,8 @@ import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
 import type { questCard } from './questNote'
 import { grantHint } from './questStep'
 
+import { isCodeJob, shellLabels } from './shellBar'
+
 export const dismissToastLabel = 'Dismiss notification'
 const giverName = (quest: QuestDef) => quest.from.replace(/^Mayor /, '')
 const newCall = (signature: string) => 'New: ' + signature.split(':')[0].trim()
@@ -47,6 +49,7 @@ export function worldEvents(
   const quest = quests.find(item => item.id === next.questId)
   if (quest && quest.id !== prev.questId) {
     say(quest, 'taken:' + quest.id, quest.why)
+    if (isCodeJob(quest.id)) announce('unlock', 'code:' + quest.id, 'Run is unlocked. ' + shellLabels.codeJob)
     if (quest.unlock) announce('unlock', 'unlocked:' + quest.id, newCall(quest.unlock.signature))
   }
 
