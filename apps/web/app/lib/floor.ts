@@ -8,14 +8,14 @@ import {
   fieldBounds, houseBox, housePrint, houseScale, propArt, villageGround, villageHomes, villageProps, type VillageView,
 } from './village'
 import { advanceWander, markerBob, wanderEnvelope, wanderFrozen, wanderOffset, type WanderClock } from './wander'
-import { screenBox } from './popupPlace'
+import { screenBox, shapeBounds } from './popupPlace'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
 import {
   cartDrawScale, cartMark, pauseMark, hoverScale, hoverStroke, selectionColor, selectionStroke, stationShapes, stationsOf,
-  cameo, markLook, npcCaptionY, npcMarker, npcShapes, tile, type CartHit, type QuestMark, type Shape,
+  cameo, captionBox, markLook, npcCaptionY, npcMarker, npcShapes, tile, type CartHit, type QuestMark, type Shape,
 } from './floorPick'
 
 export type FloorWorld = Omit<World, 'memory'>
@@ -420,7 +420,7 @@ export class FloorScene {
     this.root.addChild(this.ring)
   }
 
-  private footprint(world: FloorWorld, id: string): { origin: { x: number; y: number }; shapes: Shape[] } | undefined {
+  private footprint(world: FloorWorld, id: string, includeCartName = false): { origin: { x: number; y: number }; shapes: Shape[] } | undefined {
     const drone = world.drones.findIndex(item => item.name === id)
     if (drone >= 0) {
       const hauler = this.haulers[drone]
@@ -428,7 +428,10 @@ export class FloorScene {
       const { art, pause } = hauler
       const top = pause.visible ? pauseMark.y : cartMark.y
       const box = { ...cartMark, y: top, h: cartMark.h + cartMark.y - top }
-      return { origin: art.position, shapes: [{ type: 'box', box }] }
+      const shapes: Shape[] = [{ type: 'box', box }]
+      // The cart anchor covers the badge and truck. Its outline also encloses the name.
+      if (includeCartName) shapes.push({ type: 'box', box: captionBox(id, hauler.name.y) })
+      return { origin: art.position, shapes }
     }
     const npc = this.npcs.get(id)
     if (npc) return { origin: npc.art.position, shapes: npcShapes(npc.name, npc.badge.visible, npc.badge.y - npcMarker.y) }
@@ -443,20 +446,10 @@ export class FloorScene {
   }
 
   private strokeId(world: FloorWorld, id: string, style: { width: number; alpha: number; grow: number }) {
-    const footprint = this.footprint(world, id)
+    const footprint = this.footprint(world, id, true)
     if (!footprint) return
     const { origin, shapes } = footprint
-    for (const shape of shapes) this.strokeShape(origin.x, origin.y, shape, style)
-  }
-
-  private strokeShape(x: number, y: number, shape: Shape, style: { width: number; alpha: number; grow: number }) {
-    if (shape.type === 'ellipse') {
-      const ellipse = shape.ellipse
-      this.ring.ellipse(x + ellipse.cx, y + ellipse.cy, ellipse.rx + style.grow, ellipse.ry + style.grow)
-        .stroke({ color: selectionColor, width: style.width, alpha: style.alpha })
-      return
-    }
-    this.strokeBox(x, y, shape.box, style)
+    this.strokeBox(origin.x, origin.y, shapeBounds(shapes), style)
   }
 
   private strokeBox(x: number, y: number, box: { x: number; y: number; w: number; h: number }, style: { width: number; alpha: number; grow: number }) {
