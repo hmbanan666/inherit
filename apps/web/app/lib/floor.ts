@@ -126,15 +126,6 @@ function caption(parent: Container, title: string, x: number, y: number) {
   return text
 }
 
-function equipment(parent: Container, pos: Cell, paint: (d: ReturnType<typeof drawing>) => void) {
-  const d = drawing()
-  mountingPlate(d)
-  paint(d)
-  const p = center(pos)
-  parent.addChild(d.g).position.set(p.x, p.y)
-  return d.g
-}
-
 type VillageNpc = VillageView['npcs'][number]
 type House = VillageView['houses'][number]
 
@@ -185,6 +176,7 @@ export class FloorScene {
   root = new Container()
   private readonly haulers: {
     art: Container
+    truck: Graphics
     cargo: Graphics
     load: Material
     badge: Text
@@ -196,7 +188,7 @@ export class FloorScene {
     x: number
     y: number
   }[] = []
-  private readonly seen = new Set<string>()
+  private readonly drawings = new Map<string, Container>()
   private readonly veinBars = new Map<string, Graphics>()
   private readonly stations = new Map<string, Container>()
   private readonly villageLayer = new Container({ label: 'village' })
@@ -237,12 +229,10 @@ export class FloorScene {
     this.paths = this.root.addChild(new Graphics({ label: 'routes' }))
     this.root.addChild(this.villageLayer, this.equipmentLayer, this.npcLayer)
     for (const vein of world.veins) this.placeVein(vein)
-    const yard = equipment(this.equipmentLayer, world.depot.pos, depot)
+    const yard = this.placeEquipment('depot', world.depot.pos, depot)
     caption(yard, 'Depot', 0, -63)
-    this.stations.set('depot', yard)
-    const smelter = equipment(this.equipmentLayer, world.furnace.pos, furnace)
+    const smelter = this.placeEquipment('furnace', world.furnace.pos, furnace)
     caption(smelter, 'Furnace', 0, -63)
-    this.stations.set('furnace', smelter)
     this.fire = smelter.addChild(new Graphics())
     this.fire.ellipse(3, -22, 15, 4.5).fill(0xf3a94d)
     this.fire.ellipse(3, -22, 9, 2.6).fill(0xffdb80)
@@ -292,17 +282,37 @@ export class FloorScene {
     return Array.from(this.npcs, ([id, { art, badge, name }]) => ({ id, x: art.x, y: art.y, name, marked: badge.visible, bob: badge.y - npcMarker.y }))
   }
 
+  private placeEquipment(id: string, pos: Cell, paint: (d: ReturnType<typeof drawing>) => void) {
+    const group = this.equipmentLayer.addChild(new Container())
+    const point = center(pos)
+    group.position.set(point.x, point.y)
+    const d = drawing()
+    mountingPlate(d)
+    paint(d)
+    this.drawings.set(id, group.addChild(d.g))
+    this.stations.set(id, group)
+    return group
+  }
+
+  artFor(id: string): Container | undefined {
+    if (this.stations.get(id)?.visible) return this.drawings.get(id)
+    const cart = this.latest.drones.findIndex(drone => drone.name === id)
+    return this.haulers[cart]?.truck
+  }
+
   private placeVein(vein: FloorWorld['veins'][number]) {
-    if (vein.hidden || this.seen.has(vein.name)) return
-    this.seen.add(vein.name)
+    const id = `Vein ${vein.name}`
+    if (vein.hidden || this.stations.has(id)) return
     const { x, y } = center(vein.pos)
     const group = this.equipmentLayer.addChild(new Container())
     group.position.set(x, y)
-    this.stations.set(`Vein ${vein.name}`, group)
+    this.stations.set(id, group)
     group.addChild(new Graphics()).ellipse(0, 5, 31, 14).fill({ color: 0x202126, alpha: 0.42 })
+    const rocks = group.addChild(new Container())
+    this.drawings.set(id, rocks)
     const rock = vein.kind === 'coal' ? 'coal' : 'iron-ore'
     for (let i = 0; i < 7; i++) {
-      const ore = group.addChild(materialArt(rock))
+      const ore = rocks.addChild(materialArt(rock))
       ore.position.set(-19 + ((i * 11) % 39), -7 + ((i * 8) % 16))
       ore.scale.set(1 + (i % 3) * 0.24)
     }
@@ -333,7 +343,7 @@ export class FloorScene {
     pause.visible = false
     const { x, y } = center(drone.pos)
     art.position.set(x, y + 20)
-    this.haulers.push({ art, cargo, load, badge, name, bar, pause, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
+    this.haulers.push({ art, truck: d.g, cargo, load, badge, name, bar, pause, fromX: art.x, fromY: art.y, x: art.x, y: art.y })
   }
 
   private showLoad(item: FloorScene['haulers'][number], drone: FloorWorld['drones'][number]) {
@@ -482,9 +492,8 @@ export class FloorScene {
       return
     }
     if (!this.pressArt) {
-      this.pressArt = equipment(this.equipmentLayer, press.pos, pressDrawing)
+      this.pressArt = this.placeEquipment('press', press.pos, pressDrawing)
       caption(this.pressArt, 'Press', 0, -63)
-      this.stations.set('press', this.pressArt)
       this.pressWork = this.pressArt.addChild(new Graphics())
       this.pressWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.pressMark = this.pressArt.addChild(materialArt('steel'))
@@ -503,9 +512,8 @@ export class FloorScene {
       return
     }
     if (!this.latheArt) {
-      this.latheArt = equipment(this.equipmentLayer, machine.pos, cutter)
+      this.latheArt = this.placeEquipment('lathe', machine.pos, cutter)
       caption(this.latheArt, 'Lathe', 0, -63)
-      this.stations.set('lathe', this.latheArt)
       this.latheWork = this.latheArt.addChild(new Graphics())
       this.latheWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.latheMark = this.latheArt.addChild(materialArt('steel'))
@@ -524,9 +532,8 @@ export class FloorScene {
       return
     }
     if (!this.benchArt) {
-      this.benchArt = equipment(this.equipmentLayer, machine.pos, assembler)
+      this.benchArt = this.placeEquipment('bench', machine.pos, assembler)
       caption(this.benchArt, 'Assembly', 0, -63)
-      this.stations.set('bench', this.benchArt)
       this.benchWork = this.benchArt.addChild(new Graphics())
       this.benchWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.benchMark = this.benchArt.addChild(materialArt('iron-ingot'))
@@ -545,9 +552,8 @@ export class FloorScene {
       return
     }
     if (!this.spareArt) {
-      this.spareArt = equipment(this.equipmentLayer, press.pos, pressDrawing)
+      this.spareArt = this.placeEquipment('spare', press.pos, pressDrawing)
       caption(this.spareArt, 'Spare', 0, -63)
-      this.stations.set('spare', this.spareArt)
       this.spareWork = this.spareArt.addChild(new Graphics())
       this.spareWork.ellipse(3, -22, 10, 3).fill(0xe7c56a)
       this.spareMark = this.spareArt.addChild(materialArt('steel'))

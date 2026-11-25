@@ -1,6 +1,6 @@
 # Plan: quests live in the village
 
-Implements [ADR 0039](../adr/0039-quest-ux-village.md). Eight PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
+Implements [ADR 0039](../adr/0039-quest-ux-village.md). Nine PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
 
 | # | PR | Depends on |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ Implements [ADR 0039](../adr/0039-quest-ux-village.md). Eight PRs, in this order
 | 5 | Villagers wander; hover and motion polish; the screen spec is finished. | 3b, 4 |
 | 6 | After the playtest: top bar, toasts in the window, a Quest tab instead of the tracker, a welcome toast, the CPU item, Machines out of the Journal. | 5 |
 | 7 | The machine card becomes a modal with sections; one selection highlight. | 6 |
+| 7b | Machine modal polish: motion, machine sprite header, chips, Code API as docs, Actions bar, Locked once. | 7 |
 
 ## Rules for every phase
 
@@ -687,6 +688,195 @@ Clicking a machine, drone or vein, or choosing a row in the Machines dialog, ope
 - Do not rewrite GameDialog or the dialog system, beyond the one `wide` prop. Do not change other screens or dialogs.
 - Do not add actions, tabs, buttons, tooltips, pinning, drag, or a second card component. Do not change what any action does.
 - Do not change picking, hit areas, hover scale, highlight colours or widths. Change only how the highlight shape is drawn.
+- No new dependencies, no new localStorage keys. No browser, dev server, e2e, screenshots or shots.
+
+## Phase 7b. Machine modal polish
+
+Runs after Phase 7 (#121). Comes from Nick's playtest of the Furnace modal on 25 November 2026 (pt249u). The card fits, but it reads like things thrown into a box:
+
+- The header is just the title and a gold-outlined X, with a tiny flame and the role line under it.
+- The State bars are thin and dim, and the left column is mostly empty.
+- Code API rows look like disabled buttons.
+- Locked says the alloy unlock three times.
+
+This is a polish of `MachineCard.vue`, `machineSheet.ts` and the shared `GameDialog.vue`, not a rewrite.
+
+### Goal
+
+Opening a machine feels like a game:
+
+- The dialog slides down into place.
+- Its header shows the machine itself, as drawn on the field, with its name, kind, role and a status chip.
+- The sections breathe on an 8px scale, and stock reads as coloured bars.
+- Recipes read as item chips with an arrow.
+- Code API is plainly documentation ("Call these from your code.") and cannot be mistaken for buttons.
+- Each locked thing is listed once.
+- The existing manual actions (Smelt, Collect, Unload…) stay available as real buttons in one clearly separate Actions bar.
+- Closing is obvious: a normal X, Esc, and a muted "Esc to close" hint.
+- Every machine type still fits a 1280×720 window without inner scroll.
+
+### Files
+
+**1. Open and close motion (shared, `components/GameDialog.vue`)**
+
+- **Open:**
+  - The panel animates from `opacity: 0; transform: translateY(-24px)` to `opacity: 1; transform: none` over 220ms `ease-out`.
+  - The `::backdrop` fades in over the same 220ms.
+  - Use CSS on the open dialog (`@starting-style` with `transition`, or a keyframe animation on `.shade[open] .panel` and `.shade[open]::backdrop`). No JS timers for opening.
+- **Close from inside the dialog:**
+  - Escape (the `cancel` event), the X and a backdrop click no longer emit `close` at once.
+  - GameDialog adds a `closing` class that reverses the motion over 160ms `ease-in`, then emits `close` on `animationend`/`transitionend`, with a 200ms fallback timer.
+  - A second close request while closing is ignored.
+  - When the parent removes the dialog for another reason (another dialog opens), it unmounts immediately as today.
+- **Reduced motion:** under `prefers-reduced-motion: reduce`, only opacity animates (no translate). Durations stay.
+- **Initial focus and the X:**
+  - Remove `autofocus` from the X. Put `tabindex="-1"` and `autofocus` on `.panel`, so `showModal()` focuses the panel and no ring shows on the X when it opens.
+  - The X is a plain icon button: no border or outline at rest, hover `background: var(--hover)`, and `:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }` for keyboard focus only. `.panel:focus { outline: none }`.
+  - Its accessible name stays.
+- **`wide` panel:** `width: fit-content; min-width: min(640px, 100% - 32px); max-width: min(880px, 100% - 32px); max-height: min(92dvh, 760px)`. Panels without `wide` are unchanged apart from the motion and the X styling.
+- Nothing else in GameDialog changes. Journal, Machines, Shop, the villager dialog and the API book get the motion through it with no edits of their own.
+
+**2. The header shows the machine (`MachineCard.vue`, `lib/floor.ts`, `components/FactoryFloor.vue`, `components/FactoryFrame.vue`)**
+
+- **`FloorScene.artFor(id)`:** returns the display object that draws that object's art on the field, without its caption, selection ring, progress or cargo bars, badges or work glow.
+  - Covers furnace, depot, press, spare, lathe, bench, each cart (the `truck` drawing) and each vein (its rock).
+  - Keep references when the art is built. Do not draw anything new and do not change what the field shows.
+- **`FactoryFloor.vue`:**
+  - `defineExpose({ snapshot })`, where `snapshot(id): Promise<string | undefined>` returns `app.renderer.extract.base64({ target: art, resolution: 2 })` for `scene.artFor(id)`.
+  - It returns `undefined` when there is no renderer or art. Errors are caught and give `undefined`.
+- **`FactoryFrame.vue`:**
+  - Keep a `ref` to the floor component. When `selectedId` becomes a machine id, call `snapshot(id)` and store the result in `cardSprite`, cleared on close.
+  - Pass `:sprite="cardSprite"` to MachineCard. The card works without it (the plate stays empty).
+- **The MachineCard header**, on one row:
+  - **Left:** a 112×112px plate with `background: var(--floor-base)`, a 1px `var(--line)` border, radius 8px, and the sprite centred as `<img alt="" style="image-rendering: pixelated">` at up to 96px, `object-fit: contain`.
+  - **Right**, top to bottom:
+    - The name at 22px, weight 700.
+    - A kind line at 12px in `var(--sub)`: `Machine` for furnace, depot, press, spare, lathe and bench; `Cart` for drones; `Vein` for veins.
+    - The role sentence (`view.description`) at 13px in `var(--soft)`, up to two lines.
+    - A status chip.
+- **Status chip**, from `machineStatus(view)` in `machineSheet.ts`:
+  - When `view.progress` is set: the progress label (for example `Smelting`), tone `working` (gold).
+  - Otherwise, when a `Task` line exists and is not `idle`/`none`: that task, tone `working`.
+  - Otherwise `Idle`, tone `idle` (grey).
+  - No other data. The chip is a `<span>`, not a button.
+- GameDialog's own title stays as the accessible name. Visually the header row carries the name, so set GameDialog's `h2` to the visually-hidden style only when `wide` is set.
+
+**3. Layout and spacing**
+
+- **Spacing:** an 8px scale. Dialog body padding 24px, 24px between sections and 8px between rows.
+- **Section headings:** 12px, `font-variant: small-caps` (or uppercase), `letter-spacing: 0.08em`, `var(--sub)`, with a 1px `var(--line)` divider under them and 8px below.
+- **Columns:**
+  - Two columns, left State and Recipes, right Code API and Locked, when both sides have content.
+  - When the right side is empty (the depot) or the sheet is small, use one column. `machineSheet` decides with `sheetLayout(sheet)`, which returns `1 | 2` from the column heights: two columns only when both are non-empty and the taller is at most 1.6× the shorter. Otherwise one column, unless one column would not fit, then two with State split across them.
+- **Width:** follows the `wide` panel (shrinks to content between 640 and 880px).
+
+**4. State**
+
+- Each stock row:
+  - A 10px dot in the resource colour (the item names ore, coal, ingot, steel, grate, plate, blank, gear, pin, hinge, shutter, crate and cargo, mapped in `resourceColor(label)` with a neutral fallback), then the label.
+  - An 8px rounded bar filled in the resource colour on `var(--accent-shadow)`.
+  - The count right-aligned in mono tabular numbers.
+- Rows are 28px, one per line (no longer two per row).
+- **A full bar** (`value === max`, `max > 0`): the count is in `var(--gold)` and the bar has a 1px gold glow (`box-shadow: 0 0 6px`).
+- **Fact rows** (label and value): 24px, label in `var(--sub)`, value in `var(--text)`.
+- **Progress** is one more 28px bar row in gold with its percent.
+- Resource icons: the field's material art is not exported as DOM images, so dots are the icon. Do not add art.
+
+**5. Recipes**
+
+- Each unlocked recipe is one 32px row:
+  - Input chips, `→`, then the output chip.
+  - A chip is a 24px rounded pill on `var(--surface-raised)` with the resource dot, the quantity and the item name, from `recipeChips(text)` parsing `"2 ore + 1 coal"` into `[{ qty: 2, item: 'ore' }, { qty: 1, item: 'coal' }]`. Unparseable text becomes one plain chip with that text.
+  - On the right, the call in mono `var(--sub)`, from `recipeCall(view, recipe)`, using the API book entries:
+    - A furnace `ingot` → `furnace.smelt()`, `steel` → `furnace.alloy()`.
+    - Press, spare, lathe and bench recipes use the shown signature of the brick `<machine>.<recipe id>` up to `:` (for example `press.start("grate")`).
+    - When none is found, no call is shown.
+- `Missing …` (existing data) is a muted line under the row, 18px, when set.
+- Locked recipes are not here (item 7).
+
+**6. Code API is documentation**
+
+- Under the heading, one line at 12px in `var(--sub)`: `Call these from your code.`
+- Each action is a flat `<li>`, not a button: no border, no background, no hover, no cursor, no tabindex, and 44px tall. It shows:
+  - Line 1: the `api` signature in mono `var(--accent-soft)`.
+  - Line 2: a plain description, the first sentence of the matching API book entry's `doc` (match the entry whose id is the signature up to `(`, for example `furnace.smelt`), falling back to `reason`.
+  - On the right: a readiness tag, `Ready` (mint) when `enabled`, otherwise the action's `reason` (muted), for example `Needs 2 ore`.
+- **One optional link**, at the right of the heading: a small text link `API`, which emits `api` with the API book section id for this kind:
+  - furnace → `furnace`, press and spare → `press`, lathe → `lathe`, bench → `bench`, drone → `drone`, depot → `depot`, vein → `veins`.
+  - FactoryFrame handles it with `selectSection(id)` and `showDialog({ kind: 'api' })`. Opening the book closes the card as any other dialog does.
+  - Nothing else in the Code API section is clickable.
+- **The existing manual actions keep working.** They are not removed. They move to an **Actions bar** at the bottom of the card:
+  - A row of real buttons, one per enabled-or-disabled non-locked action, labelled with `action.label` (Smelt, Collect, Clear hopper, Mine, Unload, Dump).
+  - Each emits `manual` with the same payload as today, and is `disabled` with `title` and `aria-describedby` set to the reason when not enabled.
+  - Buttons use the existing `.calm`/default button style with a border, so they read as buttons.
+  - This is the same set of actions as before, presented separately. No new action is added.
+- **Footer**, under the Actions bar: on the left the hint `Esc to close` (12px, `var(--sub)`), and on the right the action buttons. When a machine has no manual actions, the footer is just the hint.
+
+**7. Locked: one entry per thing**
+
+- `lockedEntries(view)` merges a locked recipe and a locked action that name the same function (the recipe's `locked` text contains the action's `api`, or the recipe is that action's recipe through `recipeCall`) into **one entry**. The entry has:
+  - A lock icon (`Lock` from `@lucide/vue`).
+  - The action label and its mono signature, for example `Alloy furnace.alloy()`.
+  - The recipe as chips.
+  - One line `Unlocks after: <title>`. The title comes from the recipe's `locked` text before ` unlocks `, or the action's reason after `Unlocks with `.
+- Unmatched locked recipes or actions get their own single entry in the same shape.
+- Neither the recipe's lock sentence nor the action's `Unlocks with …` reason is shown anywhere else. The quest title appears exactly once in the whole card.
+- Locked entries are muted (`opacity: 0.7`) and never clickable. A locked action is not in the Actions bar.
+
+**8. Close**
+
+- See item 1 for the X and focus.
+- The footer hint `Esc to close` is in item 6.
+
+**9. Fit for every machine type**
+
+- Update `rowHeight` in `machineSheet.ts` to the new heights:
+  - `heading 28` (with divider)
+  - `intro 20` (the Code API line)
+  - `meter 28`, `fact 24`, `progress 28`
+  - `recipe 32`, `missing 18`
+  - `api 44`, `locked 64`
+  - `section gap 24`
+- Export `headerHeight = 112`, `footerHeight = 48` and `fitBudget`, computed as the 1280×720 panel (`min(92dvh, 760px)` = 662px) minus the 44px title bar, the 48px body padding, the header, a 24px gap and the footer. That gives **386px** per column.
+- `sheetHeight(sheet, layout)` uses these heights. The CSS uses exactly these values: fixed heights with ellipsis on single-line text.
+- **Tests:**
+  - For every machine type in the early and late fixtures from Phase 7 (24 named cases), `sheetHeight(sheet, sheetLayout(sheet)) <= fitBudget`.
+  - The layout chosen for each case is listed in the test names or the PR table.
+
+**Docs.** In `docs/specs/v8-screen-layout.md`, update the machine card paragraph:
+
+- The slide-down motion shared by every dialog.
+- The header with the field sprite, kind and status.
+- The sections and their look.
+- Code API as documentation with the one API link.
+- The Actions bar.
+- Locked entries listed once.
+- The Esc hint.
+
+Do not edit ADR 0039.
+
+### Acceptance
+
+1. Every GameDialog opens with the 220ms slide-and-fade and backdrop fade. X, Esc and backdrop play the 160ms reverse before `close` is emitted. Reduced motion fades only. A second close request during closing is ignored. Opening another dialog still replaces the current one immediately.
+2. On open, the X shows no ring. It shows a ring only on keyboard focus. It has no outline at rest and its accessible name is unchanged.
+3. The card header shows the field sprite on a 112px floor-colour plate (pixelated), the 22px name, the kind line, the role and the status chip. `artFor` is covered by a FloorScene test for every kind (furnace, depot, press, spare, lathe, bench, a cart, a vein): it returns art and none of its descendants are `Text`. `machineStatus` tests cover progress, task and idle.
+4. Spacing and headings follow the scale. `sheetLayout` tests cover a two-column furnace and a one-column depot, and show the 1.6× rule.
+5. State rows show the dot, label, 8px bar and right-aligned count. Full bars are gold. `resourceColor` maps every item named in the recipes and stock lines and falls back to neutral.
+6. `recipeChips` tests cover `2 ore`, `2 ore + 1 coal`, `1 plate + 1 pin`, `1 cut plate` and an unparseable string. `recipeCall` tests resolve every recipe of every machine type to its call, or to none, and name each case.
+7. Code API rows contain no `button`, `a` or `tabindex` (a template test is not available, so assert in `machineSheet` that api rows are data only and check by source review). The intro line is present. The readiness tag is `Ready` or the existing reason. The description comes from the API book doc or falls back to the reason. The only link is `API`, which opens the API book at the right section.
+8. The Actions bar has exactly the non-locked actions of `inspectMachine`, with the same `manual` payloads, disabled states and reasons as before. No action is added or removed. A test compares the action ids per machine type with the Phase 7 set.
+9. For the furnace before Steel for the bridge, `lockedEntries` returns one entry, Alloy `furnace.alloy()`, with chips `2 ore`, `1 coal` → `1 steel` and `Unlocks after: Steel for the bridge`. A test asserts the string `Steel for the bridge` appears exactly once across the whole sheet's rendered strings. After the unlock, there are no locked entries and Alloy is in Code API and the Actions bar.
+10. The fit test passes for all 24 cases against the 386px budget with the chosen layout.
+11. Docs updated.
+12. `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm sim` pass. After `pnpm sim:report`, `git diff --exit-code docs/sim/report.md` is clean. No deleted files, no art changes, no `packages/sim` or `tests/e2e` changes, `world.grid` still 16×6.
+
+### Do not
+
+- Do not change `packages/sim`, including `inspectMachine`, its sentences, action ids, API names and signatures, or the API book data. Do not change balance, save format, quest content, `world.grid` or `tests/e2e`.
+- Do not add art, edit or delete art files, or draw new shapes for the sprite. Reuse the field's display objects.
+- Do not add actions or buttons that do new things. The Actions bar holds exactly the existing manual actions. The `API` link is the only new clickable element.
+- Do not rewrite GameDialog or the dialog system beyond the motion, the X styling, initial focus and the `wide` sizing. Do not change other dialogs' content or other screens.
+- Do not change what the field draws, picking, highlights or the camera.
 - No new dependencies, no new localStorage keys. No browser, dev server, e2e, screenshots or shots.
 
 ## Final documentation gate
