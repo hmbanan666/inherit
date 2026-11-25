@@ -16,7 +16,7 @@ The editor and its side pane fill the rest of the bottom row. The file tree is t
 
 ## Reading order
 
-1. Nav. The logo, credits, Journal, Machines and Shop, then Settings and the player’s level and XP at the right edge.
+1. Nav. The logo and the `Inherit.` wordmark, credits, Journal, Machines and Shop, then Settings and the player’s level and XP at the right edge.
 2. Field. A gold mark identifies a villager with a request. Clicking a villager opens their dialog. Clicking a machine opens its card.
 3. Editor. The open file tab, the code, API, Loop, Deploy, and the tests beside the code.
 4. Status bar. The script, problems, the drone line, CPU, caret and tick.
@@ -25,7 +25,7 @@ The field stays above the editor on a narrow window. Journal provides a keyboard
 
 ## Nav
 
-The logo links home. Beside it, the credits pill shows a coin and the current balance. A credit gain floats up from the pill unless the player prefers reduced motion. Journal, Machines and Shop follow as text links. Their text brightens on hover or keyboard focus. A gold underline marks the open dialog. Journal shows a gold dot and announces “new request” when a request is listed and no quest is open.
+The logo and the `Inherit.` wordmark with its gold dot link home, set off by a divider. Beside them, the credits pill shows a coin and the current balance. A credit gain floats up from the pill unless the player prefers reduced motion. Journal, Machines and Shop follow as text links. Their text brightens on hover or keyboard focus. A gold underline marks the open dialog. Journal shows a gold dot and announces “new request” when a request is listed and no quest is open.
 
 Settings opens Charts and Start over. At the right edge, a 32px XP ring surrounds a player icon. Beside it are the level and XP, for example `Level 3` and `XP 12/20`. The tooltip reads `Level 3. 12 / 20 XP.` The ring fills clockwise from the top across the current level. At the last level it stays full and the label shows total XP.
 
@@ -99,7 +99,7 @@ A quiet strip, every item the same height, an icon and a short label, each with 
 
 | Element | Home |
 | --- | --- |
-| Credits and level | Credits pill beside the logo and an XP ring and level beside Settings |
+| Credits and level | Credits pill beside the wordmark and an XP ring and level beside Settings |
 | Journal, Machines and Shop | Text links after credits in the nav |
 | Request, portrait, quote, goal, rewards and quest action | Villager dialog or Now in the Journal |
 | Requests and hand-over history | Journal dialog |
