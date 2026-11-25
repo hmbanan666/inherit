@@ -1,9 +1,15 @@
 import { expect, test } from 'vitest'
 import { buyUpgrade, createWorld, inspectMachine, kettlewick, machineList, questList, shop } from '@inherit/sim/v8'
 import { createBench, createLathe, createPress, createSpare, itemNames, port } from '../../../../packages/sim/src/v8/modules/stock'
-import { fitBudget, footerHeight, headerHeight, lockedEntries, machineSheet, machineStatus, recipeCall, recipeChips, resourceColor, sheetColumns, sheetHeight, sheetLayout } from './machineSheet'
+import { disabledReason, fitBudget, footerHeight, headerHeight, lockedEntries, machineSheet, machineStatus, recipeCall, recipeChips, resourceColor, sheetColumns, sheetHeight, sheetLayout } from './machineSheet'
 
 const furnace = inspectMachine(createWorld(kettlewick), kettlewick, 'furnace')!
+const emptyCart = inspectMachine(createWorld(kettlewick), kettlewick, 'drone-1')!
+
+test('an unassigned cart with a free task has an Idle chip', () => {
+  expect(emptyCart.lines).toContainEqual({ label: 'Task', value: 'free' })
+  expect(machineStatus(emptyCart)).toEqual({ label: 'Idle', tone: 'idle' })
+})
 
 test('status prefers progress, then the current task, then Idle', () => {
   const view = { ...furnace, lines: [{ label: 'Task', value: 'Hauling' }] }
@@ -133,6 +139,16 @@ test('Code API exposes documentation and readiness as plain display data', () =>
   ])
 })
 
+test('an empty cart gives Unload the same Not ready tag and button title', () => {
+  const sheet = machineSheet(emptyCart)
+  const unload = sheet.actions.find(action => action.id === 'unload')!
+  const api = sheet.columns.flat().find(section => section.kind === 'api')!
+  expect(unload.enabled).toBe(false)
+  expect(unload.reason).toBeUndefined()
+  expect(api.rows).toContainEqual(expect.objectContaining({ key: 'unload', ready: false, readiness: 'Not ready' }))
+  expect(disabledReason(unload)).toBe('Not ready')
+})
+
 test('a positive capacity must be exactly full for a gold count and glow', () => {
   const view = { ...furnace, lines: ['6/6', '2/6', '0/0'].map(value => ({ label: value, value })) }
   expect(machineSheet(view).columns[0]![0]!.rows.map(row => row.kind === 'meter' && row.full)).toEqual([true, false, false])
@@ -161,7 +177,7 @@ for (const era of ['early', 'late'] as const) {
       label: view.progress.label, value: view.progress.pct, max: 100, text: `${Math.round(view.progress.pct)}%`,
     }] : [])
     expect(rows.filter(r => r.kind === 'api').map(r => [r.key, r.api, r.readiness])).toEqual(
-      sheet.actions.map(a => [a.id, a.api, a.enabled ? 'Ready' : a.reason]))
+      sheet.actions.map(a => [a.id, a.api, a.enabled ? 'Ready' : a.reason || 'Not ready']))
     expect(rows.filter(r => r.kind === 'recipe').map(r => [r.key, r.input, r.output, r.missing])).toEqual(
       view.recipes.filter(r => !r.locked).map(r => [r.id, recipeChips(r.input), recipeChips(r.output), r.missing]))
     expect(recipeCases.filter(([id]) => id === sample.id).map(([, id]) => id)).toEqual(view.recipes.map(r => r.id))

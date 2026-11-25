@@ -14,7 +14,7 @@ function kindOf(id: string): SheetKind {
 
 const headings = { state: 'State', recipes: 'Recipes', api: 'Code API', locked: 'Locked' } as const
 export const missingLabel = 'Missing'
-export const sheetLabels = { intro: 'Call these from your code.', link: 'API', close: 'Esc to close', actions: 'Actions' } as const
+export const sheetLabels = { intro: 'Call these from your code.', link: 'API', close: 'Esc to close', actions: 'Actions', notReady: 'Not ready' } as const
 export const rowHeight = { heading: 28, intro: 20, meter: 28, fact: 24, progress: 28, recipe: 32, missing: 18, api: 44, locked: 64, gap: 24 } as const
 export const headerHeight = 112
 export const footerHeight = 48
@@ -24,7 +24,7 @@ export const fitBudget = Math.floor(720 * 0.92) - 44 - 2 * 24 - headerHeight - r
 
 export function machineStatus(view: InspectView) {
   const task = view.lines.find(line => line.label === 'Task')?.value
-  const label = view.progress?.label ?? (task && !/^(idle|none)$/i.test(task) ? task : undefined)
+  const label = view.progress?.label ?? (task && !/^(idle|none|free)$/i.test(task) ? task : undefined)
   return label ? { label, tone: 'working' } : { label: 'Idle', tone: 'idle' }
 }
 
@@ -64,6 +64,9 @@ export function recipeCall(view: InspectView, recipe: Recipe) {
 function actionLocked(action: Action) {
   return !action.enabled && !!action.reason?.startsWith('Unlocks with ')
 }
+export function disabledReason(action: Action) {
+  return action.enabled ? undefined : action.reason || sheetLabels.notReady
+}
 type Locked = { key: string; kind: 'locked'; label: string; api?: string; input?: Chip[]; output?: Chip[]; unlock: string }
 export function lockedEntries(view: InspectView): Locked[] {
   const remaining = new Set(view.actions.filter(actionLocked))
@@ -89,7 +92,7 @@ type Row = { key: string } & (
   | Meter
   | ({ kind: 'fact' } & InspectView['lines'][number])
   | { kind: 'recipe'; input: Chip[]; output: Chip[]; call?: string; missing?: string }
-  | { kind: 'api'; api: string; description?: string; ready: boolean; readiness?: string }
+  | { kind: 'api'; api: string; description?: string; ready: boolean; readiness: string }
   | Locked
 )
 type Section = { kind: keyof typeof headings; title: string; rows: Row[] }
@@ -121,7 +124,7 @@ export function machineSheet(view: InspectView, kind = kindOf(view.id)) {
   const api = actions.map((action): Row => {
     const doc = entries.get(action.api.split('(', 1)[0]!)?.doc
     const description = doc?.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? doc ?? action.reason
-    return { key: action.id, kind: 'api', api: action.api, description, ready: action.enabled, readiness: action.enabled ? 'Ready' : action.reason }
+    return { key: action.id, kind: 'api', api: action.api, description, ready: action.enabled, readiness: disabledReason(action) ?? 'Ready' }
   })
   return {
     name: view.name, kind: kind === 'drone' ? 'Cart' : kind === 'vein' ? 'Vein' : 'Machine',

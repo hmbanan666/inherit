@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Lock } from '@lucide/vue'
-import { machineSheet, missingLabel, resourceColor, sheetColumns, sheetCss, sheetLabels, sheetLayout, type InspectView } from '../lib/machineSheet'
+import { disabledReason, machineSheet, missingLabel, resourceColor, sheetColumns, sheetCss, sheetLabels, sheetLayout, type InspectView } from '../lib/machineSheet'
 
 const props = defineProps<{ inspected: InspectView; sprite?: string }>()
 const emit = defineEmits<{ close: []; manual: [action: InspectView['actions'][number]]; api: [section: string] }>()
@@ -70,7 +70,7 @@ const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value
         <small>{{ sheetLabels.close }}</small>
         <div v-if="sheet.actions.length" class="actions" role="group" :aria-label="sheetLabels.actions">
           <button v-for="action in sheet.actions" :key="action.id" type="button" class="calm" :disabled="!action.enabled"
-            :title="!action.enabled ? action.reason : undefined" :aria-describedby="!action.enabled && action.reason ? 'readiness-' + action.id : undefined"
+            :title="disabledReason(action)" :aria-describedby="!action.enabled ? 'readiness-' + action.id : undefined"
             @click="emit('manual', action)">{{ action.label }}</button>
         </div>
       </footer>
