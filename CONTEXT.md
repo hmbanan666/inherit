@@ -12,7 +12,8 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | Inherited code | A fresh world starts from `smeltOnce` in `kettlewick.files`. `uncleMain` is the old loop that mines and never comes home. Old saves can still be running it. |
 | Run | Calls one exported function once, on one tick. The function reads the works and gives commands. Handing over Bram's quest grants it. Stop ends player code. A drone task already given keeps going. |
 | Loop | Calls `onTick` every tick until Stop. Handing over Ines's quest grants it and turns it on. |
-| Depot delivery | A quest counts goods only when they arrive at the depot. The furnace and the press hold them until a drone unloads them there. `takeFromDepot` is the only path that counts them. |
+| Depot delivery | A quest counts goods only when they arrive at the depot. The furnace and the press hold them until a drone unloads them there. `takeFromDepot` is the only path that counts them. Manual Unload takes ingots and steel to the depot, while ore reaches it through code. |
+| Machine card | A floor selection opens its card on the opposite side when space allows, while Machines opens it in the centre. |
 | Press | The machine Odile installs on Hand over. It forms a grate, a plate, or a blank. See [ADR 0036](docs/adr/0036-region-1-fabrication-chain.md). |
 | Transfer | A drone task that carries one kind of goods from one station to another. It reserves the goods and the receiving space until it finishes or is cancelled. |
 | Soft occupancy | One drone on a cell, including a station. A blocked step waits, then goes around. A head-on yields. See [ADR 0038](docs/adr/0038-soft-occupancy.md). |
@@ -21,10 +22,10 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. A new one is granted by taking a quest. |
 | Quest | One villager's ask, a count of goods, taken by hand, one at a time. The order is `questList`. |
 | Check | One test of the open quest. The Tests tab beside the code explains every check. The Quest tab shows the story and delivery objectives; checks stay in Tests. A check updates each tick after Take and costs nothing. When all pass, the player can Hand over. |
-| Hint | Taking a quest inserts its nudge comment once at the top of the open file. Handing over a quest that grants a trigger inserts its example once. Deleted comments and examples stay deleted. The tracker and API book carry grant and code hints. Toasts give feedback when something happens. |
+| Hint | Taking a quest inserts its nudge once at the top of the open file, with an example comment on the next line for a code job. Handing over a quest that grants a trigger inserts its example once. Deleted comments and examples stay deleted. The tracker and API book carry grant and code hints. Toasts show live feedback at the top centre of the floor. |
 | Credits | Paid by Hand over and spent in the shop. Never negative. There is no rent. A tick cannot lower the balance. See ADR 0027. |
-| XP | Paid with the credits on Hand over. There is no speed bonus. |
-| Level | From XP, using `levelFor`. A quest's `needLevel` gates who can be asked. |
+| XP | Paid with the credits on Hand over. There is no speed bonus. The account shows total XP over the next threshold and the ring fills within the current level. |
+| Level | From XP, using `levelFor`. A quest's `needLevel` gates who can be asked. A live level gain opens a centred dialog naming the new quests or the next level with work. |
 | Shop | Conveniences for sale: a hotter furnace, a bigger cart, a bigger hopper, and CPU. A purchase applies at once. An unaffordable item is refused. Functions are not sold. There is no key and no second drone. |
 | Order | The shipment on a taken quest: item, quantity, shipped. Hand over pays. |
 | lib | The player's own files under `lib/`. The game does not replace them. |
