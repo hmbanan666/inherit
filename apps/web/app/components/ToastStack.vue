@@ -21,7 +21,7 @@ const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, mac
         <span><b>{{ toast.name }}</b> {{ toast.text }}</span>
       </template>
       <template v-else>
-        <component :is="icons[toast.icon]" :size="18" aria-hidden="true" />
+        <component :is="icons[toast.icon]" :size="20" aria-hidden="true" />
         <span>{{ toast.text }}</span>
       </template>
     </button>
@@ -30,40 +30,44 @@ const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, mac
 
 <style scoped>
 .toast-stack {
-  position: fixed;
+  position: absolute;
   z-index: 20;
-  right: 16px;
-  bottom: 37px;
-  width: 340px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100dvh - 65px - 25px - 32px);
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(400px, 100% - 24px);
+  max-height: calc(100% - 24px);
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  flex-direction: column-reverse;
   gap: 8px;
   pointer-events: none;
 }
 .toast {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   min-height: 0;
   overflow-y: auto;
-  padding: 10px 12px;
-  background: var(--overlay);
+  padding: 12px 14px;
+  background: var(--panel);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px var(--shadow-light);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px var(--shadow-light);
   text-align: left;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.4;
   pointer-events: auto;
 }
-.toast svg { width: 18px; height: 18px; flex: none; color: var(--gold) }
+.toast svg { width: 20px; height: 20px; flex: none; color: var(--gold) }
 .cameo { width: 40px; height: 40px; flex: none }
-.toast-enter-active { transition: transform 160ms ease-out }
-.toast-enter-from { transform: translateX(100%) }
-@media (prefers-reduced-motion: reduce) { .toast-enter-active { transition: none } }
+.toast-enter-active { transition: opacity 240ms ease-out, transform 240ms ease-out }
+.toast-leave-active { transition: opacity 180ms ease-in, transform 180ms ease-in }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(-12px) }
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-from, .toast-leave-to { transform: none }
+  .toast-enter-active { transition: opacity 240ms ease-out !important }
+  .toast-leave-active { transition: opacity 180ms ease-in !important }
+}
 </style>

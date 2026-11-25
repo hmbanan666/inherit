@@ -713,6 +713,7 @@ onBeforeUnmount(() => {
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
           <LazyFactoryFloor v-if="world" ref="floor" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
+          <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
         <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': columns.stackChecks }">
@@ -821,7 +822,6 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </template>
-    <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
     <Teleport to="body">
       <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :summary="journalSummary"
         :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
