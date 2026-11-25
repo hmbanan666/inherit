@@ -2,13 +2,13 @@
 
 Governs the arrangement of Kettlewick Works. The rules are [ADR 0039](../adr/0039-quest-ux-village.md), [ADR 0034](../adr/0034-cpu-meter-stays-visible.md), [ADR 0033](../adr/0033-quest-card-stays-still.md), [ADR 0028](../adr/0028-run-to-completion.md), [ADR 0024](../adr/0024-quest-rail-and-status.md), [ADR 0025](../adr/0025-functions-with-triggers.md), [ADR 0022](../adr/0022-quest-loop-no-loss.md), and [the first playable slice](v8-first-playable.md).
 
-The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The field spans the top row. The editor fills the row below it. One splitter component divides the map from the editor, the file tree from the code, and the code from the tests. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape in the Journal with padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px ask, a 34px gold button, and a 48px portrait.
+The shell is the workshop frame already on screen: charcoal palette, 65px nav, 25px status bar. The field spans the top row. The editor fills the row below it. One splitter component divides the map from the editor, the file tree from the code, and the code from the tests. At rest the splitter draws nothing. Hover and drag show a 2px accent line and a small grip, with the row-resize or col-resize cursor, on an 8px hit area. Double-click returns that split to its default. The quest card keeps the request-card shape in the Journal with padding 12px, radius 7px, 12px between blocks, a 13px goal, a 13px villager quote, a 34px gold button, and a 48px portrait.
 
 ## Proportions
 
 The grid is 16 cells wide and 6 tall, so the map is a wide row, not a tall column. It spans the full width inside the frame padding. A horizontal splitter under the map sets the row's height. The default is 45% of the works height. The splitter can move it between 22% and 75%, and the height is saved in this browser under `inherit.v8.map-height`.
 
-The tracker sits 12px from the field’s top-right corner. It is 280px wide and scrolls within the top half of the field. A selected machine opens a 260px card 12px from the top-left corner. Its contents scroll within the field’s height.
+The tracker sits 12px from the field’s top-right corner. It is 280px wide and scrolls within the top half of the field. A selected machine or drone opens a 260px card beside its footprint. The card fits inside the field with an 8px margin and scrolls when space is short.
 
 The file tree is a column inside the editor row, 140px until the player drags it. The drag stays between 96px and 420px, and the width is saved as `inherit.v8.tree-width`. Double-click restores 140px. One Files toggle sits on its bar. Under 1280px it starts closed, as a narrow rail with that same toggle. Open or closed is saved separately. Dragging the rail opens it.
 
@@ -17,7 +17,7 @@ The editor and the tests fill the rest of the bottom row. The file tree is the l
 ## Reading order
 
 1. Nav. Kettlewick Works, Journal, Shop, credits, level, and Settings.
-2. Field. The tracker names the next step. Clicking a machine opens its card.
+2. Field. A mark identifies a villager with a quest. The tracker names the next step. Clicking a machine opens its card.
 3. Editor. The open file tab, the code, API, Loop, Deploy, and the tests beside the code.
 4. Status bar. The script, problems, the drone line, caret, tick, and the CPU meter.
 
@@ -31,7 +31,7 @@ The bar uses the six steps already in `levelFor`. Past the last step it stays fu
 
 ## Quest tracker
 
-With no open quest, the tracker shows the next step and a Journal button. With an open quest, it shows the giver, title, next step, and any grant line and file link. Up to three tests show their marks. The first pending or failed test takes the first place, with its reason when one is available. The delivery bar shows what the villager has received. Folding the tracker leaves the giver and step on one line. The browser remembers the fold under `inherit.v8.tracker`.
+With no open quest, the tracker shows the next step and a Journal button. Choosing the named villager opens their dialog and centres the map on their lot. With an open quest, it shows the giver, title, next step, and any grant line and file link. Up to three tests show their marks. The first pending or failed test takes the first place, with its reason when one is available. The delivery bar shows what the villager has received. Folding the tracker leaves the giver and step on one line. The browser remembers the fold under `inherit.v8.tracker`.
 
 The footer reads `In progress` while the order is underway. When delivery is full and a check is still open, `View remaining test` selects it in Tests. When all checks pass, Hand over becomes available and pulses once.
 
@@ -39,22 +39,36 @@ The footer reads `In progress` while the order is underway. When delivery is ful
 
 The Journal has four sections in order.
 
-1. **Now** shows the open quest or the request being read. The card has the title, step, grant line, portrait and ask, need, delivery bar, and reward tiles. Old contracts show their saved requirements. A request has Take quest and All requests. A held request shows its hold sentence and disables Take. The open quest has the same footer actions as the tracker. With no card, Now shows the next step.
-2. **Requests** lists the available villagers while no quest is open. Each row has an initial, name, ask and any hold. Selecting a row shows its card in Now.
+1. **Now** shows the open quest or the first available request. The card has the title, portrait, villager’s quote, one goal, delivery quantity and reward tiles. Old contracts show their saved goal and quantities. A request has Take quest and an All requests button that focuses the list. A held request shows its hold sentence and disables Take. The open quest has the same footer actions as the tracker. With no card, Now shows the next step.
+2. **Requests** lists the available villagers while no quest is open. Each row has an initial, name, ask and any hold. Selecting a row opens that villager’s dialog.
 3. **Done** lists hand-overs in the order they happened, with each title, giver and change.
-4. **Machines** lists the works and drones. Selecting a row closes the Journal and opens the same pinned card as a click on the field.
+4. **Machines** lists the works and drones. Selecting a row closes the Journal and opens the card beside the selected machine or drone.
 
 Shop lists the existing conveniences. Each row shows the detail and price or Owned. Buying keeps Shop open. Owned items and purchases beyond the current credit balance are disabled.
 
-Journal, Shop and the API book each open as a native modal and close any machine card. Escape, the close button or a backdrop click closes the dialog and returns focus to its opener. Editor shortcuts wait until the dialog closes.
+Journal, Shop, villager dialogs and the API book use native modals. Opening one closes the previous surface. Escape, the close button or a backdrop click returns focus to the opener, or to the Factory map after a canvas click. Editor shortcuts wait until the dialog closes.
 
 Taking a quest inserts one comment at the top of the open file, in the villager's voice, for example `// Odile: steel is ore and coal together. Where would they meet?`. It is a nudge, not a solution, and it does not name the shop. When that quest is handed over and it grants a trigger, one example with a comment is inserted under that line, once. A file that already exports `onTick` does not gain a second one. If that quest was already offered the line, deleting it does not bring it back. The API book marks a function `new` while the quest that granted it is open.
 
+## Village
+
+Seven houses and a meadow occupy two rows of 384×288 world-pixel lots west of the works. The houses use their native 210×176 prints at 1.4×. Each starts broken and appears working after a quest from that house is handed over. The river runs under the bridge. Lanes join the main road, and a spur leads to the gate in the works fence.
+
+All eight villagers stand beside their houses from the start. A cameo and name move together. A gold `!` offers a quest, a grey `?` marks the open quest, and a gold `?` means it is ready to hand over. The two gold marks bob up and down by 2 world px every 1.6 seconds. Villagers without a mark are dim until they have had a quest handed over.
+
+Each villager rests for 4–8 seconds between short, eased walks of 1.2–1.8 seconds. The walk stays within the villager’s own lot and within 240 world px of the house base. There is room for the whole token, including its name and raised mark, between houses, neighbours, paths, water, scenery and fence. A narrow gap shortens the step. Hovering, holding a pointer down or opening the villager’s dialog stops both walker and mark in place. A hidden tab or paused floor holds everyone still. Each resumes on its own clock. Reduced motion places each cameo at its original pixel spot with a still mark. At seven of those spots the caption footprint extends 6 px into a lane.
+
+Click the cameo, caption or mark to open the villager’s dialog. It shows their portrait, name and role. An offer has the villager’s quote, one goal, rewards and Take quest. A held offer explains what it needs. An open order shows delivery progress. A ready order marks the goal complete and offers Hand over. A villager without a request recalls the last hand-over or names the level they are waiting for.
+
+## Toasts
+
+Up to three toasts stack above the zoom controls at the bottom right of the field. On Take, the villager explains the work in their own words. A stuck check or a hand-over can bring another cameo and line. Event toasts report passing checks, a ready order, credits and XP, a level, a grant, a new machine or drone, or a purchase. Villager lines last seven seconds and event notices four. Hover holds the stack and a click dismisses a toast. The tracker, Tests and API book keep the information needed to act. Script errors appear in the Console and problem counts.
+
 ## Works
 
-The map fills the top row. The village extends 20 columns west of the works, and on load or resize the default camera fits the works and the nearest eight village columns in the row. The whole grid stays visible and uncropped. The center control returns to that fit. Zoom can go closer after that. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
+The map fills the top row. The village extends 20 columns west of the works, and on load or resize the default camera fits the works and the nearest eight village columns in the row. The whole grid stays visible and uncropped. The center control returns to that fit. Pan west or zoom out to see the rest of the village. Labels sit on the things themselves, in one caption: Vein A, Vein B, Depot, Furnace, and `drone-1`. A revealed vein uses its own name.
 
-Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking it, or a row under Machines in the Journal, opens its card in the top-left corner of the field with what it is, what it holds, its recipes, and its buttons. Recipes are facts. A button names the call and the reason it can run, such as `Needs 2 ore`, `Unload at furnace`, or `Collect with drone-1`. Dump calls `drone.dump()`. The drone's hit target follows the sprite. The Depot and Furnace captions are their own hits, so a drone standing on the tile does not hide the building. A vein is labeled poor, normal, or rich, and a bar shows measured mining on the drone and on the vein. A haul with no measured progress is a task label. A play mark in the gutter of `main.ts` calls one exported function once, once Run is unlocked. The same command is `Run function at cursor`. The mark uses the project dirty flag: a dirty project says deploy and run. A clean Deploy button says Deployed. Deploying clears current drone tasks. The result is a console line, such as `smeltOnce ok`. Loop, once Ines is handed over, is the toggle `Loop: onTick`. It calls `onTick` every tick. The console records when that loop starts and stops. With no `onTick` in `main.ts` the toggle is disabled. A lit Loop whose deployed `main.ts` has no `onTick` says so on the grant line.
+Each drone carries a cargo badge, such as `3/5`. While it is walking, a faint line follows the route it was given. Hovering an entity highlights it. Clicking a machine or drone, or its row under Machines in the Journal, opens its card with what it is, what it holds, its recipes, and its buttons. The card follows its footprint during pan, zoom and drone movement. It opens to the right when space allows, then tries the left and finally below. Close it with the X, Escape from the floor or card, or a click on empty floor. Recipes are facts. A button names the call and the reason it can run, such as `Needs 2 ore`, `Unload at furnace`, or `Collect with drone-1`. Dump calls `drone.dump()`. The drone's hit target follows the sprite. The Depot and Furnace captions are their own hits, so a drone standing on the tile does not hide the building. A vein is labeled poor, normal, or rich, and a bar shows measured mining on the drone and on the vein. A haul with no measured progress is a task label. A play mark in the gutter of `main.ts` calls one exported function once, once Run is unlocked. The same command is `Run function at cursor`. The mark uses the project dirty flag: a dirty project says deploy and run. A clean Deploy button says Deployed. Deploying clears current drone tasks. The result is a console line, such as `smeltOnce ok`. Loop, once Ines is handed over, is the toggle `Loop: onTick`. It calls `onTick` every tick. The console records when that loop starts and stops. With no `onTick` in `main.ts` the toggle is disabled. A lit Loop whose deployed `main.ts` has no `onTick` says so on the grant line.
 
 ## Editor
 
@@ -82,12 +96,15 @@ A quiet strip, every item the same height, an icon and a short label, each with 
 | --- | --- |
 | Credits and level | Nav, two pills |
 | Journal and Shop buttons | Nav, after Kettlewick Works |
-| Requests, portrait, need, rewards, Take, hand-over history, machine list | Journal dialog |
-| Step, grant, quantity, remaining test, Hand over | Tracker and current card in the Journal |
+| Request, portrait, quote, goal, rewards and quest action | Villager dialog or Now in the Journal |
+| Requests, hand-over history and machine list | Journal dialog |
+| Next step, grant and file link | Persistent tracker |
+| Delivery quantity, remaining test and Hand over | Tracker and current card in the Journal |
 | Test marks at a glance | Tracker in the top-right corner of the field |
 | Purchases | Shop dialog |
-| Map and its labels | Full-width top row |
-| Machine facts and manual actions | Pinned card in the top-left corner of the field |
+| Works, village, cameos and quest marks | Full-width field above the editor |
+| Villager lines and event feedback | Toasts above the field’s zoom controls |
+| Machine facts and manual actions | Card beside the selected machine or moving drone |
 | Files, code, API, Loop, Deploy, gutter Run | Editor header and the code under it |
 | Pass and fail | Test rows beside the code |
 | Errors and sim events | Console tab |

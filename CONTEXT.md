@@ -20,8 +20,8 @@ One game played by writing TypeScript. You inherit Kettlewick Works, take a vill
 | CPU | A budget per tick, stored on the world as spent and limit. A call that would pass the limit does not run, and the rest of that tick's player code is skipped. The sim still finishes the tick. The status bar shows it on every tick. CPU +10 in the shop raises the limit. |
 | Brick | One API call from `"inherit"` with a signature, a doc line and a CPU cost. A new one is granted by taking a quest. |
 | Quest | One villager's ask, a count of goods, taken by hand, one at a time. The order is `questList`. |
-| Check | One test of the open quest. It lives beside the code, with a plain line for what it checks. Open or done. It updates every tick after the quest is taken, never completes the quest, and never costs anything. The rail shows the quantity, not these rows. |
-| Hint | A comment inserted once at the top of the open file when the quest is taken. Handing over a quest that grants a trigger inserts one example the same way. Neither is put back if the player deletes it. Neither is on the rail. |
+| Check | One test of the open quest. The Tests tab beside the code explains every check. The persistent tracker shows up to three with their marks. A check updates each tick after Take and costs nothing. When all pass, the player can Hand over. |
+| Hint | Taking a quest inserts its nudge comment once at the top of the open file. Handing over a quest that grants a trigger inserts its example once. Deleted comments and examples stay deleted. The tracker and API book carry grant and code hints. Toasts give feedback when something happens. |
 | Credits | Paid by Hand over and spent in the shop. Never negative. There is no rent. A tick cannot lower the balance. See ADR 0027. |
 | XP | Paid with the credits on Hand over. There is no speed bonus. |
 | Level | From XP, using `levelFor`. A quest's `needLevel` gates who can be asked. |

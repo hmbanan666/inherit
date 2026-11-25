@@ -10,7 +10,7 @@ git checkout art-archive -- path/to/file
 
 ## Live
 
-These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `shared`, `floorMachines`, and `materials`. `TownPortrait.vue` paints a villager from `townPaint` and `townPortrait`.
+These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `shared`, `floorMachines`, `fabrication`, and `materials`. The same floor renderer prints the village and moves the existing portrait tokens with their captions and quest marks. `TownPortrait.vue` paints a villager from `townPaint` and `townPortrait`.
 
 | File | What it draws |
 | --- | --- |
@@ -18,10 +18,10 @@ These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `sh
 | `apps/web/app/lib/art/floorMachines.ts` | The depot crane and crate, the hauler truck, and the furnace with its charging mouth. |
 | `apps/web/app/lib/art/fabrication.ts` | The press, the cutter, and the assembler. The floor draws the press. The cutter and the assembler stay for the lathe and the assembly table. |
 | `apps/web/app/lib/art/materials.ts` | One lump of iron ore, one iron ingot, one steel bar, and one lump of coal. |
-| `apps/web/app/lib/art/townBuildings.ts` | The field draws each quest giver’s house, broken or working. |
-| `apps/web/app/lib/art/townLandscape.ts` | The field uses the day palette and draws firs, orchard trees, fields and split rails from `townLandscape.ts` and the horse from `townBuildings.ts`. |
+| `apps/web/app/lib/art/townBuildings.ts` | The field prints each quest giver’s house broken or working at its native 210×176 size, then displays it at 1.4×. The horse beside the forge uses the same file. |
+| `apps/web/app/lib/art/townLandscape.ts` | The field reuses the day palette for grass, river and lanes, and the existing firs, orchard trees, fields and split rails for scenery. |
 | `apps/web/app/lib/art/townPaint.ts` | Canvas helpers (box, line, stipple) for the portraits and printed scenery. |
-| `apps/web/app/lib/art/townPortrait.ts` | Cameos of Bram, Elsie, Tomas, Wen, Odile, Harrow, Ines, and Pell, each worried or happy. |
+| `apps/web/app/lib/art/townPortrait.ts` | Cameos of Bram, Elsie, Tomas, Wen, Odile, Harrow, Ines, and Pell, each worried or happy. The floor moves the unchanged, upright cameo as a token beside its house. |
 | `apps/web/app/lib/art/contact-sheet.png` | The palette and line-weight sheet. Nothing in the game renders it. |
 | `apps/web/app/components/town/TownPortrait.vue` | The canvas that shows one cameo. |
 | `packages/sim/src/visuals/Villager.vue` | The standing figure. The beginner scenes still use it. [ADR 0030](adr/0030-packs-removed.md) removed the pack that played those scenes. |
