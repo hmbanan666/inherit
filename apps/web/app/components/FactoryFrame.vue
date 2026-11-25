@@ -41,6 +41,7 @@ const catalog = computed(() => shopFor(world.value ?? { cleared: [], bought: [] 
 const { sectionId, selectSection } = useApiBook()
 const overlay = shallowRef<GameOverlay>({ kind: 'none' })
 const journalOpen = computed(() => overlay.value.kind === 'journal')
+const machinesOpen = computed(() => overlay.value.kind === 'machines')
 const shopOpen = computed(() => overlay.value.kind === 'shop')
 const bookOpen = computed(() => overlay.value.kind === 'api')
 const modalOpen = computed(() => overlay.value.kind !== 'none')
@@ -669,6 +670,10 @@ onBeforeUnmount(() => {
           :aria-label="newRequest ? overlayLabels.newRequest : overlayLabels.journal" @click="showDialog({ kind: 'journal' }, $event.currentTarget as HTMLButtonElement)">
           {{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
         </button>
+        <button type="button" class="nav-link" aria-haspopup="dialog" :aria-current="machinesOpen || undefined"
+          :disabled="!world" @click="showDialog({ kind: 'machines' }, $event.currentTarget as HTMLButtonElement)">
+          {{ overlayLabels.machines }}
+        </button>
         <button type="button" class="nav-link" aria-haspopup="dialog" :aria-current="shopOpen || undefined"
           :disabled="!world" @click="showDialog({ kind: 'shop' }, $event.currentTarget as HTMLButtonElement)">
           {{ overlayLabels.shop }}
@@ -807,9 +812,10 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :summary="journalSummary"
         :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
-        :active="!!world?.questId" :offers="offers" :history="history" :machines="machines" @close="closeSurface"
+        :active="!!world?.questId" :offers="offers" :history="history" @close="closeSurface"
         @read="showDialog({ kind: 'npc', who: $event })" @take="take" @hand-over="send({ kind: 'complete' })"
-        @show-test="showOpenTest(); closeSurface()" @open-machine="inspectFromJournal" />
+        @show-test="showOpenTest(); closeSurface()" />
+      <MachinesDialog v-else-if="machinesOpen && world" :machines="machines" @close="closeSurface" @open-machine="inspectFromJournal" />
       <VillagerDialog v-else-if="person && request" :person="person" :request="request"
         @take="take($event); closeSurface()" @hand-over="send({ kind: 'complete' }); closeSurface()" @close="closeSurface" />
       <ShopDialog v-else-if="shopOpen && world" :catalog="catalog" :credits="world.credits" :bought="world.bought"

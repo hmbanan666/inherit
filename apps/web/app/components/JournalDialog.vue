@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { overlayLabels } from '../lib/gameOverlay'
-import type { machineList } from '@inherit/sim/v8'
 import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
 import type { questCard, questSummary } from '../lib/questNote'
 import type { questHistory } from '../lib/questJournal'
@@ -18,7 +17,6 @@ defineProps<{
   active: boolean
   offers: { quest: QuestDef; hold?: string }[]
   history: ReturnType<typeof questHistory>
-  machines: ReturnType<typeof machineList>
 }>()
 const emit = defineEmits<{
   close: []
@@ -26,7 +24,6 @@ const emit = defineEmits<{
   take: [id: string]
   handOver: []
   showTest: []
-  openMachine: [id: string]
 }>()
 const requests = ref<HTMLHeadingElement>()
 </script>
@@ -66,17 +63,6 @@ const requests = ref<HTMLHeadingElement>()
       </ul>
       <p v-else>{{ overlayLabels.emptyHistory }}</p>
     </section>
-    <section>
-      <h3>{{ overlayLabels.machines }}</h3>
-      <ul class="shop-list">
-        <li v-for="row in machines" :key="row.id">
-          <button type="button" @click="emit('openMachine', row.id)">
-            <b>{{ row.name }}</b>
-            <small>{{ row.detail }}</small>
-          </button>
-        </li>
-      </ul>
-    </section>
   </GameDialog>
 </template>
 
@@ -107,24 +93,6 @@ const requests = ref<HTMLHeadingElement>()
   color: var(--gold);
   font: 700 13px var(--mono);
 }
-.shop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px }
-.shop-list button {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  justify-content: stretch;
-  justify-items: start;
-  gap: 2px 8px;
-  text-align: left;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 8px;
-}
-.shop-list button span { justify-self: end; color: var(--accent-soft); font: 13px var(--mono) }
-.shop-list button small { grid-column: 1 / -1; color: var(--soft); font-size: 12px; font-weight: 400 }
-.shop-list button:disabled, .shop-list button.locked { opacity: 0.45 }
 .goal { font-size: 13px; line-height: 1.4 }
 section + section { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line) }
 h3 { margin: 0 0 10px; font-size: 14px }

@@ -1,6 +1,7 @@
 export type GameOverlay =
   | { kind: 'none' }
   | { kind: 'journal' }
+  | { kind: 'machines' }
   | { kind: 'shop' }
   | { kind: 'npc'; who: string }
   | { kind: 'api' }
