@@ -4,13 +4,36 @@ import { questCard } from './questNote'
 import { questNextStep } from './questStep'
 import { journalRequests } from './village'
 import { emptyToasts, expireToasts, pushToasts } from './toasts'
-import { questGoal, questLog, questObjectives, questTabNotice, welcomeToast, xpProgress, xpRing } from './shellBar'
+import { hintParts, isCodeJob, questGoal, questLog, questObjectives, questTabNotice, welcomeToast, xpProgress, xpRing } from './shellBar'
 
-test('the account keeps the level bar labels and width at each part of the curve', () => {
-  expect(xpProgress(0)).toEqual({ level: 1, fraction: 0, width: '0%', label: 'XP 0/10', title: 'Level 1. 0 / 10 XP.' })
-  expect(xpProgress(32)).toEqual({ level: 3, fraction: 0.6, width: '60%', label: 'XP 12/20', title: 'Level 3. 12 / 20 XP.' })
-  expect(xpProgress(140)).toEqual({ level: 6, fraction: 0, width: '0%', label: 'XP 0/30', title: 'Level 6. 0 / 30 XP.' })
-  expect(xpProgress(180)).toEqual({ level: 7, fraction: 1, width: '100%', label: 'XP 180', title: 'Level 7. 180 XP.' })
+test.each([
+  [0, 1, '0 / 10 XP', 0],
+  [10, 2, '10 / 20 XP', 0],
+  [15, 2, '15 / 20 XP', 0.5],
+  [25, 3, '25 / 40 XP', 0.25],
+] as const)('the account shows total XP at %i and fills the ring within the level', (xp, level, label, fraction) => {
+  expect(xpProgress(xp)).toEqual({ level, fraction, width: `${fraction * 100}%`, label, title: `Level ${level} · ${label}` })
+})
+
+test.each([170, 180])('the final level keeps a full ring at %i XP', xp => {
+  expect(xpProgress(xp)).toEqual({ level: 7, fraction: 1, width: '100%', label: 'Max level', title: `Level 7 · Max level · ${xp} XP` })
+})
+
+test('Ines is the code job and the tracker explains both unload routes', () => {
+  const { quest } = take('ines')
+  expect(questList.filter(q => isCodeJob(q.id)).map(q => q.id)).toEqual(['ines'])
+  expect(questGoal(quest, quest)).toEqual({
+    goal: 'Write code to mine vein D and unload 3 ore at the depot.',
+    hint: 'The Unload button only goes to the furnace. Use drone.unload(depot) in your code.',
+  })
+})
+
+test('hint fragments keep prose and punctuation around calls and exported names', () => {
+  expect(hintParts('Run smeltOnce, then drone.unload(depot).')).toEqual([
+    { text: 'Run ', code: false }, { text: 'smeltOnce', code: true }, { text: ', then ', code: false },
+    { text: 'drone.unload(depot)', code: true }, { text: '.', code: false },
+  ])
+  expect(hintParts('Plain words')).toEqual([{ text: 'Plain words', code: false }])
 })
 
 test('the ring offsets a full circumference at zero and none at full XP', () => {

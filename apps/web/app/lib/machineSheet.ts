@@ -1,4 +1,6 @@
 import { apiBook, createWorld, factoryBricks, kettlewick, type inspectMachine } from '@inherit/sim/v8'
+import { giverName } from './worldEvents'
+import { overlayLabels } from './gameOverlay'
 import type { MachineKind } from './floorPick'
 
 export type InspectView = NonNullable<ReturnType<typeof inspectMachine>>
@@ -15,12 +17,13 @@ function kindOf(id: string): SheetKind {
 const headings = { state: 'State', recipes: 'Recipes', api: 'Code API', locked: 'Locked' } as const
 export const missingLabel = 'Missing'
 export const sheetLabels = { intro: 'Call these from your code.', link: 'API', close: 'Esc to close', actions: 'Actions', notReady: 'Not ready' } as const
-export const rowHeight = { heading: 28, intro: 20, meter: 28, fact: 24, progress: 28, recipe: 32, missing: 18, api: 44, locked: 64, gap: 24 } as const
-export const headerHeight = 112
+export const rowHeight = { heading: 28, intro: 20, meter: 28, fact: 24, progress: 28, recipe: 32, missing: 18, api: 44, locked: 44, more: 24, gap: 24 } as const
+export const headerHeight = 88
 export const footerHeight = 48
-export const sheetCss = Object.fromEntries(Object.entries({ ...rowHeight, header: headerHeight, footer: footerHeight })
+const depotHintHeight = 18
+export const sheetCss = Object.fromEntries(Object.entries({ ...rowHeight, header: headerHeight, footer: footerHeight, hint: depotHintHeight })
   .map(([name, px]) => [`--sheet-${name}`, `${px}px`]))
-export const fitBudget = Math.floor(720 * 0.92) - 44 - 2 * 24 - headerHeight - rowHeight.gap - footerHeight
+export const fitBudget = Math.floor(720 * 0.86) - 2 * 24 - headerHeight - rowHeight.gap - footerHeight
 
 export function machineStatus(view: InspectView) {
   const task = view.lines.find(line => line.label === 'Task')?.value
@@ -62,13 +65,28 @@ export function recipeCall(view: InspectView, recipe: Recipe) {
 }
 
 function actionLocked(action: Action) {
-  return !action.enabled && !!action.reason?.startsWith('Unlocks with ')
+  return !action.enabled && /^(Unlocks with |Level \d+$)/i.test(action.reason ?? '')
+}
+export function actionLabel(view: InspectView, action: Action) {
+  if (action.id !== 'unload') return action.label
+  const cargo = view.lines.find(line => line.label === 'Cargo')?.value
+  return cargo === 'ingot' || cargo === 'steel' ? 'Unload to depot' : 'Unload to furnace'
 }
 export function disabledReason(action: Action) {
   return action.enabled ? undefined : action.reason || sheetLabels.notReady
 }
-type Locked = { key: string; kind: 'locked'; label: string; api?: string; input?: Chip[]; output?: Chip[]; unlock: string }
-export function lockedEntries(view: InspectView): Locked[] {
+type Locked = { key: string; kind: 'locked'; label: string; api?: string; unlock: string }
+type More = { key: string; kind: 'more'; label: string }
+
+function unlockLine(gate: string) {
+  const title = gate.replace(/^Unlocks with /, '')
+  const level = /^level (\d+)$/i.exec(title)
+  if (level) return `Level ${level[1]}`
+  const quest = kettlewick.questList?.find(quest => quest.title === title)
+  return quest ? `Unlocks with ${title} (${giverName(quest)})` : `Unlocks with ${title}`
+}
+
+export function lockedEntries(view: InspectView): (Locked | More)[] {
   const remaining = new Set(view.actions.filter(actionLocked))
   const locked: Locked[] = []
   for (const recipe of view.recipes) {
@@ -76,15 +94,16 @@ export function lockedEntries(view: InspectView): Locked[] {
     const call = recipeCall(view, recipe)
     const action = [...remaining].find(a => recipe.locked!.includes(a.api) || a.api === call)
     if (action) remaining.delete(action)
-    const title = recipe.locked.match(/^(.+?) unlocks /)?.[1] ?? action?.reason?.slice('Unlocks with '.length) ?? recipe.locked
-    locked.push({ key: `recipe:${recipe.id}`, kind: 'locked', label: action?.label ?? recipe.id,
-      api: action?.api ?? call, input: recipeChips(recipe.input), output: recipeChips(recipe.output), unlock: `Unlocks after: ${title}` })
+    const title = recipe.locked.match(/^(.+?) unlocks /)?.[1] ?? action?.reason ?? recipe.locked
+    locked.push({ key: `recipe:${recipe.id}`, kind: 'locked', label: action?.label ?? recipe.output,
+      api: action?.api ?? call, unlock: unlockLine(title) })
   }
   for (const action of remaining) {
     locked.push({ key: `action:${action.id}`, kind: 'locked', label: action.label, api: action.api,
-      unlock: `Unlocks after: ${action.reason!.slice('Unlocks with '.length)}` })
+      unlock: unlockLine(action.reason!) })
   }
-  return locked
+  if (locked.length <= 4) return locked
+  return [...locked.slice(0, 4), { key: 'more', kind: 'more', label: overlayLabels.more(locked.length - 4) }]
 }
 
 type Meter = { kind: 'meter' | 'progress'; label: string; value: number; max: number; text: string; color: string; full: boolean }
@@ -93,7 +112,7 @@ type Row = { key: string } & (
   | ({ kind: 'fact' } & InspectView['lines'][number])
   | { kind: 'recipe'; input: Chip[]; output: Chip[]; call?: string; missing?: string }
   | { kind: 'api'; api: string; description?: string; ready: boolean; readiness: string }
-  | Locked
+  | Locked | More
 )
 type Section = { kind: keyof typeof headings; title: string; rows: Row[] }
 
@@ -123,12 +142,13 @@ export function machineSheet(view: InspectView, kind = kindOf(view.id)) {
   const actions = view.actions.filter(action => !actionLocked(action))
   const api = actions.map((action): Row => {
     const doc = entries.get(action.api.split('(', 1)[0]!)?.doc
-    const description = doc?.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? doc ?? action.reason
+    const description = action.id === 'unload' ? actionLabel(view, action) : doc?.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? doc ?? action.reason
     return { key: action.id, kind: 'api', api: action.api, description, ready: action.enabled, readiness: disabledReason(action) ?? 'Ready' }
   })
   return {
     name: view.name, kind: kind === 'drone' ? 'Cart' : kind === 'vein' ? 'Vein' : 'Machine',
     description: view.description, status: machineStatus(view), apiSection: apiSections[kind], actions,
+    depotHint: kind === 'drone' ? 'Depot: only from code, drone.unload(depot)' : undefined,
     columns: [
       [...section('state', state), ...section('recipes', recipes)],
       [...section('api', api), ...section('locked', lockedEntries(view))],
@@ -154,16 +174,19 @@ function balanced(columns: Section[][]) {
   const heights = columns.map(columnHeight)
   return Math.max(...heights) <= 1.6 * Math.min(...heights)
 }
+function columnBudget(sheet: Sheet) {
+  return fitBudget - (sheet.depotHint ? depotHintHeight : 0)
+}
 export function sheetLayout(sheet: Sheet): 1 | 2 {
   const sections = sheet.columns.flat()
-  if (columnHeight(sections) > fitBudget) return 2
+  if (columnHeight(sections) > columnBudget(sheet)) return 2
   // A small State + API sheet (a vein or cart) can be read straight down.
   return sections.length > 2 && balanced(sheet.columns) ? 2 : 1
 }
 
 export function sheetColumns(sheet: Sheet, layout: 1 | 2): Section[][] {
   if (layout === 1) return [sheet.columns.flat()]
-  if (balanced(sheet.columns) && sheet.columns.every(c => columnHeight(c) <= fitBudget)) return sheet.columns
+  if (balanced(sheet.columns) && sheet.columns.every(c => columnHeight(c) <= columnBudget(sheet))) return sheet.columns
   const [left = [], right = []] = sheet.columns
   const [state, ...recipes] = left
   if (state?.kind !== 'state' || state.rows.length < 2) return sheet.columns

@@ -10,11 +10,12 @@ function clampFraction(value: number) {
 
 export function xpProgress(xp: number) {
   const { level, start, next } = levelSpan(xp)
-  if (next === null) return { level, fraction: 1, width: '100%', label: `XP ${xp}`, title: `Level ${level}. ${xp} XP.` }
+  if (next === null) return { level, fraction: 1, width: '100%', label: 'Max level', title: `Level ${level} · Max level · ${xp} XP` }
   const into = xp - start
   const size = next - start
   const fraction = clampFraction(into / size)
-  return { level, fraction, width: `${fraction * 100}%`, label: `XP ${into}/${size}`, title: `Level ${level}. ${into} / ${size} XP.` }
+  const label = `${xp} / ${next} XP`
+  return { level, fraction, width: `${fraction * 100}%`, label, title: `Level ${level} · ${label}` }
 }
 
 export function xpRing(fraction: number, radius: number) {
@@ -33,6 +34,8 @@ export const shellLabels = {
   pane: { quest: 'Quest', tests: 'Quest tests', console: 'Console' },
   sideTabs: 'Quest, tests and console',
   seeTests: 'See Tests',
+  codeJob: 'This job is done in code.',
+  codeExample: '// Example: if (!drone.busy) drone.unload(depot)',
   level: (level: number) => `Level ${level}`,
 }
 
@@ -58,9 +61,12 @@ export function questObjectives(card: Card) {
  * The Quest tab goal in plain words. Quest text stays as written in quests.ts; code words move to a hint
  * under the next step. An old saved contract keeps its own goal.
  */
-const questGoals: Record<string, { goal: string; hint?: string }> = {
+const questGoals: Record<string, { goal: string; hint?: string; codeJob?: true }> = {
   bram: { goal: 'Smelt an ingot and bring it to Bram.', hint: 'The batch has to be started by smeltOnce in your code.' },
-  ines: { goal: 'Mine 3 ore at vein D and bring it to Ines.' },
+  ines: {
+    codeJob: true, goal: 'Write code to mine vein D and unload 3 ore at the depot.',
+    hint: 'The Unload button only goes to the furnace. Use drone.unload(depot) in your code.',
+  },
   odile: { goal: 'Smelt 2 steel and bring it to Odile.' },
   elsie: { goal: 'Press 2 grates and bring them to Elsie. Both carts have to haul.' },
   harrow: { goal: 'Make a plate and a blank and bring them to Harrow.' },
@@ -68,6 +74,15 @@ const questGoals: Record<string, { goal: string; hint?: string }> = {
   pell: { goal: 'Make 2 hinges and bring them to Pell.' },
   wen: { goal: 'Make 2 folding shutters and bring them to Wen.' },
   crew: { goal: 'Pack a winch crate, then a lamp crate, and hand both to Odile.' },
+}
+
+export function isCodeJob(questId: string) {
+  return questGoals[questId]?.codeJob === true
+}
+
+export function hintParts(text: string) {
+  const tokens = text.split(/([a-z]\w*\.\w+\([^)]*\)|\b[a-z]+[A-Z]\w*\b)/)
+  return tokens.map((text, index) => ({ text, code: index % 2 === 1 })).filter(part => part.text.length > 0)
 }
 
 export function questGoal(quest: QuestDef, card: Pick<Card, 'goal'>) {

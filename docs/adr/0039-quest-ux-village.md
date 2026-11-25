@@ -83,3 +83,5 @@ Nick played the anchored card from Phase 4 (pt248u). It ran out of room inside t
 - **The selection is one highlight** round the sprite and its label together, for every object that can be selected.
 
 The exact values are in [Phase 7 of the plan](../plans/quest-ux-village.md).
+
+In the revision after the 25 November playtest, level gains open a centred dialog, toasts appear at the top centre of the floor, and machine cards move opposite the selection with a lighter cover, a break-out sprite and compact locks.

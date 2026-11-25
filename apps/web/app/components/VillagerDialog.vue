@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isCodeJob, shellLabels } from '../lib/shellBar'
 import { villageLabels, type villagerDialog, type villagers } from '../lib/village'
 
 defineProps<{
@@ -16,6 +17,7 @@ const emit = defineEmits<{ take: [id: string]; handOver: []; close: [] }>()
       <template v-else>
         <p v-if="request.state !== 'ready'">{{ request.summary.quote }}</p>
         <p><b>{{ villageLabels.goal }}</b> · {{ request.summary.goal }} <span v-if="request.state === 'ready'">✓</span></p>
+        <p v-if="isCodeJob(request.quest.id)" class="calm">{{ shellLabels.codeJob }}</p>
         <QuestRewards :quest="request.quest" />
         <template v-if="request.state === 'offer'">
           <p v-if="request.hold" class="calm">{{ request.hold }}</p>

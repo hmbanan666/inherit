@@ -1,6 +1,6 @@
 # Plan: quests live in the village
 
-Implements [ADR 0039](../adr/0039-quest-ux-village.md). Nine PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
+Implements [ADR 0039](../adr/0039-quest-ux-village.md). Ten PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
 
 | # | PR | Depends on |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ Implements [ADR 0039](../adr/0039-quest-ux-village.md). Nine PRs, in this order.
 | 6 | After the playtest: top bar, toasts in the window, a Quest tab instead of the tracker, a welcome toast, the CPU item, Machines out of the Journal. | 5 |
 | 7 | The machine card becomes a modal with sections; one selection highlight. | 6 |
 | 7b | Machine modal polish: motion, machine sprite header, chips, Code API as docs, Actions bar, Locked once. | 7 |
+| 8 | Playtest polish: code jobs, cumulative XP, level-up dialog, machine card v3, toasts top centre. | 7b |
 
 ## Rules for every phase
 
@@ -878,6 +879,143 @@ Do not edit ADR 0039.
 - Do not rewrite GameDialog or the dialog system beyond the motion, the X styling, initial focus and the `wide` sizing. Do not change other dialogs' content or other screens.
 - Do not change what the field draws, picking, highlights or the camera.
 - No new dependencies, no new localStorage keys. No browser, dev server, e2e, screenshots or shots.
+
+## Phase 8. Playtest polish: code jobs, levels, machine card v3, toasts
+
+Runs after Phase 7b (#122). This comes from Nick's playtest on 25 November 2026 (pt251u):
+
+- He did not see that Ines's job needs code.
+- The XP display looked as if levels never grow.
+- A level-up deserves a central moment.
+- The machine card still felt clumsy: a strip that only holds the X, a sloppy Locked section, too much width, and a dark cover over the whole game.
+- Toasts at the bottom right sit over the IDE and go unnoticed.
+
+All changes are UI only and build on the existing components: `GameDialog`, `dialogMotion`, `MachineCard`, `machineSheet`, `QuestTracker`, `ToastStack`, `PackNav`, `shellBar` and `worldEvents`.
+
+### Files
+
+**1. Ines's job says it needs code (`lib/shellBar.ts`, `lib/worldEvents.ts`, `components/QuestTracker.vue`, `components/VillagerDialog.vue`, `lib/machineSheet.ts`, `components/MachineCard.vue`, the nudge-comment path in `components/FactoryFrame.vue`)**
+
+The sim is unchanged. Manual Unload sends raw ore to the furnace, and ingot or steel to the depot (`beginUnload`). Only code can unload ore at the depot.
+
+- **Mark code jobs in the UI.** In `shellBar.ts`, add `codeJob?: true` to the `questGoals` entries that need code. Today that is `ines` only. Export `isCodeJob(questId)`.
+- **The Ines goal and hint.** The goal becomes `Write code to mine vein D and unload 3 ore at the depot.` The hint becomes `The Unload button only goes to the furnace. Use drone.unload(depot) in your code.`
+  - The existing rule still holds: no code identifier in any goal line, and the test still runs.
+  - Where hints are rendered (QuestTracker and anywhere else `questGoal(...).hint` shows), call-like tokens in the hint render as `<code>`. A call-like token matches `/[a-z]\w*\.\w+\([^)]*\)|\b[a-z]+[A-Z]\w*\b/`, so Bram's `smeltOnce` becomes code too.
+  - Use a pure `hintParts(text): { text: string; code: boolean }[]` in shellBar, with tests.
+- **The villager dialog.** For a code job, VillagerDialog shows one muted line under the existing need: `This job is done in code.`, from `shellLabels`. Quest content (`ask`, `need`, `why`, `nudge`) is not edited.
+- **Toast on Take.** In `worldEvents`, when a code job is taken (the existing `taken:` branch), also announce `{ icon: 'unlock', key: 'code:' + quest.id, text: 'Run is unlocked. This job is done in code.' }`. Add a worldEvents test.
+  - Run (the ▶ glyph next to a function) is unlocked by Bram's reward. It has no attention or highlight treatment today, so do not add one.
+- **The nudge comment.** Taking a quest already inserts its nudge comment once (`questComment(quest.from, quest.nudge)` in FactoryFrame). For a code job, this existing path adds one more comment line after the nudge: `// Example: if (!drone.busy) drone.unload(depot)`. Use the same insert-once rule. Do not build any new starter mechanism.
+- **The drone Unload label.** In `machineSheet`, the drone action `unload` is shown as `Unload to furnace` when the `Cargo` line is not `ingot` or `steel`, and `Unload to depot` when it is. This is the same rule as `beginUnload`.
+  - The Actions bar and Code API rows show the new label. The `manual` payload is unchanged.
+  - For drones only, one muted 18px line sits under the Actions bar: `Depot: only from code, drone.unload(depot)`, with the call in a code span.
+  - Tests cover the label for empty, ore, coal and ingot cargo.
+
+**2. XP shows the running total (`lib/shellBar.ts`, the account block in `FactoryFrame.vue`)**
+
+- The XP thresholds `[10, 20, 40, 85, 140, 170]` are cumulative and stay as they are.
+- `xpProgress(xp)` keeps `fraction` and `width` span-based for the ring.
+- `label` becomes `<xp> / <next> XP`, the total XP over the next threshold.
+- `title` becomes `Level <n> · <xp> / <next> XP`.
+- At max level, the label is `Max level` and the title is `Level <n> · Max level · <xp> XP`.
+- The account block shows `Level <n>` and the new label.
+- Tests: 0 XP gives `Level 1 · 0 / 10 XP`, 10 gives `Level 2 · 10 / 20 XP`, 25 gives `Level 3 · 25 / 40 XP`, and 170+ gives max level. The ring fraction for 10 and 15 is 0 and 0.5.
+
+**3. The level-up moment (new `components/LevelUpDialog.vue` on GameDialog, `lib/levelUp.ts`, `FactoryFrame.vue`)**
+
+- **`levelUnlocks(level, quests)`** returns real data only:
+  - For each quest with `needLevel === level`, the line `New quest: <title> from <Name>`. The name is `from` without `Mayor `, as in worldEvents.
+  - The shop has no level gating today, so it adds nothing.
+  - When the list is empty, the result is `{ lines: [], next }`, where `next` is the smallest `needLevel > level`, or undefined.
+- **`LevelUpDialog`** uses GameDialog with no `wide`, so it gets the shared motion and the reduced-motion fade. It shows:
+  - The title `Level <n>`.
+  - One line: `You reached level <n>.`
+  - The unlock list, or `Keep going. New work opens at level <next>.` (or `Keep going.` when there is no next).
+  - One primary button `Got it`. Enter and Esc close the dialog. Enter is handled on the dialog, so it works with focus on the panel.
+- **Wiring.** FactoryFrame removes `level` events from the toast batch before `pushToasts`, so there is no level toast. It still adds their keys to `seenToasts`. Each new level key sets `levelUp = n` (the highest new level if two arrive at once).
+  - The dialog renders in the existing Teleport chain after the other dialogs. It shows only when no other overlay or card is open, and it waits until they close.
+  - `modalOpen` includes it.
+  - Nothing new is stored. Events are only produced for live changes (`worldEvents` returns nothing without `prev`, which is the load case), so loading an old save never replays past levels. `seenToasts` stops repeats in the session. A new game resets them as it does today.
+  - Pure tests in `levelUp.test.ts`:
+    - the unlock lines for levels 2 to 7 from `questList`
+    - the empty case with `next`
+    - `pickLevelUp(events, seen)`, which returns the level to show and marks it seen, so a level shows once, never on load, and two at once pick the highest
+
+**4. Machine card v3 (`GameDialog.vue`, `MachineCard.vue`, `machineSheet.ts`, `FactoryFloor.vue`, `FactoryFrame.vue`, new `lib/cardPlace.ts`)**
+
+- **No title strip.** For `wide`, GameDialog drops the 44px header band. The X becomes a 32px icon button absolutely placed at the top-right of the panel (12px inset). It keeps its accessible name and focus-visible ring. The `h2` stays visually hidden. Non-wide dialogs are unchanged.
+- **The sprite breaks out of the card.**
+  - For `wide`, the panel and body use `overflow: visible`. That is safe because the fit budget guarantees no scroll.
+  - The sprite plate is 120×120px and pulled up by 32px (`margin-top: -32px` relative to the body's top padding), so it overlaps the panel's top border.
+  - It keeps the floor colour, the 1px line border, radius 8px, a soft drop shadow, the 2× extract and `image-rendering: pixelated`.
+  - Name (22px), kind, role and status chip sit to its right. The header row takes 88px in flow.
+  - The wide panel `max-height` becomes `min(86dvh, 720px)`, which leaves room above for the overlap at 720px tall.
+- **Locked is compact.** `lockedEntries` rows become:
+  - the lock icon
+  - the thing's name (action label, or recipe output) plus its mono call if there is one
+  - one muted line, either `Unlocks with <quest title> (<Name>)`, looked up from `questList` by title, or `Level <n>` when the lock is by level
+  - No chips and no boxes. Rows are 44px. At most 4 rows show, then one muted row `+<n> more`. The section is hidden when nothing is locked.
+  - Tests: the furnace before Steel for the bridge shows exactly `Unlocks with Steel for the bridge (Odile)` once, and five locks show four rows plus `+1 more`.
+- **Debug.** No Debug disclosure exists in MachineCard or GameDialog on main. Do not add one. If one exists under another name, make it a collapsed `<details>` with a `Debug` summary at the bottom of the right column: `max-width: 420px`, monospace, `max-height: 160px; overflow: auto`, and it never widens the panel.
+- **Width.** The wide panel is `width: fit-content; min-width: min(600px, 100% - 32px); max-width: min(820px, 100% - 32px)`.
+- **A light cover.** For `wide`, the `::backdrop` is `rgba(8, 8, 9, 0.35)` with no blur, so the floor and the selected machine's existing outline stay visible. Other dialogs keep their backdrop.
+- **Keep the card off the machine.**
+  - `cardSide(machineCenterX, viewportWidth)` in `lib/cardPlace.ts` returns:
+    - `'center'` when `viewportWidth < 1100` or the x is unknown
+    - `'right'` when the machine centre is left of the viewport middle
+    - `'left'` otherwise
+  - GameDialog gets an optional `side?: 'left' | 'right' | 'center'` prop. `right` aligns the panel to the right with a 24px margin, `left` mirrors that, and the vertical position stays centred.
+  - `FactoryFloor` exposes `anchorRect(id)`, the viewport rect of `scene.anchorBox(id)` offset by the canvas's `getBoundingClientRect()` and camera, as the old popup code did.
+  - FactoryFrame computes the side when the card opens, passes it to MachineCard, and MachineCard passes it to GameDialog. A card opened from the Machines dialog, with no rect, is centred.
+  - Tests cover `cardSide` for the left, right and narrow cases.
+- **Fit.** Update `rowHeight` (locked 44, plus a `more` row of 24) and set `headerHeight = 88`, with no title bar. `fitBudget` is the 1280×720 panel (`min(86dvh, 720px)` = 619px) minus 48px padding, the 88px header, a 24px gap and the 48px footer (plus 18px for drones). That gives **411px**.
+  - All 24 cases from Phase 7 and 7b pass against it with their chosen layout.
+  - The PR lists each case's height.
+
+**5. Toasts at the top centre of the floor (`components/ToastStack.vue`, `FactoryFrame.vue`)**
+
+- **Position.**
+  - Render the ToastStack inside `.map-frame` (give it `position: relative` if needed), or position it from the map frame's rect. The stack sits at the top centre of the floor area: 12px under its top edge, centred over the floor, never over the IDE.
+  - Width `min(400px, 100% - 24px)`.
+  - Up to 3 toasts (the existing limit), newest on top, with an 8px gap.
+- **Look.**
+  - The background, border, radius and shadow match the GameDialog panel.
+  - 15px text, line-height 1.4, 12px by 14px padding.
+  - The icon is 20px. The villager cameo is a fixed 40×40 square, vertically centred (`align-items: center`) with the same padding as icon toasts and no odd offset.
+- **Motion.** Enter slides down from `translateY(-12px)` with a fade over 240ms ease-out. Leave fades up over 180ms (TransitionGroup leave classes). Under reduced motion, opacity only.
+- **Unchanged.** Toast kinds, keys, timers, hover hold, click to dismiss and the once-per-session welcome. Update any tests that assert the position.
+
+**Docs.**
+
+- `docs/specs/v8-screen-layout.md`:
+  - The Toasts section: position, size and motion.
+  - The machine card paragraph: no title strip, the break-out sprite, compact Locked, the light cover and side placement, the 820px width.
+  - The new level-up dialog.
+  - The XP label.
+  - The table row for toasts.
+- `CONTEXT.md`: one sentence each where behaviour changes. The Hint row mentions the code-job example line, and a glossary line covers the level-up dialog if levels are defined there.
+- ADR 0039: one amendment sentence "after the 25 November playtest" covering the level-up dialog, the toasts' new place and the card v3.
+
+### Acceptance
+
+1. The Ines goal and hint read exactly as above. Hints render call-like tokens as code. No goal line has a code identifier (the existing test). The villager dialog shows `This job is done in code.` for Ines only. Taking Ines toasts `Run is unlocked. This job is done in code.` once. The nudge path adds the example line once. Drone Unload reads `Unload to furnace` or `Unload to depot` by cargo, with the depot line under the Actions bar. The `manual` payloads are unchanged.
+2. The XP label and title show the total over the next threshold, or `Max level`. The ring stays span-based. Tests cover this.
+3. A level-up opens one centred LevelUpDialog with real unlock lines or the keep-going line, and `Got it`. Enter and Esc close it. There is no level toast. It never shows on load and shows once per level. Tests cover `levelUnlocks` and `pickLevelUp`.
+4. The wide card has no title strip, and the X sits top-right in the header. The 120px sprite overlaps the top edge by 32px and is pixelated. Locked is compact (max 4 plus `+N more`, hidden when empty) with no repeated text. The width is 600 to 820px. The backdrop is 35% with no blur. The side placement follows `cardSide` (tested). The fit test passes for all cases at 411px.
+5. Toasts sit at the top centre of the floor, 400px wide, at 15px, newest on top, max 3, with the new motion and a centred square cameo. Kinds, timers and the welcome are unchanged.
+6. Docs updated as listed, with one-sentence amendments only.
+7. `pnpm test`, `pnpm typecheck`, `pnpm build` and `pnpm sim` pass. After `pnpm sim:report`, `git diff --exit-code docs/sim/report.md` is clean. No deleted files, no art changes, no `packages/sim` or `tests/e2e` changes, and `world.grid` is still 16×6.
+
+### Do not
+
+- Do not change sim balance, the XP steps, quest xp, pay or `needLevel`, the manual Unload rules, or anything under `packages/sim`, including quest text, API names and the API book.
+- Do not add multi-quest.
+- Do not delete or edit art, and do not rewrite components from scratch. Extend the listed ones. `LevelUpDialog` is the only new component.
+- Do not add browser, e2e or screenshot tests, or new dependencies.
+- Do not touch unrelated screens.
+- Do not add features not listed: no sounds, no achievements, no tutorial framework, no new toast types beyond the one code-job line, no new run-button highlight, no new storage keys.
+- Do not change the wordmark or the top bar order.
 
 ## Final documentation gate
 

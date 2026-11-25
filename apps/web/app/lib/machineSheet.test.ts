@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { buyUpgrade, createWorld, inspectMachine, kettlewick, machineList, questList, shop } from '@inherit/sim/v8'
 import { createBench, createLathe, createPress, createSpare, itemNames, port } from '../../../../packages/sim/src/v8/modules/stock'
-import { disabledReason, fitBudget, footerHeight, headerHeight, lockedEntries, machineSheet, machineStatus, recipeCall, recipeChips, resourceColor, sheetColumns, sheetHeight, sheetLayout } from './machineSheet'
+import { actionLabel, disabledReason, fitBudget, footerHeight, headerHeight, lockedEntries, machineSheet, machineStatus, recipeCall, recipeChips, resourceColor, sheetColumns, sheetHeight, sheetLayout } from './machineSheet'
 
 const furnace = inspectMachine(createWorld(kettlewick), kettlewick, 'furnace')!
 const emptyCart = inspectMachine(createWorld(kettlewick), kettlewick, 'drone-1')!
@@ -79,8 +79,8 @@ const cases = [
 ]
 // Expected [columns, tallest column in pixels] at 1280×720 for the Phase 7 fixtures.
 const fit: Record<string, { early: [number, number]; late: [number, number] }> = {
-  furnace: { early: [2, 296], late: [2, 284] },
-  depot: { early: [1, 148], late: [2, 220] },
+  furnace: { early: [2, 276], late: [2, 284] },
+  depot: { early: [1, 148], late: [1, 388] },
   press: { early: [2, 308], late: [2, 308] },
   spare: { early: [2, 308], late: [2, 308] },
   lathe: { early: [1, 330], late: [1, 358] },
@@ -102,10 +102,9 @@ test.each(recipeCases)('%s recipe %s shows %s', (id, recipeId, call) => {
   expect(recipeCall(view, view.recipes.find(recipe => recipe.id === recipeId)!)).toBe(call)
 })
 
-test('Alloy has one unlock title, its signature and the complete recipe', () => {
+test('Alloy has one compact lock with the call and its quest giver', () => {
   expect(lockedEntries(furnace)).toMatchObject([{
-    label: 'Alloy', api: 'furnace.alloy()', input: [{ qty: 2, item: 'ore' }, { qty: 1, item: 'coal' }],
-    output: [{ qty: 1, item: 'steel' }], unlock: 'Unlocks after: Steel for the bridge',
+    label: 'Alloy', api: 'furnace.alloy()', unlock: 'Unlocks with Steel for the bridge (Odile)',
   }])
   const sheet = machineSheet(furnace)
   expect(JSON.stringify(sheet).match(/Steel for the bridge/g)).toHaveLength(1)
@@ -119,14 +118,41 @@ test('Alloy has one unlock title, its signature and the complete recipe', () => 
   const after = machineSheet(unlocked)
   expect(after.columns.flat().find(s => s.kind === 'api')?.rows).toContainEqual(expect.objectContaining({ api: 'furnace.alloy()', readiness: 'Ready' }))
   expect(after.actions).toContain(unlocked.actions[1])
+  expect(after.columns.flat().some(section => section.kind === 'locked')).toBe(false)
 })
 
 test('locks also match by recipe call and keep unmatched recipes and actions', () => {
   const recipe = { ...furnace.recipes[1]!, locked: 'The order unlocks a new recipe' }
   const action = furnace.actions[1]!
-  expect(lockedEntries({ ...furnace, recipes: [recipe], actions: [action] })).toMatchObject([{ label: 'Alloy', unlock: 'Unlocks after: The order' }])
-  expect(lockedEntries({ ...furnace, recipes: [recipe], actions: [] })).toMatchObject([{ api: 'furnace.alloy()', output: [{ qty: 1, item: 'steel' }] }])
-  expect(lockedEntries({ ...furnace, recipes: [], actions: [action] })).toMatchObject([{ label: 'Alloy', api: action.api, unlock: 'Unlocks after: Steel for the bridge' }])
+  expect(lockedEntries({ ...furnace, recipes: [recipe], actions: [action] })).toMatchObject([{ label: 'Alloy', unlock: 'Unlocks with The order' }])
+  expect(lockedEntries({ ...furnace, recipes: [recipe], actions: [] })).toMatchObject([{ api: 'furnace.alloy()', label: '1 steel' }])
+  expect(lockedEntries({ ...furnace, recipes: [], actions: [action] })).toMatchObject([{ label: 'Alloy', api: action.api, unlock: 'Unlocks with Steel for the bridge (Odile)' }])
+})
+
+test('five locks show four rows and a count, including a lock by level', () => {
+  const recipes = Array.from({ length: 5 }, (_, i) => ({ id: String(i), input: '1 ore', output: '1 plate', locked: 'Level 4' }))
+  const rows = lockedEntries({ ...furnace, recipes, actions: [] })
+  expect(rows).toHaveLength(5)
+  expect(rows.slice(0, 4)).toMatchObject(recipes.slice(0, 4).map(r => ({ key: 'recipe:' + r.id, label: '1 plate', unlock: 'Level 4' })))
+  expect(rows.at(-1)).toMatchObject({ kind: 'more', label: '+1 more' })
+  const sheet = machineSheet({ ...furnace, lines: [], recipes, actions: [] })
+  expect(sheetHeight(sheet, 1)).toBe(28 + 4 * 44 + 24)
+})
+
+test.each([
+  ['empty', 'Unload to furnace'], ['ore', 'Unload to furnace'], ['coal', 'Unload to furnace'],
+  ['ingot', 'Unload to depot'], ['steel', 'Unload to depot'],
+])('the %s cart names the manual destination in Actions and Code API', (cargo, label) => {
+  const view = { ...emptyCart, lines: [{ label: 'Cargo', value: cargo }] }
+  const sheet = machineSheet(view)
+  const unload = sheet.actions.find(action => action.id === 'unload')!
+  expect(actionLabel(view, unload)).toBe(label)
+  expect(unload).toBe(view.actions.find(action => action.id === 'unload'))
+  expect(sheet.columns.flat().find(section => section.kind === 'api')?.rows).toContainEqual(expect.objectContaining({
+    key: 'unload', api: 'drone.unload(station)', description: label,
+  }))
+  expect(sheet.depotHint).toBe('Depot: only from code, drone.unload(depot)')
+  expect(machineSheet(furnace).depotHint).toBeUndefined()
 })
 
 test('Code API exposes documentation and readiness as plain display data', () => {
@@ -159,7 +185,7 @@ for (const era of ['early', 'late'] as const) {
   test(`${era} fit cases include every Machines row`, () => {
     expect(cases.map(c => c.id).sort()).toEqual(machineList(world).map(machine => machine.id).sort())
   })
-  test.each(cases)(`${era} $id preserves state, recipes and Phase 7 manual actions and fits in 386px`, sample => {
+  test.each(cases)(`${era} $id preserves state, recipes and Phase 7 manual actions and fits in 411px`, sample => {
     const view = inspectMachine(world, kettlewick, sample.id)!
     const sheet = machineSheet(view)
     expect([sheet.name, sheet.kind, sheet.description, sheet.apiSection]).toEqual([view.name, sample.kind, view.description, sample.book])
@@ -182,18 +208,21 @@ for (const era of ['early', 'late'] as const) {
       view.recipes.filter(r => !r.locked).map(r => [r.id, recipeChips(r.input), recipeChips(r.output), r.missing]))
     expect(recipeCases.filter(([id]) => id === sample.id).map(([, id]) => id)).toEqual(view.recipes.map(r => r.id))
     expect([layout, sheetHeight(sheet, layout)]).toEqual(fit[sample.kind === 'Vein' ? 'vein' : sample.id]![era])
-    expect(sheetHeight(sheet, layout)).toBeLessThanOrEqual(fitBudget)
+    expect(sheetHeight(sheet, layout) + (sample.kind === 'Cart' ? 18 : 0)).toBeLessThanOrEqual(fitBudget)
   })
 }
 
 test('the one-column depot grows to two State columns only when its stock would overflow', () => {
-  expect([headerHeight, footerHeight, fitBudget]).toEqual([112, 48, 386])
+  expect([headerHeight, footerHeight, fitBudget]).toEqual([88, 48, 411])
   const depot = (world: typeof early) => machineSheet(inspectMachine(world, kettlewick, 'depot')!)
   expect(sheetLayout(depot(early))).toBe(1)
   const stocked = depot(fittedWorld('late'))
   expect(sheetHeight(stocked, 1)).toBe(388)
-  expect(sheetLayout(stocked)).toBe(2)
-  expect(sheetColumns(stocked, 2).map(c => c.map(s => s.kind))).toEqual([['state'], ['state']])
+  expect(sheetLayout(stocked)).toBe(1)
+  const overflow = machineSheet({ ...inspectMachine(early, kettlewick, 'depot')!,
+    lines: Array.from({ length: 16 }, (_, i) => ({ label: String(i), value: '1' })) })
+  expect(sheetLayout(overflow)).toBe(2)
+  expect(sheetColumns(overflow, 2).map(c => c.map(s => s.kind))).toEqual([['state'], ['state']])
   expect(sheetLayout(machineSheet(furnace))).toBe(2)
 })
 

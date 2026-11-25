@@ -17,13 +17,15 @@ import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/q
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
+import { isLevelEvent, pickLevelUp, visibleLevelUp } from '../lib/levelUp'
 import { dialogClose } from '../lib/dialogMotion'
+import { cardSide, type CardSide } from '../lib/cardPlace'
 import type { Point } from '../lib/floorPick'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
 import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
-import { questTabNotice, shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
+import { isCodeJob, questTabNotice, shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
 import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
@@ -92,12 +94,20 @@ const inspected = computed(() => {
   const current = world.value
   return current && selectedId.value ? inspectMachine(current, kettlewick, selectedId.value) : undefined
 })
-const modalOpen = computed(() => overlay.value.kind !== 'none' || !!inspected.value)
-function openMachine(id: string) {
+const settingsOpen = ref(false)
+const levelUp = ref<number>()
+const otherModalOpen = computed(() => overlay.value.kind !== 'none' || !!inspected.value)
+const shownLevel = computed(() => visibleLevelUp(levelUp.value, otherModalOpen.value || settingsOpen.value))
+const modalOpen = computed(() => otherModalOpen.value || shownLevel.value !== undefined)
+const machineSide = ref<CardSide>('center')
+function openMachine(id: string, centerX?: number) {
+  settingsOpen.value = false
+  machineSide.value = cardSide(centerX, window.innerWidth)
   selectedId.value = id
 }
 function showDialog(next: Exclude<GameOverlay, { kind: 'none' }>, from?: ApiBookOpener) {
   if (!modalOpen.value) opener = from
+  settingsOpen.value = false
   selectedId.value = ''
   overlay.value = openOverlay(overlay.value, next)
 }
@@ -108,6 +118,7 @@ function openMachineApi(id: string) {
 function closeSurface() {
   overlay.value = closeOverlay(overlay.value)
   selectedId.value = ''
+  if (levelUp.value !== undefined) return
   const from = opener
   opener = undefined
   nextTick(() => {
@@ -124,8 +135,10 @@ function inspectFromFloor(id: string) {
     return
   }
   opener = from
-  if (id) openMachine(id)
-  else closeSurface()
+  if (id) {
+    const rect = floor.value?.anchorRect(id)
+    openMachine(id, rect && rect.x + rect.w / 2)
+  } else closeSurface()
 }
 function inspectFromJournal(id: string) {
   overlay.value = closeOverlay(overlay.value)
@@ -377,7 +390,15 @@ watch(world, current => {
   }
   prevView = current
   prevRows = rows
-  if (events.length) toasts.value = pushToasts(toasts.value, events, hoverStart ?? performance.now(), seenToasts)
+  if (events.length) {
+    const level = pickLevelUp(events, seenToasts)
+    if (level !== undefined) {
+      if (!opener && document.activeElement instanceof HTMLElement) opener = document.activeElement
+      levelUp.value = level
+    }
+    const notices = events.filter(event => !isLevelEvent(event))
+    toasts.value = pushToasts(toasts.value, notices, hoverStart ?? performance.now(), seenToasts)
+  }
   if (!grantNotesReady) {
     for (const id of current.cleared) grantedNotes.add(id)
     grantNotesReady = true
@@ -395,7 +416,8 @@ function take(id: string) {
   if (!current || current.questId || !quest || !canTake(current, quest)) return
   const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
   const note = questComment(quest.from, quest.nudge)
-  const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value)
+  const example = isCodeJob(quest.id) ? shellLabels.codeExample : undefined
+  const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value, example)
   rememberNotes(next.remembered)
   if (next.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: next.source }
   send({ kind: 'accept', id })
@@ -525,6 +547,7 @@ function deploy() {
 }
 function startOver() {
   if (!window.confirm('Start over at Kettlewick? This replaces your saved works and all project files.')) return
+  levelUp.value = undefined
   closeSurface()
   grantNotesReady = false
   grantedNotes.clear()
@@ -650,7 +673,7 @@ onBeforeUnmount(() => {
 <template>
   <StudioShell class="factory">
     <template #nav>
-      <PackNav>
+      <PackNav v-model:settings="settingsOpen">
         <p v-if="world" class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
           <Coins />
           <b>{{ world.credits }}</b>
@@ -692,6 +715,7 @@ onBeforeUnmount(() => {
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
           <LazyFactoryFloor v-if="world" ref="floor" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
+          <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
         <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': columns.stackChecks }">
@@ -800,7 +824,6 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </template>
-    <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
     <Teleport to="body">
       <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :summary="journalSummary"
         :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
@@ -814,8 +837,9 @@ onBeforeUnmount(() => {
         @buy="send({ kind: 'buy', id: $event })" @close="closeSurface" />
       <ApiBook v-else-if="bookOpen" v-dialog-motion class="dialog-motion" :class="{ closing: bookClosing }"
         :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeBook" />
-      <MachineCard v-else-if="inspected" :inspected="inspected" :sprite="cardSprite" @api="openMachineApi" @close="closeSurface"
+      <MachineCard v-else-if="inspected" :inspected="inspected" :sprite="cardSprite" :side="machineSide" @api="openMachineApi" @close="closeSurface"
         @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
+      <LevelUpDialog v-else-if="shownLevel !== undefined" :level="shownLevel" :quests="quests" @close="levelUp = undefined; closeSurface()" />
     </Teleport>
   </StudioShell>
 </template>

@@ -1,20 +1,23 @@
 <script setup lang="ts">
+import type { CardSide } from '../lib/cardPlace'
 import { dialogClose } from '../lib/dialogMotion'
 import { overlayLabels } from '../lib/gameOverlay'
 import { X } from '@lucide/vue'
 
-defineProps<{ title: string; wide?: boolean }>()
+defineProps<{ title: string; wide?: boolean; side?: CardSide }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
 const { closing, requestClose, vDialogMotion } = dialogClose(() => emit('close'))
+
+defineExpose({ requestClose })
 
 onMounted(() => dialog.value?.showModal())
 onBeforeUnmount(() => dialog.value?.close())
 </script>
 
 <template>
-  <dialog ref="dialog" v-dialog-motion class="shade dialog-motion" :class="{ closing }" :aria-label="title" @cancel.prevent="requestClose" @click.self="requestClose">
-    <section class="panel" :class="{ wide }" tabindex="-1" autofocus>
+  <dialog ref="dialog" v-dialog-motion class="shade dialog-motion" :class="{ closing, 'wide-shade': wide }" :aria-label="title" @cancel.prevent="requestClose" @click.self="requestClose">
+    <section class="panel" :class="[side, { wide }]" tabindex="-1" autofocus>
       <header>
         <h2>{{ title }}</h2>
         <button type="button" :aria-label="overlayLabels.close(title)" @click="requestClose"><X :size="16" /></button>
@@ -77,13 +80,28 @@ onBeforeUnmount(() => dialog.value?.close())
   overflow: hidden;
 }
 .panel:focus { outline: none }
+.wide-shade::backdrop { background: rgba(8, 8, 9, 0.35); backdrop-filter: none }
 .panel.wide {
+  position: relative;
+  overflow: visible;
+  --sheet-padding: 24px;
   width: fit-content;
-  min-width: min(640px, 100% - 32px);
-  max-width: min(880px, 100% - 32px);
-  max-height: min(92dvh, 760px);
+  min-width: min(600px, 100% - 32px);
+  max-width: min(820px, 100% - 32px);
+  max-height: min(86dvh, 720px);
 }
-.wide .body { padding: 24px }
+.wide .body { padding: var(--sheet-padding); overflow: visible }
+@media (min-width: 1100px) {
+  .wide.right { justify-self: end; margin-right: 24px }
+  .wide.left { justify-self: start; margin-left: 24px }
+}
+@media (max-width: 639px), (max-height: 719px) {
+  /* Stacked columns can exceed the desktop fit budget. Scroll the shade with the sprite. */
+  .wide-shade { overflow-y: auto; align-items: safe center; padding-block: 40px }
+  .panel.wide { min-height: min-content }
+}
+.wide header { display: contents }
+.wide header button { position: absolute; top: 12px; right: 12px; z-index: 1 }
 .wide h2 {
   position: absolute;
   width: 1px;

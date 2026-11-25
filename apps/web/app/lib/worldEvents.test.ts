@@ -44,6 +44,17 @@ test('loading a save with Bram cleared and restarting at a lower tick are silent
   expect(changes(prev, world)).toEqual([])
 })
 
+test('taking Ines announces the code job once alongside her usual Take events', () => {
+  const world = createWorld(kettlewick)
+  handOver(world, bram)
+  const prev = structuredClone(world)
+  expect(acceptQuest(world, kettlewick, ines.id)).toBe(true)
+  expect(changes(prev, world).filter(event => event.key === 'code:ines')).toEqual([
+    { kind: 'event', icon: 'unlock', key: 'code:ines', text: 'Run is unlocked. This job is done in code.' },
+  ])
+  expect(changes(world, structuredClone(world))).toEqual([])
+})
+
 test('taking Odile announces her why and the call from her unlock signature', () => {
   const world = createWorld(kettlewick)
   handOver(world, bram)

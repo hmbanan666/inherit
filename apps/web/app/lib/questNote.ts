@@ -10,11 +10,14 @@ export function questComment(from: string, nudge: string) {
  * Put the note on the first line once.
  * An id already in `remembered` is left alone, even when the player has deleted the line.
  */
-export function insertQuestNote(source: string, note: string, id: string, remembered: readonly string[]) {
+export function insertQuestNote(source: string, note: string, id: string, remembered: readonly string[], example?: string) {
   if (remembered.includes(id)) return { source, remembered: [...remembered] }
   const next = [...remembered, id]
-  if (source.split('\n').some(line => line.trim() === note)) return { source, remembered: next }
-  return { source: source.length ? `${note}\n${source}` : `${note}\n`, remembered: next }
+  const lines = source.split('\n')
+  const at = lines.findIndex(line => line.trim() === note)
+  if (at === -1) lines.unshift(note, ...(example ? [example] : []))
+  else if (example && lines[at + 1]?.trim() !== example) lines.splice(at + 1, 0, example)
+  return { source: lines.join('\n'), remembered: next }
 }
 
 const goodName: Record<string, [string, string]> = {

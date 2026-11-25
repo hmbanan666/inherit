@@ -5,7 +5,7 @@ import TownPortrait from './town/TownPortrait.vue'
 import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
 import type { questCard } from '../lib/questNote'
 import type { GrantNote } from '../lib/questStep'
-import { portraits, questLog, questTabHint, shellLabels } from '../lib/shellBar'
+import { hintParts, portraits, questLog, questTabHint, shellLabels } from '../lib/shellBar'
 
 const props = defineProps<{
   quest?: QuestDef
@@ -51,7 +51,9 @@ const entries = computed(() => questLog(props.quest, props.card))
             </li>
           </ul>
           <p class="goal step"><MoveRight :size="14" aria-hidden="true" />{{ step }}</p>
-          <small v-if="entry.hint" class="hint-line">{{ entry.hint }}</small>
+          <small v-if="entry.hint" class="hint-line">
+            <component :is="part.code ? 'code' : 'span'" v-for="(part, i) in hintParts(entry.hint)" :key="i">{{ part.text }}</component>
+          </small>
           <p v-if="granted" class="goal">
             {{ granted.text }}
             <button v-if="granted.file" type="button" class="hint" @click="emit('openFile', granted.file)">{{ granted.file }}</button>

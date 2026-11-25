@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Settings2 } from '@lucide/vue'
-const settings = ref(false)
+const settings = defineModel<boolean>('settings', { default: false })
 function closeSettings() { settings.value = false }
 </script>
 <template>

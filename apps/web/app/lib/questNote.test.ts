@@ -20,6 +20,19 @@ test('taking a quest inserts one comment and does not put it back', () => {
   expect(again.source.split('\n').filter(line => line.trim() === odile)).toHaveLength(1)
 })
 
+test('the code example follows the nudge once, including when the file already has the nudge', () => {
+  const quest = questList.find(q => q.id === 'ines')!
+  const nudge = questComment(quest.from, quest.nudge)
+  const example = '// Example: if (!drone.busy) drone.unload(depot)'
+  const file = 'export function mine() {}'
+  const block = [nudge, example, file].join('\n')
+  for (const source of [file, nudge + '\n' + file, block]) {
+    const inserted = insertQuestNote(source, nudge, quest.id, [], example)
+    expect(inserted).toEqual({ source: block, remembered: [quest.id] })
+    expect(insertQuestNote(file, nudge, quest.id, inserted.remembered, example).source).toBe(file)
+  }
+})
+
 test('the rail names the quantity, and a trigger example is inserted once', () => {
   expect(quantityLabel({ from: 'Bram', item: 'ingot', qty: 1, shipped: 0 })).toEqual({ text: 'Delivered to Bram · 0/1 ingot', value: 0, max: 1 })
   expect(quantityLabel({ from: 'Mayor Odile', item: 'steel', qty: 4, shipped: 9 })).toEqual({ text: 'Delivered to Odile · 4/4 steel', value: 4, max: 4 })

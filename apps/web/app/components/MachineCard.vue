@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { Lock } from '@lucide/vue'
-import { disabledReason, machineSheet, missingLabel, resourceColor, sheetColumns, sheetCss, sheetLabels, sheetLayout, type InspectView } from '../lib/machineSheet'
+import type { CardSide } from '../lib/cardPlace'
+import { hintParts } from '../lib/shellBar'
+import { actionLabel, disabledReason, machineSheet, missingLabel, resourceColor, sheetColumns, sheetCss, sheetLabels, sheetLayout, type InspectView } from '../lib/machineSheet'
 
-const props = defineProps<{ inspected: InspectView; sprite?: string }>()
+const props = defineProps<{ inspected: InspectView; sprite?: string; side?: CardSide }>()
 const emit = defineEmits<{ close: []; manual: [action: InspectView['actions'][number]]; api: [section: string] }>()
 const sheet = computed(() => machineSheet(props.inspected))
 const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value)))
 </script>
 
 <template>
-  <GameDialog :title="inspected.name" wide @close="emit('close')">
+  <GameDialog :title="inspected.name" wide :side="side" @close="emit('close')">
     <article class="quest" :style="sheetCss">
       <div class="role">
         <div class="plate"><img v-if="sprite" :src="sprite" alt=""></div>
@@ -37,11 +39,15 @@ const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value
                 <template v-else-if="row.kind === 'fact'">
                   <span>{{ row.label }}</span><span :title="row.value">{{ row.value }}</span>
                 </template>
-                <template v-else-if="row.kind === 'recipe' || row.kind === 'locked'">
-                  <div v-if="row.kind === 'locked'" class="lock-label">
-                    <Lock aria-hidden="true" /><b>{{ row.label }}</b><code>{{ row.api }}</code>
+                <template v-else-if="row.kind === 'locked'">
+                  <div class="lock-label">
+                    <Lock :size="14" aria-hidden="true" /><b>{{ row.label }}</b><code v-if="row.api" :title="row.api">{{ row.api }}</code>
                   </div>
-                  <div v-if="row.input && row.output" class="recipe-line">
+                  <small class="unlock" :title="row.unlock">{{ row.unlock }}</small>
+                </template>
+                <small v-else-if="row.kind === 'more'">{{ row.label }}</small>
+                <template v-else-if="row.kind === 'recipe'">
+                  <div class="recipe-line">
                     <template v-for="(chips, side) in [row.input, row.output]" :key="side">
                       <span v-if="side" class="arrow">→</span>
                       <span v-for="(chip, i) in chips" :key="i" class="chip">
@@ -49,10 +55,9 @@ const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value
                         <span>{{ chip.qty }} {{ chip.item }}</span>
                       </span>
                     </template>
-                    <code v-if="row.kind === 'recipe' && row.call" class="recipe-call" :title="row.call">{{ row.call }}</code>
+                    <code v-if="row.call" class="recipe-call" :title="row.call">{{ row.call }}</code>
                   </div>
-                  <small v-if="row.kind === 'recipe' && row.missing" class="missing" :title="row.missing">{{ missingLabel }} {{ row.missing }}</small>
-                  <small v-if="row.kind === 'locked'" class="unlock">{{ row.unlock }}</small>
+                  <small v-if="row.missing" class="missing" :title="row.missing">{{ missingLabel }} {{ row.missing }}</small>
                 </template>
                 <template v-else-if="row.kind === 'api'">
                   <div class="action-line">
@@ -71,9 +76,12 @@ const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value
         <div v-if="sheet.actions.length" class="actions" role="group" :aria-label="sheetLabels.actions">
           <button v-for="action in sheet.actions" :key="action.id" type="button" class="calm" :disabled="!action.enabled"
             :title="disabledReason(action)" :aria-describedby="!action.enabled ? 'readiness-' + action.id : undefined"
-            @click="emit('manual', action)">{{ action.label }}</button>
+            @click="emit('manual', action)">{{ actionLabel(inspected, action) }}</button>
         </div>
       </footer>
+      <p v-if="sheet.depotHint" class="depot-hint">
+        <component :is="part.code ? 'code' : 'span'" v-for="(part, i) in hintParts(sheet.depotHint)" :key="i">{{ part.text }}</component>
+      </p>
     </article>
   </GameDialog>
 </template>
@@ -82,8 +90,12 @@ const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value
 .quest, .identity, .column, .columns section { min-width: 0 }
 .role { display: flex; align-items: center; gap: 24px; height: var(--sheet-header); margin-bottom: var(--sheet-gap) }
 .plate {
-  flex: 0 0 var(--sheet-header);
-  height: var(--sheet-header);
+  flex: 0 0 120px;
+  height: 120px;
+  align-self: flex-start;
+  margin-top: -32px;
+  transform: translateY(calc(-1 * var(--sheet-padding)));
+  box-shadow: 0 4px 12px var(--shadow-light);
   display: grid;
   place-items: center;
   background: var(--floor-base);
@@ -91,7 +103,7 @@ const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value
   border-radius: 8px;
 }
 .plate img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated }
-.identity { display: grid; justify-items: start; gap: 8px }
+.identity { display: grid; justify-items: start; gap: 3px; padding-right: 32px }
 .identity h3 { font-size: 22px; font-weight: 700; line-height: 24px }
 .identity small { line-height: 12px }
 .identity p {
@@ -161,9 +173,12 @@ li.api { height: var(--sheet-api); display: grid; align-content: center; gap: 2p
 .action-line span { color: var(--sub); text-align: right }
 .action-line .ready { color: var(--mint) }
 .description { color: var(--soft) }
-.locked li { height: var(--sheet-locked); opacity: 0.7 }
+.facts li.locked { height: var(--sheet-locked); display: grid; align-content: center }
+.lock-label svg { flex: none; color: var(--sub) }
+.facts li.more { height: var(--sheet-more); color: var(--sub) }
+.unlock { padding-left: 22px }
 .lock-label, .unlock { height: 20px; line-height: 20px }
-.locked .recipe-line { height: 24px }
+.depot-hint { margin: 0; height: var(--sheet-hint); color: var(--sub); text-align: right; font-size: 12px; line-height: var(--sheet-hint) }
 footer { height: var(--sheet-footer); display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line) }
 .actions { display: flex; align-items: center; gap: 8px }
 .actions button { font-size: 13px }
