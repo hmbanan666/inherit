@@ -4,11 +4,12 @@ import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
-import { floorCursor, floorPoint, panToCell, pickFloor, stationsOf } from '../lib/floorPick'
+import { floorCursor, floorPoint, panToCell, pickFloor, stationsOf, type Box } from '../lib/floorPick'
+import { sameBox, screenBox } from '../lib/popupPlace'
 import { fieldBounds, type VillageView } from '../lib/village'
 
 const props = defineProps<{ world: FloorWorld; village?: VillageView; focusSpot?: Cell; interval: number; paused: boolean; selected?: string }>()
-const emit = defineEmits<{ error: [message: string]; select: [id: string] }>()
+const emit = defineEmits<{ error: [message: string]; select: [id: string]; anchor: [box: Box | undefined] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 0, h: 0 }),
@@ -33,6 +34,8 @@ const camera = computed(() => ({
   y: place.value.y + pan.value.y,
 }))
 const measured = computed(() => size.value.w > 0 && size.value.h > 0)
+const selectedCart = computed(() => props.world.drones.some(drone => drone.name === props.selected))
+let lastAnchor: Box | undefined | null = null
 watch([() => props.focusSpot, measured], ([spot, ready]) => {
   if (spot && ready) pan.value = panToCell(spot, size.value, { x: fitX.value, y: place.value.y, scale: scale.value })
 })
@@ -54,6 +57,13 @@ function wheel(e: WheelEvent) {
   const r = host.value!.getBoundingClientRect()
   zoomBy(Math.exp(-Math.max(-130, Math.min(130, e.deltaY)) * 0.0026), e.clientX - r.left, e.clientY - r.top)
 }
+function syncAnchor() {
+  const box = props.selected ? scene?.anchorBox(props.selected) : undefined
+  const next = box && screenBox(box, { x: 0, y: 0 }, camera.value, scale.value)
+  if (lastAnchor !== null && sameBox(next, lastAnchor)) return
+  lastAnchor = next
+  emit('anchor', next)
+}
 function sync() {
   if (!app) return
   if (!scene) {
@@ -65,6 +75,7 @@ function sync() {
   if (props.village) scene.setVillage(props.village)
   scene.update(props.world)
   scene.select(props.selected ?? '')
+  syncAnchor()
 }
 watch([() => props.world, () => props.village, camera, scale, () => props.selected], sync)
 function pick(clientX: number, clientY: number) {
@@ -87,7 +98,7 @@ function aim(clientX: number, clientY: number) {
 }
 function down(e: PointerEvent) {
   if ((e.target as HTMLElement).closest('button,aside') || e.button !== 0) return
-  armed = true
+  armed = pointers.size === 0
   origin = { x: e.clientX, y: e.clientY }
   host.value!.focus({ preventScroll: true })
   host.value!.setPointerCapture(e.pointerId)
@@ -105,6 +116,7 @@ function leave() {
 function move(e: PointerEvent) {
   const old = pointers.get(e.pointerId)
   if (!old) return
+  if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) armed = false
   const other = [...pointers].find(([id]) => id !== e.pointerId)?.[1]
   if (other) {
     const r = host.value!.getBoundingClientRect()
@@ -124,12 +136,10 @@ function move(e: PointerEvent) {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 }
 function up(e: PointerEvent) {
-  pointers.delete(e.pointerId)
-  if (!armed) return
+  if (!pointers.delete(e.pointerId) || !armed) return
   armed = false
   if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) return
-  const hit = pick(e.clientX, e.clientY)
-  if (hit) emit('select', hit)
+  emit('select', pick(e.clientX, e.clientY) ?? '')
 }
 function cancel() {
   pointers.clear()
@@ -174,7 +184,10 @@ onMounted(async () => {
     observer = new ResizeObserver(resize)
     observer.observe(host.value!.closest('.map-frame') ?? host.value!)
     renderer.ticker.maxFPS = 40
-    renderer.ticker.add(() => scene?.animate(performance.now(), props.interval, props.paused))
+    renderer.ticker.add(() => {
+      scene?.animate(performance.now(), props.interval, props.paused)
+      if (selectedCart.value) syncAnchor()
+    })
   } catch {
     renderError.value = 'Could not open the floor renderer. Reload to retry.'
     emit('error', renderError.value)
