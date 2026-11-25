@@ -8,7 +8,7 @@ import { assembler, cutter, press } from './art/fabrication'
 import { FloorScene, tile } from './floor'
 import {
   buildingLabelHit, captionBox, cartDrawScale, floorCursor, floorPoint, footprintContains, hitPadding, hoverScale,
-  panToCell, pickFloor, stationShapes, stationsOf, type MachineKind, type StationHit,
+  panToCell, panToPoint, pickFloor, stationShapes, stationsOf, type MachineKind, type StationHit,
 } from './floorPick'
 import { screenBox } from './popupPlace'
 
@@ -294,5 +294,17 @@ test('centering a villager puts its world spot at the viewport midpoint at any z
     })!
     expect(point.x).toBeCloseTo(-336)
     expect(point.y).toBeCloseTo(144)
+  }
+})
+
+test('tracker focus puts a village pixel point at the viewport centre at both zoom levels', () => {
+  const size = { w: 1904, h: 560 }
+  const point = { x: -1576, y: 505 }
+  for (const scale of [0.5, 1.25]) {
+    const camera = { x: 623, y: -17, scale }
+    const pan = panToPoint(point, size, camera)
+    expect(floorPoint(952, 280, {
+      left: 0, top: 0, scale, cameraX: camera.x + pan.x, cameraY: camera.y + pan.y,
+    })).toEqual(point)
   }
 })
