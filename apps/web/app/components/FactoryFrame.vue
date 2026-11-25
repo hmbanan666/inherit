@@ -17,6 +17,8 @@ import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/q
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
+import type { Box } from '../lib/floorPick'
+import { popupMargin, popupPlace } from '../lib/popupPlace'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
@@ -42,6 +44,29 @@ const shopOpen = computed(() => overlay.value.kind === 'shop')
 const bookOpen = computed(() => overlay.value.kind === 'api')
 const modalOpen = computed(() => overlay.value.kind !== 'none')
 const mapFrame = ref<HTMLElement>()
+const machineCard = ref<HTMLElement>()
+const anchor = shallowRef<Box>()
+const frameSize = shallowRef({ w: 0, h: 0 })
+const cardSize = shallowRef({ w: 0, h: 0 })
+const cardInsetCss = 2 * popupMargin + 'px'
+const cardPosition = computed(() => {
+  if (!anchor.value) return
+  const { left, top } = popupPlace(anchor.value, cardSize.value, frameSize.value)
+  return { left: left + 'px', top: top + 'px' }
+})
+watch([mapFrame, machineCard], ([frame, card], _, onCleanup) => {
+  if (!frame || !card) return
+  const measure = () => {
+    const { width, height } = card.getBoundingClientRect()
+    cardSize.value = { w: width, h: height }
+    frameSize.value = { w: frame.clientWidth, h: frame.clientHeight }
+  }
+  measure()
+  const observer = new ResizeObserver(measure)
+  observer.observe(frame)
+  observer.observe(card, { box: 'border-box' })
+  onCleanup(() => observer.disconnect())
+}, { flush: 'post' })
 const focusSpot = shallowRef<Cell>()
 const journalButton = ref<HTMLButtonElement>()
 let opener: ApiBookOpener | undefined
@@ -105,7 +130,8 @@ function inspectFromFloor(id: string) {
     return
   }
   opener = from
-  openMachine(id)
+  if (id) openMachine(id)
+  else closeSurface()
 }
 function inspectFromJournal(id: string) {
   overlay.value = closeOverlay(overlay.value)
@@ -502,6 +528,7 @@ function deploy() {
 }
 function startOver() {
   if (!window.confirm('Start over at Kettlewick? This replaces your saved works and all project files.')) return
+  closeSurface()
   grantNotesReady = false
   grantedNotes.clear()
   toasts.value = emptyToasts()
@@ -518,7 +545,7 @@ function startOver() {
 }
 function shortcut(event: KeyboardEvent) {
   if (modalOpen.value) return
-  if (event.key === 'Escape' && inspected.value && mapFrame.value?.contains(event.target as Node)) {
+  if (event.key === 'Escape' && inspected.value && event.target instanceof Element && event.target.closest('.machine-card, .floor')) {
     event.preventDefault()
     event.stopPropagation()
     closeSurface()
@@ -663,13 +690,15 @@ onBeforeUnmount(() => {
     <template #floor>
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-spot="focusSpot" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
+          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-spot="focusSpot" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
           <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
             @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
             @show-test="showOpenTest" @open-file="activeFile = $event" />
           <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
-          <MachineCard v-if="inspected" class="machine-card" :inspected="inspected" @close="closeSurface"
-            @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
+          <div v-if="inspected" ref="machineCard" class="machine-card" :style="cardPosition">
+            <MachineCard :inspected="inspected" @close="closeSurface"
+              @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
+          </div>
         </div>
         <PaneSplit axis="y" label="Resize map" @move="onMap" @reset="setMapHeight(defaultMapHeight())" @nudge="setMapHeight(mapHeight + $event * 2)" />
         <div ref="editorBay" class="editor-bay" :class="{ 'stack-checks': columns.stackChecks }">
@@ -842,12 +871,10 @@ onBeforeUnmount(() => {
 .editor-bay :deep(.tree) { grid-column: 1; grid-row: 1; height: 100%; min-height: 0 }
 .machine-card {
   position: absolute;
-  top: 12px;
-  left: 12px;
   z-index: 5;
   width: 260px;
-  max-width: calc(100% - 24px);
-  max-height: calc(100% - 24px);
+  max-width: calc(100% - v-bind(cardInsetCss));
+  max-height: calc(100% - v-bind(cardInsetCss));
   overflow: auto;
 }
 .nav-btn {
