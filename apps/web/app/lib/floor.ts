@@ -1,10 +1,12 @@
 import { CanvasSource, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
 import type { Cell, World } from '@inherit/sim/v8'
-import { illustration, type Paint } from './art/townPaint'
-import { drawBuilding } from './art/townBuildings'
-import { landscape } from './art/townLandscape'
+import { grain, illustration, type Paint } from './art/townPaint'
+import { drawBuilding, horse } from './art/townBuildings'
+import { fields, fir, landColors, orchard, splitRail } from './art/townLandscape'
 import { portrait } from './art/townPortrait'
-import { fieldBounds, villageHomes, type VillageView } from './village'
+import {
+  fieldBounds, houseBox, housePrint, houseScale, propArt, villageGround, villageHomes, villageProps, type VillageView,
+} from './village'
 import { screenBox } from './popupPlace'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
@@ -77,22 +79,38 @@ function land(scene: Container, grid: World['grid']) {
   scene.addChild(label('INHERIT  /  MACHINE WORKS', 15, 0xa3a298)).position.set(20, 25)
 }
 
-function print(w: number, h: number, draw: (p: Paint) => void) {
-  const source = new CanvasSource({ resource: illustration(w, h, draw), resolution: 2 })
+function print(w: number, h: number, draw: (p: Paint) => void, resolution = 2) {
+  const source = new CanvasSource({ resource: illustration(w, h, draw, resolution), resolution })
   return new Sprite(new Texture({ source }))
+}
+
+const drawProp = {
+  fir: (p: Paint) => fir(p, 0, 0, propArt.fir.height, '#3e625b', '#628278'),
+  orchard: (p: Paint) => orchard(p, 0, 0, propArt.orchard.height, false),
+  fields: (p: Paint) => fields(p, 0, 0, propArt.fields.width, propArt.fields.height, false),
+  rail: (p: Paint) => splitRail(p, 0, 0, propArt.rail.length, 0),
+  horse,
 }
 
 function village(scene: Container, grid: World['grid']) {
   const { left, height } = fieldBounds(grid)
-  const ground = print(-left, height, p => {
-    // The ground in the archived 1000 × 420 landscape starts below the horizon.
-    const scale = height / (420 - 176)
-    p.at(-480 * scale, -176 * scale, scale, () => landscape(p, 'day'))
-  })
+  const ground = print(-left, height, p => p.at(-left, 0, 1, () => {
+    const [grass, lane, earth, water, ripple] = landColors.day
+    const { road, spur, lanes, river } = villageGround
+    p.box(grass, left, 0, -left, height)
+    for (const { x, y, w, h } of [road, spur, ...lanes]) p.box(earth, x, y, w, h)
+    p.box(lane, road.x + 2, road.y, road.w - 4, road.h)
+    for (const { x, y, w, h } of [spur, ...lanes]) p.box(lane, x, y + 2, w, h - 4)
+
+    p.box(water, river.x, river.y, river.w, river.h)
+    for (let y = river.y + 9; y < river.y + river.h; y += 13) {
+      const x = river.x + 8 + grain(y) * (river.w - 34)
+      p.line(ripple, 1.2, x, y, x + 5 + grain(y + 1) * 12, y)
+    }
+    for (const { kind, x, y, size } of villageProps) p.at(x, y, size, () => drawProp[kind](p))
+  }))
   scene.addChild(ground).x = left
   const road = scene.addChild(new Graphics())
-  road.rect(-tile * 0.75, 0, tile / 2, height).fill(0xd5c392)
-  road.rect(-tile / 2, tile * 1.25, tile / 2, tile / 2).fill(0xd5c392)
   for (let row = 0; row < grid.height; row++) {
     if (row === 1) continue
     const y = row * tile
@@ -122,8 +140,7 @@ type House = VillageView['houses'][number]
 
 function villagerToken(layer: Container, npc: VillageNpc) {
   const art = layer.addChild(new Container())
-  const { x, y } = center(npc.spot)
-  art.position.set(x, y)
+  art.position.set(npc.spot.x, npc.spot.y)
   const face = art.addChild(print(60, 64, p => portrait(p, npc.who, 'waiting')))
   face.anchor.set(0.5)
   face.y = cameo.y
@@ -218,11 +235,11 @@ export class FloorScene {
       const house = this.houses.get(building)
       if (house?.state === state) continue
       house?.art.destroy({ texture: true, textureSource: true })
-      const art = print(210, 176, p => p.at(105, 138, 1, () => drawBuilding(p, building, state, 'day', undefined)))
-      art.anchor.set(0.5)
-      art.scale.set(tile / 210)
-      const { x, y } = center(villageHomes[building])
-      art.position.set(x, y)
+      const { w, h, baseX, baseY } = housePrint
+      const art = print(w, h, p => p.at(baseX, baseY, 1, () => drawBuilding(p, building, state, 'day', undefined)), 3)
+      const box = houseBox(villageHomes[building])
+      art.position.set(box.x, box.y)
+      art.scale.set(houseScale)
       this.villageLayer.addChild(art)
       this.houses.set(building, { state, art })
     }

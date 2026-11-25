@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import type { Cell } from '@inherit/sim/v8'
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
-import { floorCursor, floorPoint, panToCell, pickFloor, stationsOf, type Box } from '../lib/floorPick'
+import { floorCursor, floorPoint, panToPoint, pickFloor, stationsOf, type Box, type Point } from '../lib/floorPick'
 import { sameBox, screenBox } from '../lib/popupPlace'
-import { fieldBounds, type VillageView } from '../lib/village'
+import { homeView, type VillageView } from '../lib/village'
 
-const props = defineProps<{ world: FloorWorld; village?: VillageView; focusSpot?: Cell; interval: number; paused: boolean; selected?: string }>()
+const props = defineProps<{ world: FloorWorld; village?: VillageView; focusPoint?: Point; interval: number; paused: boolean; selected?: string }>()
 const emit = defineEmits<{ error: [message: string]; select: [id: string]; anchor: [box: Box | undefined] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
@@ -25,7 +24,7 @@ let app: Application | undefined,
 const pointers = new Map<number, { x: number; y: number }>()
 let armed = false
 let origin = { x: 0, y: 0 }
-const bounds = computed(() => fieldBounds(props.world.grid))
+const bounds = computed(() => homeView(props.world.grid))
 const place = computed(() => containPlace(size.value.w, size.value.h, bounds.value.width, bounds.value.height, zoom.value))
 const scale = computed(() => place.value.scale)
 const fitX = computed(() => place.value.x - bounds.value.left * scale.value)
@@ -36,8 +35,8 @@ const camera = computed(() => ({
 const measured = computed(() => size.value.w > 0 && size.value.h > 0)
 const selectedCart = computed(() => props.world.drones.some(drone => drone.name === props.selected))
 let lastAnchor: Box | undefined | null = null
-watch([() => props.focusSpot, measured], ([spot, ready]) => {
-  if (spot && ready) pan.value = panToCell(spot, size.value, { x: fitX.value, y: place.value.y, scale: scale.value })
+watch([() => props.focusPoint, measured], ([point, ready]) => {
+  if (point && ready) pan.value = panToPoint(point, size.value, { x: fitX.value, y: place.value.y, scale: scale.value })
 })
 function recenter() {
   pan.value = { x: 0, y: 0 }

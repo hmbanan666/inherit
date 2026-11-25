@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type Cell, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { BookOpen, CircleAlert, Coins, Cpu, Store, TextCursor, Timer, TriangleAlert } from '@lucide/vue'
@@ -17,7 +17,7 @@ import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/q
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
-import type { Box } from '../lib/floorPick'
+import type { Box, Point } from '../lib/floorPick'
 import { popupMargin, popupPlace } from '../lib/popupPlace'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
@@ -67,7 +67,7 @@ watch([mapFrame, machineCard], ([frame, card], _, onCleanup) => {
   observer.observe(card, { box: 'border-box' })
   onCleanup(() => observer.disconnect())
 }, { flush: 'post' })
-const focusSpot = shallowRef<Cell>()
+const focusPoint = shallowRef<Point>()
 const journalButton = ref<HTMLButtonElement>()
 let opener: ApiBookOpener | undefined
 const files = shallowRef({ ...kettlewick.files })
@@ -211,7 +211,7 @@ function visitFromTracker(from: HTMLButtonElement) {
   if (!quest) return
   showDialog({ kind: 'npc', who: quest.who }, from)
   const npc = village.value?.npcs.find(npc => npc.who === quest.who)
-  if (npc) focusSpot.value = { ...npc.spot }
+  if (npc) focusPoint.value = { ...npc.spot }
 }
 const offers = computed(() => available.value.map(quest => ({
   quest,
@@ -597,7 +597,7 @@ onMounted(async () => {
         files.value = { ...data.deployed }
         activeFile.value = 'main.ts'
         tool.value = undefined
-        focusSpot.value = undefined
+        focusPoint.value = undefined
         closeSurface()
         resetting = false
       }
@@ -690,7 +690,7 @@ onBeforeUnmount(() => {
     <template #floor>
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-spot="focusSpot" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
+          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-point="focusPoint" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
           <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
             @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
             @show-test="showOpenTest" @open-file="activeFile = $event" />
