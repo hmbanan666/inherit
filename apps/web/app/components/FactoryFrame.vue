@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
         </template>
         <template #account>
           <p v-if="world" class="account" data-testid="level" :title="xp.title" :aria-label="xp.title">
-            <span class="avatar" aria-hidden="true">
+            <span class="account-avatar" aria-hidden="true">
               <svg viewBox="0 0 32 32" class="ring" fill="none" stroke-width="3">
                 <circle cx="16" cy="16" :r="ringRadius" stroke="var(--line)" />
                 <circle cx="16" cy="16" :r="ringRadius" stroke="var(--gold)" transform="rotate(-90 16 16)"
@@ -919,10 +919,10 @@ onBeforeUnmount(() => {
 .nav-link:disabled { opacity: 0.5; cursor: default }
 .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--gold) }
 .account { display: flex; align-items: center; gap: 8px; margin: 0; white-space: nowrap }
-.avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-low) }
-.avatar svg { grid-area: 1 / 1 }
-.avatar .ring { width: 32px; height: 32px }
-.avatar .lucide { width: 16px; height: 16px }
+.account-avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-low) }
+.account-avatar svg { grid-area: 1 / 1 }
+.account-avatar .ring { width: 32px; height: 32px }
+.account-avatar .lucide { width: 16px; height: 16px }
 .account-text { display: grid; color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums }
 .account-text b { color: var(--text); font-size: 13px; font-weight: 600 }
 .pill {

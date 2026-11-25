@@ -40,7 +40,7 @@ export function questTabNotice(side: SideTab, ready: boolean) {
   if (ready && side !== 'quest') return 'Quest, ready to hand over'
 }
 
-export const giverPortraits = new Map(kettlewick.questList?.map(({ who, from, role, building }) => [
+export const portraits = new Map(kettlewick.questList?.map(({ who, from, role, building }) => [
   who, { id: who, name: from, role, buildingId: building, mood: 'waiting' as const },
 ]))
 

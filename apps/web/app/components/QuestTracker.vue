@@ -5,7 +5,7 @@ import TownPortrait from './town/TownPortrait.vue'
 import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
 import type { questCard } from '../lib/questNote'
 import type { GrantNote } from '../lib/questStep'
-import { giverPortraits, questLog, questTabHint, shellLabels } from '../lib/shellBar'
+import { portraits, questLog, questTabHint, shellLabels } from '../lib/shellBar'
 
 const props = defineProps<{
   quest?: QuestDef
@@ -33,7 +33,7 @@ const entries = computed(() => questLog(props.quest, props.card))
         <header>
           <button type="button" class="villager" aria-haspopup="dialog" :disabled="!canVisit"
             @click="emit('visit', $event.currentTarget as HTMLButtonElement)">
-            <TownPortrait class="cameo" :person="giverPortraits.get(entry.who)!" />
+            <TownPortrait class="cameo" :person="portraits.get(entry.who)!" />
             <span class="heading">
               <span class="byline">{{ entry.name }} · {{ entry.role }}</span>
               <b class="entry-title">{{ entry.title }}</b>

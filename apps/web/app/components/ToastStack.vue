@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { giverPortraits } from '../lib/shellBar'
+import { portraits } from '../lib/shellBar'
 import { BellRing, Check, Cog, Coins, MessageCircle, Sparkles, Truck, Unlock } from '@lucide/vue'
 import TownPortrait from './town/TownPortrait.vue'
 import type { Toast } from '../lib/toasts'
@@ -17,7 +17,7 @@ const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, mac
     <button v-for="toast in toasts" :key="toast.id" type="button" class="toast" :title="dismissToastLabel"
       @click="emit('dismiss', toast.id)">
       <template v-if="toast.kind === 'npc'">
-        <TownPortrait class="cameo" :person="giverPortraits.get(toast.who)!" />
+        <TownPortrait class="cameo" :person="portraits.get(toast.who)!" />
         <span><b>{{ toast.name }}</b> {{ toast.text }}</span>
       </template>
       <template v-else>
@@ -37,7 +37,6 @@ const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, mac
   width: 340px;
   max-width: calc(100vw - 32px);
   max-height: calc(100dvh - 65px - 25px - 32px);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
