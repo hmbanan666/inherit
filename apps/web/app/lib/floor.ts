@@ -1,16 +1,21 @@
-import { Container, Graphics, Text } from 'pixi.js'
+import { CanvasSource, Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
 import type { Cell, World } from '@inherit/sim/v8'
+import { illustration, type Paint } from './art/townPaint'
+import { drawBuilding } from './art/townBuildings'
+import { landscape } from './art/townLandscape'
+import { portrait } from './art/townPortrait'
+import { fieldBounds, villageHomes, type VillageView } from './village'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
 import {
   cartDrawScale, cartMark, pauseMark, hoverScale, hoverStroke, selectionColor, selectionStroke, stationShapes, stationsOf,
-  type CartHit, type Shape,
+  cameo, npcCaptionY, npcMarker, npcShapes, tile, type CartHit, type Shape,
 } from './floorPick'
 
 export type FloorWorld = Omit<World, 'memory'>
-export const tile = 96
+export { tile } from './floorPick'
 function center(p: Cell) { return { x: (p.x + 0.5) * tile, y: (p.y + 0.5) * tile } }
 
 const label = (text: string, size: number, color: number) =>
@@ -71,6 +76,30 @@ function land(scene: Container, grid: World['grid']) {
   scene.addChild(label('INHERIT  /  MACHINE WORKS', 15, 0xa3a298)).position.set(20, 25)
 }
 
+function print(w: number, h: number, draw: (p: Paint) => void) {
+  const source = new CanvasSource({ resource: illustration(w, h, draw), resolution: 2 })
+  return new Sprite(new Texture({ source }))
+}
+
+function village(scene: Container, grid: World['grid']) {
+  const { left, height } = fieldBounds(grid)
+  const ground = print(-left, height, p => {
+    // The ground in the archived 1000 × 420 landscape starts below the horizon.
+    const scale = height / (420 - 176)
+    p.at(-480 * scale, -176 * scale, scale, () => landscape(p, 'day'))
+  })
+  scene.addChild(ground).x = left
+  const road = scene.addChild(new Graphics())
+  road.rect(-tile * 0.75, 0, tile / 2, height).fill(0xd5c392)
+  road.rect(-tile / 2, tile * 1.25, tile / 2, tile / 2).fill(0xd5c392)
+  for (let row = 0; row < grid.height; row++) {
+    if (row === 1) continue
+    const y = row * tile
+    road.rect(-5, y, 4, tile).fill(0x685c4c)
+    road.rect(-7, y, 7, 7).rect(-7, y + tile - 7, 7, 7).fill(0xbdac87)
+  }
+}
+
 function caption(parent: Container, title: string, x: number, y: number) {
   const text = parent.addChild(label(title, 16, 0xf2ead8))
   text.anchor.set(0.5, 0)
@@ -85,6 +114,27 @@ function equipment(parent: Container, pos: Cell, paint: (d: ReturnType<typeof dr
   const p = center(pos)
   parent.addChild(d.g).position.set(p.x, p.y)
   return d.g
+}
+
+type VillageNpc = VillageView['npcs'][number]
+type House = VillageView['houses'][number]
+
+function villagerToken(layer: Container, npc: VillageNpc) {
+  const art = layer.addChild(new Container())
+  const { x, y } = center(npc.spot)
+  art.position.set(x, y)
+  const face = art.addChild(print(60, 64, p => portrait(p, npc.who, 'waiting')))
+  face.anchor.set(0.5)
+  face.y = cameo.y
+  face.setSize(cameo.radius * 2, cameo.radius * 2)
+  face.mask = art.addChild(new Graphics()).circle(0, cameo.y, cameo.radius).fill(0xffffff)
+  art.addChild(new Graphics()).circle(0, cameo.y, cameo.radius).stroke({ width: 2, color: 0x2a2b2e })
+  caption(art, npc.name, 0, npcCaptionY)
+  const badge = art.addChild(new Graphics()).circle(0, 0, npcMarker.radius).fill(0xffffff)
+  badge.y = npcMarker.y
+  const glyph = badge.addChild(label('', 16, 0x242529))
+  glyph.anchor.set(0.5)
+  return { art, badge, glyph, name: npc.name }
 }
 
 export class FloorScene {
@@ -105,6 +155,10 @@ export class FloorScene {
   private readonly seen = new Set<string>()
   private readonly veinBars = new Map<string, Graphics>()
   private readonly stations = new Map<string, Container>()
+  private readonly villageLayer = new Container({ label: 'village' })
+  private readonly houses = new Map<House['building'], { state: House['state']; art: Sprite }>()
+  private readonly npcLayer = new Container({ label: 'villagers' })
+  private readonly npcs = new Map<string, ReturnType<typeof villagerToken>>()
   private readonly equipmentLayer = new Container({ label: 'equipment' })
   private readonly paths: Graphics
   private readonly ring: Graphics
@@ -133,7 +187,7 @@ export class FloorScene {
     this.latest = world
     land(this.root, world.grid)
     this.paths = this.root.addChild(new Graphics({ label: 'routes' }))
-    this.root.addChild(this.equipmentLayer)
+    this.root.addChild(this.villageLayer, this.equipmentLayer, this.npcLayer)
     for (const vein of world.veins) this.placeVein(vein)
     const yard = equipment(this.equipmentLayer, world.depot.pos, depot)
     caption(yard, 'Depot', 0, -63)
@@ -155,6 +209,39 @@ export class FloorScene {
     this.syncBench(world)
     this.ring = this.root.addChild(new Graphics())
     for (const drone of world.drones) this.placeHauler(drone)
+  }
+
+  setVillage(view: VillageView) {
+    if (!this.villageLayer.children.length) village(this.villageLayer, this.latest.grid)
+    for (const { building, state } of view.houses) {
+      const house = this.houses.get(building)
+      if (house?.state === state) continue
+      house?.art.destroy({ texture: true, textureSource: true })
+      const art = print(210, 176, p => p.at(105, 138, 1, () => drawBuilding(p, building, state, 'day', undefined)))
+      art.anchor.set(0.5)
+      art.scale.set(tile / 210)
+      const { x, y } = center(villageHomes[building])
+      art.position.set(x, y)
+      this.villageLayer.addChild(art)
+      this.houses.set(building, { state, art })
+    }
+    for (const npc of view.npcs) {
+      let token = this.npcs.get(npc.id)
+      if (!token) {
+        token = villagerToken(this.npcLayer, npc)
+        this.npcs.set(npc.id, token)
+      }
+      token.art.alpha = npc.dim ? 0.55 : 1
+      token.badge.visible = !!npc.mark
+      if (npc.mark) {
+        token.badge.tint = npc.mark === 'active' ? 0x8a8a8a : selectionColor
+        token.glyph.text = npc.mark === 'offer' ? '!' : '?'
+      }
+    }
+  }
+
+  npcAnchors() {
+    return Array.from(this.npcs, ([id, { art, badge, name }]) => ({ id, x: art.x, y: art.y, name, marked: badge.visible }))
   }
 
   private placeVein(vein: FloorWorld['veins'][number]) {
@@ -240,6 +327,7 @@ export class FloorScene {
 
   private paintHover() {
     const scale = (id: string | undefined) => id === this.hover ? hoverScale : 1
+    for (const [id, { art }] of this.npcs) art.scale.set(scale(id))
     for (const [id, art] of this.stations) art.scale.set(scale(id))
     for (const [i, item] of this.haulers.entries()) item.art.scale.set(scale(this.latest.drones[i]?.name))
   }
@@ -259,6 +347,11 @@ export class FloorScene {
       const { art, pause } = hauler
       const top = pause.visible ? pauseMark.y : cartMark.y
       this.strokeBox(art.x, art.y, { ...cartMark, y: top, h: cartMark.h + cartMark.y - top }, style)
+      return
+    }
+    const npc = this.npcs.get(id)
+    if (npc) {
+      for (const shape of npcShapes(npc.name, npc.badge.visible)) this.strokeShape(npc.art.x, npc.art.y, shape, style)
       return
     }
     const spot = stationsOf(world).find(item => item.id === id)
