@@ -7,11 +7,13 @@ import { readTrackerOpen, testLabel, testMark, trackerKey, trackerRows } from '.
 
 const props = defineProps<{
   card?: NonNullable<ReturnType<typeof questCard>>
+  canVisit: boolean
   step: string
   granted?: GrantNote
   pulse: boolean
 }>()
 const emit = defineEmits<{
+  visit: [opener: HTMLButtonElement]
   journal: [opener: HTMLButtonElement]
   handOver: []
   showTest: []
@@ -32,41 +34,41 @@ function toggle() {
 
 <template>
   <aside class="tracker" :aria-label="overlayLabels.tracker">
-    <template v-if="card">
-      <header>
-        <b :class="{ folded: !open }">{{ card.from.replace(/^Mayor /, '') }} · {{ open ? card.title : step }}</b>
-        <button type="button" class="fold" :aria-expanded="open" :aria-label="open ? overlayLabels.collapse : overlayLabels.expand" @click="toggle">
-          <ChevronUp v-if="open" :size="16" /><ChevronDown v-else :size="16" />
-        </button>
-      </header>
-      <template v-if="open">
-        <p class="goal step">{{ step }}</p>
-        <p v-if="granted" class="goal">
-          {{ granted.text }}
-          <button v-if="granted.file" type="button" class="hint" @click="emit('openFile', granted.file)">{{ granted.file }}</button>
-        </p>
-        <ul class="goals">
-          <li v-for="row in tests.rows" :key="row.id" :data-mark="row.state" :aria-label="testLabel(row.state, row.text)">
-            <span><span aria-hidden="true">{{ testMark(row.state) }}</span> {{ row.text }}</span>
-            <small v-if="row.reason">{{ row.reason }}</small>
-          </li>
-        </ul>
-        <small v-if="tests.more">{{ overlayLabels.more(tests.more) }}</small>
-        <div class="need">
-          <span class="goal-line">{{ card.quantity.text }}</span>
-          <progress :value="card.quantity.value" :max="card.quantity.max" :aria-label="card.quantity.text" />
-        </div>
-        <div class="quest-action">
-          <button v-if="card.remainingTest" type="button" class="calm link" @click="emit('showTest')">View remaining test</button>
-          <p v-else-if="!card.ready" class="calm">In progress</p>
-          <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" @click="emit('handOver')">Hand over</button>
-        </div>
-      </template>
-    </template>
-    <header v-else>
-      <b>{{ step }}</b>
-      <button type="button" class="hint" aria-haspopup="dialog" @click="emit('journal', $event.currentTarget as HTMLButtonElement)">{{ overlayLabels.journal }}</button>
+    <header>
+      <button v-if="canVisit" type="button" class="villager" :class="{ folded: card && !open }" aria-haspopup="dialog"
+        @click="emit('visit', $event.currentTarget as HTMLButtonElement)">
+        <b v-if="card">{{ card.from.replace(/^Mayor /, '') }} · {{ open ? card.title : step }}</b>
+        <b v-else>{{ step }}</b>
+      </button>
+      <b v-else>{{ step }}</b>
+      <button v-if="card" type="button" class="fold" :aria-expanded="open" :aria-label="open ? overlayLabels.collapse : overlayLabels.expand" @click="toggle">
+        <ChevronUp v-if="open" :size="16" /><ChevronDown v-else :size="16" />
+      </button>
+      <button v-else type="button" class="hint" aria-haspopup="dialog" @click="emit('journal', $event.currentTarget as HTMLButtonElement)">{{ overlayLabels.journal }}</button>
     </header>
+    <template v-if="card && open">
+      <p class="goal step">{{ step }}</p>
+      <p v-if="granted" class="goal">
+        {{ granted.text }}
+        <button v-if="granted.file" type="button" class="hint" @click="emit('openFile', granted.file)">{{ granted.file }}</button>
+      </p>
+      <ul class="goals">
+        <li v-for="row in tests.rows" :key="row.id" :data-mark="row.state" :aria-label="testLabel(row.state, row.text)">
+          <span><span aria-hidden="true">{{ testMark(row.state) }}</span> {{ row.text }}</span>
+          <small v-if="row.reason">{{ row.reason }}</small>
+        </li>
+      </ul>
+      <small v-if="tests.more">{{ overlayLabels.more(tests.more) }}</small>
+      <div class="need">
+        <span class="goal-line">{{ card.quantity.text }}</span>
+        <progress :value="card.quantity.value" :max="card.quantity.max" :aria-label="card.quantity.text" />
+      </div>
+      <div class="quest-action">
+        <button v-if="card.remainingTest" type="button" class="calm link" @click="emit('showTest')">View remaining test</button>
+        <p v-else-if="!card.ready" class="calm">In progress</p>
+        <button v-else class="gold" :class="{ pulse }" type="button" data-testid="complete-quest" @click="emit('handOver')">Hand over</button>
+      </div>
+    </template>
   </aside>
 </template>
 
@@ -89,6 +91,7 @@ function toggle() {
   font-size: 13px;
 }
 header { display: flex; align-items: center; justify-content: space-between; gap: 6px }
+.villager { min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer }
 .folded { overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
 .fold { flex: none; display: grid; place-items: center; padding: 2px; color: var(--soft); background: transparent; border: 0 }
 .goal { margin: 0; font-size: 13px; line-height: 1.4 }
