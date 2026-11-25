@@ -4,7 +4,7 @@ const settings = ref(false)
 function closeSettings() { settings.value = false }
 </script>
 <template>
-  <a class="pack-brand brand" href="/" aria-label="Inherit"><img src="/mark.svg" alt="" /></a>
+  <a class="pack-brand brand" href="/" aria-label="Inherit"><img src="/mark.svg" alt="" />Inherit<span>.</span></a>
   <slot />
   <slot name="clock" />
   <div v-if="$slots.settings" class="settings pack-settings" @keydown.esc="closeSettings">
