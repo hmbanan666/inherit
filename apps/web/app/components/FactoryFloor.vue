@@ -7,7 +7,7 @@ import { floorCursor, floorPoint, panToPoint, pickFloor, stationsOf, type Box, t
 import { sameBox, screenBox } from '../lib/popupPlace'
 import { homeView, type VillageView } from '../lib/village'
 
-const props = defineProps<{ world: FloorWorld; village?: VillageView; focusPoint?: Point; interval: number; paused: boolean; selected?: string }>()
+const props = defineProps<{ world: FloorWorld; village?: VillageView; focusPoint?: Point; interval: number; paused: boolean; selected?: string; frozen?: string }>()
 const emit = defineEmits<{ error: [message: string]; select: [id: string]; anchor: [box: Box | undefined] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
@@ -19,9 +19,11 @@ const renderError = ref('')
 let app: Application | undefined,
   scene: FloorScene | undefined,
   observer: ResizeObserver | undefined,
+  motion: MediaQueryList | undefined,
   disposed = false
 
 const pointers = new Map<number, { x: number; y: number }>()
+let hoverPoint: Point | undefined
 let armed = false
 let origin = { x: 0, y: 0 }
 const bounds = computed(() => homeView(props.world.grid))
@@ -33,6 +35,7 @@ const camera = computed(() => ({
   y: place.value.y + pan.value.y,
 }))
 const measured = computed(() => size.value.w > 0 && size.value.h > 0)
+const stations = computed(() => stationsOf(props.world))
 const selectedCart = computed(() => props.world.drones.some(drone => drone.name === props.selected))
 let lastAnchor: Box | undefined | null = null
 watch([() => props.focusPoint, measured], ([point, ready]) => {
@@ -67,6 +70,9 @@ function sync() {
   if (!app) return
   if (!scene) {
     scene = new FloorScene(props.world)
+    syncMotion()
+    syncVisibility()
+    scene.setFrozen(props.frozen)
     app.stage.addChild(scene.root)
   }
   scene.root.scale.set(scale.value)
@@ -77,6 +83,13 @@ function sync() {
   syncAnchor()
 }
 watch([() => props.world, () => props.village, camera, scale, () => props.selected], sync)
+watch(() => props.frozen, id => scene?.setFrozen(id))
+function syncMotion() {
+  scene?.setReducedMotion(motion?.matches ?? false)
+}
+function syncVisibility() {
+  scene?.setVisible(document.visibilityState === 'visible')
+}
 function pick(clientX: number, clientY: number) {
   const rect = host.value?.getBoundingClientRect()
   if (!rect) return
@@ -88,7 +101,7 @@ function pick(clientX: number, clientY: number) {
     scale: scale.value,
   })
   if (!point) return
-  return pickFloor(point.x, point.y, tile, stationsOf(props.world), scene?.cartAnchors() ?? [], scene?.npcAnchors())
+  return pickFloor(point.x, point.y, tile, stations.value, scene?.cartAnchors() ?? [], scene?.npcAnchors())
 }
 function aim(clientX: number, clientY: number) {
   const hit = pick(clientX, clientY)
@@ -100,15 +113,20 @@ function down(e: PointerEvent) {
   armed = pointers.size === 0
   origin = { x: e.clientX, y: e.clientY }
   host.value!.focus({ preventScroll: true })
+  const hit = pick(e.clientX, e.clientY)
+  if (hit?.startsWith('npc:')) scene?.setPressed(hit, e.pointerId)
+  hoverPoint = undefined
   host.value!.setPointerCapture(e.pointerId)
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 }
 function hover(e: PointerEvent) {
-  if (pointers.size) return
+  if (pointers.size || e.pointerType === 'touch') return
+  if ((e.target as Element).closest('button,aside')) return leave()
+  hoverPoint = { x: e.clientX, y: e.clientY }
   aim(e.clientX, e.clientY)
 }
 function leave() {
-  if (pointers.size) return
+  hoverPoint = undefined
   scene?.highlight('')
   pointing.value = false
 }
@@ -135,17 +153,29 @@ function move(e: PointerEvent) {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 }
 function up(e: PointerEvent) {
-  if (!pointers.delete(e.pointerId) || !armed) return
+  if (!pointers.delete(e.pointerId)) return
+  scene?.setPressed(undefined, e.pointerId)
+  const clicked = armed && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) <= 5
   armed = false
-  if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) return
-  emit('select', pick(e.clientX, e.clientY) ?? '')
+  // Capture delivers pointerup to the floor even if the pointer was dragged outside.
+  const over = document.elementFromPoint(e.clientX, e.clientY)
+  if (!pointers.size && e.pointerType !== 'touch' && over && host.value?.contains(over) && !over.closest('button,aside')) {
+    hoverPoint = { x: e.clientX, y: e.clientY }
+    aim(e.clientX, e.clientY)
+  } else leave()
+  if (clicked) emit('select', pick(e.clientX, e.clientY) ?? '')
 }
-function cancel() {
-  pointers.clear()
+function cancel(e: PointerEvent) {
+  if (!pointers.delete(e.pointerId)) return
+  scene?.setPressed(undefined, e.pointerId)
   armed = false
+  leave()
 }
 onMounted(async () => {
   const renderer = new Application()
+  motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  motion.addEventListener('change', syncMotion)
+  document.addEventListener('visibilitychange', syncVisibility)
   window.addEventListener('pointermove', move)
   window.addEventListener('pointerup', up)
   window.addEventListener('pointercancel', cancel)
@@ -185,6 +215,7 @@ onMounted(async () => {
     renderer.ticker.maxFPS = 40
     renderer.ticker.add(() => {
       scene?.animate(performance.now(), props.interval, props.paused)
+      if (hoverPoint) aim(hoverPoint.x, hoverPoint.y)
       if (selectedCart.value) syncAnchor()
     })
   } catch {
@@ -194,6 +225,14 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  for (const id of pointers.keys()) {
+    scene?.setPressed(undefined, id)
+    if (host.value?.hasPointerCapture(id)) host.value.releasePointerCapture(id)
+  }
+  pointers.clear()
+  leave()
+  motion?.removeEventListener('change', syncMotion)
+  document.removeEventListener('visibilitychange', syncVisibility)
   window.removeEventListener('pointermove', move)
   window.removeEventListener('pointerup', up)
   window.removeEventListener('pointercancel', cancel)
@@ -212,6 +251,7 @@ onBeforeUnmount(() => {
     @pointerdown="down"
     @pointermove="hover"
     @pointerleave="leave"
+    @lostpointercapture="cancel"
   >
     <div ref="mount" class="pixi-mount"></div>
     <div class="map-controls">

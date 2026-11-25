@@ -1,6 +1,6 @@
 # Quest rail and status
 
-Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Amended by [ADR 0031](0031-quest-gift-before-take.md). [ADR 0033](0033-quest-card-stays-still.md) moves the live drone task off the quest card and onto one fixed status-bar line. [ADR 0034](0034-cpu-meter-stays-visible.md) keeps the CPU meter on the status bar on every tick.
+Accepted 23 November 2026. Amends [ADR 0022](0022-quest-loop-no-loss.md). Amended by [ADR 0031](0031-quest-gift-before-take.md). [ADR 0033](0033-quest-card-stays-still.md) moves the live drone task off the quest card and onto one fixed status-bar line. [ADR 0034](0034-cpu-meter-stays-visible.md) keeps the CPU meter on the status bar on every tick. [ADR 0039](0039-quest-ux-village.md) replaces the rail with the village, the tracker, and the Journal.
 
 ## Context
 

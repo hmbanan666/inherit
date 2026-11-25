@@ -180,7 +180,7 @@ export function villageView(world: World, quests: Quests) {
   const people = villagers(quests)
   return {
     npcs: people.map(({ who, name, building }) => ({
-      id: `npc:${who}`, who, name, spot: villagerSpot(building, who),
+      id: `npc:${who}`, who, name, building, spot: villagerSpot(building, who),
       ...appearance(world, quests, who),
     })),
     houses: [...new Set(quests.map(quest => quest.building))].map(building => ({

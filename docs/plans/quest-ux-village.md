@@ -422,42 +422,63 @@ Ground, all inside the band:
 
 ---
 
-## Phase 5. Villagers wander; polish
+## Phase 5. Villagers wander; final documentation
 
 ### Goal
 
-Villagers take a few steps around their spot now and then, so the field feels alive, without ever being hard to click. The screen spec describes the finished screen.
+Villagers take a few steps around their Phase 3b pixel spots now and then, so the field feels alive, without ever being hard to click. Each stays inside the 384×288 lot of their house, at most 240 world px from its base, never on the river or road. The screen spec and glossary describe the finished screen, including the anchored machine card.
 
 ### Files
 
 **New `apps/web/app/lib/wander.ts` + `wander.test.ts`.**
-- `wanderOffset(who: string, ms: number, radius = 0.3 * tile)` returns `{ x, y, walking }` in world pixels. Deterministic from a hash of `who` and the time: each villager idles 4–8 s, then walks 1.2–1.8 s to a new point within `radius` horizontally and `radius / 2` vertically of the spot, with ease-in-out. Different villagers are out of phase.
+- `wanderOffset(who: string, ms: number, radius = 0.3 * tile)` returns `{ x, y, walking }` in world pixels. Deterministic from a hash of `who` and active animation time: each villager idles 4–8 s, then walks 1.2–1.8 s to a new point within `radius` horizontally and `radius / 2` vertically of their home spot, with ease-in-out. Different villagers are out of phase. No sim RNG or wall-clock state in this pure function.
+- Constrain the motion to the actual Phase 3b layout using pure, tested helpers in this file. Read `villageHomes`, `villageLots`, `houseBox`, `villagerBox` and `villageGround` from `village.ts`; do not copy the layout table. A villager belongs to the lot whose `building` matches theirs. The whole marked token footprint (cameo, caption and marker, allowing 2px marker bob) stays within that lot, clear of house boxes, other villager footprints, river, road, gate spur, lanes, props and the fence. The anchor stays within 240px of its house base at all times, not just at endpoints. Treat `propBox` rectangles as static exclusions, not simulation collisions.
+- Choose a deterministic safe local motion envelope around each existing home spot; constrain endpoints before interpolation so a straight walk never crosses an exclusion. Narrow lots/corridors may reduce travel below the nominal radius. Do not clip the final animated position in a way that causes jumps. Do not change the Phase 3b homes or initial spots to make a test pass.
 - `wanderFrozen({ hovered, dialog, reducedMotion })` is true when any is true.
+- Keep the per-villager active clock and freeze/resume calculations pure and testable here if practical. Document the active-time units. No timers inside the helpers.
 
-**`apps/web/app/lib/floor.ts`.** In `animate(now, ...)`, move each villager container to `spot + wanderOffset(who, now)`, unless frozen (hovered id, pointer pressed on the token, the id passed by `setFrozen(id)`, reduced motion, hidden document, or pause), in which case it stays where it is. Keep a per-villager active animation clock: resuming continues from the frozen position with no jump. Reduced motion always uses the home spot. Do not let the absolute wall clock skip the token to a different target after a dialog closes. Keep the cameo readable; move the token only, never mirror portrait art or text. The mark bobs 2px on a 1.6 s sine for `offer` and `ready`; no bob under reduced motion. `npcAnchors()` returns the moved positions, so hit-testing follows the villager.
+**`apps/web/app/lib/floor.ts`.**
+- In `animate(now, ...)`, move each villager container to its Phase 3b pixel spot plus the constrained wander offset, unless frozen (hovered id, pointer pressed on the token, the id passed by `setFrozen(id)`, reduced motion, hidden document, or pause), in which case it stays where it is. Keep a per-villager active animation clock: resuming continues from the frozen position with no jump. Reduced motion always uses the home spot. Do not let the absolute wall clock skip the token to a different target after a dialog closes or after a hidden tab resumes.
+- Provide scene setters for dialog-frozen id, pointer-pressed id, reduced motion and document visibility, as needed. The floor component owns browser APIs; the scene remains usable in the existing unit-test environment.
+- Keep the cameo readable: move the token only, never mirror portrait art or text. The mark bobs 2px on a 1.6 s sine for `offer` and `ready`; no bob under reduced motion. Freeze bob as well as movement during hover, pointer press, dialog, hidden tab and pause. Include the live bob displacement in hit/anchor/outline geometry so the mark remains clickable.
+- `npcAnchors()` and `anchorBox()` return the moved positions. The existing hover scale, outline and cart behaviour stay unchanged. Updating quest marks/house states with `setVillage` must not reset an NPC's active clock each tick.
 
-**`apps/web/app/components/FactoryFloor.vue`.** Read `matchMedia('(prefers-reduced-motion: reduce)')` once and on change; pass it to the scene. Refresh hover hit-testing against the saved pointer coordinates while villagers move, and freeze a token from pointerdown through pointerup/cancel so it cannot escape a click. New prop `frozen?: string` (the villager whose dialog is open), passed to `scene.setFrozen`.
+**`apps/web/app/components/FactoryFloor.vue`.**
+- Read `matchMedia('(prefers-reduced-motion: reduce)')` once and on change; pass it to the scene. Set initial and changed `document.visibilityState` on the scene. Clean up listeners on unmount.
+- Refresh hover hit-testing against the saved pointer coordinates while villagers move. When the pointer leaves the floor, clear the saved pointer so a token cannot freeze under an absent pointer. Preserve the existing drag and pinch rules.
+- Freeze a token from pointerdown through pointerup/cancel so it cannot escape a click. Clear pressed state on cancel, loss of capture and unmount.
+- New prop `frozen?: string` (the `npc:` id whose dialog is open), passed to `scene.setFrozen`. Opening/closing a dialog must not depend on waiting for a camera move.
 
-**`apps/web/app/components/FactoryFrame.vue`.** Pass the open villager's `npc:` id as `frozen`.
+**`apps/web/app/components/FactoryFrame.vue`.** Pass the open villager's `npc:` id as `frozen`. No other behaviour changes.
 
-**`docs/specs/v8-screen-layout.md`.** Final pass for the whole screen: the field with the village band, villager marks and dialog, toasts, the anchored machine card, the tracker, Journal and Shop. Update the One home each table. Keep the editor, status bar, and API book sections word for word.
+**`docs/specs/v8-screen-layout.md`.** Final pass for the whole screen: the 20-column village, 1.4× houses, 384×288 lots, default works-plus-eight-column home camera, villager marks/dialog and constrained wander/freeze, toasts, anchored machine/drone card following pan/zoom/motion (not a pinned corner), tracker, Journal and Shop. Update the One home each table. Remove stale rail, request-selection and duplicated goal descriptions. Keep the editor, status bar and API book prose word for word; edit only references explicitly superseded by ADR 0039 outside those protected sections.
+
+**`CONTEXT.md`.** Update only the Check and Hint entries to match the current UI: checks live in Tests and the persistent tracker (not the removed rail); taking a quest inserts a nudge comment once, handing over a trigger quest inserts an example once, and deleted examples/comments are not restored. Grant/code hints are in the tracker/API book and event feedback in toasts; no new mechanics or glossary terms.
+
+**`docs/art.md`.** Final accuracy pass for the live village renderer: native building art reused at scale 1.4, existing landscape props, unchanged cameo art now moved as tokens. Keep the archive inventory and preservation rules; do not claim archived renderers are live.
 
 **`docs/adr/0024-quest-rail-and-status.md` and `0033-quest-card-stays-still.md`.** Add one sentence to each header: `[ADR 0039](0039-quest-ux-village.md) replaces the rail with the village, the tracker, and the Journal.` Nothing else.
 
+**Optional cheap style cleanup.** Dedupe identical `.quest-action` and `.need` styles between `QuestTracker.vue` and `QuestCard.vue` only if it can be done with a small shared stylesheet and no markup, specificity or visual change. Keep their intentional differences. Skip and say so if it needs restructuring. This is not an acceptance blocker.
+
 ### Acceptance
 
-- `wander.test.ts`: the offset is within the radius for every `ms` in a long sampled range; the same `who` and `ms` give the same result; two villagers differ at the same `ms`; a villager is idle (`walking: false`) for at least 60% of a sampled minute; the offset is continuous (no jump larger than `radius / 4` between samples 16 ms apart).
+- `wander.test.ts`: nominal offset within radius for every sample over a long range; same who/time gives same result; two villagers differ at the same time; at least 60% idle over a sampled minute; no jump larger than `radius / 4` between 16ms samples. Check wrap/cycle boundaries as well.
 - `wanderFrozen` is true for each flag and false for none.
-- Resume after hover/dialog/hidden-tab freeze is continuous within the same per-frame bound. A click held down on a villager freezes its anchor until pointerup/cancel.
-- A frozen villager's anchor does not change between two `animate` calls (test on `FloorScene` the way `floorPick.test.ts` builds one).
-- `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm sim` pass; the sim report is unchanged.
+- Sample every villager over at least ten active minutes with the real Phase 3b layout. At every sample, its full marked/bobbing footprint is inside its own 384×288 lot, clear of all house boxes, river/road/spur/lanes, props and fence; every pair of moving footprints is disjoint; each anchor is within 240px of its house base. At least Bram and Ines move nonzero distance, and narrow corridors do not break continuity. No home/spot/layout changes.
+- Scene tests (in `wander.test.ts` or existing `floorPick.test.ts` style) cover hover, dialog, pressed pointer, hidden tab and pause separately: the frozen NPC anchor is identical across two `animate` calls, and resuming after a long freeze is continuous within the same per-frame bound. `setVillage` on the next world tick does not reset wander. Reduced motion puts every NPC at its exact home spot, with no bob; motion changes are handled without a wall-clock jump when re-enabled.
+- The moved cameo, caption and live marker are pickable through the existing cart-first picker. `anchorBox` follows their moved positions. Pressed-token anchoring remains fixed until release/cancel. Existing cart picking and anchored-card tests remain green.
+- Source review verifies media-query/visibility listeners, saved-pointer refresh/leave clearing, pointer capture cleanup, and `frozen` prop wiring.
+- Final docs describe the implemented UI, including the anchored card, Check/Hint glossary and art reuse. Editor/status/API prose is preserved, old ADRs receive only the specified sentence.
+- `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm sim` pass. After `pnpm sim:report`, `git diff --exit-code docs/sim/report.md` is clean. No deleted files, no art changes, no `packages/sim` or `tests/e2e` changes.
 
 ### Do not
 
-- Do not give villagers paths, collisions, or routes between houses.
-- Do not let a villager leave the village band or overlap the fence.
-- Do not add new animation to machines, drones, or the grid.
-- Do not touch `packages/sim`, art files, or `tests/e2e`. No browser, no e2e, no shots.
+- Do not give villagers navigation, sim paths, collision mechanics or routes between lots. Safe visual envelopes are not a new game mechanic.
+- Do not let a villager leave its lot or the 240px radius, enter the river or road, overlap the fence, a house, prop or another villager. Do not move houses, props or home spots.
+- Do not change portrait art, token size, names, mark meaning/colour, dim rules, dialogue or quests. Do not add animation to machines, drones or grid.
+- Do not change the camera, village layout, machine-card content, Journal, shop or toasts. Existing UI interactions stay functional.
+- Do not touch `packages/sim`, art files, `components/town`, save format, balance, `world.grid` (16×6), or `tests/e2e`. No browser, dev server, e2e, screenshots or shots.
 
 
 ## Final documentation gate

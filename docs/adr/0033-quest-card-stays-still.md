@@ -1,6 +1,6 @@
 # The quest card does not narrate the drone
 
-Accepted 24 November 2026. Amends the quest-rail clause of [the screen layout](../specs/v8-screen-layout.md) and the status-bar list in [ADR 0024](0024-quest-rail-and-status.md).
+Accepted 24 November 2026. Amends the quest-rail clause of [the screen layout](../specs/v8-screen-layout.md) and the status-bar list in [ADR 0024](0024-quest-rail-and-status.md). [ADR 0039](0039-quest-ux-village.md) replaces the rail with the village, the tracker, and the Journal.
 
 ## Context
 
