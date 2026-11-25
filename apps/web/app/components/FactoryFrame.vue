@@ -19,6 +19,8 @@ import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
+import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
+import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
@@ -299,10 +301,43 @@ function offerTrigger(trigger: 'run' | 'events' | 'tick') {
   rememberNotes(added.remembered)
   if (added.source !== (files.value[file] ?? '')) files.value = { ...files.value, [file]: added.source }
 }
+const toasts = shallowRef(emptyToasts())
+const seenToasts = new Set<string>()
+let prevView: WorldView | undefined
+let prevRows: Row[] = []
+let hoverStart: number | undefined
+function hoverToasts(over: boolean) {
+  const now = performance.now()
+  if (over) hoverStart ??= now
+  else if (hoverStart !== undefined) {
+    toasts.value = holdToasts(toasts.value, now, now - hoverStart)
+    hoverStart = undefined
+  }
+}
+function dismiss(id: number) {
+  toasts.value = dismissToast(toasts.value, id, hoverStart ?? performance.now())
+}
+watch(() => toasts.value.visible.length > 0, (visible, _, onCleanup) => {
+  if (!visible) {
+    hoverStart = undefined
+    return
+  }
+  const timer = window.setInterval(() => {
+    if (hoverStart === undefined) toasts.value = expireToasts(toasts.value, performance.now())
+  }, 500)
+  onCleanup(() => window.clearInterval(timer))
+})
 let grantNotesReady = false
 const grantedNotes = new Set<string>()
 watch(world, current => {
-  if (!current) return
+  if (!current || resetting) return
+  const rows = current.questId ? testRows.value : []
+  const events = worldEvents(grantNotesReady ? prevView : undefined, current, kettlewick.questList ?? [], catalog.value, {
+    prev: prevRows, next: rows,
+  })
+  prevView = current
+  prevRows = rows
+  if (events.length) toasts.value = pushToasts(toasts.value, events, hoverStart ?? performance.now(), seenToasts)
   if (!grantNotesReady) {
     for (const id of current.cleared) grantedNotes.add(id)
     grantNotesReady = true
@@ -451,6 +486,9 @@ function startOver() {
   if (!window.confirm('Start over at Kettlewick? This replaces your saved works and all project files.')) return
   grantNotesReady = false
   grantedNotes.clear()
+  toasts.value = emptyToasts()
+  seenToasts.clear()
+  hoverStart = undefined
   preserveSlot = false
   rememberNotes([])
   resetting = true
@@ -611,6 +649,7 @@ onBeforeUnmount(() => {
           <QuestTracker v-if="world" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
             @journal="showDialog('journal', $event)" @hand-over="send({ kind: 'complete' })"
             @show-test="showOpenTest" @open-file="activeFile = $event" />
+          <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
           <MachineCard v-if="inspected" class="machine-card" :inspected="inspected" @close="closeSurface"
             @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
         </div>
