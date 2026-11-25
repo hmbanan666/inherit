@@ -2,6 +2,7 @@
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
+import { screenBox } from '../lib/popupPlace'
 import { containPlace } from '../lib/factoryLayout'
 import { floorCursor, floorPoint, panToPoint, pickFloor, stationsOf, type Point } from '../lib/floorPick'
 import { homeView, type VillageView } from '../lib/village'
@@ -29,7 +30,13 @@ async function snapshot(id: string): Promise<string | undefined> {
     // The card can also open from Machines before the floor is ready.
   }
 }
-defineExpose({ snapshot })
+function anchorRect(id: string) {
+  const box = scene?.anchorBox(id)
+  const rect = app?.canvas.getBoundingClientRect()
+  if (!box || !rect) return
+  return screenBox(box, { x: 0, y: 0 }, { x: rect.left + camera.value.x, y: rect.top + camera.value.y }, scale.value)
+}
+defineExpose({ snapshot, anchorRect })
 
 const pointers = new Map<number, { x: number; y: number }>()
 let hoverPoint: Point | undefined

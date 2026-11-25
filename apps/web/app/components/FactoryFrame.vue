@@ -19,6 +19,7 @@ import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
 import { isLevelEvent, pickLevelUp, visibleLevelUp } from '../lib/levelUp'
 import { dialogClose } from '../lib/dialogMotion'
+import { cardSide } from '../lib/cardPlace'
 import type { Point } from '../lib/floorPick'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
@@ -98,7 +99,9 @@ const levelUp = ref<number>()
 const otherModalOpen = computed(() => overlay.value.kind !== 'none' || !!inspected.value)
 const shownLevel = computed(() => visibleLevelUp(levelUp.value, otherModalOpen.value || settingsOpen.value))
 const modalOpen = computed(() => otherModalOpen.value || shownLevel.value !== undefined)
-function openMachine(id: string) {
+const machineSide = ref<ReturnType<typeof cardSide>>('center')
+function openMachine(id: string, centerX?: number) {
+  machineSide.value = cardSide(centerX, window.innerWidth)
   selectedId.value = id
 }
 function showDialog(next: Exclude<GameOverlay, { kind: 'none' }>, from?: ApiBookOpener) {
@@ -130,8 +133,10 @@ function inspectFromFloor(id: string) {
     return
   }
   opener = from
-  if (id) openMachine(id)
-  else closeSurface()
+  if (id) {
+    const rect = floor.value?.anchorRect(id)
+    openMachine(id, rect && rect.x + rect.w / 2)
+  } else closeSurface()
 }
 function inspectFromJournal(id: string) {
   overlay.value = closeOverlay(overlay.value)
@@ -830,7 +835,7 @@ onBeforeUnmount(() => {
         @buy="send({ kind: 'buy', id: $event })" @close="closeSurface" />
       <ApiBook v-else-if="bookOpen" v-dialog-motion class="dialog-motion" :class="{ closing: bookClosing }"
         :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeBook" />
-      <MachineCard v-else-if="inspected" :inspected="inspected" :sprite="cardSprite" @api="openMachineApi" @close="closeSurface"
+      <MachineCard v-else-if="inspected" :inspected="inspected" :sprite="cardSprite" :side="machineSide" @api="openMachineApi" @close="closeSurface"
         @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
       <LevelUpDialog v-else-if="shownLevel !== undefined" :level="shownLevel" :quests="quests" @close="levelUp = undefined; closeSurface()" />
     </Teleport>
