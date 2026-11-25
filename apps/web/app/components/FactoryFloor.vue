@@ -209,12 +209,13 @@ onBeforeUnmount(() => {
     tabindex="0"
     aria-label="Factory map"
     @wheel.prevent="wheel"
+    @dblclick="recenter()"
     @pointerdown="down"
     @pointermove="hover"
     @pointerleave="leave"
   >
     <div ref="mount" class="pixi-mount"></div>
-    <div class="map-controls">
+    <div class="map-controls" @dblclick.stop>
       <button aria-label="Zoom out" @click="zoomBy(0.8)"><Minus /></button
       ><button aria-label="Center map" @click="recenter()"><Maximize /></button
       ><button aria-label="Zoom in" @click="zoomBy(1.25)"><Plus /></button>
