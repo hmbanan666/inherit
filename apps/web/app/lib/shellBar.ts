@@ -54,11 +54,33 @@ export function questObjectives(card: Card) {
   })
 }
 
+/**
+ * The Quest tab goal in plain words. Quest text stays as written in quests.ts; code words move to a hint
+ * under the next step. An old saved contract keeps its own goal.
+ */
+const questGoals: Record<string, { goal: string; hint?: string }> = {
+  bram: { goal: 'Smelt an ingot and bring it to Bram.', hint: 'The batch has to be started by smeltOnce in your code.' },
+  ines: { goal: 'Mine 3 ore at vein D and bring it to Ines.' },
+  odile: { goal: 'Smelt 2 steel and bring it to Odile.' },
+  elsie: { goal: 'Press 2 grates and bring them to Elsie. Both carts have to haul.' },
+  harrow: { goal: 'Make a plate and a blank and bring them to Harrow.' },
+  tomas: { goal: 'Cut 2 gears on the lathe and bring them to Tomas.' },
+  pell: { goal: 'Make 2 hinges and bring them to Pell.' },
+  wen: { goal: 'Make 2 folding shutters and bring them to Wen.' },
+  crew: { goal: 'Pack a winch crate, then a lamp crate, and hand both to Odile.' },
+}
+
+export function questGoal(quest: QuestDef, card: Pick<Card, 'goal'>) {
+  const human = questGoals[quest.id]
+  if (!human || card.goal !== quest.goal) return { goal: card.goal, hint: undefined }
+  return { goal: human.goal, hint: human.hint }
+}
+
 export function questLog(quest?: QuestDef, card?: Card) {
   if (!quest || !card) return []
   return [{
     id: quest.id, who: quest.who, name: card.from.replace(/^Mayor /, ''), role: quest.role,
-    title: card.title, quote: quest.quote, goal: card.goal, objectives: questObjectives(card),
+    title: card.title, quote: quest.quote, ...questGoal(quest, card), objectives: questObjectives(card),
     ready: card.ready, expanded: true,
   }]
 }

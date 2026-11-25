@@ -15,7 +15,7 @@ import { assembler, cutter, press as pressDrawing } from './art/fabrication'
 import { materialArt, type Material } from './art/materials'
 import {
   cartDrawScale, cartMark, pauseMark, hoverScale, hoverStroke, selectionColor, selectionStroke, stationShapes, stationsOf,
-  cameo, npcCaptionY, npcMarker, npcShapes, tile, type CartHit, type Shape,
+  cameo, markLook, npcCaptionY, npcMarker, npcShapes, tile, type CartHit, type QuestMark, type Shape,
 } from './floorPick'
 
 export type FloorWorld = Omit<World, 'memory'>
@@ -77,7 +77,6 @@ function land(scene: Container, grid: World['grid']) {
       g.rect(x + dx + 4, y + dy + 4, 22, 3).fill(0x99997e)
       g.rect(x + dx + 4, y + dy + 4, 3, 18).fill(0x99997e)
     }
-  scene.addChild(label('INHERIT  /  MACHINE WORKS', 15, 0xa3a298)).position.set(20, 25)
 }
 
 function print(w: number, h: number, draw: (p: Paint) => void, resolution = 2) {
@@ -149,16 +148,32 @@ function villagerToken(layer: Container, npc: VillageNpc, neighbours: VillageNpc
   face.mask = art.addChild(new Graphics()).circle(0, cameo.y, cameo.radius).fill(0xffffff)
   art.addChild(new Graphics()).circle(0, cameo.y, cameo.radius).stroke({ width: 2, color: 0x2a2b2e })
   caption(art, npc.name, 0, npcCaptionY)
-  const badge = art.addChild(new Graphics()).circle(0, 0, npcMarker.radius).fill(0xffffff)
+  const badge = art.addChild(new Container())
   badge.y = npcMarker.y
+  const disc = badge.addChild(new Graphics())
   const glyph = badge.addChild(label('', 16, 0x242529))
   glyph.anchor.set(0.5)
   const clock: WanderClock = { ms: 0 }
-  return { art, badge, glyph, name: npc.name, who: npc.who, spot: npc.spot, mark: npc.mark, clock,
+  return { art, badge, disc, glyph, painted: undefined as QuestMark | undefined, name: npc.name, who: npc.who, spot: npc.spot, mark: npc.mark, clock,
     envelope: wanderEnvelope(npc, neighbours) }
 }
 
 type Token = ReturnType<typeof villagerToken>
+
+function paintMark(token: Token, mark: QuestMark) {
+  const look = markLook(mark)
+  const disc = token.disc.clear()
+  if (look.glow) disc.circle(0, 0, npcMarker.radius + 5).fill({ color: look.fill!, alpha: 0.28 })
+  disc.circle(0, 0, npcMarker.radius)
+  if (look.fill !== undefined) disc.fill(look.fill)
+  else disc.fill({ color: 0x1c1d21, alpha: 0.7 }).stroke({ width: 1.5, color: look.line! })
+  token.glyph.text = look.glyph
+  token.glyph.style.fill = { color: look.text, alpha: mark === 'active' ? 0 : 1 }
+  token.glyph.style.stroke = { color: look.text, width: mark === 'active' ? 1 : 0 }
+  token.badge.alpha = look.alpha
+  token.badge.scale.set(look.scale)
+  token.painted = mark
+}
 
 function pose(token: Token, reducedMotion: boolean) {
   const offset = reducedMotion ? { x: 0, y: 0 } : wanderOffset(token.who, token.clock.ms, undefined, token.envelope)
@@ -269,10 +284,7 @@ export class FloorScene {
       token.mark = npc.mark
       token.badge.y = npcMarker.y + markerBob(npc.mark, token.clock.ms)
       token.badge.visible = !!npc.mark
-      if (npc.mark) {
-        token.badge.tint = npc.mark === 'active' ? 0x8a8a8a : selectionColor
-        token.glyph.text = npc.mark === 'offer' ? '!' : '?'
-      }
+      if (npc.mark && token.painted !== npc.mark) paintMark(token, npc.mark)
     }
   }
 

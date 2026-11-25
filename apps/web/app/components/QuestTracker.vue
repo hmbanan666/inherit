@@ -51,6 +51,7 @@ const entries = computed(() => questLog(props.quest, props.card))
             </li>
           </ul>
           <p class="goal step"><MoveRight :size="14" aria-hidden="true" />{{ step }}</p>
+          <small v-if="entry.hint" class="hint-line">{{ entry.hint }}</small>
           <p v-if="granted" class="goal">
             {{ granted.text }}
             <button v-if="granted.file" type="button" class="hint" @click="emit('openFile', granted.file)">{{ granted.file }}</button>
@@ -94,6 +95,7 @@ header .villager { display: flex; width: 100%; justify-content: start; gap: 8px 
 .quest-entry[data-expanded="false"] .entry-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
 .goal { margin: 0; font-size: 13px; line-height: 1.4 }
 .quote { color: var(--soft); font-style: italic }
+.hint-line { margin-top: -4px; padding-left: 20px; color: var(--sub); font-size: 12px; line-height: 1.35 }
 .step { display: flex; align-items: baseline; gap: 6px; color: var(--sub) }
 .step svg { width: 14px; height: 14px; align-self: start; margin-top: 2px }
 .goals li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; min-width: 0 }

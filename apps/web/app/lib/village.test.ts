@@ -1,7 +1,7 @@
 import { acceptQuest, canTake, completeQuest, createWorld, kettlewick, questHold, questList, runTicks, settleTriggers } from '@inherit/sim/v8'
 import { expect, test } from 'vitest'
 import { containPlace } from './factoryLayout'
-import type { Box } from './floorPick'
+import { tile, type Box } from './floorPick'
 import {
   fieldBounds, homeView, houseBox, houseScale, idleLine, journalRequests, propBox, villageGround, villageHomes, villageLots, villageProps,
   villagerBox, villagerDialog, villagerQuest, villagers, villageView,
@@ -23,13 +23,23 @@ test('the field lists each giver once in first-quest order, without titles', () 
   expect(people[2]!.name).toBe('Odile')
 })
 
-test('the home view frames the works and eight village columns with legible house signs', () => {
+test('the home view gives the village over 40% of the width and keeps the depot, furnace and veins', () => {
   const grid = { width: 16, height: 6 }
   expect(fieldBounds(grid)).toEqual({ left: -1920, top: 0, width: 3456, height: 576 })
   const home = homeView(grid)
-  expect(home).toEqual({ left: -768, top: 0, width: 2304, height: 576 })
+  expect(home).toEqual({ left: -1152, top: 0, width: 2592, height: 576 })
+  const village = -home.left / home.width
+  expect(village).toBeGreaterThanOrEqual(0.4)
+  expect(village).toBeLessThanOrEqual(0.5)
+  const right = home.left + home.width
+  const world = createWorld(kettlewick)
+  for (const cell of [world.depot.pos, world.furnace.pos, ...world.veins.map(vein => vein.pos)]) {
+    expect(cell.x * tile).toBeGreaterThanOrEqual(0)
+    expect((cell.x + 1) * tile).toBeLessThanOrEqual(right)
+  }
   expect(houseScale).toBeGreaterThanOrEqual(1.4)
-  expect(containPlace(1904, 560, home.width, home.height).scale * houseScale * 8).toBeGreaterThanOrEqual(9)
+  // Signs stay about 8 screen px on a wide frame; zoom in for more.
+  expect(containPlace(1904, 560, home.width, home.height).scale * houseScale * 8).toBeGreaterThanOrEqual(8)
 })
 
 test('the seven houses and eight villagers have their own places in the lots', () => {
