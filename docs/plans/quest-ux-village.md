@@ -583,7 +583,7 @@ The top bar reads like a game's navigation: logo, credits, then Journal, Machine
 **Docs.**
 
 - `docs/specs/v8-screen-layout.md`: update the Proportions paragraph (no tracker), Reading order items 1, 2 and 4, the Nav section, replace the Quest tracker section with a Quest tab section, the Toasts section (window corner, sizes, welcome toast), the Status bar CPU sentence only where the look changed, and the One home each table rows that name the tracker, the two pills or the field's zoom controls. Describe the UI as built.
-- `CONTEXT.md`: in the Check row, replace "The persistent tracker shows up to three with their marks." with "The Quest tab shows how many pass." No other row changes.
+- `CONTEXT.md`: in the Check row, replace "The persistent tracker shows up to three with their marks." with "The Quest tab shows the story and delivery objectives; checks stay in Tests." No other row changes.
 - ADR 0039 already carries the amendment for this phase. Do not edit it.
 
 ### Acceptance
@@ -598,7 +598,7 @@ The top bar reads like a game's navigation: logo, credits, then Journal, Machine
 8. A fresh game shows one welcome toast naming the first giver, once per page session, for 7 s; a loaded game with an open quest or a hand-over shows none. `welcomeToast` tests cover all three cases and the `More is coming.` case.
 9. `questObjectives` tests cover a single-item order, a multi-line order (Harrow plate and blank), a full line ticked, an old saved contract, and that labels never contain a test text or the giver name. `questLog` tests cover no quest (empty) and an open quest (one expanded entry).
 10. The CPU item: icon, left-aligned label, then the bar, same gap and font as its neighbours, no fixed 148px width; tones and tooltip unchanged; `cpuMeter.test.ts` and `metricHistory.test.ts` pass unchanged.
-11. Docs updated as listed; CONTEXT changes only the Check row.
+11. Docs updated as listed. Only the Check row in `CONTEXT.md` changes, and it includes the sentence "The Quest tab shows the story and delivery objectives; checks stay in Tests."
 12. The nav has Journal, Machines, Shop as text links. Journal shows Now, Requests and Done only. Machines opens its own modal with the same rows; a row closes it and opens that machine's card beside it. `gameOverlay` tests cover the `machines` kind.
 13. The Quest tab renders `<ol class="quest-entries">` from `questLog`; the template and CSS handle an expanded and a collapsed entry; only one expanded entry is ever produced now.
 14. `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm sim` pass. After `pnpm sim:report`, `git diff --exit-code docs/sim/report.md` is clean. No deleted files, no art changes, no `packages/sim` or `tests/e2e` changes, `world.grid` still 16×6.
