@@ -6,7 +6,9 @@ import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press } from './art/fabrication'
 import { FloorScene, tile } from './floor'
+import { markerBob } from './wander'
 import {
+  markLook, selectionColor,
   buildingLabelHit, captionBox, cartDrawScale, floorCursor, floorPoint, footprintContains, hitPadding, hoverScale,
   panToCell, panToPoint, pickFloor, stationShapes, stationsOf, type MachineKind, type StationHit,
 } from './floorPick'
@@ -307,4 +309,15 @@ test('tracker focus puts a village pixel point at the viewport centre at both zo
       left: 0, top: 0, scale, cameraX: camera.x + pan.x, cameraY: camera.y + pan.y,
     })).toEqual(point)
   }
+})
+
+test('an open quest mark is a dim grey outline and a ready one is filled gold with a glow', () => {
+  const open = markLook('active'), ready = markLook('ready'), offer = markLook('offer')
+  expect(open).toMatchObject({ glyph: '?', fill: undefined, glow: false })
+  expect(open.alpha).toBeLessThan(1)
+  expect(open.scale).toBeLessThan(1)
+  expect(ready).toMatchObject({ glyph: '?', fill: selectionColor, alpha: 1, scale: 1, glow: true })
+  expect(offer).toMatchObject({ glyph: '!', fill: selectionColor, alpha: 1, scale: 1, glow: false })
+  expect(markerBob('active', 400)).toBe(0)
+  expect(markerBob('ready', 400)).not.toBe(0)
 })

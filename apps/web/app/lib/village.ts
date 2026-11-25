@@ -11,7 +11,9 @@ type VillagerMark = 'offer' | 'active' | 'ready'
 
 export const villageLabels = { goal: 'Goal', take: 'Take quest', handOver: 'Hand over', close: 'Close' }
 export const villageCols = 20
-export const homeCols = 8
+/** The default view: three village lots west of the works, and the works up to vein B. */
+export const homeCols = 12
+export const homeWorksCols = 15
 export const houseScale = 1.4
 export const housePrint = { w: 210, h: 176, baseX: 105, baseY: 138 }
 
@@ -20,7 +22,7 @@ export function fieldBounds(grid: World['grid']) {
 }
 
 export function homeView(grid: World['grid']) {
-  return { left: -homeCols * tile, top: 0, width: (grid.width + homeCols) * tile, height: grid.height * tile }
+  return { left: -homeCols * tile, top: 0, width: (Math.min(grid.width, homeWorksCols) + homeCols) * tile, height: grid.height * tile }
 }
 
 function lot(building: Building | 'meadow', x: number, y: number) {

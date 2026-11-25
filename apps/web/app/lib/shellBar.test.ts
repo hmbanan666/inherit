@@ -4,7 +4,7 @@ import { questCard } from './questNote'
 import { questNextStep } from './questStep'
 import { journalRequests } from './village'
 import { emptyToasts, expireToasts, pushToasts } from './toasts'
-import { questLog, questObjectives, questTabNotice, welcomeToast, xpProgress, xpRing } from './shellBar'
+import { questGoal, questLog, questObjectives, questTabNotice, welcomeToast, xpProgress, xpRing } from './shellBar'
 
 test('the account keeps the level bar labels and width at each part of the curve', () => {
   expect(xpProgress(0)).toEqual({ level: 1, fraction: 0, width: '0%', label: 'XP 0/10', title: 'Level 1. 0 / 10 XP.' })
@@ -110,6 +110,21 @@ test('the log has no entry for a preview and one expanded entry for the open que
   const card = questCard(world, quest)!
   expect(questLog(quest, card)).toEqual([{
     id: quest.id, who: quest.who, name: 'Odile', role: quest.role, title: card.title, quote: quest.quote,
-    goal: card.goal, objectives: questObjectives(card), ready: false, expanded: true,
+    goal: 'Smelt 2 steel and bring it to Odile.', hint: undefined, objectives: questObjectives(card), ready: false, expanded: true,
   }])
+})
+
+test('every Quest tab goal is plain words, and code words only reach the hint', () => {
+  const code = /[a-z][A-Z]|[()]/
+  expect(questList.length).toBeGreaterThanOrEqual(9)
+  for (const quest of questList) {
+    const { goal, hint } = questGoal(quest, quest)
+    expect(goal, quest.id).not.toMatch(code)
+    expect(goal.endsWith('.'), quest.id).toBe(true)
+    if (code.test(quest.goal)) expect(hint, quest.id).toMatch(code)
+  }
+  const { quest, world } = take('bram')
+  expect(questLog(quest, questCard(world, quest)!)[0]).toMatchObject({
+    goal: 'Smelt an ingot and bring it to Bram.', hint: 'The batch has to be started by smeltOnce in your code.',
+  })
 })

@@ -40,6 +40,14 @@ export const cameo = { y: -22, radius: 20 }
 export const npcMarker = { y: cameo.y - 30, radius: 10 }
 export const npcCaptionY = 2
 
+export type QuestMark = 'offer' | 'active' | 'ready'
+
+/** How a mark is drawn. An open quest is a dim grey outline; a ready one is filled gold and glows. */
+export function markLook(mark: QuestMark) {
+  if (mark === 'active') return { glyph: '?', fill: undefined, line: 0x8a8a8a, text: 0x9a9a9a, alpha: 0.6, scale: 0.8, glow: false }
+  return { glyph: mark === 'offer' ? '!' : '?', fill: selectionColor, line: undefined, text: 0x242529, alpha: 1, scale: 1, glow: mark === 'ready' }
+}
+
 export interface Box { x: number; y: number; w: number; h: number }
 export interface Ellipse { cx: number; cy: number; rx: number; ry: number }
 export type Shape = { type: 'box'; box: Box } | { type: 'ellipse'; ellipse: Ellipse }
