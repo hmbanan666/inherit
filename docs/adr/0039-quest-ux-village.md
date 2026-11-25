@@ -61,3 +61,15 @@ Nick playtested Phase 3 (t241u). The village on the left of the works, on the sa
 - **The default camera frames the works plus the eight nearest village columns.** The player pans or zooms out to see the rest, and there is no hard canvas limit.
 
 The exact values are in [Phase 3b of the plan](../plans/quest-ux-village.md). Wandering (Phase 5) is measured from the new pixel spots.
+
+## Amendment, 25 November 2026: after the playtest
+
+Nick played Phases 1–5 (pt242u). The field, the village and the dialogs stay. Five things changed:
+
+- **The top bar.** Left to right: the logo, the credits, then Journal, Machines and Shop as text links, and on the right Settings and a player block with the level and an XP ring. The place name and the wordmark next to the logo are removed. The player block is display only; there is no profile or login.
+- **Machines leave the Journal.** The Journal keeps the quest that is open, the requests and the quests handed over. The machine list opens as its own Machines dialog from the top bar, with the same rows, and stays the keyboard route to the works.
+- **The tracker leaves the field.** It showed test rows the Tests tab already has and covered the floor. The open quest is read in a Quest tab beside Tests and Console, written as a quest log: the giver's portrait and name, the title, the villager's line and the goal, objectives with counts, the next step, and Hand over. Tests stay in the Tests tab, the technical part; the log links to it once. The log is laid out as a list so two or three quests could stack later; only one is open today. This replaces the tracker paragraph above. The two doors in Consequences are now the villager and the Quest tab or Journal. The fold key `inherit.v8.tracker` is no longer used.
+- **Toasts sit at the bottom right of the window**, above the status bar, larger and at 14px. The kinds, the limit of three and the timings stay. On a new game one welcome toast names the first villager to talk to. This replaces the toast corner chosen above.
+- **The CPU meter** keeps its label, bar and tones from [ADR 0034](0034-cpu-meter-stays-visible.md) and takes the same icon-and-text look as the other status items.
+
+The exact values are in [Phase 6 of the plan](../plans/quest-ux-village.md).

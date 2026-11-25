@@ -1,6 +1,6 @@
 # Plan: quests live in the village
 
-Implements [ADR 0039](../adr/0039-quest-ux-village.md). Six PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
+Implements [ADR 0039](../adr/0039-quest-ux-village.md). Seven PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
 
 | # | PR | Depends on |
 | --- | --- | --- |
@@ -10,6 +10,7 @@ Implements [ADR 0039](../adr/0039-quest-ux-village.md). Six PRs, in this order. 
 | 4 | The machine card anchored next to the machine or drone. | 1, 3 |
 | 3b | A bigger village: 20 columns, houses at 1.4×, lots, river, roads and props from existing art. Runs after 4, before 5. | 3, 4 |
 | 5 | Villagers wander; hover and motion polish; the screen spec is finished. | 3b, 4 |
+| 6 | After the playtest: top bar, toasts in the window, a Quest tab instead of the tracker, a welcome toast, the CPU item, Machines out of the Journal. | 5 |
 
 ## Rules for every phase
 
@@ -24,7 +25,7 @@ Read these before the phase. They hold in every PR.
 - **Checks you never run.** No browser, no dev server opened in a browser, no Playwright, no `pnpm shots`, no screenshots, no e2e. Do not edit `tests/e2e/`; those specs already point at old copy and are out of scope.
 - **Logic is tested as pure functions.** Anything that decides (what to show, where, when) goes in `apps/web/app/lib/*.ts` with a `*.test.ts` beside it, in the style of `questStep.test.ts` and `floorPick.test.ts`. Components only wire those functions to the DOM. There are no component tests in this repo; do not add a component test harness.
 - **No new dependencies.** Vue, Nuxt auto-imports, Pixi, and `@lucide/vue` are already there.
-- **Modal and keyboard contract.** Every dialog uses native `showModal()` focus handling. Escape closes only the topmost surface. Closing returns focus to the opener, or to the Factory map after a canvas click. Opening Journal, Shop, a villager dialog, or the API book closes the machine card and any other modal; nothing stacks. Editor shortcuts are suppressed while a modal is open. Every icon button has an accessible name. The Journal is the route that never needs the canvas: taking quests, reading history, opening machines. A toast is never the only place a hint can be read.
+- **Modal and keyboard contract.** Every dialog uses native `showModal()` focus handling. Escape closes only the topmost surface. Closing returns focus to the opener, or to the Factory map after a canvas click. Opening Journal, Shop, a villager dialog, or the API book closes the machine card and any other modal; nothing stacks. Editor shortcuts are suppressed while a modal is open. Every icon button has an accessible name. The Journal and, from Phase 6, the Machines dialog are the routes that never need the canvas: taking quests, reading history, opening machines. A toast is never the only place a hint can be read.
 - **The PR description** lists every acceptance item with how it was checked, and ends with a Friction report.
 
 ---
@@ -480,6 +481,141 @@ Villagers take a few steps around their Phase 3b pixel spots now and then, so th
 - Do not change the camera, village layout, machine-card content, Journal, shop or toasts. Existing UI interactions stay functional.
 - Do not touch `packages/sim`, art files, `components/town`, save format, balance, `world.grid` (16×6), or `tests/e2e`. No browser, dev server, e2e, screenshots or shots.
 
+
+## Phase 6. Top bar, toasts in the window, a Quest tab
+
+Runs after Phase 5. Comes from Nick's playtest on 25 November 2026 (pt242u). It changes where things sit; it adds no feature beyond the six items below.
+
+### Goal
+
+The top bar reads like a game's navigation: logo, credits, then Journal, Machines and Shop as text links, and on the right Settings and a player block with the level and its XP ring. Toasts leave the field and sit at the bottom right of the window, bigger and readable. The quest tracker overlay leaves the field; the open quest is read in a new Quest tab beside Tests and Console. A new game shows one clear pointer to the first villager. The Journal keeps quests, villagers and their story; the machine list moves to its own Machines dialog. The CPU item on the status bar looks like its neighbours.
+
+### Files
+
+**1. Top bar**
+
+- `components/PackNav.vue`.
+  - The brand link keeps `/mark.svg`, `href="/"`, `aria-label="Inherit"` and the classes `pack-brand brand`. The visible text `Inherit` and the gold `.` span are removed from the template. Nothing else is drawn next to the logo.
+  - Add one named slot, `account`, rendered after the Settings block. The order inside the bar becomes: brand, default slot, `clock` slot, Settings, `account` slot. The `clock` slot stays in the component for compatibility; FactoryFrame stops using it.
+- `components/FactoryFrame.vue`, `#nav`.
+  - Remove `<strong class="pack-switch">Kettlewick Works</strong>`. The page title from `useHead` stays `Kettlewick Works · Inherit`.
+  - Default slot, in this order: the credits pill (the existing `<p class="pill" data-testid="credits">` with its `Coins` icon, number, title and the floating `gains`), then Journal, then Machines (item 6), then Shop.
+  - Journal and Shop stay `<button type="button" aria-haspopup="dialog">` with the same handlers, `ref="journalButton"`, the Journal `aria-label` switch and the new-request gold `.dot`. Their class becomes `nav-link` (replace `nav-btn` everywhere, CSS included). They drop the `BookOpen` and `Store` icons and show only their text from `overlayLabels`. Remove those two imports if nothing else uses them.
+  - `.nav-link` CSS: no border, no background, no border-radius, padding `4px 2px`, `color: var(--sub)`, the bar's font, `font-size: 14px`, `font-weight: 600`, `cursor: pointer`, and a 2px bottom border that is `transparent` at rest. Hover and `:focus-visible`: `color: var(--text)`. Active (that dialog is open: Journal while `journalOpen`, Shop while `shopOpen`): `color: var(--text)`, `border-bottom-color: var(--gold)`, and `aria-current="true"` on that button. Disabled Shop (no world yet): `opacity: 0.5`, `cursor: default`, no hover change.
+  - The `#clock` template with the centred `.pills` wrapper is removed. The `.pills` rule goes.
+  - New `#account` template: one block, `<p class="account" data-testid="level" :title="xp.title" :aria-label="xp.title">`. Inside, left to right: an avatar 32×32px drawn as an inline SVG ring (track circle in `var(--line)`, progress arc in `var(--gold)`, 3px stroke, starting at 12 o'clock, clockwise, length from the XP fraction) around a `User` icon from `@lucide/vue` at 16px on `var(--surface-low)`; then two lines of text: `Level {n}` (13px, 600) and the XP label such as `XP 12/20` (11px, `var(--sub)`, tabular). The level badge and thin bar from the old level pill are replaced by this block; their `.badge` and `.bar` rules stay only if something else still uses them (`.cpu-meter .bar` does).
+  - The account block is not a button and has no click handler. No level or profile panel exists in the game, so none is added. No name, no login, no sign-in copy.
+  - The `xp` computed moves into the new module (below) as `xpProgress`; FactoryFrame calls it. Its `label` and `title` strings stay exactly as today (`XP 12/20`, `Level 2. 12 / 20 XP.`, and past the last step `XP 140`, `Level 6. 140 XP.`).
+- `assets/game.css`: only the `.brand` rule may change, to drop the right border and padding that framed the old wordmark if it now looks detached. No other global rule changes.
+
+**2. Toasts in the window**
+
+- `components/ToastStack.vue`.
+  - Same component, props, emits, `TransitionGroup`, `role="status"`, `aria-live`, icons and cameo. Its CSS changes:
+  - `.toast-stack`: `position: fixed`, `right: 16px`, `bottom: 37px` (the 25px status bar plus 12px), `width: 340px`, `max-width: calc(100vw - 32px)`, `max-height: calc(100dvh - 65px - 25px - 32px)`, `z-index: 20` (above the field and the editor, below native modals, which sit in the top layer), `gap: 8px`. It still stacks upward and lets clicks through between toasts.
+  - `.toast`: `padding: 10px 12px`, `gap: 10px`, `font-size: 14px`, `line-height: 1.4`, `border-radius: 8px`, `box-shadow: 0 4px 16px var(--shadow-light)`. Icons 18px. `.cameo` 40×40px.
+- `components/FactoryFrame.vue`: the `<ToastStack>` element leaves `.map-frame` and is placed in the StudioShell default slot (next to the `Teleport`), with the same props and handlers. It renders whether or not a world is loaded, as today.
+- `lib/toasts.ts` keeps `visibleLimit = 3`, the queue and the durations. The event kinds in `worldEvents.ts` stay. The only new event is the welcome toast (item 4).
+
+**3. The Quest tab replaces the tracker overlay**
+
+- `components/FactoryFrame.vue`.
+  - Remove `<QuestTracker …>` from `.map-frame`. Nothing is drawn over the field's top-right corner any more.
+  - The checks pane tablist becomes Quest, Tests, Console, in that order. The new tab is `<button type="button" role="tab" :aria-selected="side === 'quest'">Quest</button>`. While `card?.ready` is true and the Quest tab is not selected, the tab shows the same gold `.dot` the Journal link uses, with the accessible name `Quest, ready to hand over`.
+  - `side` becomes `'quest' | 'tests' | 'console'`. The pane's `aria-label` reads `Quest` for the Quest tab. The tablist `aria-label` becomes `Quest, tests and console`.
+  - The Quest panel is `<section v-if="side === 'quest'" class="quest-tab" aria-label="Quest">` holding the reused `QuestTracker` component (below), which now also gets the open `quest` and emits `openTests`.
+  - `showOpenTest` still selects Tests and the remaining test. A new `openTests()` selects Tests without picking a row.
+- `components/QuestTracker.vue` is reused as the Quest tab panel. Same file, same props plus what is listed, same emits plus `openTests`. Move the markup that survives; do not rewrite the component from scratch.
+  - **What the tab is.** An in-game quest log, the kind an MMO keeps: who asked, what the quest is called, a few lines of story, and plain objectives with counts. It is not a task tracker and not tests. The hidden tests never appear here. No test names, no test marks, no test counts, no ticket ids, no status pills (`In progress`, `Open`, `Done` badges), no kanban look, no tables.
+  - Root element: `<div class="tracker quest-log">` (no longer `aside`, no `aria-label`; the section has it). Remove the overlay CSS: `position`, `top`, `right`, `width`, `max-width`, `max-height`, `z-index`, the overlay background and border. It fills the pane, scrolls inside it, padding `10px 12px`.
+  - Remove the fold button, the `open` ref, the `onMounted` read and `toggle`. `inherit.v8.tracker` is no longer read or written. Its helpers in `questTracker.ts` stay exported and tested; leave them. `trackerRows`, `testMark` and `testLabel` are not used in this tab.
+  - **Look.** A quest-log page with a parchment feel built from the existing palette and fonts only: entry background `var(--accent-surface)`, 1px border `var(--accent-line)`, radius 7px, a faint inner shadow or a top rule in `var(--accent-shadow)`; title in `var(--accent-soft)`, 15px, 700, Space Grotesk (the body font); story lines 13px `var(--soft)`, italic; objective counts in `var(--mono)`, tabular. Checked objectives use a gold `✓` box (`var(--gold)`), open ones an empty box in `var(--accent-line)`. No new font, no image file, no new colour variable.
+  - **A list that holds more later.** The panel renders `<ol class="quest-entries">` with one `<li class="quest-entry">` per entry from `questLog(...)` in the new module (below). Today the array has zero or one entry, and the first entry is expanded. An expanded entry shows its body; a collapsed one would show only its header line. Phase 6 never produces a collapsed entry and adds no toggle, but the template and CSS handle both so two or three entries can stack later without a redesign.
+  - **No open quest.** No entries. One quest-log page with: the next step (`step`, for example `Talk to Bram`) in bold, as the existing villager button that emits `visit` when `canVisit` (opens the dialog and centres the map, as today); under it `questTabHint` (`Go and talk to a villager with a gold ! over their head.`); then the existing Journal button. When `step` is `More is coming.`, the hint is not shown.
+  - **An expanded entry, top to bottom:**
+    1. Header: the giver's portrait (`TownPortrait`, 40px, the same `person` shape `ToastStack` builds from `kettlewick.questList`), the giver's name without `Mayor ` and their role, and the quest title. The header is the existing villager button (emits `visit`).
+    2. Story: `quest.quote` in italics (the villager's own line), then `card.goal` as one plain sentence. Both are read from the quest and card; do not write new quest text.
+    3. Objectives: a checklist from `questObjectives(card)`. One row per delivery line, label then count, for example `Deliver ingots 0/1` or `Deliver plates 1/1`, ticked when that line is full. Labels are derived in the UI layer from `item`/`qty`/`lines` with the existing `named()` helper in `questNote.ts` (export it if needed; do not change what it returns). The giver's name is not repeated in the label.
+    4. Next: `step` as one quiet line with a small `MoveRight` or `Footprints` icon from `@lucide/vue`, then the existing grant line and file link when `granted` is set. No `In progress` text anywhere.
+    5. Footer: when `card.ready`, the gold `Hand over` button with `data-testid="complete-quest"` and the one-time pulse (emits `handOver`). Always, at most one small text link `See Tests`: it emits `showTest` when `card.remainingTest` is set (selects that test) and `openTests` otherwise. Nothing else in the footer.
+- Hand-over works from the villager dialog (as today), from this tab's Hand over, and from the Journal's Now card. No other path is added or removed.
+- `lib/factoryLayout.ts`: `readSideTab` returns `'quest'` for `null` and for unknown values, `'tests'` for `'tests'`, `'console'` for `'console'`, and `'quest'` for `'quest'`. Same key `inherit.v8.side`; the stored value `quest` is the one new value. Update its test.
+
+**4. First open**
+
+- When a world is first shown in a page session with no open quest and nothing handed over (`!world.questId && world.cleared.length === 0`), push one welcome event toast through the existing `pushToasts`, key `welcome`, so `seenToasts` keeps it to once per page session. Its text comes from the new module: the existing next step plus a pointer, `Talk to Bram. Click the gold ! next to the house.`, where the name is taken from `questNextStep` / the first available request, never hard-coded.
+- The welcome toast uses the event kind with a new icon key `talk`, mapped to `MessageCircle` in `ToastStack.vue`. It lasts as long as a villager line (7 s): `show()` in `toasts.ts` treats `key === 'welcome'` like `npc`. Hover holds it; a click dismisses it.
+- The Quest tab is selected by default when nothing is stored (item 3), so the same step stays readable after the toast leaves.
+- Nothing else is added: no tutorial, no overlay, no arrow, no camera move, no extra highlight on the field. The gold `!` marks stay as they are.
+
+**5. Status bar CPU item**
+
+- `components/FactoryFrame.vue`, `.cpu-meter` CSS only. The element, `role="meter"`, `data-testid="cpu"`, `data-tone`, ARIA values, title, `Cpu` icon, the readout and the short bar all stay, in that order: icon, label, bar.
+- The item uses the same `.context .item` look as Ln/Col and the tick: `gap: 4px`, the icon right before the text, the text left-aligned, the same 11px mono font and `var(--sub)` colour at rest.
+- Remove `width: 148px`, and the readout's `width: 10ch` and `text-align: right`. To keep the caret still when the figures change, give the readout `min-width: 9ch` (left-aligned, tabular). The bar stays 36px after the readout.
+- Order on the right of the bar stays as the spec says: drone line, CPU, caret, tick.
+- The tones from ADR 0034 stay: gold above 80%, alert colour and alert surface at the limit. `steadyCpu`, the Charts traces from #111 and `cpuMeter.ts` do not change.
+
+
+**6. Machines get their own link and modal; the Journal keeps quests**
+
+- New `components/MachinesDialog.vue`, in the shape of `ShopDialog.vue`. Its markup is the Machines `<section>` moved out of `JournalDialog.vue` unchanged (the `<ul class="shop-list">` rows with name and detail, the same `openMachine` emit), inside `<GameDialog :title="overlayLabels.machines">`, without the `<h3>` (the dialog title names it). Props: `machines: ReturnType<typeof machineList>`. Emits: `close`, `openMachine`. Copy only the scoped styles that section needs; if `.shop-list` is global, copy nothing.
+- `components/JournalDialog.vue`: remove the Machines section, the `machines` prop and the `openMachine` emit. Now, Requests and Done stay exactly as they are, in that order. Nothing else in the Journal changes.
+- `lib/gameOverlay.ts`: `GameOverlay` gains `{ kind: 'machines' }`; `openOverlay` and `closeOverlay` handle it like `shop`. Extend `gameOverlay.test.ts` with it.
+- `components/FactoryFrame.vue`:
+  - Nav order: credits, Journal, Machines, Shop. Machines is a `nav-link` button with `aria-haspopup="dialog"`, `:disabled="!world"`, text `overlayLabels.machines`, `aria-current` while open.
+  - `machinesOpen = computed(() => overlay.value.kind === 'machines')`. In the `Teleport`, add `<MachinesDialog v-else-if="machinesOpen && world" :machines="machines" @close="closeSurface" @open-machine="inspectFromJournal" />`. Selecting a row closes the modal and opens the card beside that machine or drone, as the Journal row did.
+  - The Journal element drops `:machines` and `@open-machine`.
+- The modal contract holds for Machines: one surface at a time, Escape and backdrop close it, focus returns to the Machines link, editor shortcuts wait.
+- Docs: in `v8-screen-layout.md`, the Journal lists three sections; Machines is its own dialog from the nav. The "keyboard route" sentence names Journal and Machines.
+
+**The one new module.** `apps/web/app/lib/shellBar.ts` with `shellBar.test.ts`. It holds the new UI strings and these pure helpers:
+
+- `xpProgress(xp: number)`: `{ level, fraction, width, label, title }`, using `levelSpan`; `fraction` is 0–1 and 1 past the last step; `width`, `label`, `title` equal what the inline `xp` computed returns today.
+- `xpRing(fraction, radius)`: `{ circumference, dashArray, dashOffset }` for the SVG arc, clamped to 0–1.
+- `welcomeToast(world, step)`: a `GameEvent` with key `welcome`, kind `event`, icon `talk`, or `undefined` when a quest is open, something has been handed over, or `step` does not start with `Talk to `.
+- `questObjectives(card)`: rows `{ id, text, count, done }` from the card's lines, or its single `item`/`qty`/`shipped`. `text` is `Deliver ` plus `named(item, qty)`, `count` is `shipped/qty` clamped, `done` when full. Old saved contracts use the card's resolved lines and quantities.
+- `questLog(quest, card)`: `[]` with no open quest, otherwise one entry `{ id, who, name, role, title, quote, goal, objectives, ready, expanded: true }`. Returns an array so a later phase can pass more.
+- `questTabHint`: `Go and talk to a villager with a gold ! over their head.`
+
+`GameEvent`'s `EventIcon` union in `worldEvents.ts` gains `'talk'`. No other change to `worldEvents.ts`.
+
+**Docs.**
+
+- `docs/specs/v8-screen-layout.md`: update the Proportions paragraph (no tracker), Reading order items 1, 2 and 4, the Nav section, replace the Quest tracker section with a Quest tab section, the Toasts section (window corner, sizes, welcome toast), the Status bar CPU sentence only where the look changed, and the One home each table rows that name the tracker, the two pills or the field's zoom controls. Describe the UI as built.
+- `CONTEXT.md`: in the Check row, replace "The persistent tracker shows up to three with their marks." with "The Quest tab shows the story and delivery objectives; checks stay in Tests." No other row changes.
+- ADR 0039 already carries the amendment for this phase. Do not edit it.
+
+### Acceptance
+
+1. Top bar left to right: logo (mark only), credits pill, Journal, Machines, Shop, then Settings and the account block at the right edge. No `Kettlewick Works` or `Inherit` text in the bar. Journal and Shop have no border or background; hover, focus and the open dialog change colour and the gold underline, with `aria-current` on the open one. The new-request dot still shows.
+2. The account block shows the avatar ring, `Level n` and the XP label, with the old tooltip text. It is not clickable. The old centred pills are gone.
+3. `xpProgress` reproduces today's `width`, `label` and `title` for 0 XP, mid-level and past the last step; `xpRing` clamps and gives a full arc at 1 and none at 0. Tests prove both.
+4. Toasts render outside the field, fixed at the bottom right of the window, 340px wide, 14px text, 10px 12px padding, above the status bar, at most three visible, with the same event kinds, durations, hover hold and click dismiss.
+5. No quest overlay on the field. The checks pane has Quest, Tests, Console. With no quest the Quest tab shows the step, the villager button, the hint sentence and Journal. With an open quest it shows one quest-log entry: portrait, name, role, title, the quote and goal, the objective checklist with counts, the next step with any grant line and file link, and the footer. No test names, marks or counts, no ids, no status pills, no `In progress` in the Quest tab. The parchment styling uses only existing variables and fonts.
+6. Hand over in the Quest tab completes the quest (same `send({ kind: 'complete' })`), shows only when ready, pulses once, and keeps `data-testid="complete-quest"`. The one `See Tests` link selects the remaining test when there is one, otherwise opens Tests. The gold dot on the Quest tab shows only while ready and not selected.
+7. `readSideTab` tests cover null, `quest`, `tests`, `console` and an unknown value.
+8. A fresh game shows one welcome toast naming the first giver, once per page session, for 7 s; a loaded game with an open quest or a hand-over shows none. `welcomeToast` tests cover all three cases and the `More is coming.` case.
+9. `questObjectives` tests cover a single-item order, a multi-line order (Harrow plate and blank), a full line ticked, an old saved contract, and that labels never contain a test text or the giver name. `questLog` tests cover no quest (empty) and an open quest (one expanded entry).
+10. The CPU item: icon, left-aligned label, then the bar, same gap and font as its neighbours, no fixed 148px width; tones and tooltip unchanged; `cpuMeter.test.ts` and `metricHistory.test.ts` pass unchanged.
+11. Docs updated as listed. Only the Check row in `CONTEXT.md` changes, and it includes the sentence "The Quest tab shows the story and delivery objectives; checks stay in Tests."
+12. The nav has Journal, Machines, Shop as text links. Journal shows Now, Requests and Done only. Machines opens its own modal with the same rows; a row closes it and opens that machine's card beside it. `gameOverlay` tests cover the `machines` kind.
+13. The Quest tab renders `<ol class="quest-entries">` from `questLog`; the template and CSS handle an expanded and a collapsed entry; only one expanded entry is ever produced now.
+14. `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm sim` pass. After `pnpm sim:report`, `git diff --exit-code docs/sim/report.md` is clean. No deleted files, no art changes, no `packages/sim` or `tests/e2e` changes, `world.grid` still 16×6.
+
+### Do not
+
+- Do not change quests, quest text, rewards, levels, balance, the sim, `FactorySave` or its version, `world.grid`, or `tests/e2e`. No new localStorage key; only the value `quest` for `inherit.v8.side`.
+- Do not support more than one open quest. Do not add a collapse toggle or sorting to the Quest tab. Do not edit quest content files to get objective text; derive labels in the UI layer.
+- Do not show tests, test counts, ids or status pills in the Quest tab.
+- Do not delete any file, component or art. `QuestTracker.vue` is reused, not deleted; `questTracker.ts` stays.
+- Do not redraw screens. Move markup and keep classes and `data-testid` values except `nav-btn` → `nav-link`.
+- Do not add a profile, login, avatar upload, player name, level panel or any click on the account block.
+- Do not add a tutorial system, onboarding steps, arrows, spotlight, camera move or new marks. One welcome toast is the whole of item 4.
+- Do not change the Journal (beyond moving Machines out), Shop, villager dialog, machine card, API book, the editor, Tests rows, the Console, the field, villagers, wander or the camera, beyond what is listed.
+- Do not change toast timing, count, queue or event kinds, except the welcome toast.
+- Do not change CPU behaviour, `cpuMeter.ts`, the Charts panel or the status-bar order.
+- No new dependencies. No browser, dev server, e2e, screenshots or shots.
 
 ## Final documentation gate
 

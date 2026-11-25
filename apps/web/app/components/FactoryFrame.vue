@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
-import { BookOpen, CircleAlert, Coins, Cpu, Store, TextCursor, Timer, TriangleAlert } from '@lucide/vue'
+import { CircleAlert, Coins, Cpu, TextCursor, Timer, TriangleAlert, User } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
   checksPanePx, clampMapHeight, editorColumns, consoleBody, defaultMapHeight, editorHeaderPx, filesStorageKey, fileTreePx, mapHeightKey,
   readFilesOpen, readMapHeight, readPaneWidth, readSideTab, sideTabKey, sideWidthKey, sideWidthMax, sideWidthMin,
-  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldInsetPx,
+  treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldInsetPx, type SideTab,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
 import { insertQuestNote, questCard, questComment, questSummary } from '../lib/questNote'
@@ -23,6 +23,7 @@ import { journalRequests, villagerDialog, villagers, villageView } from '../lib/
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
 import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
+import { questTabNotice, shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
 import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
@@ -40,6 +41,7 @@ const catalog = computed(() => shopFor(world.value ?? { cleared: [], bought: [] 
 const { sectionId, selectSection } = useApiBook()
 const overlay = shallowRef<GameOverlay>({ kind: 'none' })
 const journalOpen = computed(() => overlay.value.kind === 'journal')
+const machinesOpen = computed(() => overlay.value.kind === 'machines')
 const shopOpen = computed(() => overlay.value.kind === 'shop')
 const bookOpen = computed(() => overlay.value.kind === 'api')
 const modalOpen = computed(() => overlay.value.kind !== 'none')
@@ -93,7 +95,7 @@ const floorNotice = ref<HostNotice>()
 const pending = ref(true)
 const panels = ['Charts'] as const
 const tool = ref<typeof panels[number]>()
-const side = ref<'tests' | 'console'>('tests')
+const side = ref<SideTab>(readSideTab(null))
 const pickedTest = ref('')
 const consoleFilter = ref<'all' | 'problems'>('all')
 const seenSeq = ref(0)
@@ -227,6 +229,7 @@ const card = computed(() => shownQuest.value && world.value ? questCard(world.va
 const journalSummary = computed(() => journalOpen.value && world.value && shownQuest.value && card.value
   ? questSummary(world.value, shownQuest.value, card.value) : undefined)
 const ready = computed(() => card.value?.ready ?? false)
+const readyNotice = computed(() => questTabNotice(side.value, ready.value))
 const testRows = computed(() => card.value?.tests ?? [])
 const pulse = ref(false)
 let pulseTimer = 0
@@ -294,14 +297,9 @@ function openLine(entry: { file: string; line: number }) {
   activeFile.value = entry.file
   navigation.value = { file: entry.file, line: entry.line }
 }
-const xp = computed(() => {
-  const value = world.value?.xp ?? 0
-  const span = levelSpan(value)
-  if (span.next === null) return { width: '100%', label: `XP ${value}`, title: `Level ${span.level}. ${value} XP.` }
-  const into = value - span.start
-  const size = span.next - span.start
-  return { width: `${Math.min(100, (into / size) * 100)}%`, label: `XP ${into}/${size}`, title: `Level ${span.level}. ${into} / ${size} XP.` }
-})
+const xp = computed(() => xpProgress(world.value?.xp ?? 0))
+const ringRadius = 14
+const ring = computed(() => xpRing(xp.value.fraction, ringRadius))
 function notesFromBrowser() {
   try {
     const raw = localStorage.getItem(notesKey)
@@ -381,6 +379,10 @@ watch(world, current => {
   const events = worldEvents(grantNotesReady ? prevView : undefined, current, kettlewick.questList ?? [], catalog.value, {
     prev: prevRows, next: rows,
   })
+  if (!grantNotesReady) {
+    const welcome = welcomeToast(current, nextStep.value)
+    if (welcome) events.push(welcome)
+  }
   prevView = current
   prevRows = rows
   if (events.length) toasts.value = pushToasts(toasts.value, events, hoverStart ?? performance.now(), seenToasts)
@@ -470,8 +472,11 @@ const granted = computed(() => {
   if (!note || note.text === nextStep.value) return
   return note
 })
-function showOpenTest() {
+function openTests() {
   side.value = 'tests'
+}
+function showOpenTest() {
+  openTests()
   const id = card.value?.remainingTest
   if (id) pickedTest.value = id
 }
@@ -532,7 +537,8 @@ function startOver() {
   grantNotesReady = false
   grantedNotes.clear()
   toasts.value = emptyToasts()
-  seenToasts.clear()
+  // Quest events repeat in a new game. The welcome belongs to the page session.
+  for (const key of seenToasts) if (key !== 'welcome') seenToasts.delete(key)
   hoverStart = undefined
   preserveSlot = false
   rememberNotes([])
@@ -659,31 +665,40 @@ onBeforeUnmount(() => {
   <StudioShell class="factory">
     <template #nav>
       <PackNav>
-        <strong class="pack-switch">Kettlewick Works</strong>
-        <button ref="journalButton" type="button" class="nav-btn" aria-haspopup="dialog"
+        <p v-if="world" class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
+          <Coins />
+          <b>{{ world.credits }}</b>
+          <span v-for="gain in gains.filter(item => item.kind === 'credits')" :key="gain.id" class="float">{{ gain.text }}</span>
+        </p>
+        <button ref="journalButton" type="button" class="nav-link" aria-haspopup="dialog" :aria-current="journalOpen || undefined"
           :aria-label="newRequest ? overlayLabels.newRequest : overlayLabels.journal" @click="showDialog({ kind: 'journal' }, $event.currentTarget as HTMLButtonElement)">
-          <BookOpen :size="16" />{{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
+          {{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
         </button>
-        <button type="button" class="nav-btn" aria-haspopup="dialog" :disabled="!world" @click="showDialog({ kind: 'shop' }, $event.currentTarget as HTMLButtonElement)">
-          <Store :size="16" />{{ overlayLabels.shop }}
+        <button type="button" class="nav-link" aria-haspopup="dialog" :aria-current="machinesOpen || undefined"
+          :disabled="!world" @click="showDialog({ kind: 'machines' }, $event.currentTarget as HTMLButtonElement)">
+          {{ overlayLabels.machines }}
         </button>
-        <template #clock>
-          <div v-if="world" class="pills">
-            <p class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
-              <Coins />
-              <b>{{ world.credits }}</b>
-              <span v-for="gain in gains.filter(item => item.kind === 'credits')" :key="gain.id" class="float">{{ gain.text }}</span>
-            </p>
-            <p class="pill" data-testid="level" :title="xp.title">
-              <span class="badge">{{ world.level }}</span>
-              <i class="bar" aria-hidden="true"><i :style="{ width: xp.width }" /></i>
-            </p>
-          </div>
-        </template>
+        <button type="button" class="nav-link" aria-haspopup="dialog" :aria-current="shopOpen || undefined"
+          :disabled="!world" @click="showDialog({ kind: 'shop' }, $event.currentTarget as HTMLButtonElement)">
+          {{ overlayLabels.shop }}
+        </button>
         <template #settings="{ close }">
           <button v-for="name in panels" :key="name" :aria-pressed="tool === name"
             @click="tool = tool === name ? undefined : name; close()">{{ name }}</button>
           <button :disabled="pending" @click="close(); startOver()">Start over</button>
+        </template>
+        <template #account>
+          <p v-if="world" class="account" data-testid="level" :title="xp.title" :aria-label="xp.title">
+            <span class="account-avatar" aria-hidden="true">
+              <svg viewBox="0 0 32 32" class="ring" fill="none" stroke-width="3">
+                <circle cx="16" cy="16" :r="ringRadius" stroke="var(--line)" />
+                <circle cx="16" cy="16" :r="ringRadius" stroke="var(--gold)" transform="rotate(-90 16 16)"
+                  :stroke-dasharray="ring.dashArray" :stroke-dashoffset="ring.dashOffset" />
+              </svg>
+              <User :size="16" />
+            </span>
+            <span class="account-text"><b>{{ shellLabels.level(xp.level) }}</b><span>{{ xp.label }}</span></span>
+          </p>
         </template>
       </PackNav>
     </template>
@@ -691,10 +706,6 @@ onBeforeUnmount(() => {
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
           <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-point="focusPoint" :frozen="person && 'npc:' + person.who" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" @anchor="anchor = $event" />
-          <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
-            @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
-            @show-test="showOpenTest" @open-file="activeFile = $event" />
-          <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
           <div v-if="inspected" ref="machineCard" class="machine-card" :style="cardPosition">
             <MachineCard :inspected="inspected" @close="closeSurface"
               @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
@@ -725,8 +736,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <PaneSplit class="side-split" axis="x" label="Resize checks" @move="onSide" @reset="setSideWidth(checksPanePx)" @nudge="nudgeSide" />
-          <aside class="checks-pane" :aria-label="side === 'tests' ? 'Quest tests' : 'Console'">
-            <div class="checks-head" role="tablist" aria-label="Tests and console">
+          <aside class="checks-pane" :aria-label="shellLabels.pane[side]">
+            <div class="checks-head" role="tablist" :aria-label="shellLabels.sideTabs">
+              <button type="button" role="tab" :aria-selected="side === 'quest'"
+                :aria-label="readyNotice" @click="side = 'quest'">
+                {{ shellLabels.pane.quest }}<i v-if="readyNotice" class="dot" aria-hidden="true" />
+              </button>
               <button type="button" role="tab" :aria-selected="side === 'tests'" @click="side = 'tests'">Tests</button>
               <button type="button" role="tab" :aria-selected="side === 'console'" @click="side = 'console'; consoleFilter = 'all'">
                 Console
@@ -735,7 +750,12 @@ onBeforeUnmount(() => {
               <button v-if="side === 'console'" type="button" class="clear" @click="clearLog">Clear</button>
             </div>
             <p v-if="hostError" class="host-error">{{ hostError }}</p>
-            <section v-if="side === 'tests'" class="tests" aria-label="Quest tests">
+            <section v-if="side === 'quest'" class="quest-tab" :aria-label="shellLabels.pane.quest">
+              <QuestTracker v-if="world" :quest="activeQuest" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
+                @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
+                @show-test="showOpenTest" @open-tests="openTests" @open-file="activeFile = $event" />
+            </section>
+            <section v-else-if="side === 'tests'" class="tests" aria-label="Quest tests">
               <p v-if="!testRows.length" class="empty">Take a quest to see its tests.</p>
               <button v-for="row in testRows" :key="row.id" type="button" class="test" :data-mark="row.state" :aria-pressed="pickedTest === row.id" :aria-label="testLabel(row.state, row.text)" @click="pickedTest = row.id">
                 <b><span class="state-mark" aria-hidden="true">{{ testMark(row.state) }}</span> {{ row.text }}</b>
@@ -798,12 +818,14 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </template>
+    <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
     <Teleport to="body">
       <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :summary="journalSummary"
         :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
-        :active="!!world?.questId" :offers="offers" :history="history" :machines="machines" @close="closeSurface"
+        :active="!!world?.questId" :offers="offers" :history="history" @close="closeSurface"
         @read="showDialog({ kind: 'npc', who: $event })" @take="take" @hand-over="send({ kind: 'complete' })"
-        @show-test="showOpenTest(); closeSurface()" @open-machine="inspectFromJournal" />
+        @show-test="showOpenTest(); closeSurface()" />
+      <MachinesDialog v-else-if="machinesOpen && world" :machines="machines" @close="closeSurface" @open-machine="inspectFromJournal" />
       <VillagerDialog v-else-if="person && request" :person="person" :request="request"
         @take="take($event); closeSurface()" @hand-over="send({ kind: 'complete' }); closeSurface()" @close="closeSurface" />
       <ShopDialog v-else-if="shopOpen && world" :catalog="catalog" :credits="world.credits" :bought="world.bought"
@@ -877,18 +899,32 @@ onBeforeUnmount(() => {
   max-height: calc(100% - v-bind(cardInsetCss));
   overflow: auto;
 }
-.nav-btn {
+.nav-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  padding: 4px 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--sub);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
-.nav-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold) }
-.pills { display: flex; align-items: center; gap: 8px; margin-inline: auto }
+.nav-link:enabled:hover, .nav-link:focus-visible { color: var(--text); background: none; border-bottom-color: transparent }
+.nav-link[aria-current="true"], .nav-link[aria-current="true"]:hover { color: var(--text); border-bottom-color: var(--gold) }
+.nav-link:disabled { opacity: 0.5; cursor: default }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--gold) }
+.account { display: flex; align-items: center; gap: 8px; margin: 0; white-space: nowrap }
+.account-avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-low) }
+.account-avatar svg { grid-area: 1 / 1 }
+.account-avatar .ring { width: 32px; height: 32px }
+.account-avatar .lucide { width: 16px; height: 16px }
+.account-text { display: grid; color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums }
+.account-text b { color: var(--text); font-size: 13px; font-weight: 600 }
 .pill {
   position: relative;
   display: inline-flex;
@@ -957,14 +993,13 @@ onBeforeUnmount(() => {
 .context button.item:hover { background: var(--surface-low); color: var(--text) }
 .cpu-meter {
   flex: none;
-  width: 148px;
   overflow: hidden;
   white-space: nowrap;
 }
 .cpu-meter .readout {
-  width: 10ch;
+  min-width: 9ch;
   flex: none;
-  text-align: right;
+  text-align: left;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
@@ -1074,6 +1109,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: var(--panel);
 }
+.quest-tab { flex: 1; min-height: 0; display: flex; flex-direction: column }
 .checks-head {
   flex: none;
   height: v-bind(headerCss);
@@ -1089,7 +1125,7 @@ onBeforeUnmount(() => {
   background: transparent;
   color: var(--sub);
   font: inherit;
-  padding: 0 10px;
+  padding: 0 6px;
 }
 .checks-head button[aria-selected="true"] {
   color: var(--text);

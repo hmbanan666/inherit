@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { kettlewick } from '@inherit/sim/v8'
-import { BellRing, Check, Cog, Coins, Sparkles, Truck, Unlock } from '@lucide/vue'
+import { portraits } from '../lib/shellBar'
+import { BellRing, Check, Cog, Coins, MessageCircle, Sparkles, Truck, Unlock } from '@lucide/vue'
 import TownPortrait from './town/TownPortrait.vue'
 import type { Toast } from '../lib/toasts'
 import { dismissToastLabel } from '../lib/worldEvents'
 
 defineProps<{ toasts: readonly Toast[] }>()
 const emit = defineEmits<{ dismiss: [id: number]; hover: [over: boolean] }>()
-const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, machine: Cog, drone: Truck, ready: BellRing }
-const portraits = new Map(kettlewick.questList?.map(({ who, from, role, building }) => [
-  who, { id: who, name: from, role, buildingId: building, mood: 'waiting' as const },
-]))
+const icons = { check: Check, coins: Coins, level: Sparkles, unlock: Unlock, machine: Cog, drone: Truck, ready: BellRing, talk: MessageCircle }
 </script>
 
 <template>
@@ -24,7 +21,7 @@ const portraits = new Map(kettlewick.questList?.map(({ who, from, role, building
         <span><b>{{ toast.name }}</b> {{ toast.text }}</span>
       </template>
       <template v-else>
-        <component :is="icons[toast.icon]" :size="16" aria-hidden="true" />
+        <component :is="icons[toast.icon]" :size="18" aria-hidden="true" />
         <span>{{ toast.text }}</span>
       </template>
     </button>
@@ -33,39 +30,39 @@ const portraits = new Map(kettlewick.questList?.map(({ who, from, role, building
 
 <style scoped>
 .toast-stack {
-  position: absolute;
-  z-index: 4;
-  right: 12px;
-  bottom: 52px;
-  width: 300px;
-  max-width: calc(100% - 24px);
-  max-height: calc(45% - 64px);
-  overflow: hidden;
+  position: fixed;
+  z-index: 20;
+  right: 16px;
+  bottom: 37px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 65px - 25px - 32px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 8px;
   pointer-events: none;
 }
 .toast {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
   overflow-y: auto;
-  padding: 5px 8px;
+  padding: 10px 12px;
   background: var(--overlay);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px var(--shadow-light);
   text-align: left;
   font: inherit;
-  font-size: 13px;
-  line-height: 1.3;
+  font-size: 14px;
+  line-height: 1.4;
   pointer-events: auto;
 }
-.toast svg { flex: none; color: var(--gold) }
-.cameo { width: 32px; height: 32px; flex: none }
+.toast svg { width: 18px; height: 18px; flex: none; color: var(--gold) }
+.cameo { width: 40px; height: 40px; flex: none }
 .toast-enter-active { transition: transform 160ms ease-out }
 .toast-enter-from { transform: translateX(100%) }
 @media (prefers-reduced-motion: reduce) { .toast-enter-active { transition: none } }

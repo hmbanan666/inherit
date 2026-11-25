@@ -33,7 +33,7 @@ const goodName: Record<string, [string, string]> = {
   lamp: ['lamp crate', 'lamp crates'],
 }
 
-function named(item: string, qty: number) {
+export function named(item: string, qty: number) {
   const pair = goodName[item]
   if (!pair) return qty === 1 ? item : `${item}s`
   return qty === 1 ? pair[0] : pair[1]
