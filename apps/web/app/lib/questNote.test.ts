@@ -1,6 +1,6 @@
 import { acceptQuest, createWorld, kettlewick, migrateWorld, questList, runTicks, settleTriggers } from '@inherit/sim/v8'
 import { expect, test } from 'vitest'
-import { deliveryNote, firstOpenTest, goalLabel, insertQuestNote, quantityLabel, questCard, questComment } from './questNote'
+import { deliveryNote, firstOpenTest, goalLabel, insertQuestNote, quantityLabel, questCard, questComment, questSummary } from './questNote'
 import { questNextStep } from './questStep'
 import { insertTriggerExample, triggerExample } from './triggerNote'
 
@@ -137,4 +137,37 @@ test('a full Bram shipment points the footer at the open batch check', () => {
   expect(card.ready).toBe(false)
   expect(card.batchCheck).toBe('open')
   expect(card.needText).toBe(quest.need)
+})
+
+test('one resolved goal keeps the coded batch, both haulers and crate sequence in previews and open orders', () => {
+  for (const id of ['bram', 'elsie', 'crew']) {
+    const quest = questList.find(entry => entry.id === id)!
+    const world = createWorld(kettlewick)
+    world.cleared = questList.slice(0, questList.indexOf(quest)).map(previous => previous.id)
+    world.level = quest.needLevel
+    if (id === 'elsie') world.drones.push({ ...world.drones[0]!, name: 'drone-2' })
+    const summary = questSummary(world, quest)!
+    expect(summary).toEqual({ quote: quest.quote, goal: quest.goal, quantity: questCard(world, quest)!.quantity })
+    expect(acceptQuest(world, kettlewick, id)).toBe(true)
+    expect(questSummary(world, quest)).toEqual(summary)
+  }
+})
+
+test('a resumed Harrow summary keeps the saved delivery goal and its receipt', () => {
+  const { world, quest, order } = accepted('harrow')
+  Object.assign(order, { item: 'ingot', qty: 60, shipped: 12, text: 'Bring Harrow 60 ingots.' })
+  delete order.lines
+  const resumed = migrateWorld(structuredClone(world))
+  expect(questSummary(resumed, quest)).toEqual({
+    quote: quest.quote, goal: order.text,
+    quantity: { text: 'Delivered to Harrow · 12/60 ingots', value: 12, max: 60 },
+  })
+})
+
+test('reading an open summary leaves the worker snapshot untouched', () => {
+  const { world, quest } = accepted('bram')
+  world.checkMoved = {}
+  const before = structuredClone(world)
+  expect(questSummary(world, quest)?.goal).toBe(quest.goal)
+  expect(world).toEqual(before)
 })

@@ -18,7 +18,9 @@ These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `sh
 | `apps/web/app/lib/art/floorMachines.ts` | The depot crane and crate, the hauler truck, and the furnace with its charging mouth. |
 | `apps/web/app/lib/art/fabrication.ts` | The press, the cutter, and the assembler. The floor draws the press. The cutter and the assembler stay for the lathe and the assembly table. |
 | `apps/web/app/lib/art/materials.ts` | One lump of iron ore, one iron ingot, one steel bar, and one lump of coal. |
-| `apps/web/app/lib/art/townPaint.ts` | Canvas helpers (box, line, stipple) for the portraits. The comment also names printed scenery. That scenery is in the archive. |
+| `apps/web/app/lib/art/townBuildings.ts` | The field draws each quest giver’s house, broken or working. |
+| `apps/web/app/lib/art/townLandscape.ts` | The field draws the village ground from the day landscape. |
+| `apps/web/app/lib/art/townPaint.ts` | Canvas helpers (box, line, stipple) for the portraits and printed scenery. |
 | `apps/web/app/lib/art/townPortrait.ts` | Cameos of Bram, Elsie, Tomas, Wen, Odile, Harrow, Ines, and Pell, each worried or happy. |
 | `apps/web/app/lib/art/contact-sheet.png` | The palette and line-weight sheet. Nothing in the game renders it. |
 | `apps/web/app/components/town/TownPortrait.vue` | The canvas that shows one cameo. |
@@ -33,8 +35,6 @@ Tag `art-archive`. Each row is a file that `843137c` deleted. The last column is
 
 | File | What it draws | Could serve |
 | --- | --- | --- |
-| `apps/web/app/lib/art/townBuildings.ts` | Forge, bakery, mill, bridge, lamp street, town hall, bank, and riverside, plus the horse, the lamps, and the mill wheel. | Buildings on the one Kettlewick map. |
-| `apps/web/app/lib/art/townLandscape.ts` | Sky, ground, and firs for morning, day, evening, and night. | The ground of that map. |
 | `apps/web/app/lib/art/townPaint.ts` | The same paint helpers as the live file, at the revision that the buildings imported. | Restore only if a building file needs that revision. The live `townPaint.ts` is the one to edit. |
 | `apps/web/app/lib/art/townPortrait.ts` | The cameos at that revision. | Restore only to compare. The live file already has the eight people. |
 | `apps/web/app/lib/art/extraction.ts` | A crawler miner for iron, copper, or coal, and a second furnace. | A vein machine on the map. The live furnace is `floorMachines.ts`. |
@@ -56,5 +56,5 @@ Tag `art-archive`. Each row is a file that `843137c` deleted. The last column is
 Example:
 
 ```sh
-git checkout art-archive -- apps/web/app/lib/art/townBuildings.ts
+git checkout art-archive -- apps/web/app/lib/art/routing.ts
 ```

@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import type { Cell } from '@inherit/sim/v8'
 import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
-import { floorCursor, floorPoint, pickFloor, stationsOf } from '../lib/floorPick'
+import { floorCursor, floorPoint, panToCell, pickFloor, stationsOf } from '../lib/floorPick'
+import { fieldBounds, type VillageView } from '../lib/village'
 
-const props = defineProps<{ world: FloorWorld; interval: number; paused: boolean; selected?: string }>()
+const props = defineProps<{ world: FloorWorld; village?: VillageView; focusSpot?: Cell; interval: number; paused: boolean; selected?: string }>()
 const emit = defineEmits<{ error: [message: string]; select: [id: string] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
@@ -22,16 +24,18 @@ let app: Application | undefined,
 const pointers = new Map<number, { x: number; y: number }>()
 let armed = false
 let origin = { x: 0, y: 0 }
-const worldSize = computed(() => ({
-  w: tile * props.world.grid.width,
-  h: tile * props.world.grid.height,
-}))
-const place = computed(() => containPlace(size.value.w, size.value.h, worldSize.value.w, worldSize.value.h, zoom.value))
+const bounds = computed(() => fieldBounds(props.world.grid))
+const place = computed(() => containPlace(size.value.w, size.value.h, bounds.value.width, bounds.value.height, zoom.value))
 const scale = computed(() => place.value.scale)
+const fitX = computed(() => place.value.x - bounds.value.left * scale.value)
 const camera = computed(() => ({
-  x: place.value.x + pan.value.x,
+  x: fitX.value + pan.value.x,
   y: place.value.y + pan.value.y,
 }))
+const measured = computed(() => size.value.w > 0 && size.value.h > 0)
+watch([() => props.focusSpot, measured], ([spot, ready]) => {
+  if (spot && ready) pan.value = panToCell(spot, size.value, { x: fitX.value, y: place.value.y, scale: scale.value })
+})
 function recenter() {
   pan.value = { x: 0, y: 0 }
   zoom.value = 1
@@ -58,10 +62,11 @@ function sync() {
   }
   scene.root.scale.set(scale.value)
   scene.root.position.set(camera.value.x, camera.value.y)
+  if (props.village) scene.setVillage(props.village)
   scene.update(props.world)
   scene.select(props.selected ?? '')
 }
-watch([() => props.world, camera, scale, () => props.selected], sync)
+watch([() => props.world, () => props.village, camera, scale, () => props.selected], sync)
 function pick(clientX: number, clientY: number) {
   const rect = host.value?.getBoundingClientRect()
   if (!rect) return
@@ -73,7 +78,7 @@ function pick(clientX: number, clientY: number) {
     scale: scale.value,
   })
   if (!point) return
-  return pickFloor(point.x, point.y, tile, stationsOf(props.world), scene?.cartAnchors() ?? [])
+  return pickFloor(point.x, point.y, tile, stationsOf(props.world), scene?.cartAnchors() ?? [], scene?.npcAnchors())
 }
 function aim(clientX: number, clientY: number) {
   const hit = pick(clientX, clientY)
@@ -181,7 +186,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointerup', up)
   window.removeEventListener('pointercancel', cancel)
   observer?.disconnect()
-  app?.destroy(true, { children: true })
+  app?.destroy(true, { children: true, texture: true, textureSource: true })
 })
 </script>
 <template>

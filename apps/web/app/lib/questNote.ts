@@ -121,6 +121,12 @@ export function questCard(world: World, quest: QuestDef) {
   }
 }
 
+export function questSummary(world: World, quest: QuestDef, resolved?: ReturnType<typeof questCard>) {
+  // Check readings can record motion. A dialog only reads the worker snapshot.
+  const card = resolved ?? questCard({ ...world, checkMoved: { ...world.checkMoved } }, quest)
+  if (card) return { quote: quest.quote, goal: card.goal, quantity: card.quantity }
+}
+
 /** The first test that is not passing. The footer uses it to open Tests. */
 export function firstOpenTest(rows: readonly { id: string; state: string }[]) {
   return rows.find(row => row.state !== 'passing')?.id

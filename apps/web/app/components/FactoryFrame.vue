@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { apiBook, canTake, chainReady, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type Cell, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
 import { BookOpen, CircleAlert, Coins, Cpu, Store, TextCursor, Timer, TriangleAlert } from '@lucide/vue'
@@ -11,12 +11,13 @@ import {
   treeRailPx, treeWidthKey, treeWidthMax, treeWidthMin, worldInsetPx,
 } from '../lib/factoryLayout'
 import { runnableExports } from '../lib/runGlyph'
-import { insertQuestNote, questCard, questComment } from '../lib/questNote'
+import { insertQuestNote, questCard, questComment, questSummary } from '../lib/questNote'
 import { cpuTitle, readCpu, steadyCpu, type CpuHold, type CpuMeter } from '../lib/cpuMeter'
 import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/questStep'
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
+import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
 import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
@@ -24,6 +25,8 @@ import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
 useHead({ title: 'Kettlewick Works · Inherit' })
+const quests = kettlewick.questList ?? []
+const people = villagers(quests)
 const bricks = factoryBricks(kettlewick)
 const lockedWorld = { questId: undefined, cleared: [] as string[], bought: [] as string[], automation: { run: false, events: false, tick: false } }
 const visibleBricks = computed(() => bricks.filter(brick => functionUnlocked(world.value ?? lockedWorld, brick.name)))
@@ -39,6 +42,7 @@ const shopOpen = computed(() => overlay.value.kind === 'shop')
 const bookOpen = computed(() => overlay.value.kind === 'api')
 const modalOpen = computed(() => overlay.value.kind !== 'none')
 const mapFrame = ref<HTMLElement>()
+const focusSpot = shallowRef<Cell>()
 const journalButton = ref<HTMLButtonElement>()
 let opener: ApiBookOpener | undefined
 const files = shallowRef({ ...kettlewick.files })
@@ -51,6 +55,12 @@ const cursor = ref({ line: 1, column: 1 })
 const notesKey = 'inherit.v8.notes'
 const notes = ref<string[]>([])
 const world = shallowRef<World>()
+const village = computed(() => world.value && villageView(world.value, quests))
+const person = computed(() => {
+  const current = overlay.value
+  return current.kind === 'npc' ? people.find(person => person.who === current.who) : undefined
+})
+const request = computed(() => world.value && person.value && villagerDialog(world.value, quests, person.value.who))
 watch([visibleBricks, freshNames, droneNames], () => { api.value = declarations(visibleBricks.value, freshNames.value, droneNames.value) })
 const scriptNotice = ref<HostNotice>()
 const saveNotice = ref<HostNotice>()
@@ -72,10 +82,10 @@ const inspected = computed(() => {
 function openMachine(id: string) {
   selectedId.value = id
 }
-function showDialog(kind: 'journal' | 'shop' | 'api', from: ApiBookOpener) {
+function showDialog(next: Exclude<GameOverlay, { kind: 'none' }>, from?: ApiBookOpener) {
   if (!modalOpen.value) opener = from
   selectedId.value = ''
-  overlay.value = openOverlay(overlay.value, { kind })
+  overlay.value = openOverlay(overlay.value, next)
 }
 function closeSurface() {
   overlay.value = closeOverlay(overlay.value)
@@ -89,7 +99,12 @@ function closeSurface() {
   })
 }
 function inspectFromFloor(id: string) {
-  opener = mapFrame.value?.querySelector<HTMLElement>('[aria-label="Factory map"]') ?? undefined
+  const from = mapFrame.value?.querySelector<HTMLElement>('[aria-label="Factory map"]') ?? undefined
+  if (id.startsWith('npc:')) {
+    showDialog({ kind: 'npc', who: id.slice(4) }, from)
+    return
+  }
+  opener = from
   openMachine(id)
 }
 function inspectFromJournal(id: string) {
@@ -162,24 +177,29 @@ function nudgeTree(direction: -1 | 1) {
 function nudgeSide(direction: -1 | 1) {
   setSideWidth(sideWidth.value - direction * 16)
 }
-const activeQuest = computed(() => kettlewick.questList?.find(quest => quest.id === world.value?.questId))
-const available = computed(() => {
-  const current = world.value
-  if (!current || current.questId) return []
-  return kettlewick.questList?.filter(quest => !current.cleared.includes(quest.id) && current.level >= quest.needLevel && chainReady(current, quest)) ?? []
-})
+const activeQuest = computed(() => quests.find(quest => quest.id === world.value?.questId))
+const available = computed(() => world.value ? journalRequests(world.value, quests) : [])
+const trackedQuest = computed(() => activeQuest.value ?? available.value[0])
+function visitFromTracker(from: HTMLButtonElement) {
+  const quest = trackedQuest.value
+  if (!quest) return
+  showDialog({ kind: 'npc', who: quest.who }, from)
+  const npc = village.value?.npcs.find(npc => npc.who === quest.who)
+  if (npc) focusSpot.value = { ...npc.spot }
+}
 const offers = computed(() => available.value.map(quest => ({
   quest,
   hold: world.value ? questHold(world.value, quest) : undefined,
 })))
 const newRequest = computed(() => !world.value?.questId && offers.value.length > 0)
 const history = computed(() => questHistory(world.value?.cleared ?? [], kettlewick.questList ?? []))
-const readingId = ref<string>()
-const reading = computed(() => journalOpen.value ? available.value.find(quest => quest.id === readingId.value) : undefined)
+const reading = computed(() => journalOpen.value ? available.value[0] : undefined)
 const readingHold = computed(() => reading.value && world.value ? questHold(world.value, reading.value) : undefined)
 const readingTake = computed(() => !!reading.value && !!world.value && canTake(world.value, reading.value))
 const shownQuest = computed(() => activeQuest.value ?? reading.value)
 const card = computed(() => shownQuest.value && world.value ? questCard(world.value, shownQuest.value) : undefined)
+const journalSummary = computed(() => journalOpen.value && world.value && shownQuest.value && card.value
+  ? questSummary(world.value, shownQuest.value, card.value) : undefined)
 const ready = computed(() => card.value?.ready ?? false)
 const testRows = computed(() => card.value?.tests ?? [])
 const pulse = ref(false)
@@ -352,7 +372,7 @@ watch(world, current => {
 function take(id: string) {
   const current = world.value
   const quest = kettlewick.questList?.find(item => item.id === id)
-  if (!current || !quest || !canTake(current, quest)) return
+  if (!current || current.questId || !quest || !canTake(current, quest)) return
   const file = files.value[activeFile.value] !== undefined ? activeFile.value : 'main.ts'
   const note = questComment(quest.from, quest.nudge)
   const next = insertQuestNote(files.value[file] ?? '', note, quest.id, notes.value)
@@ -391,10 +411,8 @@ watch(world, (current) => {
   cpuMeter.value = next.meter
 })
 const nextStep = computed(() => {
-  if (!activeQuest.value && readingHold.value) return readingHold.value
   return questNextStep({
     quest: activeQuest.value ? card.value : undefined,
-    reading: !activeQuest.value && reading.value ? { from: reading.value.from } : undefined,
     available: !activeQuest.value ? (available.value[0] ? { from: available.value[0].from } : undefined) : undefined,
     ready: ready.value,
     shipped: card.value?.shipped ?? 0,
@@ -552,8 +570,8 @@ onMounted(async () => {
         files.value = { ...data.deployed }
         activeFile.value = 'main.ts'
         tool.value = undefined
+        focusSpot.value = undefined
         closeSurface()
-        readingId.value = undefined
         resetting = false
       }
       pending.value = false
@@ -616,10 +634,10 @@ onBeforeUnmount(() => {
       <PackNav>
         <strong class="pack-switch">Kettlewick Works</strong>
         <button ref="journalButton" type="button" class="nav-btn" aria-haspopup="dialog"
-          :aria-label="newRequest ? overlayLabels.newRequest : overlayLabels.journal" @click="showDialog('journal', $event.currentTarget as HTMLButtonElement)">
+          :aria-label="newRequest ? overlayLabels.newRequest : overlayLabels.journal" @click="showDialog({ kind: 'journal' }, $event.currentTarget as HTMLButtonElement)">
           <BookOpen :size="16" />{{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
         </button>
-        <button type="button" class="nav-btn" aria-haspopup="dialog" :disabled="!world" @click="showDialog('shop', $event.currentTarget as HTMLButtonElement)">
+        <button type="button" class="nav-btn" aria-haspopup="dialog" :disabled="!world" @click="showDialog({ kind: 'shop' }, $event.currentTarget as HTMLButtonElement)">
           <Store :size="16" />{{ overlayLabels.shop }}
         </button>
         <template #clock>
@@ -645,9 +663,9 @@ onBeforeUnmount(() => {
     <template #floor>
       <div class="stage">
         <div ref="mapFrame" class="map-frame">
-          <LazyFactoryFloor v-if="world" :world="world" :paused="false" :selected="selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
-          <QuestTracker v-if="world" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
-            @journal="showDialog('journal', $event)" @hand-over="send({ kind: 'complete' })"
+          <LazyFactoryFloor v-if="world" :world="world" :village="village" :focus-spot="focusSpot" :paused="false" :selected="person ? 'npc:' + person.who : selectedId" :interval="kettlewick.tickMs" @error="floorNotice = rememberHost(floorNotice, $event)" @select="inspectFromFloor" />
+          <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
+            @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
             @show-test="showOpenTest" @open-file="activeFile = $event" />
           <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
           <MachineCard v-if="inspected" class="machine-card" :inspected="inspected" @close="closeSurface"
@@ -659,9 +677,9 @@ onBeforeUnmount(() => {
           <PaneSplit class="tree-split" axis="x" label="Resize files" @move="onTree" @reset="setTreeWidth(fileTreePx)" @nudge="nudgeTree" />
           <div class="editor-column">
             <div class="editor-pane"><div class="editor-host">
-              <LazyCodeEditor :book-open="modalOpen" @reference="showDialog('api', $event)">
+              <LazyCodeEditor :book-open="modalOpen" @reference="showDialog({ kind: 'api' }, $event)">
                 <template #actions>
-                  <button class="ide" type="button" aria-haspopup="dialog" @click="showDialog('api', $event.currentTarget as HTMLButtonElement)">API</button>
+                  <button class="ide" type="button" aria-haspopup="dialog" @click="showDialog({ kind: 'api' }, $event.currentTarget as HTMLButtonElement)">API</button>
                   <button v-if="canLoop" class="ide" type="button" :aria-pressed="loopOn" :data-state="loopOn ? 'running' : 'idle'"
                     :disabled="pending || !world || (!loopOn && !loopable)"
                     :title="loopable || loopOn ? 'calls onTick every tick' : 'Export onTick in main.ts to loop it.'"
@@ -752,11 +770,13 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <Teleport to="body">
-      <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :granted="granted"
+      <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :summary="journalSummary"
         :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
         :active="!!world?.questId" :offers="offers" :history="history" :machines="machines" @close="closeSurface"
-        @read="readingId = $event" @take="take" @hand-over="send({ kind: 'complete' })"
-        @show-test="showOpenTest(); closeSurface()" @open-machine="inspectFromJournal" @open-file="activeFile = $event; closeSurface()" />
+        @read="showDialog({ kind: 'npc', who: $event })" @take="take" @hand-over="send({ kind: 'complete' })"
+        @show-test="showOpenTest(); closeSurface()" @open-machine="inspectFromJournal" />
+      <VillagerDialog v-else-if="person && request" :person="person" :request="request"
+        @take="take($event); closeSurface()" @hand-over="send({ kind: 'complete' }); closeSurface()" @close="closeSurface" />
       <ShopDialog v-else-if="shopOpen && world" :catalog="catalog" :credits="world.credits" :bought="world.bought"
         @buy="send({ kind: 'buy', id: $event })" @close="closeSurface" />
       <ApiBook v-else-if="bookOpen" :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeSurface" />

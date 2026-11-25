@@ -2,15 +2,14 @@
 import { overlayLabels } from '../lib/gameOverlay'
 import type { machineList } from '@inherit/sim/v8'
 import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
-import type { questCard } from '../lib/questNote'
+import type { questCard, questSummary } from '../lib/questNote'
 import type { questHistory } from '../lib/questJournal'
-import type { GrantNote } from '../lib/questStep'
 
 defineProps<{
   quest?: QuestDef
   card?: NonNullable<ReturnType<typeof questCard>>
   step: string
-  granted?: GrantNote
+  summary?: NonNullable<ReturnType<typeof questSummary>>
   reading: boolean
   canTake: boolean
   hold?: string
@@ -23,43 +22,30 @@ defineProps<{
 }>()
 const emit = defineEmits<{
   close: []
-  read: [id?: string]
+  read: [who: QuestDef['who']]
   take: [id: string]
   handOver: []
   showTest: []
   openMachine: [id: string]
-  openFile: [file: string]
 }>()
-const now = ref<HTMLHeadingElement>()
 const requests = ref<HTMLHeadingElement>()
-let requestButton: HTMLButtonElement | undefined
-
-function read(id: string, button: HTMLButtonElement) {
-  requestButton = button
-  emit('read', id)
-  nextTick(() => now.value?.focus())
-}
-function back() {
-  emit('read')
-  nextTick(() => (requestButton ?? requests.value)?.focus())
-}
 </script>
 
 <template>
   <GameDialog :title="overlayLabels.journal" @close="emit('close')">
     <section>
-      <h3 ref="now" tabindex="-1">{{ overlayLabels.now }}</h3>
-      <QuestCard v-if="quest && card" :quest="quest" :card="card" :step="step" :granted="granted"
+      <h3>{{ overlayLabels.now }}</h3>
+      <QuestCard v-if="quest && card && summary" :quest="quest" :card="card" :summary="summary"
         :reading="reading" :can-take="canTake" :hold="hold" :ready="ready" :pulse="pulse"
-        @back="back" @take="emit('take', quest.id)" @hand-over="emit('handOver')"
-        @show-test="emit('showTest')" @open-file="emit('openFile', $event)" />
+        @back="requests?.focus()" @take="emit('take', quest.id)" @hand-over="emit('handOver')"
+        @show-test="emit('showTest')" />
       <p v-else class="goal">{{ step }}</p>
     </section>
     <section v-if="!active">
       <h3 ref="requests" tabindex="-1">{{ overlayLabels.requests }}</h3>
       <ul v-if="offers.length" class="requests">
         <li v-for="offer in offers" :key="offer.quest.id">
-          <button type="button" @click="read(offer.quest.id, $event.currentTarget as HTMLButtonElement)">
+          <button type="button" aria-haspopup="dialog" @click="emit('read', offer.quest.who)">
             <span class="initial" aria-hidden="true">{{ offer.quest.from.replace(/^Mayor /, '').slice(0, 1) }}</span>
             <span>
               <b>{{ offer.quest.from.replace(/^Mayor /, '') }}</b>

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
-import type { questCard } from '../lib/questNote'
-import type { GrantNote } from '../lib/questStep'
+import type { questCard, questSummary } from '../lib/questNote'
+import { villageLabels } from '../lib/village'
 
 defineProps<{
   quest: QuestDef
   card: NonNullable<ReturnType<typeof questCard>>
-  step: string
-  granted?: GrantNote
+  summary: NonNullable<ReturnType<typeof questSummary>>
   reading: boolean
   canTake: boolean
   hold?: string
@@ -19,7 +18,6 @@ const emit = defineEmits<{
   handOver: []
   showTest: []
   back: []
-  openFile: [file: string]
 }>()
 </script>
 
@@ -27,16 +25,11 @@ const emit = defineEmits<{
   <article class="quest">
     <button v-if="reading" type="button" class="hint" @click="emit('back')">All requests</button>
     <h2>{{ card.title }}</h2>
-    <p class="goal step">{{ step }}</p>
-    <p v-if="granted" class="goal">
-      {{ granted.text }}
-      <button v-if="granted.file" type="button" class="hint" @click="emit('openFile', granted.file)">{{ granted.file }}</button>
-    </p>
-    <VillageAsk :who="quest.who" :name="card.from.replace(/^Mayor /, '')" :role="quest.role" :building-id="quest.building" :line="card.ask" />
+    <VillageAsk :who="quest.who" :name="card.from.replace(/^Mayor /, '')" :role="quest.role" :building-id="quest.building" :line="summary.quote" />
     <div class="need">
-      <p>{{ card.needText }}</p>
-      <span class="goal-line">{{ card.quantity.text }}</span>
-      <progress :value="card.quantity.value" :max="card.quantity.max" :aria-label="card.quantity.text" />
+      <p><b>{{ villageLabels.goal }}</b> · {{ summary.goal }}</p>
+      <span class="goal-line">{{ summary.quantity.text }}</span>
+      <progress :value="summary.quantity.value" :max="summary.quantity.max" :aria-label="summary.quantity.text" />
     </div>
     <QuestRewards :quest="quest" />
   </article>
@@ -59,8 +52,6 @@ const emit = defineEmits<{
   letter-spacing: -0.4px;
   margin: 0;
 }
-.goal { font-size: 13px; line-height: 1.4 }
-.quest > .goal.step { min-height: calc(2 * 1.4em) }
 .quest-action {
   flex: none;
   margin-top: auto;
