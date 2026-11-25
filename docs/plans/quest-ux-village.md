@@ -1,6 +1,6 @@
 # Plan: quests live in the village
 
-Implements [ADR 0039](../adr/0039-quest-ux-village.md). Seven PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
+Implements [ADR 0039](../adr/0039-quest-ux-village.md). Eight PRs, in this order. Each one ships on its own, leaves the game playable, and is merged before the next one starts.
 
 | # | PR | Depends on |
 | --- | --- | --- |
@@ -11,6 +11,7 @@ Implements [ADR 0039](../adr/0039-quest-ux-village.md). Seven PRs, in this order
 | 3b | A bigger village: 20 columns, houses at 1.4×, lots, river, roads and props from existing art. Runs after 4, before 5. | 3, 4 |
 | 5 | Villagers wander; hover and motion polish; the screen spec is finished. | 3b, 4 |
 | 6 | After the playtest: top bar, toasts in the window, a Quest tab instead of the tracker, a welcome toast, the CPU item, Machines out of the Journal. | 5 |
+| 7 | The machine card becomes a modal with sections; one selection highlight. | 6 |
 
 ## Rules for every phase
 
@@ -616,6 +617,77 @@ The top bar reads like a game's navigation: logo, credits, then Journal, Machine
 - Do not change toast timing, count, queue or event kinds, except the welcome toast.
 - Do not change CPU behaviour, `cpuMeter.ts`, the Charts panel or the status-bar order.
 - No new dependencies. No browser, dev server, e2e, screenshots or shots.
+
+## Phase 7. The machine card becomes a modal
+
+Runs after the polish PR (#120). Comes from Nick's playtest of the Phase 4 card on 25 November 2026 (pt248u). The card opened next to the machine inside the field. It ran out of height, so the actions sat below the fold, and its content was an unstructured pile. In one case two lines ran together: `2 ore + 1 coal → 1 steel` ran straight into `Steel for the bridge unlocks furnace.alloy()`. The selection was also drawn as two separate gold boxes, one round the sprite and one round its name.
+
+### Goal
+
+Clicking a machine, drone or vein, or choosing a row in the Machines dialog, opens its card as a modal over the whole app. It uses the same `GameDialog` as Journal, Machines and Shop: centred, with a dim backdrop, and closed by Escape, its X or a backdrop click. The card is split into labelled sections and fits a 1280×720 window without inner scroll for every machine type. The field keeps the selection while the card is open, drawn as one highlight around the sprite and its label together. The card shows the same data as before and offers the same actions; only the presentation changes.
+
+### Files
+
+**1. The card is a shell modal**
+
+- `components/GameDialog.vue`. Add one optional prop, `wide?: boolean`. When it is set, `.panel` is `width: min(880px, 100% - 32px)`. Without it nothing changes. No other change to GameDialog.
+- `components/MachineCard.vue` is reused as the dialog's content. Same file name, same props (`inspected`) and the same `manual` emit. It renders inside `<GameDialog :title="inspected.name" wide @close="emit('close')">`. Remove its own close button and the `closeButton` focus code; GameDialog owns the X, focus and Escape. Its template is reorganised into the sections in item 2. Do not create a second card component.
+- `components/FactoryFrame.vue`.
+  - Remove the `.machine-card` wrapper from `.map-frame`, along with `cardPosition`, `cardSize`, `frameSize`, `cardInsetCss`, the `watch([mapFrame, machineCard])` measuring block, the `machineCard` ref, the `anchor` shallowRef, the `@anchor` listener on `LazyFactoryFloor`, the `popupMargin`/`popupPlace` import, and the `.machine-card` CSS rule. Keep `mapFrame`: `inspectFromFloor` uses it to find the map as the focus opener.
+  - In the `Teleport`, add `<MachineCard v-else-if="inspected" :inspected="inspected" @close="closeSurface" @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />` as the last branch.
+  - `modalOpen` becomes `overlay.value.kind !== 'none' || !!inspected.value`, so editor shortcuts wait and `LazyCodeEditor :book-open` is true while the card is open.
+  - `selectedId`, `openMachine`, `inspectFromFloor`, `inspectFromJournal` and `closeSurface` keep their meaning. The field's `:selected` still gets `selectedId`, so the selection stays drawn while the modal is open. Closing returns focus to the opener: the Machines link, or the Factory map after a canvas click (the existing `opener` logic).
+  - Remove the Escape branch for `.machine-card, .floor` in `shortcut()`; GameDialog's cancel closes the card.
+  - Opening Journal, Machines, Shop, the API book or a villager still clears `selectedId` (`showDialog` already does), so only one surface is open at a time.
+- `components/FactoryFloor.vue`: remove the `anchor` emit and the code that computes and emits it (`lastAnchor`, the `anchorBox` call, `sameBox`/`screenBox` imports if they become unused). `FloorScene.anchorBox` stays; tests use it.
+- `lib/popupPlace.ts`: remove `popupPlace` and `popupMargin` and their cases in `popupPlace.test.ts`. Keep `screenBox`, `sameBox` and `shapeBounds`, which `village.ts`, `floor.ts` and the tests use. The file stays.
+- `VillagerDialog.vue` already uses `GameDialog`. It is not the anchored card and does not change.
+
+**2. A clear structure (new module `lib/machineSheet.ts` + `machineSheet.test.ts`)**
+
+`machineSheet(view: InspectView, kind)` takes the `inspectMachine` result unchanged and returns the sections. It reads only what the view has. It never edits sim text; it only regroups it.
+
+- **Header:** an icon for the kind (from `@lucide/vue`: furnace `Flame`, depot `Warehouse`, press and spare `Stamp`, lathe `Cog`, bench `Hammer`, drone `Truck`, vein `Mountain`), the name (the dialog title), and `view.description` as the one-line role under the title (13px `var(--soft)`, one line, ellipsis).
+- **State.** Every `line` whose value is `a/b` (whole numbers) becomes a meter `{ label, value, max, text }`: label left, a 4px bar, `a/b` right in mono. They are laid out two per row. Every other line becomes a fact row `{ label, value }`: label in `var(--sub)`, value in `var(--text)`, one line with an ellipsis. `progress`, when set, is one more meter row with its label and percent. Heading: `State`.
+- **Recipes:** each unlocked recipe on its own line, `{input} → {output}`, with `Missing {missing}` on the same row, right-aligned and muted, when set. Heading: `Recipes`. Locked recipes are not listed here.
+- **Code API:** each action is a row with three parts. The first line has the action's button label and the `api` signature in mono (`var(--accent-soft)`). The second line has `reason` as the short description. While `enabled`, the row is the existing manual button and emits `manual` exactly as today; when not enabled, the button is disabled. Heading: `Code API`.
+- **Locked:** recipes with `locked`, and actions that are disabled with a `reason` starting with `Unlocks`, move here under a `Locked` heading. Each one is a muted row: the recipe text or the action label with its mono `api` on one line, then the unlock reason on its own line. A locked action is still a disabled button, so nothing new becomes clickable. The section is omitted when empty.
+- Empty sections are omitted. Text is never joined into one string; each value is its own element, so the run-together bug cannot recur.
+- **Layout.** The dialog body is a grid. From 860px of panel width (the `wide` panel at a 1280px window), use two columns: left State and Recipes, right Code API and Locked, with the header above both. Below that width, one column in the same order.
+- **Fit.** Export fixed row heights: `heading 18`, `meter 22`, `fact 20`, `recipe 20`, `api 40`, `locked 36`, `progress 22`, `gap 8` between sections. The CSS uses exactly these heights (fixed `height` and `overflow: hidden` with an ellipsis on single-line text, two fixed lines for API and locked rows). Two meters share one 22px row. Export `sheetHeight(sheet, columns: 1 | 2)`, the tallest column in px. The 1280×720 budget: GameDialog's panel is `min(80dvh, 720px)` = 576px, minus the 44px header and 24px body padding, minus the header strip (44px), which gives **464px** per column. Export `fitBudget = 464`.
+- `MachineCard.vue` renders only what `machineSheet` returns. Do not compute anything in the template.
+
+**3. One highlight per selected object**
+
+- `lib/floor.ts`, `strokeId`. Instead of stroking each shape of the footprint, stroke one rounded rect (radius 8) around the union of all its shapes, `shapeBounds(shapes)` from `popupPlace.ts`, grown by `style.grow`. This applies to hover and selection, and to every selectable kind: stations, carts and villagers. Remove `strokeShape` if nothing else uses it; keep `strokeBox`. Colours, widths and alphas (`selectionStroke`, `hoverStroke`) stay. Picking (`pickFloor`, footprints) does not change; only the drawing does.
+
+**4. Docs**
+
+- `docs/specs/v8-screen-layout.md`. Replace the anchored-card sentences (Proportions, Works and the One home each row "Card beside the selected machine or moving drone") with the modal: a 880px GameDialog over the app, the sections, two columns at 1280px, and one highlight around sprite and label. Update the Machines-dialog sentence that says a row opens the card "beside" the machine.
+- `docs/adr/0039-quest-ux-village.md`: already amended in the plan commit. Do not edit it.
+
+### Acceptance
+
+1. A field click on a machine, drone or vein, or a Machines dialog row, opens MachineCard inside GameDialog (`wide`) over the app, in the `Teleport`. Nothing is drawn in `.map-frame`. Escape, the X and a backdrop click close it, and focus returns to the opener. `modalOpen` is true while it is open. Opening any other dialog clears it.
+2. The field keeps `selected` while the card is open, and the highlight stays drawn.
+3. `machineSheet` tests cover the furnace (meters for hopper ore, coal, ingots and steel; two recipes; alloy and its recipe under Locked before Steel for the bridge, and under Recipes and Code API after), the depot, the press, the spare press, the lathe, the bench, both drones (one idle, one with a task and progress), and every vein. For each, the State, Recipes, Code API and Locked contents match the `inspectMachine` data with nothing dropped. No recipe row contains a lock sentence.
+4. Fit test: for every machine type, in an early world and in a late world with all machines installed, two drones and everything unlocked, `sheetHeight(sheet, 2) <= fitBudget`. The test lists each case by name.
+5. Sections without content are omitted. The header shows the kind icon, the name and the one-line role.
+6. Manual actions behave as before: same `manual` emit payloads, disabled with the same reasons, and the card stays open after an action.
+7. Selection and hover draw one rounded rect around the whole footprint for stations, carts and villagers. A test on `FloorScene` checks that selecting the furnace, a cart and a villager each adds exactly one stroked shape to the ring (or one `roundRect` call), and not one per footprint shape.
+8. `popupPlace` and `popupMargin` are gone with their tests. `screenBox`, `sameBox`, `shapeBounds` and `FloorScene.anchorBox` remain, and their tests pass. The `anchor` emit and all card-placement code in FactoryFrame and FactoryFloor are gone.
+9. VillagerDialog, Journal, Machines, Shop and the API book are unchanged apart from the shared `wide` prop default.
+10. Docs updated as listed.
+11. `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm sim` pass. After `pnpm sim:report`, `git diff --exit-code docs/sim/report.md` is clean. No deleted files, no art changes, no `packages/sim` or `tests/e2e` changes, `world.grid` still 16×6.
+
+### Do not
+
+- Do not change `inspectMachine` or anything under `packages/sim`, including the sentences it returns, action ids, API names and signatures. Do not change balance, quest content, save format, `world.grid` or `tests/e2e`.
+- Do not delete files or art, or edit art files. `popupPlace.ts` and `popupPlace.test.ts` stay as files.
+- Do not rewrite GameDialog or the dialog system, beyond the one `wide` prop. Do not change other screens or dialogs.
+- Do not add actions, tabs, buttons, tooltips, pinning, drag, or a second card component. Do not change what any action does.
+- Do not change picking, hit areas, hover scale, highlight colours or widths. Change only how the highlight shape is drawn.
+- No new dependencies, no new localStorage keys. No browser, dev server, e2e, screenshots or shots.
 
 ## Final documentation gate
 
