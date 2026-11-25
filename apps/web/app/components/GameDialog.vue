@@ -1,26 +1,52 @@
 <script setup lang="ts">
+import { dialogClose } from '../lib/dialogMotion'
 import { overlayLabels } from '../lib/gameOverlay'
 import { X } from '@lucide/vue'
 
 defineProps<{ title: string; wide?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
+const { closing, requestClose, vDialogMotion } = dialogClose(() => emit('close'))
 
 onMounted(() => dialog.value?.showModal())
 onBeforeUnmount(() => dialog.value?.close())
 </script>
 
 <template>
-  <dialog ref="dialog" class="shade" :aria-label="title" @cancel.prevent="emit('close')" @click.self="emit('close')">
-    <section class="panel" :class="{ wide }">
+  <dialog ref="dialog" v-dialog-motion class="shade dialog-motion" :class="{ closing }" :aria-label="title" @cancel.prevent="requestClose" @click.self="requestClose">
+    <section class="panel" :class="{ wide }" tabindex="-1" autofocus>
       <header>
         <h2>{{ title }}</h2>
-        <button type="button" :aria-label="overlayLabels.close(title)" autofocus @click="emit('close')"><X :size="16" /></button>
+        <button type="button" :aria-label="overlayLabels.close(title)" @click="requestClose"><X :size="16" /></button>
       </header>
       <div class="body"><slot /></div>
     </section>
   </dialog>
 </template>
+
+<style>
+.dialog-motion[open] > section { animation: dialog-panel-in 220ms ease-out }
+.dialog-motion[open]::backdrop { animation: dialog-backdrop-in 220ms ease-out }
+.dialog-motion[open].closing > section { animation: dialog-panel-out 160ms ease-in forwards }
+.dialog-motion[open].closing::backdrop { animation: dialog-backdrop-out 160ms ease-in forwards }
+@keyframes dialog-panel-in {
+  from { opacity: 0; transform: var(--dialog-offset, translateY(-24px)) }
+  to { opacity: 1; transform: none }
+}
+@keyframes dialog-panel-out {
+  from { opacity: 1; transform: none }
+  to { opacity: 0; transform: var(--dialog-offset, translateY(-24px)) }
+}
+@keyframes dialog-backdrop-in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes dialog-backdrop-out { from { opacity: 1 } to { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) {
+  .dialog-motion { --dialog-offset: none }
+  /* Keep the fade timings through the global reduced-motion reset. */
+  .dialog-motion[open] > section, .dialog-motion[open]::backdrop { animation-duration: 220ms !important }
+  .dialog-motion[open].closing > section, .dialog-motion[open].closing::backdrop { animation-duration: 160ms !important }
+}
+.dialog-motion > section:focus { outline: none }
+</style>
 
 <style scoped>
 .shade {
@@ -50,7 +76,24 @@ onBeforeUnmount(() => dialog.value?.close())
   box-shadow: 0 16px 48px var(--shadow-light);
   overflow: hidden;
 }
-.panel.wide { width: min(880px, 100% - 32px) }
+.panel:focus { outline: none }
+.panel.wide {
+  width: fit-content;
+  min-width: min(640px, 100% - 32px);
+  max-width: min(880px, 100% - 32px);
+  max-height: min(92dvh, 760px);
+}
+.wide .body { padding: 24px }
+.wide h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 header {
   flex: none;
   display: flex;
@@ -68,9 +111,12 @@ header button {
   display: grid;
   place-items: center;
   border: 0;
+  outline: none;
   border-radius: 6px;
   background: transparent;
   color: var(--soft);
 }
+header button:hover { background: var(--hover) }
+header button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
 .body { min-height: 0; overflow: auto; padding: 12px }
 </style>
