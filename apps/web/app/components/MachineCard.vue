@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { Lock } from '@lucide/vue'
-import type { cardSide } from '../lib/cardPlace'
+import type { CardSide } from '../lib/cardPlace'
 import { hintParts } from '../lib/shellBar'
 import { actionLabel, disabledReason, machineSheet, missingLabel, resourceColor, sheetColumns, sheetCss, sheetLabels, sheetLayout, type InspectView } from '../lib/machineSheet'
 
-const props = defineProps<{ inspected: InspectView; sprite?: string; side?: ReturnType<typeof cardSide> }>()
+const props = defineProps<{ inspected: InspectView; sprite?: string; side?: CardSide }>()
 const emit = defineEmits<{ close: []; manual: [action: InspectView['actions'][number]]; api: [section: string] }>()
 const sheet = computed(() => machineSheet(props.inspected))
 const columns = computed(() => sheetColumns(sheet.value, sheetLayout(sheet.value)))

@@ -1,6 +1,7 @@
 import { createWorld, kettlewick, questList } from '@inherit/sim/v8'
 import { expect, test } from 'vitest'
-import { levelUnlocks, pickLevelUp, visibleLevelUp } from './levelUp'
+import { isLevelEvent, levelUnlocks, levelUpLabels, pickLevelUp, visibleLevelUp } from './levelUp'
+import { emptyToasts, pushToasts } from './toasts'
 import { worldEvents, type GameEvent } from './worldEvents'
 
 test.each([
@@ -18,6 +19,8 @@ test('an empty level points to the nearest later quest if one exists', () => {
   const quests = [questList.at(-1)!, questList[2]!]
   expect(levelUnlocks(2, quests)).toEqual({ lines: [], next: 3 })
   expect(levelUnlocks(8, quests)).toEqual({ lines: [], next: undefined })
+  expect(levelUpLabels.keepGoing(3)).toBe('Keep going. New work opens at level 3.')
+  expect(levelUpLabels.keepGoing()).toBe('Keep going.')
 })
 
 test('loading a save is silent and each live level key is consumed only once', () => {
@@ -39,6 +42,8 @@ test('a mixed batch selects the highest new level and leaves other keys for toas
   ]
   expect(pickLevelUp(events, seen)).toBe(4)
   expect(seen).toEqual(new Set(['level:2', 'level:3', 'level:4']))
+  const toasts = pushToasts(emptyToasts(), events.filter(event => !isLevelEvent(event)), 0, seen)
+  expect(toasts.visible.map(toast => toast.key)).toEqual(['handed:odile'])
   expect(pickLevelUp(events, seen)).toBeUndefined()
 })
 

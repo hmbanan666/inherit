@@ -1,5 +1,6 @@
 import { apiBook, createWorld, factoryBricks, kettlewick, type inspectMachine } from '@inherit/sim/v8'
 import { giverName } from './worldEvents'
+import { overlayLabels } from './gameOverlay'
 import type { MachineKind } from './floorPick'
 
 export type InspectView = NonNullable<ReturnType<typeof inspectMachine>>
@@ -102,7 +103,7 @@ export function lockedEntries(view: InspectView): (Locked | More)[] {
       unlock: unlockLine(action.reason!) })
   }
   if (locked.length <= 4) return locked
-  return [...locked.slice(0, 4), { key: 'more', kind: 'more', label: `+${locked.length - 4} more` }]
+  return [...locked.slice(0, 4), { key: 'more', kind: 'more', label: overlayLabels.more(locked.length - 4) }]
 }
 
 type Meter = { kind: 'meter' | 'progress'; label: string; value: number; max: number; text: string; color: string; full: boolean }

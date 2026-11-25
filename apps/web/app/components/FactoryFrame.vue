@@ -19,7 +19,7 @@ import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
 import { isLevelEvent, pickLevelUp, visibleLevelUp } from '../lib/levelUp'
 import { dialogClose } from '../lib/dialogMotion'
-import { cardSide } from '../lib/cardPlace'
+import { cardSide, type CardSide } from '../lib/cardPlace'
 import type { Point } from '../lib/floorPick'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
 import { questHistory } from '../lib/questJournal'
@@ -99,13 +99,15 @@ const levelUp = ref<number>()
 const otherModalOpen = computed(() => overlay.value.kind !== 'none' || !!inspected.value)
 const shownLevel = computed(() => visibleLevelUp(levelUp.value, otherModalOpen.value || settingsOpen.value))
 const modalOpen = computed(() => otherModalOpen.value || shownLevel.value !== undefined)
-const machineSide = ref<ReturnType<typeof cardSide>>('center')
+const machineSide = ref<CardSide>('center')
 function openMachine(id: string, centerX?: number) {
+  settingsOpen.value = false
   machineSide.value = cardSide(centerX, window.innerWidth)
   selectedId.value = id
 }
 function showDialog(next: Exclude<GameOverlay, { kind: 'none' }>, from?: ApiBookOpener) {
   if (!modalOpen.value) opener = from
+  settingsOpen.value = false
   selectedId.value = ''
   overlay.value = openOverlay(overlay.value, next)
 }

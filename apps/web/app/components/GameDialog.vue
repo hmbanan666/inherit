@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { cardSide } from '../lib/cardPlace'
+import type { CardSide } from '../lib/cardPlace'
 import { dialogClose } from '../lib/dialogMotion'
 import { overlayLabels } from '../lib/gameOverlay'
 import { X } from '@lucide/vue'
 
-defineProps<{ title: string; wide?: boolean; side?: ReturnType<typeof cardSide> }>()
+defineProps<{ title: string; wide?: boolean; side?: CardSide }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
 const { closing, requestClose, vDialogMotion } = dialogClose(() => emit('close'))
@@ -94,6 +94,11 @@ onBeforeUnmount(() => dialog.value?.close())
 @media (min-width: 1100px) {
   .wide.right { justify-self: end; margin-right: 24px }
   .wide.left { justify-self: start; margin-left: 24px }
+}
+@media (max-width: 639px), (max-height: 719px) {
+  /* Stacked columns can exceed the desktop fit budget. Scroll the shade with the sprite. */
+  .wide-shade { overflow-y: auto; align-items: safe center; padding-block: 40px }
+  .panel.wide { min-height: min-content }
 }
 .wide header { display: contents }
 .wide header button { position: absolute; top: 12px; right: 12px; z-index: 1 }
