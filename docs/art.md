@@ -19,7 +19,7 @@ These files are on `main`. `apps/web/app/lib/floor.ts` paints the works from `sh
 | `apps/web/app/lib/art/fabrication.ts` | The press, the cutter, and the assembler. The floor draws the press. The cutter and the assembler stay for the lathe and the assembly table. |
 | `apps/web/app/lib/art/materials.ts` | One lump of iron ore, one iron ingot, one steel bar, and one lump of coal. |
 | `apps/web/app/lib/art/townBuildings.ts` | The field draws each quest giver’s house, broken or working. |
-| `apps/web/app/lib/art/townLandscape.ts` | The field draws the village ground from the day landscape. |
+| `apps/web/app/lib/art/townLandscape.ts` | The field uses the day palette and draws firs, orchard trees, fields and split rails from `townLandscape.ts` and the horse from `townBuildings.ts`. |
 | `apps/web/app/lib/art/townPaint.ts` | Canvas helpers (box, line, stipple) for the portraits and printed scenery. |
 | `apps/web/app/lib/art/townPortrait.ts` | Cameos of Bram, Elsie, Tomas, Wen, Odile, Harrow, Ines, and Pell, each worried or happy. |
 | `apps/web/app/lib/art/contact-sheet.png` | The palette and line-weight sheet. Nothing in the game renders it. |

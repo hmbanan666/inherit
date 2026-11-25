@@ -7,7 +7,7 @@ const skies = {
   evening: ['#947f98', '#fcc08d', '#c39a91', '#9d8384', '#736f78'],
   night: ['#222d47', '#76748b', '#606582', '#4b5972', '#35485e'],
 } as const
-const landColors = {
+export const landColors = {
   morning: ['#b7ae78', '#dace9a', '#ab9d72', '#638e91', '#a8c7bd'],
   day: ['#a7ab76', '#d5c392', '#9a9266', '#528c92', '#a5c4b5'],
   evening: ['#b39a6d', '#d4b384', '#948368', '#757e89', '#c3ad9c'],
@@ -47,7 +47,7 @@ function ridge(p: Paint, y: number, amplitude: number, seed: number, color: stri
   p.poly(color, ...points, 1030, 250, -24, 250)
 }
 
-function orchard(p: Paint, x: number, y: number, h: number, night: boolean) {
+export function orchard(p: Paint, x: number, y: number, h: number, night: boolean) {
   const bark = night ? '#423e40' : '#746554',
     leaf = night ? '#3a514f' : '#718674'
   p.oval('#303e3926', x + 4, y, 12, 2.5)
@@ -64,7 +64,7 @@ function orchard(p: Paint, x: number, y: number, h: number, night: boolean) {
     p.oval(night ? '#53625b' : '#94a07c', x + dx - 2, y - h * 0.6 + dy - 1, h * r * 0.78, h * r * 0.85)
   }
 }
-function splitRail(p: Paint, x: number, y: number, length: number, slope: number) {
+export function splitRail(p: Paint, x: number, y: number, length: number, slope: number) {
   for (const dy of [-5, -10]) {
     p.line('#685c4c', 3.6, x, y + dy, x + length, y + slope + dy)
     p.line('#bdac87', 1.1, x, y + dy - 1.4, x + length, y + slope + dy - 1.4)
@@ -77,7 +77,7 @@ function splitRail(p: Paint, x: number, y: number, length: number, slope: number
     p.line('#d1bd93', 1, xx - 1.5, yy, xx - 1.9, yy - 13)
   }
 }
-function fields(p: Paint, x: number, y: number, w: number, h: number, night: boolean) {
+export function fields(p: Paint, x: number, y: number, w: number, h: number, night: boolean) {
   p.poly(night ? '#626456' : '#bba36c', x, y, x + w * 0.72, y - h, x + w, y - h + 3, x + w * 0.29, y + 5)
   for (let i = 0; i < 7; i++) {
     const sx = x + i * w * 0.038

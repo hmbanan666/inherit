@@ -1,6 +1,7 @@
 import type { Cell } from '@inherit/sim/v8'
 
 export const tile = 96
+export interface Point { x: number; y: number }
 
 export interface LabelSpot {
   id: string
@@ -218,9 +219,13 @@ export function floorPoint(
 
 /** Pan delta that puts the centre of a world cell at the centre of the viewport. */
 export function panToCell(cell: Cell, size: { w: number; h: number }, camera: { x: number; y: number; scale: number }) {
+  return panToPoint({ x: (cell.x + 0.5) * tile, y: (cell.y + 0.5) * tile }, size, camera)
+}
+
+export function panToPoint(point: Point, size: { w: number; h: number }, camera: Point & { scale: number }) {
   return {
-    x: size.w / 2 - camera.x - (cell.x + 0.5) * tile * camera.scale,
-    y: size.h / 2 - camera.y - (cell.y + 0.5) * tile * camera.scale,
+    x: size.w / 2 - camera.x - point.x * camera.scale,
+    y: size.h / 2 - camera.y - point.y * camera.scale,
   }
 }
 

@@ -1,6 +1,11 @@
 import { acceptQuest, canTake, completeQuest, createWorld, kettlewick, questHold, questList, runTicks, settleTriggers } from '@inherit/sim/v8'
 import { expect, test } from 'vitest'
-import { fieldBounds, idleLine, journalRequests, villagerDialog, villagerQuest, villagers, villageHomes, villageView } from './village'
+import { containPlace } from './factoryLayout'
+import type { Box } from './floorPick'
+import {
+  fieldBounds, homeView, houseBox, houseScale, idleLine, journalRequests, propBox, villageGround, villageHomes, villageLots, villageProps,
+  villagerBox, villagerDialog, villagerQuest, villagers, villageView,
+} from './village'
 
 test('only Bram offers a quest on a fresh field', () => {
   const view = villageView(createWorld(kettlewick), questList)
@@ -18,25 +23,120 @@ test('the field lists each giver once in first-quest order, without titles', () 
   expect(people[2]!.name).toBe('Odile')
 })
 
-test('the four columns fit every house and villager in a distinct cell', () => {
-  expect(fieldBounds({ width: 16, height: 6 })).toEqual({ left: -384, top: 0, width: 1920, height: 576 })
+test('the home view frames the works and eight village columns with legible house signs', () => {
+  const grid = { width: 16, height: 6 }
+  expect(fieldBounds(grid)).toEqual({ left: -1920, top: 0, width: 3456, height: 576 })
+  const home = homeView(grid)
+  expect(home).toEqual({ left: -768, top: 0, width: 2304, height: 576 })
+  expect(houseScale).toBeGreaterThanOrEqual(1.4)
+  expect(containPlace(1904, 560, home.width, home.height).scale * houseScale * 8).toBeGreaterThanOrEqual(9)
+})
+
+test('the seven houses and eight villagers have their own places in the lots', () => {
   const { npcs, houses } = villageView(createWorld(kettlewick), questList)
   expect(new Set(houses.map(house => house.building))).toEqual(new Set(questList.map(quest => quest.building)))
   expect(villageHomes).toEqual({
-    forge: { x: -4, y: 0 }, bakery: { x: -2, y: 0 }, 'town-hall': { x: -4, y: 2 },
-    mill: { x: -2, y: 2 }, 'lamp-street': { x: -4, y: 4 }, riverside: { x: -2, y: 4 }, bridge: { x: -1, y: 5 },
+    forge: { x: -616, y: 230 }, 'town-hall': { x: -1000, y: 230 }, bakery: { x: -1384, y: 230 },
+    mill: { x: -616, y: 515 }, 'lamp-street': { x: -1000, y: 515 },
+    riverside: { x: -1384, y: 515 }, bridge: { x: -1768, y: 515 },
   })
   expect(Object.fromEntries(npcs.map(npc => [npc.who, npc.spot]))).toEqual({
-    bram: { x: -4, y: 1 }, elsie: { x: -2, y: 1 }, ines: { x: -4, y: 3 }, harrow: { x: -3, y: 3 },
-    tomas: { x: -2, y: 3 }, wen: { x: -4, y: 5 }, pell: { x: -2, y: 5 }, odile: { x: -1, y: 4 },
+    bram: { x: -424, y: 220 }, ines: { x: -808, y: 220 }, harrow: { x: -808, y: 110 }, elsie: { x: -1192, y: 220 },
+    tomas: { x: -424, y: 505 }, wen: { x: -808, y: 505 }, pell: { x: -1192, y: 505 }, odile: { x: -1576, y: 505 },
   })
-  const cells = [...Object.values(villageHomes), ...npcs.map(npc => npc.spot)]
-  expect(new Set(cells.map(cell => `${cell.x},${cell.y}`)).size).toBe(cells.length)
-  for (const { x, y } of cells) {
-    expect(x).toBeGreaterThanOrEqual(-4)
-    expect(x).toBeLessThanOrEqual(-1)
-    expect(y).toBeGreaterThanOrEqual(0)
-    expect(y).toBeLessThanOrEqual(5)
+})
+
+test('four lots on each side of the lanes leave the square beside the gate', () => {
+  const layout = [...villageLots].sort((a, b) => a.y - b.y || a.x - b.x)
+  expect(layout.map(lot => lot.building)).toEqual([
+    'meadow', 'bakery', 'town-hall', 'forge', 'bridge', 'riverside', 'lamp-street', 'mill',
+  ])
+  layout.forEach((lot, i) => {
+    expect(lot).toMatchObject({ x: -1920 + i % 4 * 384, y: i < 4 ? 0 : 288, w: 384, h: 288 })
+  })
+  expect(villageGround).toEqual({
+    river: { x: -1828, y: 0, w: 120, h: 576 }, road: { x: -168, y: 0, w: 48, h: 576 },
+    spur: { x: -144, y: 120, w: 144, h: 48 },
+    lanes: [{ x: -1708, y: 238, w: 1564, h: 24 }, { x: -1920, y: 523, w: 1776, h: 24 }],
+  })
+})
+
+function intersects(a: Box, b: Box) {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+}
+
+function expectInsideBand(box: Box) {
+  const { left, top, height } = fieldBounds(kettlewick.grid)
+  expect(box.x).toBeGreaterThanOrEqual(left)
+  expect(box.x + box.w).toBeLessThanOrEqual(0)
+  expect(box.y).toBeGreaterThanOrEqual(top)
+  expect(box.y + box.h).toBeLessThanOrEqual(top + height)
+}
+
+test('house prints and marked villagers fit beside one another and leave the road and river clear', () => {
+  const { houses, npcs } = villageView(createWorld(kettlewick), questList)
+  const forge = houseBox(villageHomes.forge)
+  expect(forge.x).toBe(-763)
+  expect(forge.y).toBeCloseTo(36.8)
+  expect(forge.w).toBe(294)
+  expect(forge.h).toBeCloseTo(246.4)
+  expect(villagerBox({ x: -424, y: 220 }, 'Bram')).toEqual({ x: -460, y: 158, w: 72, h: 86 })
+
+  const footprints = [
+    ...houses.map(({ building }) => ({ id: building, box: houseBox(villageHomes[building]) })),
+    ...npcs.map(({ who, name, spot }) => ({ id: who, box: villagerBox(spot, name) })),
+  ]
+  for (const [i, { id, box }] of footprints.entries()) {
+    expectInsideBand(box)
+    expect(footprints.slice(i + 1).filter(other => intersects(box, other.box)), id).toEqual([])
+    expect(intersects(box, villageGround.road), id).toBe(false)
+    expect(intersects(box, villageGround.river), id).toBe(id === 'bridge')
+  }
+  for (const { who, building } of villagers(questList)) {
+    const { spot } = npcs.find(npc => npc.who === who)!
+    const base = villageHomes[building]
+    const box = houseBox(base)
+    expect(spot.x, who).toBeGreaterThan(box.x + box.w)
+    expect(Math.hypot(spot.x - base.x, spot.y - base.y), who).toBeLessThanOrEqual(240)
+  }
+})
+
+test('prop boxes cover the scaled drawings including shadows, rail posts and hooves', () => {
+  // Outermost painted coordinates in each native drawing, before the prop is placed.
+  const extents = [
+    ['fir', -13.332, -60, 13.332, 0.6],
+    ['orchard', -14.864, -41.408, 16, 2.5],
+    ['fields', -0.65, -18.65, 80, 5],
+    ['rail', -2.45, -15.85, 67.85, 2.85],
+    ['horse', -20, -19, 21, 13.4],
+  ] as const
+  for (const [kind, left, top, right, bottom] of extents) {
+    const box = propBox({ kind, x: -700, y: 300, size: 2 })
+    expect(box.x, kind).toBeLessThanOrEqual(-700 + 2 * left)
+    expect(box.y, kind).toBeLessThanOrEqual(300 + 2 * top)
+    expect(box.x + box.w, kind).toBeGreaterThanOrEqual(-700 + 2 * right)
+    expect(box.y + box.h, kind).toBeGreaterThanOrEqual(300 + 2 * bottom)
+  }
+})
+
+test('village scenery leaves each house, villager, waterway, road and fence clear', () => {
+  const { npcs } = villageView(createWorld(kettlewick), questList)
+  const obstacles = [
+    ...Object.values(villageHomes).map(houseBox), ...npcs.map(npc => villagerBox(npc.spot, npc.name)),
+    villageGround.river, villageGround.road, villageGround.spur, ...villageGround.lanes,
+  ]
+  for (const prop of villageProps) {
+    const box = propBox(prop)
+    expect(prop.size).toBeGreaterThan(0)
+    expectInsideBand(box)
+    expect(box.x + box.w).toBeLessThanOrEqual(-8)
+    expect(obstacles.filter(obstacle => intersects(box, obstacle)), JSON.stringify(prop)).toEqual([])
+  }
+  for (const [kind, minimum] of Object.entries({ fir: 16, orchard: 8, fields: 2, rail: 6, horse: 1 })) {
+    expect(villageProps.filter(prop => prop.kind === kind).length, kind).toBeGreaterThanOrEqual(minimum)
+  }
+  for (const horse of villageProps.filter(prop => prop.kind === 'horse')) {
+    expect(Math.hypot(horse.x - villageHomes.forge.x, horse.y - villageHomes.forge.y)).toBeLessThanOrEqual(200)
   }
 })
 
