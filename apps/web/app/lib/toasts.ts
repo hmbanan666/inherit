@@ -12,7 +12,7 @@ export function emptyToasts(): ToastList {
 }
 
 function show(event: Waiting, now: number): Toast {
-  return { ...event, until: now + (event.kind === 'npc' ? 7000 : 4000) }
+  return { ...event, until: now + (event.kind === 'npc' || event.key === 'welcome' ? 7000 : 4000) }
 }
 
 function queue(pending: Waiting[], event: Waiting) {

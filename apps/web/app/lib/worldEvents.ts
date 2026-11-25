@@ -19,7 +19,7 @@ const machines = [
 export type WorldView = Pick<World, 'questId' | 'cleared' | 'bought' | 'level' | 'credits' | 'xp' |
   'drones' | 'press' | 'lathe' | 'bench' | 'spare' | 'tick'>
 export type Row = NonNullable<ReturnType<typeof questCard>>['tests'][number]
-type EventIcon = 'check' | 'coins' | 'level' | 'unlock' | 'machine' | 'drone' | 'ready'
+type EventIcon = 'check' | 'coins' | 'level' | 'unlock' | 'machine' | 'drone' | 'ready' | 'talk'
 export type GameEvent =
   | { kind: 'npc'; who: QuestDef['who']; name: string; text: string; key: string }
   | { kind: 'event'; icon: EventIcon; text: string; key: string }

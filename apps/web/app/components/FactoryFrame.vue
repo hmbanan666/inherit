@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, levelSpan, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
+import { apiBook, canTake, declarations, inspectMachine, kettlewick, factoryBricks, machineList, questHold, shopFor, functionUnlocked, freshBrick, triggerUnlocked, type ConsoleLine, type World } from '@inherit/sim/v8'
 import ApiBook from './ApiBook.vue'
 import PaneSplit from './PaneSplit.vue'
-import { BookOpen, CircleAlert, Coins, Cpu, Store, TextCursor, Timer, TriangleAlert } from '@lucide/vue'
+import { CircleAlert, Coins, Cpu, TextCursor, Timer, TriangleAlert, User } from '@lucide/vue'
 import { editorKey } from '../lib/editor'
 import { archiveFactorySave, recoverFactorySave, type FactoryCommand, type FactoryFrame, type FactorySave } from '../lib/factoryProtocol'
 import {
@@ -23,6 +23,7 @@ import { journalRequests, villagerDialog, villagers, villageView } from '../lib/
 import { questHistory } from '../lib/questJournal'
 import { testLabel, testMark } from '../lib/questTracker'
 import { dismissToast, emptyToasts, expireToasts, holdToasts, pushToasts } from '../lib/toasts'
+import { shellLabels, welcomeToast, xpProgress, xpRing } from '../lib/shellBar'
 import { worldEvents, type Row, type WorldView } from '../lib/worldEvents'
 import { insertTriggerExample } from '../lib/triggerNote'
 
@@ -294,14 +295,9 @@ function openLine(entry: { file: string; line: number }) {
   activeFile.value = entry.file
   navigation.value = { file: entry.file, line: entry.line }
 }
-const xp = computed(() => {
-  const value = world.value?.xp ?? 0
-  const span = levelSpan(value)
-  if (span.next === null) return { width: '100%', label: `XP ${value}`, title: `Level ${span.level}. ${value} XP.` }
-  const into = value - span.start
-  const size = span.next - span.start
-  return { width: `${Math.min(100, (into / size) * 100)}%`, label: `XP ${into}/${size}`, title: `Level ${span.level}. ${into} / ${size} XP.` }
-})
+const xp = computed(() => xpProgress(world.value?.xp ?? 0))
+const ringRadius = 14
+const ring = computed(() => xpRing(xp.value.fraction, ringRadius))
 function notesFromBrowser() {
   try {
     const raw = localStorage.getItem(notesKey)
@@ -381,6 +377,10 @@ watch(world, current => {
   const events = worldEvents(grantNotesReady ? prevView : undefined, current, kettlewick.questList ?? [], catalog.value, {
     prev: prevRows, next: rows,
   })
+  if (!grantNotesReady) {
+    const welcome = welcomeToast(current, nextStep.value)
+    if (welcome) events.push(welcome)
+  }
   prevView = current
   prevRows = rows
   if (events.length) toasts.value = pushToasts(toasts.value, events, hoverStart ?? performance.now(), seenToasts)
@@ -532,7 +532,8 @@ function startOver() {
   grantNotesReady = false
   grantedNotes.clear()
   toasts.value = emptyToasts()
-  seenToasts.clear()
+  // Quest events repeat in a new game. The welcome belongs to the page session.
+  for (const key of seenToasts) if (key !== 'welcome') seenToasts.delete(key)
   hoverStart = undefined
   preserveSlot = false
   rememberNotes([])
@@ -659,31 +660,36 @@ onBeforeUnmount(() => {
   <StudioShell class="factory">
     <template #nav>
       <PackNav>
-        <strong class="pack-switch">Kettlewick Works</strong>
-        <button ref="journalButton" type="button" class="nav-btn" aria-haspopup="dialog"
+        <p v-if="world" class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
+          <Coins />
+          <b>{{ world.credits }}</b>
+          <span v-for="gain in gains.filter(item => item.kind === 'credits')" :key="gain.id" class="float">{{ gain.text }}</span>
+        </p>
+        <button ref="journalButton" type="button" class="nav-link" aria-haspopup="dialog" :aria-current="journalOpen || undefined"
           :aria-label="newRequest ? overlayLabels.newRequest : overlayLabels.journal" @click="showDialog({ kind: 'journal' }, $event.currentTarget as HTMLButtonElement)">
-          <BookOpen :size="16" />{{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
+          {{ overlayLabels.journal }}<i v-if="newRequest" class="dot" aria-hidden="true" />
         </button>
-        <button type="button" class="nav-btn" aria-haspopup="dialog" :disabled="!world" @click="showDialog({ kind: 'shop' }, $event.currentTarget as HTMLButtonElement)">
-          <Store :size="16" />{{ overlayLabels.shop }}
+        <button type="button" class="nav-link" aria-haspopup="dialog" :aria-current="shopOpen || undefined"
+          :disabled="!world" @click="showDialog({ kind: 'shop' }, $event.currentTarget as HTMLButtonElement)">
+          {{ overlayLabels.shop }}
         </button>
-        <template #clock>
-          <div v-if="world" class="pills">
-            <p class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
-              <Coins />
-              <b>{{ world.credits }}</b>
-              <span v-for="gain in gains.filter(item => item.kind === 'credits')" :key="gain.id" class="float">{{ gain.text }}</span>
-            </p>
-            <p class="pill" data-testid="level" :title="xp.title">
-              <span class="badge">{{ world.level }}</span>
-              <i class="bar" aria-hidden="true"><i :style="{ width: xp.width }" /></i>
-            </p>
-          </div>
-        </template>
         <template #settings="{ close }">
           <button v-for="name in panels" :key="name" :aria-pressed="tool === name"
             @click="tool = tool === name ? undefined : name; close()">{{ name }}</button>
           <button :disabled="pending" @click="close(); startOver()">Start over</button>
+        </template>
+        <template #account>
+          <p v-if="world" class="account" data-testid="level" :title="xp.title" :aria-label="xp.title">
+            <span class="avatar" aria-hidden="true">
+              <svg viewBox="0 0 32 32" class="ring" fill="none" stroke-width="3">
+                <circle cx="16" cy="16" :r="ringRadius" stroke="var(--line)" />
+                <circle cx="16" cy="16" :r="ringRadius" stroke="var(--gold)" transform="rotate(-90 16 16)"
+                  :stroke-dasharray="ring.dashArray" :stroke-dashoffset="ring.dashOffset" />
+              </svg>
+              <User :size="16" />
+            </span>
+            <span class="account-text"><b>{{ shellLabels.level(xp.level) }}</b><span>{{ xp.label }}</span></span>
+          </p>
         </template>
       </PackNav>
     </template>
@@ -694,7 +700,6 @@ onBeforeUnmount(() => {
           <QuestTracker v-if="world" :can-visit="!!trackedQuest" :card="activeQuest ? card : undefined" :step="nextStep" :granted="granted" :pulse="pulse"
             @visit="visitFromTracker" @journal="showDialog({ kind: 'journal' }, $event)" @hand-over="send({ kind: 'complete' })"
             @show-test="showOpenTest" @open-file="activeFile = $event" />
-          <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
           <div v-if="inspected" ref="machineCard" class="machine-card" :style="cardPosition">
             <MachineCard :inspected="inspected" @close="closeSurface"
               @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
@@ -798,6 +803,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
     </template>
+    <ToastStack :toasts="toasts.visible" @dismiss="dismiss" @hover="hoverToasts" />
     <Teleport to="body">
       <JournalDialog v-if="journalOpen" :quest="shownQuest" :card="card" :step="nextStep" :summary="journalSummary"
         :reading="!!reading" :can-take="readingTake" :hold="readingHold" :ready="ready" :pulse="pulse"
@@ -877,18 +883,32 @@ onBeforeUnmount(() => {
   max-height: calc(100% - v-bind(cardInsetCss));
   overflow: auto;
 }
-.nav-btn {
+.nav-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  padding: 4px 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--sub);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
-.nav-btn .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold) }
-.pills { display: flex; align-items: center; gap: 8px; margin-inline: auto }
+.nav-link:enabled:hover, .nav-link:focus-visible { color: var(--text); background: none; border-bottom-color: transparent }
+.nav-link[aria-current="true"], .nav-link[aria-current="true"]:hover { color: var(--text); border-bottom-color: var(--gold) }
+.nav-link:disabled { opacity: 0.5; cursor: default }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--gold) }
+.account { display: flex; align-items: center; gap: 8px; margin: 0; white-space: nowrap }
+.avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-low) }
+.avatar svg { grid-area: 1 / 1 }
+.avatar .ring { width: 32px; height: 32px }
+.avatar .lucide { width: 16px; height: 16px }
+.account-text { display: grid; color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums }
+.account-text b { color: var(--text); font-size: 13px; font-weight: 600 }
 .pill {
   position: relative;
   display: inline-flex;
@@ -957,14 +977,13 @@ onBeforeUnmount(() => {
 .context button.item:hover { background: var(--surface-low); color: var(--text) }
 .cpu-meter {
   flex: none;
-  width: 148px;
   overflow: hidden;
   white-space: nowrap;
 }
 .cpu-meter .readout {
-  width: 10ch;
+  min-width: 9ch;
   flex: none;
-  text-align: right;
+  text-align: left;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }

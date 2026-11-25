@@ -119,8 +119,6 @@ small,
   font-weight: 700;
   letter-spacing: -2px;
   line-height: 1;
-  border-right: 1px solid var(--line);
-  padding-right: 26px;
 }
 .brand img {
   width: 33px;
