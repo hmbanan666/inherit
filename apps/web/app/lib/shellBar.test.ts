@@ -1,6 +1,8 @@
 import { acceptQuest, createWorld, kettlewick, migrateWorld, questList } from '@inherit/sim/v8'
-import { questCard } from './questNote'
 import { expect, test } from 'vitest'
+import { questCard } from './questNote'
+import { questNextStep } from './questStep'
+import { journalRequests } from './village'
 import { emptyToasts, expireToasts, pushToasts } from './toasts'
 import { questLog, questObjectives, questTabNotice, welcomeToast, xpProgress, xpRing } from './shellBar'
 
@@ -20,7 +22,16 @@ test('the ring offsets a full circumference at zero and none at full XP', () => 
   for (const full of [1, 2]) expect(xpRing(full, 10).dashOffset).toBe(0)
 })
 
-test('the first visit names the available villager and gives the player seven seconds once', () => {
+test('a fresh Kettlewick game points to the first villager in the quest chain', () => {
+  const world = createWorld(kettlewick)
+  const [available] = journalRequests(world, questList)
+  const step = questNextStep({
+    available, ready: false, shipped: 0, loop: false, furnace: world.furnace, made: { ingots: 0, steel: 0 },
+  })
+  expect(welcomeToast(world, step)?.text).toBe('Talk to Bram. Click the gold ! next to the house.')
+})
+
+test('the welcome follows the given step and gives the player seven seconds once', () => {
   const welcome = welcomeToast({ cleared: [] }, 'Talk to Ines')!
   expect(welcome).toEqual({ key: 'welcome', kind: 'event', icon: 'talk', text: 'Talk to Ines. Click the gold ! next to the house.' })
   const seen = new Set<string>()

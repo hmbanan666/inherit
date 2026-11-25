@@ -8,14 +8,16 @@ const emit = defineEmits<{ close: []; openMachine: [id: string] }>()
 
 <template>
   <GameDialog :title="overlayLabels.machines" @close="emit('close')">
-    <ul class="shop-list">
-      <li v-for="row in machines" :key="row.id">
-        <button type="button" @click="emit('openMachine', row.id)">
-          <b>{{ row.name }}</b>
-          <small>{{ row.detail }}</small>
-        </button>
-      </li>
-    </ul>
+    <section>
+      <ul class="shop-list">
+        <li v-for="row in machines" :key="row.id">
+          <button type="button" @click="emit('openMachine', row.id)">
+            <b>{{ row.name }}</b>
+            <small>{{ row.detail }}</small>
+          </button>
+        </li>
+      </ul>
+    </section>
   </GameDialog>
 </template>
 
