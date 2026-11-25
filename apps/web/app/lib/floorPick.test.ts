@@ -8,8 +8,9 @@ import { assembler, cutter, press } from './art/fabrication'
 import { FloorScene, tile } from './floor'
 import {
   buildingLabelHit, captionBox, cartDrawScale, floorCursor, floorPoint, footprintContains, hitPadding, hoverScale,
-  panToCell, pickFloor, stationsOf, type MachineKind, type StationHit,
+  panToCell, pickFloor, stationShapes, stationsOf, type MachineKind, type StationHit,
 } from './floorPick'
+import { screenBox } from './popupPlace'
 
 function fitted() {
   const world = createWorld(kettlewick)
@@ -37,6 +38,17 @@ function vein(name: string) {
   if (!found) throw new Error(name)
   return found
 }
+
+test('card anchors cover the furnace and its caption and disappear for missing stations', () => {
+  const world = fitted()
+  const scene = new FloorScene(world)
+  expect(scene.anchorBox('furnace')).toEqual(screenBox(stationShapes('furnace', 'Furnace'), at(world.furnace.pos, 0, 0)))
+  expect(scene.anchorBox('unknown')).toBeUndefined()
+  expect(scene.anchorBox('press')).toBeDefined()
+  world.press = null
+  scene.update(world)
+  expect(scene.anchorBox('press')).toBeUndefined()
+})
 
 test('the depot caption is hit above the tile, and the tile itself is not the caption', () => {
   const spots = [
@@ -165,8 +177,14 @@ test('a cart on a detour is picked at its interpolated sprite', () => {
   scene.animate(1250, 500, false)
   const anchors = scene.cartAnchors()
   expect(anchors[0]).toMatchObject(at(cart.pos, -tile / 2, 20))
+  expect(scene.anchorBox(cart.name)).toEqual({ ...at(cart.pos, -tile / 2 - 22, 20 - 48), w: 46, h: 63 })
   expect(pick(cart.pos, -tile / 2, 20, anchors)).toBe(cart.name)
   expect(pick(cart.pos, 0, 20, anchors)).not.toBe(cart.name)
+  scene.animate(1500, 500, false)
+  expect(scene.anchorBox(cart.name)).toEqual({ ...at(cart.pos, -22, 20 - 48), w: 46, h: 63 })
+  world.drones = []
+  scene.update(world)
+  expect(scene.anchorBox(cart.name)).toBeUndefined()
 })
 
 test('the selection footprint follows the drawing, not a circle at the cell centre', () => {

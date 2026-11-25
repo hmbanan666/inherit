@@ -5,6 +5,7 @@ import { drawBuilding } from './art/townBuildings'
 import { landscape } from './art/townLandscape'
 import { portrait } from './art/townPortrait'
 import { fieldBounds, villageHomes, type VillageView } from './village'
+import { screenBox } from './popupPlace'
 import { drawing, mountingPlate } from './art/shared'
 import { depot, furnace, truck } from './art/floorMachines'
 import { assembler, cutter, press as pressDrawing } from './art/fabrication'
@@ -339,25 +340,33 @@ export class FloorScene {
     this.root.addChild(this.ring)
   }
 
-  private strokeId(world: FloorWorld, id: string, style: { width: number; alpha: number; grow: number }) {
+  private footprint(world: FloorWorld, id: string): { origin: { x: number; y: number }; shapes: Shape[] } | undefined {
     const drone = world.drones.findIndex(item => item.name === id)
     if (drone >= 0) {
       const hauler = this.haulers[drone]
       if (!hauler?.art.visible) return
       const { art, pause } = hauler
       const top = pause.visible ? pauseMark.y : cartMark.y
-      this.strokeBox(art.x, art.y, { ...cartMark, y: top, h: cartMark.h + cartMark.y - top }, style)
-      return
+      const box = { ...cartMark, y: top, h: cartMark.h + cartMark.y - top }
+      return { origin: art.position, shapes: [{ type: 'box', box }] }
     }
     const npc = this.npcs.get(id)
-    if (npc) {
-      for (const shape of npcShapes(npc.name, npc.badge.visible)) this.strokeShape(npc.art.x, npc.art.y, shape, style)
-      return
-    }
+    if (npc) return { origin: npc.art.position, shapes: npcShapes(npc.name, npc.badge.visible) }
     const spot = stationsOf(world).find(item => item.id === id)
     if (!this.stations.has(id) || !spot) return
-    const origin = center(spot.pos)
-    for (const shape of stationShapes(spot.kind, spot.title)) this.strokeShape(origin.x, origin.y, shape, style)
+    return { origin: center(spot.pos), shapes: stationShapes(spot.kind, spot.title) }
+  }
+
+  anchorBox(id: string) {
+    const footprint = this.footprint(this.latest, id)
+    if (footprint) return screenBox(footprint.shapes, footprint.origin)
+  }
+
+  private strokeId(world: FloorWorld, id: string, style: { width: number; alpha: number; grow: number }) {
+    const footprint = this.footprint(world, id)
+    if (!footprint) return
+    const { origin, shapes } = footprint
+    for (const shape of shapes) this.strokeShape(origin.x, origin.y, shape, style)
   }
 
   private strokeShape(x: number, y: number, shape: Shape, style: { width: number; alpha: number; grow: number }) {
