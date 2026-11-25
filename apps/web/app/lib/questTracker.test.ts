@@ -3,16 +3,21 @@ import { readTrackerOpen, testLabel, testMark, trackerRows } from './questTracke
 
 const passing = ['a', 'b', 'c'].map(id => ({ id, text: id, state: 'passing' as const }))
 
-test('the first pending test stays visible after three passing tests', () => {
+test('the tracker keeps the pending test in list order after three passing tests', () => {
   const pending = { id: 'd', text: 'd', state: 'pending' as const }
   expect(trackerRows([...passing, pending], 3)).toEqual({
-    rows: [pending, passing[0], passing[1]], more: 1,
+    rows: [passing[0], passing[1], pending], more: 1,
   })
 })
 
 test('the first failed test brings its reason to the tracker', () => {
   const failed = { id: 'd', text: 'd', state: 'failed' as const, reason: 'Hopper full' }
   expect(trackerRows([...passing, failed], 1)).toEqual({ rows: [failed], more: 3 })
+})
+
+test('an open test at the start is followed by the next row', () => {
+  const open = { id: 'd', text: 'd', state: 'pending' as const }
+  expect(trackerRows([open, ...passing], 2)).toEqual({ rows: [open, passing[0]], more: 2 })
 })
 
 test('an empty tracker has no hidden rows', () => {

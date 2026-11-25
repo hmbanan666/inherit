@@ -9,9 +9,11 @@ export function readTrackerOpen(stored: string | null) {
 }
 
 export function trackerRows(rows: readonly TestRow[], max = 3) {
+  const visible = rows.slice(0, Math.max(0, max))
   const firstOpen = rows.find(row => row.state !== 'passing')
-  const ordered = firstOpen ? [firstOpen, ...rows.filter(row => row !== firstOpen)] : rows
-  const visible = ordered.slice(0, Math.max(0, max))
+  if (firstOpen && visible.length > 0 && !visible.includes(firstOpen)) {
+    visible[visible.length - 1] = firstOpen
+  }
   return { rows: visible, more: rows.length - visible.length }
 }
 
