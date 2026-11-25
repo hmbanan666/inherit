@@ -17,6 +17,7 @@ import { grantNote, questNextStep, useDroneStatus, type CartCue } from '../lib/q
 import { knownLocation, markHostRead, noteHost, type HostNotice } from '../lib/hostNotice'
 import { useApiBook, type ApiBookOpener } from '../lib/apiBookState'
 import { closeOverlay, openOverlay, overlayLabels, type GameOverlay } from '../lib/gameOverlay'
+import { isLevelEvent, pickLevelUp, visibleLevelUp } from '../lib/levelUp'
 import { dialogClose } from '../lib/dialogMotion'
 import type { Point } from '../lib/floorPick'
 import { journalRequests, villagerDialog, villagers, villageView } from '../lib/village'
@@ -92,7 +93,11 @@ const inspected = computed(() => {
   const current = world.value
   return current && selectedId.value ? inspectMachine(current, kettlewick, selectedId.value) : undefined
 })
-const modalOpen = computed(() => overlay.value.kind !== 'none' || !!inspected.value)
+const settingsOpen = ref(false)
+const levelUp = ref<number>()
+const otherModalOpen = computed(() => overlay.value.kind !== 'none' || !!inspected.value)
+const shownLevel = computed(() => visibleLevelUp(levelUp.value, otherModalOpen.value || settingsOpen.value))
+const modalOpen = computed(() => otherModalOpen.value || shownLevel.value !== undefined)
 function openMachine(id: string) {
   selectedId.value = id
 }
@@ -108,6 +113,7 @@ function openMachineApi(id: string) {
 function closeSurface() {
   overlay.value = closeOverlay(overlay.value)
   selectedId.value = ''
+  if (levelUp.value !== undefined) return
   const from = opener
   opener = undefined
   nextTick(() => {
@@ -377,7 +383,15 @@ watch(world, current => {
   }
   prevView = current
   prevRows = rows
-  if (events.length) toasts.value = pushToasts(toasts.value, events, hoverStart ?? performance.now(), seenToasts)
+  if (events.length) {
+    const level = pickLevelUp(events, seenToasts)
+    if (level !== undefined) {
+      if (!opener && document.activeElement instanceof HTMLElement) opener = document.activeElement
+      levelUp.value = level
+    }
+    const notices = events.filter(event => !isLevelEvent(event))
+    toasts.value = pushToasts(toasts.value, notices, hoverStart ?? performance.now(), seenToasts)
+  }
   if (!grantNotesReady) {
     for (const id of current.cleared) grantedNotes.add(id)
     grantNotesReady = true
@@ -526,6 +540,7 @@ function deploy() {
 }
 function startOver() {
   if (!window.confirm('Start over at Kettlewick? This replaces your saved works and all project files.')) return
+  levelUp.value = undefined
   closeSurface()
   grantNotesReady = false
   grantedNotes.clear()
@@ -651,7 +666,7 @@ onBeforeUnmount(() => {
 <template>
   <StudioShell class="factory">
     <template #nav>
-      <PackNav>
+      <PackNav v-model:settings="settingsOpen">
         <p v-if="world" class="pill" data-testid="credits" title="Credits. They rise when a quest is handed over, and fall only in the shop.">
           <Coins />
           <b>{{ world.credits }}</b>
@@ -817,6 +832,7 @@ onBeforeUnmount(() => {
         :sections="bookSections" :section-id="sectionId" @select="selectSection" @close="closeBook" />
       <MachineCard v-else-if="inspected" :inspected="inspected" :sprite="cardSprite" @api="openMachineApi" @close="closeSurface"
         @manual="send({ kind: 'manual', action: $event.id, drone: $event.drone, vein: $event.vein })" />
+      <LevelUpDialog v-else-if="shownLevel !== undefined" :level="shownLevel" :quests="quests" @close="levelUp = undefined; closeSurface()" />
     </Teleport>
   </StudioShell>
 </template>

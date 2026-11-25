@@ -2,11 +2,10 @@ import type { World } from '@inherit/sim/v8'
 import type { QuestDef } from '../../../../packages/sim/src/v8/quests'
 import type { questCard } from './questNote'
 import { grantHint } from './questStep'
-
 import { isCodeJob, shellLabels } from './shellBar'
 
 export const dismissToastLabel = 'Dismiss notification'
-const giverName = (quest: QuestDef) => quest.from.replace(/^Mayor /, '')
+export const giverName = (quest: QuestDef) => quest.from.replace(/^Mayor /, '')
 const newCall = (signature: string) => 'New: ' + signature.split(':')[0].trim()
 const readyLine = (name: string) => 'Ready to hand over to ' + name
 const rewardLine = (credits: number, xp: number) => `+${credits} credits · +${xp} XP`

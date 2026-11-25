@@ -8,6 +8,8 @@ const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
 const { closing, requestClose, vDialogMotion } = dialogClose(() => emit('close'))
 
+defineExpose({ requestClose })
+
 onMounted(() => dialog.value?.showModal())
 onBeforeUnmount(() => dialog.value?.close())
 </script>
