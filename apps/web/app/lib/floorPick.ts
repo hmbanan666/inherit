@@ -1,5 +1,7 @@
 import type { Cell } from '@inherit/sim/v8'
 
+export const tile = 96
+
 export interface LabelSpot {
   id: string
   title: string
@@ -23,6 +25,18 @@ export interface CartHit {
   y: number
   waiting?: boolean
 }
+
+export interface NpcHit {
+  id: string
+  x: number
+  y: number
+  name?: string
+  marked?: boolean
+}
+
+export const cameo = { y: -22, radius: 20 }
+export const npcMarker = { y: cameo.y - 30, radius: 10 }
+export const npcCaptionY = 2
 
 export interface Box { x: number; y: number; w: number; h: number }
 export interface Ellipse { cx: number; cy: number; rx: number; ry: number }
@@ -95,6 +109,15 @@ export function stationShapes(kind: MachineKind, title: string): Shape[] {
   return [bodies[kind], { type: 'box', box: captionBox(title, top) }]
 }
 
+export function npcShapes(name: string, marked = true): Shape[] {
+  const shapes: Shape[] = [
+    { type: 'ellipse', ellipse: { cx: 0, cy: cameo.y, rx: cameo.radius, ry: cameo.radius } },
+    { type: 'box', box: captionBox(name, npcCaptionY) },
+  ]
+  if (marked) shapes.push({ type: 'ellipse', ellipse: { cx: 0, cy: npcMarker.y, rx: npcMarker.radius, ry: npcMarker.radius } })
+  return shapes
+}
+
 export function cartShapes(): Shape[] {
   return cartParts.map(box => ({ type: 'box', box }))
 }
@@ -145,7 +168,7 @@ function hitsShapes(x: number, y: number, shapes: readonly Shape[], pad: number)
 }
 
 /**
- * World pixel to station or cart.
+ * Pick in reverse draw order: carts, villagers, then station footprints and captions.
  * Carts are painted above stations, so a point on the truck selects the cart
  * and a point on the building beside it selects the building.
  * Stations are back to front: a later station wins a shared edge.
@@ -156,12 +179,18 @@ export function pickFloor(
   tile: number,
   stations: readonly StationHit[],
   carts: readonly CartHit[] = [],
+  npcs: readonly NpcHit[] = [],
 ) {
   for (let i = carts.length - 1; i >= 0; i--) {
     const cart = carts[i]!
     const x = px - cart.x, y = py - cart.y
     if (cart.waiting && hitsBox(x, y, pauseMark, cartPadding)) return cart.id
     if (hitsShapes(x, y, cartShapes(), cartPadding)) return cart.id
+  }
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const npc = npcs[i]!
+    const shapes = npcShapes(npc.name ?? npc.id.slice(4), npc.marked)
+    if (hitsShapes(px - npc.x, py - npc.y, shapes, hitPadding)) return npc.id
   }
   for (let i = stations.length - 1; i >= 0; i--) {
     const station = stations[i]!
@@ -184,6 +213,14 @@ export function floorPoint(
   return {
     x: (clientX - frame.left - frame.cameraX) / frame.scale,
     y: (clientY - frame.top - frame.cameraY) / frame.scale,
+  }
+}
+
+/** Pan delta that puts the centre of a world cell at the centre of the viewport. */
+export function panToCell(cell: Cell, size: { w: number; h: number }, camera: { x: number; y: number; scale: number }) {
+  return {
+    x: size.w / 2 - camera.x - (cell.x + 0.5) * tile * camera.scale,
+    y: size.h / 2 - camera.y - (cell.y + 0.5) * tile * camera.scale,
   }
 }
 

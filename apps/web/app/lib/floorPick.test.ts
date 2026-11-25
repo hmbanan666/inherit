@@ -8,7 +8,7 @@ import { assembler, cutter, press } from './art/fabrication'
 import { FloorScene, tile } from './floor'
 import {
   buildingLabelHit, captionBox, cartDrawScale, floorCursor, floorPoint, footprintContains, hitPadding, hoverScale,
-  pickFloor, stationsOf, type MachineKind, type StationHit,
+  panToCell, pickFloor, stationsOf, type MachineKind, type StationHit,
 } from './floorPick'
 
 function fitted() {
@@ -249,4 +249,32 @@ test('a later station wins a shared edge', () => {
   ]
   const point = at({ x: 0, y: 0 }, 0, 0)
   expect(pickFloor(point.x, point.y, tile, overlap)).toBe('furnace')
+})
+
+test('villager cameo, name and mark pick in reverse draw order under carts', () => {
+  const bram = { id: 'npc:bram', x: -336, y: 144, name: 'Bram', marked: true }
+  const ines = { ...bram, id: 'npc:ines', name: 'Ines' }
+  for (const [dx, dy] of [[0, -22], [33, 14], [0, -60]]) {
+    expect(pickFloor(bram.x + dx!, bram.y + dy!, tile, placed, [], [bram])).toBe('npc:bram')
+  }
+  expect(pickFloor(bram.x, bram.y - 60, tile, placed, [], [{ ...bram, marked: false }])).toBeUndefined()
+  expect(pickFloor(bram.x, bram.y - 22, tile, placed, [], [bram, ines])).toBe('npc:ines')
+  const cart = { id: 'drone-1', x: bram.x, y: bram.y - 22 }
+  expect(pickFloor(cart.x, cart.y, tile, placed, [cart], [bram])).toBe('drone-1')
+  const station = at(works.depot.pos, 0, 0)
+  expect(pickFloor(station.x, station.y, tile, placed, [], [bram])).toBe('depot')
+})
+
+test('centering a villager puts its world spot at the viewport midpoint at any zoom', () => {
+  const size = { w: 900, h: 400 }
+  const spot = { x: -4, y: 1 }
+  for (const scale of [0.4, 1.2]) {
+    const camera = { x: 130 + 384 * scale, y: -25, scale }
+    const pan = panToCell(spot, size, camera)
+    const point = floorPoint(450, 200, {
+      left: 0, top: 0, scale, cameraX: camera.x + pan.x, cameraY: camera.y + pan.y,
+    })!
+    expect(point.x).toBeCloseTo(-336)
+    expect(point.y).toBeCloseTo(144)
+  }
 })
