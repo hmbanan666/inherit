@@ -3,12 +3,11 @@ import { Application } from 'pixi.js'
 import { Minus, Plus, Maximize } from '@lucide/vue'
 import { FloorScene, tile, type FloorWorld } from '../lib/floor'
 import { containPlace } from '../lib/factoryLayout'
-import { floorCursor, floorPoint, panToPoint, pickFloor, stationsOf, type Box, type Point } from '../lib/floorPick'
-import { sameBox, screenBox } from '../lib/popupPlace'
+import { floorCursor, floorPoint, panToPoint, pickFloor, stationsOf, type Point } from '../lib/floorPick'
 import { homeView, type VillageView } from '../lib/village'
 
 const props = defineProps<{ world: FloorWorld; village?: VillageView; focusPoint?: Point; interval: number; paused: boolean; selected?: string; frozen?: string }>()
-const emit = defineEmits<{ error: [message: string]; select: [id: string]; anchor: [box: Box | undefined] }>()
+const emit = defineEmits<{ error: [message: string]; select: [id: string] }>()
 const host = ref<HTMLElement>(),
   mount = ref<HTMLElement>()
 const size = ref({ w: 0, h: 0 }),
@@ -36,8 +35,6 @@ const camera = computed(() => ({
 }))
 const measured = computed(() => size.value.w > 0 && size.value.h > 0)
 const stations = computed(() => stationsOf(props.world))
-const selectedCart = computed(() => props.world.drones.some(drone => drone.name === props.selected))
-let lastAnchor: Box | undefined | null = null
 watch([() => props.focusPoint, measured], ([point, ready]) => {
   if (point && ready) pan.value = panToPoint(point, size.value, { x: fitX.value, y: place.value.y, scale: scale.value })
 })
@@ -59,13 +56,6 @@ function wheel(e: WheelEvent) {
   const r = host.value!.getBoundingClientRect()
   zoomBy(Math.exp(-Math.max(-130, Math.min(130, e.deltaY)) * 0.0026), e.clientX - r.left, e.clientY - r.top)
 }
-function syncAnchor() {
-  const box = props.selected ? scene?.anchorBox(props.selected) : undefined
-  const next = box && screenBox(box, { x: 0, y: 0 }, camera.value, scale.value)
-  if (lastAnchor !== null && sameBox(next, lastAnchor)) return
-  lastAnchor = next
-  emit('anchor', next)
-}
 function sync() {
   if (!app) return
   if (!scene) {
@@ -80,7 +70,6 @@ function sync() {
   if (props.village) scene.setVillage(props.village)
   scene.update(props.world)
   scene.select(props.selected ?? '')
-  syncAnchor()
 }
 watch([() => props.world, () => props.village, camera, scale, () => props.selected], sync)
 watch(() => props.frozen, id => scene?.setFrozen(id))
@@ -216,7 +205,6 @@ onMounted(async () => {
     renderer.ticker.add(() => {
       scene?.animate(performance.now(), props.interval, props.paused)
       if (hoverPoint) aim(hoverPoint.x, hoverPoint.y)
-      if (selectedCart.value) syncAnchor()
     })
   } catch {
     renderError.value = 'Could not open the floor renderer. Reload to retry.'

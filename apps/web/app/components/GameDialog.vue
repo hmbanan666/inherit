@@ -2,7 +2,7 @@
 import { overlayLabels } from '../lib/gameOverlay'
 import { X } from '@lucide/vue'
 
-defineProps<{ title: string }>()
+defineProps<{ title: string; wide?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const dialog = ref<HTMLDialogElement>()
 
@@ -12,7 +12,7 @@ onBeforeUnmount(() => dialog.value?.close())
 
 <template>
   <dialog ref="dialog" class="shade" :aria-label="title" @cancel.prevent="emit('close')" @click.self="emit('close')">
-    <section class="panel">
+    <section class="panel" :class="{ wide }">
       <header>
         <h2>{{ title }}</h2>
         <button type="button" :aria-label="overlayLabels.close(title)" autofocus @click="emit('close')"><X :size="16" /></button>
@@ -50,6 +50,7 @@ onBeforeUnmount(() => dialog.value?.close())
   box-shadow: 0 16px 48px var(--shadow-light);
   overflow: hidden;
 }
+.panel.wide { width: min(880px, 100% - 32px) }
 header {
   flex: none;
   display: flex;
