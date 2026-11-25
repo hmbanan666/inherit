@@ -21,6 +21,16 @@ let app: Application | undefined,
   motion: MediaQueryList | undefined,
   disposed = false
 
+async function snapshot(id: string): Promise<string | undefined> {
+  try {
+    const art = scene?.artFor(id)
+    if (art && app?.renderer) return await app.renderer.extract.base64({ target: art, resolution: 2 })
+  } catch {
+    // The card can also open from Machines before the floor is ready.
+  }
+}
+defineExpose({ snapshot })
+
 const pointers = new Map<number, { x: number; y: number }>()
 let hoverPoint: Point | undefined
 let armed = false
