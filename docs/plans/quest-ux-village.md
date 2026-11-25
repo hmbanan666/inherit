@@ -382,7 +382,7 @@ Ground, all inside the band:
 **`apps/web/app/lib/floorPick.ts` + `floorPick.test.ts`.** Add `panToPoint(point, size, camera)`, the pixel twin of `panToCell`. Keep `panToCell` and its test.
 
 **`apps/web/app/components/FactoryFloor.vue`.**
-- `place` is `containPlace` of `homeView(grid)` instead of `fieldBounds(grid)`, and the camera x adds `-homeView.left * scale`. Recenter, double-click reset and the Phase 4 anchor emit keep working against that view.
+- `place` is `containPlace` of `homeView(grid)` instead of `fieldBounds(grid)`, and the camera x adds `-homeView.left * scale`. Recenter and the Phase 4 anchor emit keep working against that view.
 - `focusSpot?: Cell` becomes `focusPoint?: { x; y }` in world pixels and uses `panToPoint`.
 - `floorPoint`, picking and zoom limits are unchanged.
 
