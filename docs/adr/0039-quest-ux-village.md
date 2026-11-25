@@ -50,3 +50,14 @@ He looked at three sketches (`A1`–`C2`, kept outside the repo) and picked part
 ## Open decisions
 
 None needed from Nick before implementation. House art, cameo tokens, placement, toast corner, and tracker position are chosen here; Nick can adjust their appearance after playtesting.
+
+## Amendment, 25 November 2026: a bigger village
+
+Nick playtested Phase 3 (t241u). The village on the left of the works, on the same canvas, its look, and the cameos and names stay. The houses were too small and their signs unreadable, and a 4-tile band did not read as a village. So:
+
+- **The band is 20 columns wide**, not 4: x from −1920 to 0 world px, with the field `{ left: -1920, top: 0, width: 3456, height: 576 }`. It is still drawing only. `world.grid` stays 16 by 6, drones never enter it, and the sim and the balance report do not change.
+- **Houses are drawn at 1.4× their native 210×176 print**, not about 0.46, so the 8px plaque text is 11.2 world px. That is about 9 screen px at the default zoom on a common map frame.
+- **Each house has its own 4 × 3 tile lot, with its villager standing beside it.** A river with the bridge, a main road, a spur to the gate, lanes, trees, orchards, fields, split rails and a horse come from the existing `townLandscape.ts` and `townBuildings.ts` drawings, reused and not redrawn.
+- **The default camera frames the works plus the eight nearest village columns.** The player pans or zooms out to see the rest, and there is no hard canvas limit.
+
+The exact values are in [Phase 3b of the plan](../plans/quest-ux-village.md). Wandering (Phase 5) is measured from the new pixel spots.
